@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Jupiter;
 using Jupiter.Implementation;
 using Jupiter.Utils;
@@ -53,7 +54,7 @@ namespace Horde.Storage.Implementation
             }
 
             var namespaceContainer = _blobs.GetOrAdd(ns, new ConcurrentDictionary<BlobIdentifier, BlobContainer>());
-            if (namespaceContainer.ContainsKey(identifier))
+            if (throwOnOverwrite && namespaceContainer.ContainsKey(identifier))
             {
                 throw new Exception($"Blob {identifier} already exists in {ns}");
             }
@@ -124,7 +125,7 @@ namespace Horde.Storage.Implementation
             return Task.CompletedTask;
         }
 
-        public async IAsyncEnumerable<BlobIdentifier> ListOldObjects(NamespaceId ns, DateTime cutoff)
+        public async IAsyncEnumerable<(BlobIdentifier,DateTime)> ListObjects(NamespaceId ns)
         {
             if (!_blobs.TryGetValue(ns, value: out var namespaceContainer))
             {
@@ -134,11 +135,7 @@ namespace Horde.Storage.Implementation
             await Task.CompletedTask;
             foreach (BlobContainer blobContainer in namespaceContainer.Values)
             {
-                if (blobContainer.LastModified > cutoff)
-                {
-                    continue;
-                }
-                yield return blobContainer.BlobIdentifier;
+                yield return (blobContainer.BlobIdentifier, blobContainer.LastModified);
             }
         }
 

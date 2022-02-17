@@ -137,6 +137,21 @@ namespace HordeServer.Collections.Impl
 				}
 				return null;
 			}
+
+			public string FingerprintsDesc
+			{
+				get
+				{
+					if (Fingerprints == null || Fingerprints.Count == 0)
+					{
+						return string.Empty;
+					}
+
+					return string.Join(", ", Fingerprints.Select(x => {
+					   return $"(Type: {x.Type} / Keys: {string.Join(", ", x.Keys)} / RejectKeys: {string.Join(", ", x.RejectKeys ?? new CaseInsensitiveStringSet(new string[] {"No Reject Keys"}))})";
+				   }));
+				}
+			}
 		}
 
 		class IssueStream : IIssueStream
@@ -532,6 +547,14 @@ namespace HordeServer.Collections.Impl
 					IssueLogger.LogInformation("Resolved by {UserId}", NewIssue.ResolvedById);
 				}
 			}
+
+			string OldFingerprints = OldIssue.FingerprintsDesc;
+			string NewFingerprints = NewIssue.FingerprintsDesc;
+			if (OldFingerprints != NewFingerprints)
+			{
+				IssueLogger.LogInformation("Fingerprints changed {Fingerprints}", NewFingerprints);
+			}
+
 
 			HashSet<StreamId> OldFixStreams = new HashSet<StreamId>(OldIssue.Streams.Where(x => x.ContainsFix ?? false).Select(x => x.StreamId));
 			HashSet<StreamId> NewFixStreams = new HashSet<StreamId>(NewIssue.Streams.Where(x => x.ContainsFix ?? false).Select(x => x.StreamId));
@@ -1141,6 +1164,48 @@ namespace HordeServer.Collections.Impl
 		{
 			List<IssueSpan> Spans = await IssueSpans.Find(x => x.StreamId == StreamId && x.TemplateRefId == TemplateId && x.NodeName == NodeName && Change >= x.MinChange && Change <= x.MaxChange).ToListAsync();
 			return Spans.ConvertAll<IIssueSpan>(x => x);
+		}
+
+		/// <inheritdoc/>
+		public Task<List<IIssueSpan>> FindSpansAsync(IEnumerable<ObjectId>? SpanIds, IEnumerable<int>? IssueIds, StreamId? StreamId, int? MinChange, int? MaxChange, bool? Resolved, int? Index, int? Count)
+		{
+			FilterDefinition<IssueSpan> Filter = FilterDefinition<IssueSpan>.Empty;
+
+			if(SpanIds != null)
+			{
+				Filter &= Builders<IssueSpan>.Filter.In(x => x.Id, SpanIds);
+			}
+
+			if (StreamId != null)
+			{
+				Filter &= Builders<IssueSpan>.Filter.Eq(x => x.StreamId, StreamId);
+			}
+
+			if (IssueIds != null)
+			{
+				Filter &= Builders<IssueSpan>.Filter.In(x => x.IssueId, IssueIds.Select<int, int?>(x => x));
+			}
+			if (MinChange != null)
+			{
+				Filter &= Builders<IssueSpan>.Filter.Not(Builders<IssueSpan>.Filter.Lt(x => x.MaxChange, MinChange.Value));
+			}
+			if (MaxChange != null)
+			{
+				Filter &= Builders<IssueSpan>.Filter.Not(Builders<IssueSpan>.Filter.Gt(x => x.MinChange, MaxChange.Value));
+			}
+			if (Resolved != null)
+			{
+				if (Resolved.Value)
+				{
+					Filter &= Builders<IssueSpan>.Filter.Ne(x => x.ResolvedAt, null);
+				}
+				else
+				{
+					Filter &= Builders<IssueSpan>.Filter.Eq(x => x.ResolvedAt, null);
+				}
+			}
+
+			return IssueSpans.Find(Filter).Range(Index, Count).ToListAsync<IssueSpan, IIssueSpan>();
 		}
 
 		#endregion

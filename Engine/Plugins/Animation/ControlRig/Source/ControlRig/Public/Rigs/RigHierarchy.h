@@ -1011,9 +1011,9 @@ public:
 	 * @param bSetupUndo If true the transform stack will be setup for undo / redo
 	 */
 	UFUNCTION(BlueprintCallable, Category = URigHierarchy)
-    FORCEINLINE_DEBUGGABLE void SetGlobalTransform(FRigElementKey InKey, FTransform InTransform, bool bInitial = false, bool bAffectChildren = true, bool bSetupUndo = false)
+    FORCEINLINE_DEBUGGABLE void SetGlobalTransform(FRigElementKey InKey, FTransform InTransform, bool bInitial = false, bool bAffectChildren = true, bool bSetupUndo = false, bool bPrintPythonCommand = false)
 	{
-		SetGlobalTransformByIndex(GetIndex(InKey), InTransform, bInitial, bAffectChildren, bSetupUndo);
+		SetGlobalTransformByIndex(GetIndex(InKey), InTransform, bInitial, bAffectChildren, bSetupUndo, bPrintPythonCommand);
 	}
 
 	/**
@@ -1025,13 +1025,13 @@ public:
 	 * @param bSetupUndo If true the transform stack will be setup for undo / redo
 	 */
 	UFUNCTION(BlueprintCallable, Category = URigHierarchy)
-    FORCEINLINE_DEBUGGABLE void SetGlobalTransformByIndex(int32 InElementIndex, FTransform InTransform, bool bInitial = false, bool bAffectChildren = true, bool bSetupUndo = false)
+    FORCEINLINE_DEBUGGABLE void SetGlobalTransformByIndex(int32 InElementIndex, FTransform InTransform, bool bInitial = false, bool bAffectChildren = true, bool bSetupUndo = false, bool bPrintPythonCommand = false)
 	{
 		if(Elements.IsValidIndex(InElementIndex))
 		{
 			if(FRigTransformElement* TransformElement = Cast<FRigTransformElement>(Elements[InElementIndex]))
 			{
-				SetTransform(TransformElement, InTransform, bInitial ? ERigTransformType::InitialGlobal : ERigTransformType::CurrentGlobal, bAffectChildren, bSetupUndo);
+				SetTransform(TransformElement, InTransform, bInitial ? ERigTransformType::InitialGlobal : ERigTransformType::CurrentGlobal, bAffectChildren, bSetupUndo, false, bPrintPythonCommand);
 			}
 		}
 	}
@@ -2536,6 +2536,20 @@ private:
 	* Helper function to create an element for a given type
 	*/
 	static void DestroyElement(FRigBaseElement*& InElement); 
+
+	/*
+	 * Templated helper function to create an element
+	 */
+	template<typename ElementType = FRigBaseElement>
+	FORCEINLINE static ElementType* NewElement(int32 Num = 1)
+	{
+		ElementType* Elements = (ElementType*)FMemory::Malloc(sizeof(ElementType) * Num);
+		for(int32 Index=0;Index<Num;Index++)
+		{
+			new(&Elements[Index]) ElementType(); 
+		}
+		return Elements;
+	}
 
 	/**
 	 * Marks all affected elements of a given element as dirty

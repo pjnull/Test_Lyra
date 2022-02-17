@@ -1596,6 +1596,38 @@ void FAssetRegistryState::AddAssetData(FAssetData* AssetData)
 	}
 }
 
+void FAssetRegistryState::AddTagsToAssetData(const FSoftObjectPath& InObjectPath, FAssetDataTagMap&& InTagsAndValues)
+{
+	if (InTagsAndValues.IsEmpty())
+	{
+		return;
+	}
+
+	FAssetData* AssetData = CachedAssetsByObjectPath.FindRef(InObjectPath.GetAssetPathName());
+	if (AssetData == nullptr)
+	{
+		UE_LOG(LogAssetRegistry, Error, TEXT("AddTagsToAssetData called with asset data that doesn't exist! Tags not added. ObjectPath: %s"), *InObjectPath.GetAssetPathName().ToString());
+		return;
+	}
+
+	// Update the tag cache map with the new tags.
+	for (auto TagIt : InTagsAndValues)
+	{
+		const FName FNameKey = TagIt.Key;
+
+		if (!AssetData->TagsAndValues.Contains(FNameKey))
+		{
+			TArray<FAssetData*>& NewTagAssets = CachedAssetsByTag.FindOrAdd(FNameKey);
+			NewTagAssets.Add(AssetData);
+		}
+	}
+
+	FAssetDataTagMap OldTags = AssetData->TagsAndValues.CopyMap();
+	OldTags.Append(MoveTemp(InTagsAndValues));
+	AssetData->TagsAndValues = FAssetDataTagMapSharedView(MoveTemp(OldTags));
+}
+
+
 void FAssetRegistryState::UpdateAssetData(const FAssetData& NewAssetData)
 {
 	if (FAssetData* AssetData = CachedAssetsByObjectPath.FindRef(NewAssetData.ObjectPath))
@@ -1650,8 +1682,8 @@ void FAssetRegistryState::UpdateAssetData(FAssetData* AssetData, const FAssetDat
 	// Update PackageName
 	if (AssetData->PackageName != NewAssetData.PackageName)
 	{
-		TArray<FAssetData*, TInlineAllocator<1>>* OldPackageAssets = CachedAssetsByPackageName.Find(AssetData->PackageName);
 		TArray<FAssetData*, TInlineAllocator<1>>& NewPackageAssets = CachedAssetsByPackageName.FindOrAdd(NewAssetData.PackageName);
+		TArray<FAssetData*, TInlineAllocator<1>>* OldPackageAssets = CachedAssetsByPackageName.Find(AssetData->PackageName);
 
 		OldPackageAssets->Remove(AssetData);
 		NewPackageAssets.Add(AssetData);
@@ -1660,8 +1692,8 @@ void FAssetRegistryState::UpdateAssetData(FAssetData* AssetData, const FAssetDat
 	// Update PackagePath
 	if (AssetData->PackagePath != NewAssetData.PackagePath)
 	{
-		TArray<FAssetData*>* OldPathAssets = CachedAssetsByPath.Find(AssetData->PackagePath);
 		TArray<FAssetData*>& NewPathAssets = CachedAssetsByPath.FindOrAdd(NewAssetData.PackagePath);
+		TArray<FAssetData*>* OldPathAssets = CachedAssetsByPath.Find(AssetData->PackagePath);
 
 		OldPathAssets->Remove(AssetData);
 		NewPathAssets.Add(AssetData);
@@ -1670,8 +1702,8 @@ void FAssetRegistryState::UpdateAssetData(FAssetData* AssetData, const FAssetDat
 	// Update AssetClass
 	if (AssetData->AssetClass != NewAssetData.AssetClass)
 	{
-		TArray<FAssetData*>* OldClassAssets = CachedAssetsByClass.Find(AssetData->AssetClass);
 		TArray<FAssetData*>& NewClassAssets = CachedAssetsByClass.FindOrAdd(NewAssetData.AssetClass);
+		TArray<FAssetData*>* OldClassAssets = CachedAssetsByClass.Find(AssetData->AssetClass);
 
 		OldClassAssets->Remove(AssetData);
 		NewClassAssets.Add(AssetData);

@@ -64,6 +64,7 @@ class FMeshMaterialShaderMapLayout;
 struct FMaterialShaderTypes;
 struct FMaterialShaders;
 struct FMaterialCachedExpressionData;
+class FMaterialHLSLGenerator;
 class FShaderMapLayout;
 
 namespace UE
@@ -382,6 +383,15 @@ inline bool operator!=(const FMaterialVirtualTextureStack& Lhs, const FMaterialV
 	return !operator==(Lhs, Rhs);
 }
 
+class FMaterialUniformPreshaderField
+{
+	DECLARE_TYPE_LAYOUT(FMaterialUniformPreshaderField, NonVirtual);
+public:
+	LAYOUT_FIELD(uint32, BufferOffset); /** Offset in the uniform buffer where result will be written */
+	LAYOUT_FIELD(uint32, ComponentIndex);
+	LAYOUT_FIELD(UE::Shader::EValueType, Type);
+};
+
 class FMaterialUniformPreshaderHeader
 {
 	DECLARE_TYPE_LAYOUT(FMaterialUniformPreshaderHeader, NonVirtual);
@@ -390,9 +400,8 @@ public:
 	{
 		return Lhs.OpcodeOffset == Rhs.OpcodeOffset &&
 			Lhs.OpcodeSize == Rhs.OpcodeSize &&
-			Lhs.BufferOffset == Rhs.BufferOffset &&
-			Lhs.ComponentType == Rhs.ComponentType &&
-			Lhs.NumComponents == Rhs.NumComponents;
+			Lhs.FieldIndex == Rhs.FieldIndex &&
+			Lhs.NumFields == Rhs.NumFields;
 	}
 	friend inline bool operator!=(const FMaterialUniformPreshaderHeader& Lhs, const FMaterialUniformPreshaderHeader& Rhs)
 	{
@@ -401,9 +410,8 @@ public:
 
 	LAYOUT_FIELD(uint32, OpcodeOffset); /** Offset of the preshader opcodes, within the material's buffer */
 	LAYOUT_FIELD(uint32, OpcodeSize); /** Size of the preshader opcodes */
-	LAYOUT_FIELD(uint32, BufferOffset); /** Offset in the uniform buffer where result will be written */
-	LAYOUT_FIELD(UE::Shader::EValueComponentType, ComponentType);
-	LAYOUT_FIELD(uint8, NumComponents);
+	LAYOUT_FIELD(uint32, FieldIndex);
+	LAYOUT_FIELD(uint32, NumFields);
 };
 
 class FMaterialNumericParameterInfo
@@ -590,6 +598,7 @@ protected:
 	friend class UE::HLSLTree::FEmitContext;
 
 	LAYOUT_FIELD(TMemoryImageArray<FMaterialUniformPreshaderHeader>, UniformPreshaders);
+	LAYOUT_FIELD(TMemoryImageArray<FMaterialUniformPreshaderField>, UniformPreshaderFields);
 	LAYOUT_FIELD(TMemoryImageArray<FMaterialNumericParameterInfo>, UniformNumericParameters);
 	LAYOUT_ARRAY(TMemoryImageArray<FMaterialTextureParameterInfo>, UniformTextureParameters, NumMaterialTextureParameterTypes);
 	LAYOUT_FIELD(TMemoryImageArray<FMaterialExternalTextureParameterInfo>, UniformExternalTextureParameters);
@@ -1813,6 +1822,7 @@ public:
 	virtual bool HasEmissiveColorConnected() const { return false; }
 	virtual bool HasAnisotropyConnected() const { return false; }
 	virtual bool HasAmbientOcclusionConnected() const { return false; }
+	virtual bool HasMaterialPropertyConnected(EMaterialProperty In) const { return false; }
 	virtual bool IsStrataMaterial() const { return false; }
 	virtual bool RequiresSynchronousCompilation() const { return false; };
 	virtual bool IsDefaultMaterial() const { return false; };
@@ -1863,7 +1873,7 @@ public:
 	ENGINE_API bool IsCompilationFinished() const;
 
 	/** Should the material be compiled using exec pin? */
-	virtual bool IsCompiledWithExecutionFlow() const { return false; }
+	virtual bool IsUsingControlFlow() const { return false; }
 
 	/** Is the material using the new (WIP) HLSL generator? */
 	virtual bool IsUsingNewHLSLGenerator() const { return false; }
@@ -2289,7 +2299,7 @@ private:
 	friend class FMaterialShaderMap;
 	friend class FShaderCompilingManager;
 	friend class FHLSLMaterialTranslator;
-	friend class FMaterialHLSLTree;
+	friend class FMaterialHLSLErrorHandler;
 };
 
 /**
@@ -2713,6 +2723,7 @@ public:
 	ENGINE_API virtual bool HasAnisotropyConnected() const override;
 	ENGINE_API virtual bool HasAmbientOcclusionConnected() const override;
 	ENGINE_API virtual bool IsStrataMaterial() const override;
+	ENGINE_API virtual bool HasMaterialPropertyConnected(EMaterialProperty In) const override;
 	ENGINE_API virtual FMaterialShadingModelField GetShadingModels() const override;
 	ENGINE_API virtual bool IsShadingModelFromMaterialExpression() const override;
 	ENGINE_API virtual enum ETranslucencyLightingMode GetTranslucencyLightingMode() const override;
@@ -2766,7 +2777,7 @@ public:
 	/** Allows to associate the shader resources with the asset for load order. */
 	ENGINE_API virtual FName GetAssetPath() const override;
 	ENGINE_API virtual bool ShouldInlineShaderCode() const override;
-	ENGINE_API virtual bool IsCompiledWithExecutionFlow() const override;
+	ENGINE_API virtual bool IsUsingControlFlow() const override;
 	ENGINE_API virtual bool IsUsingNewHLSLGenerator() const override;
 #endif // WITH_EDITOR
 
@@ -2790,6 +2801,7 @@ public:
 protected:
 	UMaterial* Material;
 	UMaterialInstance* MaterialInstance;
+	mutable FStrataMaterialInfo CachedStrataMaterialInfo;
 
 	/** Entry point for compiling a specific material property.  This must call SetMaterialProperty. */
 	ENGINE_API virtual int32 CompilePropertyAndSetMaterialProperty(EMaterialProperty Property, class FMaterialCompiler* Compiler, EShaderFrequency OverrideShaderFrequency, bool bUsePreviousFrameTime) const override;
@@ -2967,14 +2979,14 @@ public:
 	}
 
 	/** Returns the display name of a material attribute */
-	ENGINE_API static FString GetAttributeName(EMaterialProperty Property)
+	ENGINE_API static const FString& GetAttributeName(EMaterialProperty Property)
 	{
 		FMaterialAttributeDefintion* Attribute = GMaterialPropertyAttributesMap.Find(Property);
 		return Attribute->AttributeName;
 	}
 
 	/** Returns the display name of a material attribute */
-	ENGINE_API static FString GetAttributeName(const FGuid& AttributeID)
+	ENGINE_API static const FString& GetAttributeName(const FGuid& AttributeID)
 	{
 		FMaterialAttributeDefintion* Attribute = GMaterialPropertyAttributesMap.Find(AttributeID);
 		return Attribute->AttributeName;
@@ -3294,6 +3306,8 @@ struct FMaterialShaderParameters
 			uint64 bShouldCastDynamicShadows : 1;
 			uint64 bWritesEveryPixel : 1;
 			uint64 bWritesEveryPixelShadowPass : 1;
+			uint64 bHasDiffuseAlbedoConnected : 1;
+			uint64 bHasF0Connected : 1;
 			uint64 bHasBaseColorConnected : 1;
 			uint64 bHasNormalConnected : 1;
 			uint64 bHasRoughnessConnected : 1;
@@ -3338,69 +3352,7 @@ struct FMaterialShaderParameters
 		};
 	};
 
-	FMaterialShaderParameters(const FMaterial* InMaterial)
-	{
-		// Make sure to zero-initialize so we get consistent hashes
-		FMemory::Memzero(*this);
-
-		MaterialDomain = InMaterial->GetMaterialDomain();
-		ShadingModels = InMaterial->GetShadingModels();
-		BlendMode = InMaterial->GetBlendMode();
-		FeatureLevel = InMaterial->GetFeatureLevel();
-		QualityLevel = InMaterial->GetQualityLevel();
-		BlendableLocation = InMaterial->GetBlendableLocation();
-		NumCustomizedUVs = InMaterial->GetNumCustomizedUVs();
-		StencilCompare = InMaterial->GetStencilCompare();
-		bIsDefaultMaterial = InMaterial->IsDefaultMaterial();
-		bIsSpecialEngineMaterial = InMaterial->IsSpecialEngineMaterial();
-		bIsMasked = InMaterial->IsMasked();
-		bIsTwoSided = InMaterial->IsTwoSided();
-		bIsDistorted = InMaterial->IsDistorted();
-		bShouldCastDynamicShadows = InMaterial->ShouldCastDynamicShadows();
-		bWritesEveryPixel = InMaterial->WritesEveryPixel(false);
-		bWritesEveryPixelShadowPass = InMaterial->WritesEveryPixel(true);
-		bHasBaseColorConnected = InMaterial->HasBaseColorConnected();
-		bHasNormalConnected = InMaterial->HasNormalConnected();
-		bHasRoughnessConnected = InMaterial->HasRoughnessConnected();
-		bHasSpecularConnected = InMaterial->HasSpecularConnected();
-		bHasMetallicConnected = InMaterial->HasMetallicConnected();
-		bHasEmissiveColorConnected = InMaterial->HasEmissiveColorConnected();
-		bHasAmbientOcclusionConnected = InMaterial->HasAmbientOcclusionConnected();
-		bHasAnisotropyConnected = InMaterial->HasAnisotropyConnected();
-		bHasVertexPositionOffsetConnected = InMaterial->HasVertexPositionOffsetConnected();
-		bHasPixelDepthOffsetConnected = InMaterial->HasPixelDepthOffsetConnected();
-		bMaterialMayModifyMeshPosition = InMaterial->MaterialMayModifyMeshPosition();
-		bIsUsedWithStaticLighting = InMaterial->IsUsedWithStaticLighting();
-		bIsUsedWithParticleSprites = InMaterial->IsUsedWithParticleSprites();
-		bIsUsedWithMeshParticles = InMaterial->IsUsedWithMeshParticles();
-		bIsUsedWithNiagaraSprites = InMaterial->IsUsedWithNiagaraSprites();
-		bIsUsedWithNiagaraMeshParticles = InMaterial->IsUsedWithNiagaraMeshParticles();
-		bIsUsedWithNiagaraRibbons = InMaterial->IsUsedWithNiagaraRibbons();
-		bIsUsedWithLandscape = InMaterial->IsUsedWithLandscape();
-		bIsUsedWithBeamTrails = InMaterial->IsUsedWithBeamTrails();
-		bIsUsedWithSplineMeshes = InMaterial->IsUsedWithSplineMeshes();
-		bIsUsedWithSkeletalMesh = InMaterial->IsUsedWithSkeletalMesh();
-		bIsUsedWithMorphTargets = InMaterial->IsUsedWithMorphTargets();
-		bIsUsedWithAPEXCloth = InMaterial->IsUsedWithAPEXCloth();
-		bIsUsedWithGeometryCache = InMaterial->IsUsedWithGeometryCache();
-		bIsUsedWithGeometryCollections = InMaterial->IsUsedWithGeometryCollections();
-		bIsUsedWithHairStrands = InMaterial->IsUsedWithHairStrands();
-		bIsUsedWithWater = InMaterial->IsUsedWithWater();
-		bIsTranslucencyWritingVelocity = InMaterial->IsTranslucencyWritingVelocity();
-		bIsTranslucencyWritingCustomDepth = InMaterial->IsTranslucencyWritingCustomDepth();
-		bIsDitheredLODTransition = InMaterial->IsDitheredLODTransition();
-		bIsUsedWithInstancedStaticMeshes = InMaterial->IsUsedWithInstancedStaticMeshes();
-		bHasPerInstanceCustomData = InMaterial->HasPerInstanceCustomData();
-		bHasPerInstanceRandom = InMaterial->HasPerInstanceRandom();
-		bHasVertexInterpolator = InMaterial->HasVertexInterpolator();
-		bHasRuntimeVirtualTextureOutput = InMaterial->HasRuntimeVirtualTextureOutput();
-		bIsUsedWithLidarPointCloud = InMaterial->IsUsedWithLidarPointCloud();
-		bIsUsedWithVirtualHeightfieldMesh = InMaterial->IsUsedWithVirtualHeightfieldMesh();
-		bIsUsedWithNanite = InMaterial->IsUsedWithNanite();
-		bIsStencilTestEnabled = InMaterial->IsStencilTestEnabled();
-		bIsTranslucencySurface = InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_Surface || InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_SurfacePerPixelLighting;
-		bShouldDisableDepthTest = InMaterial->ShouldDisableDepthTest();
-	}
+	FMaterialShaderParameters(const FMaterial* InMaterial);
 };
 
 inline bool ShouldIncludeMaterialInDefaultOpaquePass(const FMaterial& Material)

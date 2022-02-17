@@ -136,8 +136,17 @@ static TAutoConsoleVariable<int32> CVarMaterialEnableControlFlow(
 static TAutoConsoleVariable<int32> CVarMaterialEnableNewHLSLGenerator(
 	TEXT("r.MaterialEnableNewHLSLGenerator"),
 	0,
-	TEXT("Enables the new (WIP) material HLSL generator.\n"),
+	TEXT("Enables the new (WIP) material HLSL generator.\n")
+	TEXT("0 - Don't allow\n")
+	TEXT("1 - Allow if enabled by material\n")
+	TEXT("2 - Force all materials to use new generator\n"),
 	ECVF_RenderThreadSafe | ECVF_ReadOnly);
+
+bool Engine_IsStrataEnabled()
+{
+	static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
+	return CVar && CVar->GetValueOnAnyThread() > 0;
+}
 
 #if WITH_EDITOR
 const FMaterialsWithDirtyUsageFlags FMaterialsWithDirtyUsageFlags::DefaultAnnotation;
@@ -2283,6 +2292,11 @@ void UMaterial::CacheShadersForResources(EShaderPlatform ShaderPlatform, const T
 	}
 }
 
+void UMaterial::CacheShaders(EMaterialShaderPrecompileMode CompileMode)
+{
+	CacheResourceShadersForRendering(false, CompileMode);
+}
+
 void UMaterial::ReleaseResourcesAndMutateDDCKey(const FGuid& TransformationId)
 {
 	if (TransformationId.IsValid())
@@ -2738,9 +2752,7 @@ static void AddStrataShadingModelFromMaterialShadingModel(FStrataMaterialInfo& O
 void UMaterial::ConvertMaterialToStrataMaterial()
 {
 #if WITH_EDITOR
-	static const auto CVarStrata = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
-	const bool bStrataEnabled = CVarStrata ? CVarStrata->GetValueOnAnyThread() > 0 : false;
-
+	const bool bStrataEnabled = Engine_IsStrataEnabled();
 	if (!bStrataEnabled)
 	{
 		return;
@@ -2793,9 +2805,13 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 		// * Remove support for material attribute
 		// * explicitely connect the Strata node to the root node
 		// * Forward inputs to the root node (Do not reconnect the Opacity as we handle the opacity by internally within the conversion node)
+		// * Forward masked opacity only if blend mode is set to masked, as certain material (e.g., FlattenVT requires to have no OpacityMask plugged)
 		bUseMaterialAttributes = false;
 		FrontMaterial.Connect(0, ConvertNode);
-		OpacityMask.Connect(7, BreakMatAtt);
+		if (BlendMode == BLEND_Masked)
+		{
+			OpacityMask.Connect(7, BreakMatAtt);
+		}
 		WorldPositionOffset.Connect(10, BreakMatAtt);
 		AmbientOcclusion.Connect(14, BreakMatAtt);
 		PixelDepthOffset.Connect(24, BreakMatAtt);
@@ -2952,6 +2968,63 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 
 			// STRATA_TODO remove the VolumetricAdvancedOutput node and add the input onto FogCloudBSDF even if only used by the cloud renderer?
 			FrontMaterial.Connect(0, VolBSDF);
+			bInvalidateShader = true;
+		}
+		else if (MaterialDomain == MD_PostProcess || MaterialDomain == MD_LightFunction)
+		{
+			// Some post-process material don't have their shading mode set correctly to Unlit. Since only Unlit is supported, forcing it here.
+			ShadingModel = MSM_Unlit;
+			ShadingModels.ClearShadingModels();
+			ShadingModels.AddShadingModel(MSM_Unlit);
+
+			// Only Emissive & Opacity are valid input for PostProcess material
+			UMaterialExpressionStrataLegacyConversion* ConvertNode = NewObject<UMaterialExpressionStrataLegacyConversion>(this);
+			MoveConnectionTo(EmissiveColor, ConvertNode, 5);
+			MoveConnectionTo(Opacity, ConvertNode, 11);
+
+			// Add constant for the Unlit shading model
+			UMaterialExpressionConstant* ShadingModelNode = NewObject<UMaterialExpressionConstant>(this);
+			ShadingModelNode->SetParameterName(FName(TEXT("ConstantShadingModel")));
+			ShadingModelNode->R = ShadingModel;
+			ConvertNode->ShadingModel.Connect(0, ShadingModelNode);
+
+			AddStrataShadingModelFromMaterialShadingModel(ConvertNode->ConvertedStrataMaterialInfo, ShadingModels);
+			check(ConvertNode->ConvertedStrataMaterialInfo.CountShadingModels() == 1);
+
+			FrontMaterial.Connect(0, ConvertNode);
+			bInvalidateShader = true;
+		}
+		else if (MaterialDomain == MD_DeferredDecal)
+		{
+			// Some decal materials don't have their shading mode set correctly to DefaultLit. Since only DefaultLit is supported, forcing it here.
+			ShadingModel = MSM_DefaultLit;
+			ShadingModels.ClearShadingModels();
+			ShadingModels.AddShadingModel(MSM_DefaultLit);
+
+			UMaterialExpressionStrataLegacyConversion* ConvertNode = NewObject<UMaterialExpressionStrataLegacyConversion>(this);
+			MoveConnectionTo(BaseColor, ConvertNode, 0);
+			MoveConnectionTo(Metallic, ConvertNode, 1);
+			MoveConnectionTo(Specular, ConvertNode, 2);
+			MoveConnectionTo(Roughness, ConvertNode, 3);
+			MoveConnectionTo(Anisotropy, ConvertNode, 4);
+			MoveConnectionTo(EmissiveColor, ConvertNode, 5);
+			CopyConnectionTo(Normal, ConvertNode, 6);
+			MoveConnectionTo(Tangent, ConvertNode, 7);
+			MoveConnectionTo(SubsurfaceColor, ConvertNode, 8);
+			MoveConnectionTo(ClearCoat, ConvertNode, 9);
+			MoveConnectionTo(ClearCoatRoughness, ConvertNode, 10);
+			MoveConnectionTo(Opacity, ConvertNode, 11);
+
+			// Add constant for the Unlit shading model
+			UMaterialExpressionConstant* ShadingModelNode = NewObject<UMaterialExpressionConstant>(this);
+			ShadingModelNode->SetParameterName(FName(TEXT("ConstantShadingModel")));
+			ShadingModelNode->R = ShadingModel;
+			ConvertNode->ShadingModel.Connect(0, ShadingModelNode);
+
+			AddStrataShadingModelFromMaterialShadingModel(ConvertNode->ConvertedStrataMaterialInfo, ShadingModels);
+			check(ConvertNode->ConvertedStrataMaterialInfo.CountShadingModels() == 1);
+
+			FrontMaterial.Connect(0, ConvertNode);
 			bInvalidateShader = true;
 		}
 	}
@@ -3125,7 +3198,6 @@ void UMaterial::PostLoad()
 	BackwardsCompatibilityInputConversion();
 	BackwardsCompatibilityVirtualTextureOutputConversion();
 	BackwardsCompatibilityDecalConversion();
-	ConvertMaterialToStrataMaterial();
 
 #if WITH_EDITOR
 	if ( GMaterialsThatNeedSamplerFixup.Get( this ) )
@@ -3173,6 +3245,10 @@ void UMaterial::PostLoad()
 		UpdateCachedExpressionData();
 	}
 #endif // WITH_EDITOR
+
+	// Strata materials conversion needs to be done after expressions are cached, otherwise material function won't have 
+	// valid inputs in certain cases
+	ConvertMaterialToStrataMaterial();
 
 	checkf(CachedExpressionData, TEXT("Missing cached expression data for material, should have been either serialized or created during PostLoad"));
 
@@ -3327,7 +3403,7 @@ void UMaterial::PropagateDataToMaterialProxy()
 	UpdateMaterialRenderProxy(*DefaultMaterialInstance);
 }
 
-bool UMaterial::IsCompiledWithExecutionFlow() const
+bool UMaterial::IsUsingControlFlow() const
 {
 	if (bEnableExecWire)
 	{
@@ -3338,11 +3414,12 @@ bool UMaterial::IsCompiledWithExecutionFlow() const
 
 bool UMaterial::IsUsingNewHLSLGenerator() const
 {
+	const int CVarValue = CVarMaterialEnableNewHLSLGenerator.GetValueOnAnyThread();
 	if (bEnableNewHLSLGenerator)
 	{
-		return CVarMaterialEnableNewHLSLGenerator.GetValueOnAnyThread() != 0;
+		return CVarValue != 0;
 	}
-	return false;
+	return CVarValue == 2;
 }
 
 #if WITH_EDITOR
@@ -3560,7 +3637,7 @@ bool UMaterial::CanEditChange(const FProperty* InProperty) const
 
 void UMaterial::CreateExecutionFlowExpressions()
 {
-	if (IsCompiledWithExecutionFlow())
+	if (IsUsingControlFlow())
 	{
 		if (!ExpressionExecBegin)
 		{
@@ -3858,9 +3935,7 @@ void UMaterial::UpdateExpressionParameterName(UMaterialExpression* Expression)
 void UMaterial::RebuildShadingModelField()
 {
 	ShadingModels.ClearShadingModels();
-
-	static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
-	const bool bStrataEnabled = CVar && CVar->GetValueOnAnyThread() > 0;
+	const bool bStrataEnabled = Engine_IsStrataEnabled();
 	if (bStrataEnabled && FrontMaterial.IsConnected())
 	{
 		FStrataMaterialInfo StrataMaterialInfo;
@@ -3868,6 +3943,7 @@ void UMaterial::RebuildShadingModelField()
 		if (this->FrontMaterial.Expression->IsResultStrataMaterial(this->FrontMaterial.OutputIndex))
 		{
 			this->FrontMaterial.Expression->GatherStrataMaterialInfo(StrataMaterialInfo, this->FrontMaterial.OutputIndex);
+			this->CachedConnectedInputs = StrataMaterialInfo.GetPropertyConnected();
 		}
 
 		bool bSanitizeMaterial = false;
@@ -3965,7 +4041,10 @@ void UMaterial::RebuildShadingModelField()
 			// Now derive some properties from the material
 			if (StrataMaterialInfo.HasOnlyShadingModel(SSM_Unlit))
 			{
-				MaterialDomain = EMaterialDomain::MD_Surface;
+				if (MaterialDomain != EMaterialDomain::MD_Surface && MaterialDomain != EMaterialDomain::MD_PostProcess && MaterialDomain != EMaterialDomain::MD_LightFunction)
+				{
+					MaterialDomain = EMaterialDomain::MD_Surface;
+				}
 				ShadingModel = MSM_Unlit;
 				if (BlendMode != EBlendMode::BLEND_Opaque && BlendMode != EBlendMode::BLEND_Masked)
 				{
@@ -3984,7 +4063,10 @@ void UMaterial::RebuildShadingModelField()
 			}
 			else if (StrataMaterialInfo.HasOnlyShadingModel(SSM_DefaultLit))
 			{
-				MaterialDomain = EMaterialDomain::MD_Surface;
+				if (MaterialDomain != EMaterialDomain::MD_Surface && MaterialDomain != EMaterialDomain::MD_DeferredDecal)
+				{
+					MaterialDomain = EMaterialDomain::MD_Surface;
+				}
 				ShadingModel = MSM_DefaultLit;
 				if (BlendMode != EBlendMode::BLEND_Opaque && BlendMode != EBlendMode::BLEND_Masked)
 				{
@@ -4516,7 +4598,7 @@ static void SetMaterialInputDescription(FShadingModelMaterialInput& Input, bool 
 
 static void SetMaterialInputDescription(FMaterialAttributesInput& Input, bool bHidden, FMaterialInputDescription& OutDescription)
 {
-	OutDescription.Type = UE::Shader::EValueType::MaterialAttributes;
+	OutDescription.Type = UE::Shader::EValueType::Struct;
 	OutDescription.Input = &Input;
 	OutDescription.bUseConstant = false;
 	OutDescription.bHidden = bHidden;
@@ -5008,7 +5090,7 @@ int32 UMaterial::CompilePropertyEx( FMaterialCompiler* Compiler, const FGuid& At
 {
 	const EMaterialProperty Property = FMaterialAttributeDefinitionMap::GetProperty(AttributeID);
 
-	if (IsCompiledWithExecutionFlow())
+	if (IsUsingControlFlow())
 	{
 		check(ExpressionExecBegin);
 		return ExpressionExecBegin->Compile(Compiler, UMaterialExpression::CompileExecutionOutputIndex);
@@ -5283,18 +5365,38 @@ static bool IsPropertyActive_Internal(EMaterialProperty InProperty,
 	bool bUsesShadingModelFromMaterialExpression,
 	bool bIsTranslucencyWritingVelocity)
 {
+	const bool bStrataEnabled = Engine_IsStrataEnabled();
+
 	if (Domain == MD_PostProcess)
 	{
-		return InProperty == MP_EmissiveColor || (bBlendableOutputAlpha && InProperty == MP_Opacity);
+		if (bStrataEnabled)
+		{
+			return InProperty == MP_FrontMaterial;
+		}
+		else
+		{
+			return InProperty == MP_EmissiveColor || (bBlendableOutputAlpha && InProperty == MP_Opacity);
+		}
 	}
 	else if (Domain == MD_LightFunction)
 	{
 		// light functions should already use MSM_Unlit but we also we don't want WorldPosOffset
-		return InProperty == MP_EmissiveColor;
+		if (bStrataEnabled)
+		{
+			return InProperty == MP_FrontMaterial;
+		}
+		else
+		{
+			return InProperty == MP_EmissiveColor;
+		}
 	}
 	else if (Domain == MD_DeferredDecal)
 	{
-		if (InProperty >= MP_CustomizedUVs0 && InProperty <= MP_CustomizedUVs7)
+		if (bStrataEnabled)
+		{
+			return InProperty == MP_FrontMaterial;
+		}
+		else if (InProperty >= MP_CustomizedUVs0 && InProperty <= MP_CustomizedUVs7)
 		{
 			return true;
 		}
@@ -5439,8 +5541,6 @@ static bool IsPropertyActive_Internal(EMaterialProperty InProperty,
 		break;
 	case MP_FrontMaterial:
 		{
-			static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
-			const bool bStrataEnabled = CVar && CVar->GetValueOnAnyThread() > 0;
 			Active = bStrataEnabled;
 			break;
 		}

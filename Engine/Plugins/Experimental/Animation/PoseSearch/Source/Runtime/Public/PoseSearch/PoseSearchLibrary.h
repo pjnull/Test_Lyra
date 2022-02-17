@@ -15,21 +15,23 @@
 
 namespace UE::PoseSearch
 {
-	struct FMotionMatchingContinuityParams
+	struct FMotionMatchingPoseStepper
 	{
-		FDbSearchResult Result;
+		FSearchResult Result;
 		bool bJumpRequired = false;
 
-		bool IsValid()
+		bool CanContinue() const
 		{
 			return Result.IsValid();
 		}
 
 		void Reset()
 		{
-			Result = UE::PoseSearch::FDbSearchResult();
+			Result = UE::PoseSearch::FSearchResult();
 			bJumpRequired = false;
 		}
+
+		void Update(const FAnimationUpdateContext& UpdateContext, const struct FMotionMatchingState& State);
 	};
 }
 
@@ -37,7 +39,8 @@ UENUM(BlueprintType, Category="Motion Trajectory", meta=(Bitflags, UseEnumValues
 enum class EMotionMatchingFlags : uint8
 {
 	None = 0 UMETA(Hidden),
-	JumpedToPose = 1 << 0 // Signals that motion matching has made a significant deviation in the selected sequence/pose index
+	JumpedToPose = 1 << 0,		// Signals that motion matching has made a significant deviation in the selected sequence/pose index
+	JumpedToFollowUp = 1 << 1,	// Motion matching chose the follow up animation of the prior sequence
 };
 ENUM_CLASS_FLAGS(EMotionMatchingFlags);
 
@@ -53,6 +56,10 @@ struct POSESEARCH_API FMotionMatchingSettings
 	// Time in seconds to blend out to the new pose. Uses inertial blending and requires an Inertialization node after this node.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
 	float BlendTime = 0.2f;
+
+	// If the pose jump requires a mirroring change and this value is greater than 0, it will be used instead of BlendTime
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ClampMin = "0", DislayAfter = "BlendTime"))
+	float MirrorChangeBlendTime = 0.0f;
 	
 	// Don't jump to poses that are less than this many seconds away
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0"))
@@ -63,14 +70,8 @@ struct POSESEARCH_API FMotionMatchingSettings
 	float SearchThrottleTime = 0.1f;
 
 	// How much better the search result must be compared to the current pose in order to jump to it
-	// Note: This feature won't work quite as advertised until search data rescaling is implemented
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(ClampMin="0", ClampMax="100"))
-	float MinPercentImprovement = 100.f;
-
-	// Pose indices SequenceEndExclusionTime or less away from the end of the database sequence will be ignored by the 
-	// PoseSearch. This ensures the search doesn't get stuck at the end of a sequence.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ClampMin = "0"))
-	float SequenceEndExlusionTime = 0.25f;
+	float MinPercentImprovement = 40.0f;
 };
 
 USTRUCT(BlueprintType, Category="Animation|Pose Search")
@@ -79,16 +80,17 @@ struct POSESEARCH_API FMotionMatchingState
 	GENERATED_BODY()
 
 	// Initializes the minimum required motion matching state
-	void InitNewDatabaseSearch(const UPoseSearchDatabase* Database, float SearchThrottleTime);
+	bool InitNewDatabaseSearch(const UPoseSearchDatabase* Database, float SearchThrottleTime, FText* OutError);
 
 	// Adds trajectory prediction and history information to ComposedQuery
 	void ComposeQuery(const UPoseSearchDatabase* Database, const FTrajectorySampleRange& Trajectory);
 
 	// Internally stores the 'jump' to a new pose/sequence index and asset time for evaluation
-	void JumpToPose(const UE::PoseSearch::FDbSearchResult& Result);
+	void JumpToPose(const FAnimationUpdateContext& Context, const FMotionMatchingSettings& Settings, const UE::PoseSearch::FSearchResult& Result);
 
-	// Updates DbPoseIdx to track DeltaTime and jumps to a follow-up sequence when available
-	UE::PoseSearch::FMotionMatchingContinuityParams ComputeContinuityParameters(const FAnimationUpdateContext& Context) const;
+	const FPoseSearchIndexAsset* GetCurrentSearchIndexAsset() const;
+
+	float ComputeJumpBlendTime(const UE::PoseSearch::FSearchResult& Result, const FMotionMatchingSettings& Settings) const;
 
 	// The current pose we're playing from the database
 	UPROPERTY(Transient)
@@ -96,7 +98,7 @@ struct POSESEARCH_API FMotionMatchingState
 
 	// The current animation we're playing from the database
 	UPROPERTY(Transient)
-	int32 DbSequenceIdx = INDEX_NONE;
+	int32 SearchIndexAssetIdx = INDEX_NONE;
 
 	// The current query feature vector used to search the database for pose candidates
 	UPROPERTY(Transient)
@@ -131,10 +133,10 @@ struct POSESEARCH_API FMotionMatchingState
 * @param Trajectory					Input motion trajectory samples for pose search queries
 * @param Settings					Input motion matching algorithm configuration settings
 * @param InOutMotionMatchingState	Input/Output encapsulated motion matching algorithm and state
-* @param bOutJumpedToPose			Output motion matching decision to 'jump' to a new pose/sequence index in the database
 */
 POSESEARCH_API void UpdateMotionMatchingState(const FAnimationUpdateContext& Context
 	, const UPoseSearchDatabase* Database
+	, const FGameplayTagQuery* DatabaseTagQuery
 	, const FTrajectorySampleRange& Trajectory
 	, const FMotionMatchingSettings& Settings
 	, FMotionMatchingState& InOutMotionMatchingState

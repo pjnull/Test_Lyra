@@ -67,12 +67,10 @@ using HordeServer.Notifications.Impl;
 using HordeServer.Notifications;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using System.Runtime.InteropServices;
-using HordeServer.Storage.Collections;
 using Amazon.Extensions.NETCore.Setup;
 using Amazon.S3;
 using Amazon.Runtime;
 using HordeServer.Storage.Backends;
-using HordeServer.Storage.Services;
 using HordeServer.Commits.Impl;
 using HordeServer.Commits;
 using OpenTracing.Contrib.Grpc.Interceptors;
@@ -81,8 +79,17 @@ using EpicGames.Horde.Compute;
 using HordeServer.Compute.Impl;
 using HordeServer.Compute;
 using System.Net.Http.Headers;
+using Amazon.SecurityToken.Model;
+using Horde.Build.Fleet.Autoscale;
+using Horde.Build.Utilities;
 using Serilog.Events;
 using HordeServer.Jobs;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Horde.Build.Storage.Services;
+using EpicGames.Horde.Storage;
+using System.Net.Http;
+using EpicGames.Horde.Storage.Impl;
 
 namespace HordeServer
 {
@@ -105,108 +112,75 @@ namespace HordeServer
 			}
 
 			[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-			IDisposable? RequestContext<TRequest>(TRequest Request)
+			public override Task<TResponse> UnaryServerHandler<TRequest, TResponse>(TRequest Request, ServerCallContext Context, UnaryServerMethod<TRequest, TResponse> Continuation)
 			{
-				try
+				return Guard(Context, () => base.UnaryServerHandler(Request, Context, Continuation));
+			}
+
+			public override Task<TResponse> ClientStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> RequestStream, ServerCallContext Context, ClientStreamingServerMethod<TRequest, TResponse> Continuation) where TRequest : class where TResponse : class
+			{
+				return Guard(Context, () => base.ClientStreamingServerHandler(RequestStream, Context, Continuation));
+			}
+
+			public override Task ServerStreamingServerHandler<TRequest, TResponse>(TRequest Request, IServerStreamWriter<TResponse> ResponseStream, ServerCallContext Context, ServerStreamingServerMethod<TRequest, TResponse> Continuation) where TRequest : class where TResponse : class
+			{
+				return Guard(Context, () => base.ServerStreamingServerHandler(Request, ResponseStream, Context, Continuation));
+			}
+
+			public override Task DuplexStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> RequestStream, IServerStreamWriter<TResponse> ResponseStream, ServerCallContext Context, DuplexStreamingServerMethod<TRequest, TResponse> Continuation) where TRequest : class where TResponse : class
+			{
+				return Guard(Context, () => base.DuplexStreamingServerHandler(RequestStream, ResponseStream, Context, Continuation));
+			}
+
+			async Task<T> Guard<T>(ServerCallContext Context, Func<Task<T>> CallFunc) where T : class
+			{
+				T Result = null!;
+				await Guard(Context, async () => { Result = await CallFunc(); });
+				return Result;
+			}
+
+			async Task Guard(ServerCallContext Context, Func<Task> CallFunc)
+			{
+				HttpContext HttpContext = Context.GetHttpContext();
+
+				AgentId? AgentId = AclService.GetAgentId(HttpContext.User);
+				if (AgentId != null)
 				{
-					return Logger.BeginScope("Request: {Request}", JsonSerializer.Serialize<TRequest>(Request));
+					using IDisposable Scope = Logger.BeginScope("Agent: {AgentId}, RemoteIP: {RemoteIP}, Method: {Method}", AgentId.Value, HttpContext.Connection.RemoteIpAddress, Context.Method);
+					await GuardInner(Context, CallFunc);
 				}
-				catch
+				else
 				{
-					return null;
+					using IDisposable Scope = Logger.BeginScope("RemoteIP: {RemoteIP}, Method: {Method}", HttpContext.Connection.RemoteIpAddress, Context.Method);
+					await GuardInner(Context, CallFunc);
 				}
 			}
 
-			[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-			IDisposable? ConnectionContext(ConnectionInfo Connection)
+			async Task GuardInner(ServerCallContext Context, Func<Task> CallFunc)
 			{
 				try
 				{
-					return Logger.BeginScope("Client: {ClientIp}", Connection.RemoteIpAddress);
-				}
-				catch
-				{
-					return null;
-				}
-			}
-
-			public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> Context, AsyncClientStreamingCallContinuation<TRequest, TResponse> Continuation)
-			{
-				try
-				{
-					return base.AsyncClientStreamingCall(Context, Continuation);
+					await CallFunc();
 				}
 				catch (StructuredRpcException Ex)
 				{
+#pragma warning disable CA2254 // Template should be a static expression
 					Logger.LogError(Ex, Ex.Format, Ex.Args);
+#pragma warning restore CA2254 // Template should be a static expression
 					throw;
 				}
 				catch (Exception Ex)
 				{
-					Logger.LogError(Ex, "Exception in call to {Method}", Context.Method);
-					throw new RpcException(new Status(StatusCode.Internal, $"An exception was thrown on the server: {Ex}"));
-				}
-			}
-
-			public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> Context, AsyncDuplexStreamingCallContinuation<TRequest, TResponse> Continuation)
-			{
-				try
-				{
-					return base.AsyncDuplexStreamingCall(Context, Continuation);
-				}
-				catch (StructuredRpcException Ex)
-				{
-					Logger.LogError(Ex, Ex.Format, Ex.Args);
-					throw;
-				}
-				catch (Exception Ex)
-				{
-					Logger.LogError(Ex, "Exception in call to {Method}", Context.Method);
-					throw new RpcException(new Status(StatusCode.Internal, $"An exception was thrown on the server: {Ex}"));
-				}
-			}
-
-			[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-			public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(TRequest Request, ClientInterceptorContext<TRequest, TResponse> Context, AsyncServerStreamingCallContinuation<TRequest, TResponse> Continuation)
-			{
-				try
-				{
-					return base.AsyncServerStreamingCall(Request, Context, Continuation);
-				}
-				catch (StructuredRpcException Ex)
-				{
-					using IDisposable? Scope = RequestContext(Request); 
-					Logger.LogError(Ex, Ex.Format, Ex.Args);
-					throw;
-				}
-				catch (Exception Ex)
-				{
-					using IDisposable? Scope = RequestContext(Request);
-					Logger.LogError(Ex, "Exception in call to {Method}", Context.Method);
-					throw new RpcException(new Status(StatusCode.Internal, $"An exception was thrown on the server: {Ex}"));
-				}
-			}
-
-			[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
-			public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(TRequest Request, ServerCallContext Context, UnaryServerMethod<TRequest, TResponse> Continuation)
-			{
-				try
-				{
-					return await base.UnaryServerHandler(Request, Context, Continuation);
-				}
-				catch (StructuredRpcException Ex)
-				{
-					using IDisposable? ConnectionScope = ConnectionContext(Context.GetHttpContext().Connection);
-					using IDisposable? Scope = RequestContext(Request);
-					Logger.LogError(Ex, Ex.Format, Ex.Args);
-					throw;
-				}
-				catch (Exception Ex)
-				{
-					using IDisposable? ConnectionScope = ConnectionContext(Context.GetHttpContext().Connection);
-					using IDisposable? Scope = RequestContext(Request);
-					Logger.LogError(Ex, "Exception in call to {Method}", Context.Method);
-					throw new RpcException(new Status(StatusCode.Internal, $"An exception was thrown on the server: {Ex}"));
+					if (Context.CancellationToken.IsCancellationRequested)
+					{
+						Logger.LogInformation(Ex, "Call to method {Method} was cancelled", Context.Method);
+						throw;
+					}
+					else
+					{
+						Logger.LogError(Ex, "Exception in call to {Method}", Context.Method);
+						throw new RpcException(new Status(StatusCode.Internal, $"An exception was thrown on the server: {Ex}"));
+					}
 				}
 			}
 		}
@@ -279,8 +253,9 @@ namespace HordeServer
 			Services.Configure<ServerSettings>(Configuration.GetSection("Horde"));
 
 			// Settings used for configuring services
+			IConfigurationSection ConfigSection = Configuration.GetSection("Horde");
 			ServerSettings Settings = new ServerSettings();
-			Configuration.GetSection("Horde").Bind(Settings);			
+			ConfigSection.Bind(Settings);			
 
 			if (Settings.GlobalThreadPoolMinSize != null)
 			{
@@ -347,21 +322,20 @@ namespace HordeServer
 			Services.AddSingleton<IUgsMetadataCollection, UgsMetadataCollection>();
 			Services.AddSingleton<IUserCollection, UserCollectionV2>();
 			Services.AddSingleton<IDeviceCollection, DeviceCollection>();
+			Services.AddSingleton<INoticeCollection, NoticeCollection>();
 
 			// Auditing
 			Services.AddSingleton<IAuditLog<AgentId>>(SP => SP.GetRequiredService<IAuditLogFactory<AgentId>>().Create("Agents.Log", "AgentId"));
-
-			// Storage
-			Services.AddSingleton<IBlobCollection>(SP => new CachingBlobCollection(new BlobCollection(SP.GetRequiredService<IStorageBackend<BlobCollection>>()), 256 * 1024 * 1024));
-			Services.AddSingleton<IBucketCollection, BucketCollection>();
-			Services.AddSingleton<INamespaceCollection, NamespaceCollection>();
-			Services.AddSingleton<IObjectCollection, ObjectCollection>();
-			Services.AddSingleton<IRefCollection, RefCollection>();
 
 			Services.AddSingleton(typeof(IAuditLogFactory<>), typeof(AuditLogFactory<>));
 			Services.AddSingleton(typeof(ISingletonDocument<>), typeof(SingletonDocument<>));
 
 			Services.AddSingleton<AutoscaleService>();
+			Services.AddSingleton<AutoscaleServiceV2>();
+			Services.AddSingleton<LeaseUtilizationStrategy>();
+			Services.AddSingleton<JobQueueStrategy>();
+			Services.AddSingleton<NoOpPoolSizeStrategy>();
+			
 			switch (Settings.FleetManager)
 			{
 				case FleetManagerType.Aws:
@@ -417,8 +391,9 @@ namespace HordeServer
 			Services.AddSingleton<INotificationSink, SlackNotificationSink>(SP => SP.GetRequiredService<SlackNotificationSink>());
 			Services.AddSingleton<StreamService>();
 			Services.AddSingleton<UpgradeService>();
-
-			Services.AddSingleton<DeviceService>();
+			Services.AddSingleton<DeviceService>();			
+			Services.AddSingleton<JiraService>();
+			Services.AddSingleton<NoticeService>();
 
 			AWSOptions AwsOptions = Configuration.GetAWSOptions();
 			if (Settings.S3CredentialType == "AssumeRole" && Settings.S3AssumeArn != null)
@@ -434,34 +409,53 @@ namespace HordeServer
 				// Using the fallback credentials from the AWS SDK, it will pick up credentials through a number of default mechanisms.
 				AwsOptions.Credentials = FallbackCredentialsFactory.GetCredentials();
 			}
+			else if(Settings.S3CredentialType == "SharedCredentials" && Settings.S3AwsProfile != null)
+			{
+				// This SharedCredentials option is primarily for development purposes.
+				var (AccessKey, SecretAccessKey, SecretToken) = AwsHelper.ReadAwsCredentials(Settings.S3AwsProfile);
+				AwsOptions.Credentials = new Credentials(AccessKey, SecretAccessKey, SecretToken, DateTime.Now + TimeSpan.FromHours(12));
+			}
 			
 			Services.AddSingleton(AwsOptions);
 
 			Services.AddSingleton(new StorageBackendSettings<PersistentLogStorage> { Type = Settings.ExternalStorageProviderType, BaseDir = Settings.LocalLogsDir, BucketName = Settings.S3LogBucketName });
 			Services.AddSingleton(new StorageBackendSettings<ArtifactCollection> { Type = Settings.ExternalStorageProviderType, BaseDir = Settings.LocalArtifactsDir, BucketName = Settings.S3ArtifactBucketName });
-			Services.AddSingleton(new StorageBackendSettings<BlobCollection> { Type = Settings.ExternalStorageProviderType, BaseDir = Settings.LocalBlobsDir, BucketName = Settings.S3LogBucketName, BucketPath = "blobs/" });
 			Services.AddSingleton(typeof(IStorageBackend<>), typeof(StorageBackendFactory<>));
 
+			Services.AddHordeStorage(Settings => ConfigSection.GetSection("Storage").Bind(Settings));
+
 			ConfigureLogStorage(Services);
-			Services.AddSingleton<IStorageService, SimpleStorageService>();
-			//			ConfigureLogFileWriteCache(Services, Settings);
 
 			AuthenticationBuilder AuthBuilder = Services.AddAuthentication(Options =>
 				{
-					if (Settings.DisableAuth)
+					switch (Settings.AuthMethod)
 					{
-						Options.DefaultAuthenticateScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
-						Options.DefaultSignInScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
-						Options.DefaultChallengeScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
-					}
-					else
-					{
-						// If an authentication cookie is present, use it to get authentication information
-						Options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-						Options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+						case AuthMethod.Anonymous:
+							Options.DefaultAuthenticateScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
+							Options.DefaultSignInScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
+							Options.DefaultChallengeScheme = AnonymousAuthenticationHandler.AuthenticationScheme;
+							break;
+						
+						case AuthMethod.Okta:
+							// If an authentication cookie is present, use it to get authentication information
+							Options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+							Options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 
-						// If authentication is required, and no cookie is present, use OIDC to sign in
-						Options.DefaultChallengeScheme = OktaDefaults.AuthenticationScheme;
+							// If authentication is required, and no cookie is present, use OIDC to sign in
+							Options.DefaultChallengeScheme = OktaDefaults.AuthenticationScheme;
+							break;
+						
+						case AuthMethod.OpenIdConnect:
+							// If an authentication cookie is present, use it to get authentication information
+							Options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+							Options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+
+							// If authentication is required, and no cookie is present, use OIDC to sign in
+							Options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+							break;
+						
+						default:
+							throw new ArgumentException($"Invalid auth method {Settings.AuthMethod}");
 					}
 				});
 
@@ -489,36 +483,67 @@ namespace HordeServer
 			AuthBuilder.AddServiceAccount(Options => { });
 			Schemes.Add(ServiceAccountAuthHandler.AuthenticationScheme);
 
-			if (Settings.DisableAuth)
+			
+			switch (Settings.AuthMethod)
 			{
-				AuthBuilder.AddAnonymous(Options =>
-				{
-					Options.AdminClaimType = Settings.AdminClaimType;
-					Options.AdminClaimValue = Settings.AdminClaimValue;
-				});
-				Schemes.Add(AnonymousAuthenticationHandler.AuthenticationScheme);
-			}
-			else if (Settings.OidcClientId != null && Settings.OidcAuthority != null)
-			{
-				AuthBuilder.AddOkta(OktaDefaults.AuthenticationScheme, OpenIdConnectDefaults.DisplayName, 
-					Options =>
+				case AuthMethod.Anonymous:
+					AuthBuilder.AddAnonymous(Options =>
 					{
-						Options.Authority = Settings.OidcAuthority;
-						Options.ClientId = Settings.OidcClientId;
-
-						if (!String.IsNullOrEmpty(Settings.OidcSigninRedirect))
-						{
-							Options.Events = new OpenIdConnectEvents
-							{
-								OnRedirectToIdentityProvider = async RedirectContext =>
-								{
-									RedirectContext.ProtocolMessage.RedirectUri = Settings.OidcSigninRedirect;
-									await Task.CompletedTask;
-								}
-							};
-						}
+						Options.AdminClaimType = Settings.AdminClaimType;
+						Options.AdminClaimValue = Settings.AdminClaimValue;
 					});
-				Schemes.Add(OktaDefaults.AuthenticationScheme);
+					Schemes.Add(AnonymousAuthenticationHandler.AuthenticationScheme);
+					break;
+						
+				case AuthMethod.Okta:
+					AuthBuilder.AddOkta(OktaDefaults.AuthenticationScheme, OpenIdConnectDefaults.DisplayName, Options =>
+						{
+							Options.Authority = Settings.OidcAuthority;
+							Options.ClientId = Settings.OidcClientId;
+
+							if (!String.IsNullOrEmpty(Settings.OidcSigninRedirect))
+							{
+								Options.Events = new OpenIdConnectEvents
+								{
+									OnRedirectToIdentityProvider = async RedirectContext =>
+									{
+										RedirectContext.ProtocolMessage.RedirectUri = Settings.OidcSigninRedirect;
+										await Task.CompletedTask;
+									}
+								};
+							}
+						});
+					Schemes.Add(OktaDefaults.AuthenticationScheme);
+					break;
+						
+				case AuthMethod.OpenIdConnect:
+					AuthBuilder.AddHordeOpenId(Settings, OpenIdConnectDefaults.AuthenticationScheme, OpenIdConnectDefaults.DisplayName, Options =>
+						{
+							Options.Authority = Settings.OidcAuthority;
+							Options.ClientId = Settings.OidcClientId;
+							Options.ClientSecret = Settings.OidcClientSecret;
+							foreach (string Scope in Settings.OidcRequestedScopes)
+							{
+								Options.Scope.Add(Scope);
+							}
+
+							if (!String.IsNullOrEmpty(Settings.OidcSigninRedirect))
+							{
+								Options.Events = new OpenIdConnectEvents
+								{
+									OnRedirectToIdentityProvider = async RedirectContext =>
+									{
+										RedirectContext.ProtocolMessage.RedirectUri = Settings.OidcSigninRedirect;
+										await Task.CompletedTask;
+									}
+								};
+							}
+						});
+					Schemes.Add(OpenIdConnectDefaults.AuthenticationScheme);
+					break;
+						
+				default:
+					throw new ArgumentException($"Invalid auth method {Settings.AuthMethod}");
 			}
 
 			AuthBuilder.AddScheme<JwtBearerOptions, HordeJwtBearerHandler>(HordeJwtBearerHandler.AuthenticationScheme, Options => { });
@@ -533,8 +558,17 @@ namespace HordeServer
 
 			if (Settings.EnableBackgroundServices)
 			{
+				if (Settings.FeatureFlags.AutoscaleServiceV1Enabled)
+				{
+					Services.AddHostedService(Provider => Provider.GetRequiredService<AutoscaleService>());	
+				}
+				
+				if (Settings.FeatureFlags.AutoscaleServiceV2Enabled)
+				{
+					Services.AddHostedService(Provider => Provider.GetRequiredService<AutoscaleServiceV2>());
+				}
+				
 				Services.AddHostedService(Provider => Provider.GetRequiredService<AgentService>());
-				Services.AddHostedService(Provider => Provider.GetRequiredService<AutoscaleService>());
 				Services.AddHostedService(Provider => Provider.GetRequiredService<CommitService>());
 				Services.AddHostedService(Provider => Provider.GetRequiredService<ConsistencyService>());
 				Services.AddHostedService(Provider => (DowntimeService)Provider.GetRequiredService<IDowntimeService>());
@@ -557,7 +591,9 @@ namespace HordeServer
 
 			// Task sources. Order of registration is important here; it dictates the priority in which sources are served.
 			Services.AddSingleton<JobTaskSource>();
+			Services.AddHostedService<JobTaskSource>(Provider => Provider.GetRequiredService<JobTaskSource>());
 			Services.AddSingleton<ConformTaskSource>();
+			Services.AddHostedService<ConformTaskSource>(Provider => Provider.GetRequiredService<ConformTaskSource>());
 			Services.AddSingleton<IComputeService, ComputeService>();
 
 			Services.AddSingleton<ITaskSource, UpgradeTaskSource>();
@@ -597,6 +633,27 @@ namespace HordeServer
 			{
 				Config.SwaggerDoc("v1", new OpenApiInfo { Title = "Horde Server API", Version = "v1" });
 				Config.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml"));
+			});
+
+			Services.Configure<ApiBehaviorOptions>(Options =>
+			{
+				Options.InvalidModelStateResponseFactory = Context =>
+				{
+					foreach(KeyValuePair<string, ModelStateEntry> Pair in Context.ModelState)
+					{
+						ModelError? Error = Pair.Value.Errors.FirstOrDefault();
+						if (Error != null)
+						{
+							string Message = Error.ErrorMessage;
+							if (String.IsNullOrEmpty(Message))
+							{
+								Message = Error.Exception?.Message ?? "Invalid error object";
+							}
+							return new BadRequestObjectResult(EpicGames.Core.LogEvent.Create(LogLevel.Error, KnownLogEvents.None, Error.Exception, "Invalid value for {Name}: {Message}", Pair.Key, Message));
+						}
+					}
+					return new BadRequestObjectResult(Context.ModelState);
+				};
 			});
 
 			DirectoryReference DashboardDir = DirectoryReference.Combine(Program.AppDir, "DashboardApp");
@@ -774,6 +831,13 @@ namespace HordeServer
 			App.UseForwardedHeaders();
 			App.UseExceptionHandler("/api/v1/error");
 
+			// Used for allowing auth cookies in combination with OpenID Connect auth (for example, Google Auth did not work with these unset)
+			App.UseCookiePolicy(new CookiePolicyOptions()
+			{
+				MinimumSameSitePolicy = SameSiteMode.None,
+				CheckConsentNeeded = _ => true
+			});
+
 			if (Settings.Value.CorsEnabled)
 			{
 				App.UseCors("CorsPolicy");
@@ -825,11 +889,6 @@ namespace HordeServer
 			{
 				Endpoints.MapGrpcService<HealthService>();
 				Endpoints.MapGrpcService<RpcService>();
-				
-				// Google Remote Execution API
-				Endpoints.MapGrpcService<ComputeRpcServer>();
-				Endpoints.MapGrpcService<BlobStoreRpc>();
-				Endpoints.MapGrpcService<RefTableRpc>();
 
 				Endpoints.MapGrpcReflectionService();
 
@@ -884,6 +943,16 @@ namespace HordeServer
 				}
 			}
 			return LogEventLevel.Information;
+		}
+
+		public static IServiceProvider CreateServiceProvider(IConfiguration Configuration)
+		{
+			IServiceCollection ServiceCollection = new ServiceCollection();
+
+			Startup Startup = new Startup(Configuration);
+			Startup.ConfigureServices(ServiceCollection);
+
+			return ServiceCollection.BuildServiceProvider();
 		}
 	}
 }

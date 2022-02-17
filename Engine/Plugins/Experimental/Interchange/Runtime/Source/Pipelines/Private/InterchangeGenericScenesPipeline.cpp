@@ -18,12 +18,12 @@
 #include "Engine/SpotLight.h"
 #include "Engine/StaticMeshActor.h"
 
-bool UInterchangeGenericLevelPipeline::ExecutePreImportPipeline(UInterchangeBaseNodeContainer* InBaseNodeContainer, const TArray<UInterchangeSourceData*>& InSourceDatas)
+void UInterchangeGenericLevelPipeline::ExecutePreImportPipeline(UInterchangeBaseNodeContainer* InBaseNodeContainer, const TArray<UInterchangeSourceData*>& InSourceDatas)
 {
 	if (!InBaseNodeContainer)
 	{
 		UE_LOG(LogInterchangePipeline, Warning, TEXT("UInterchangeGenericAssetsPipeline: Cannot execute pre-import pipeline because InBaseNodeContrainer is null"));
-		return false;
+		return;
 	}
 
 	TArray<UInterchangeSceneNode*> SceneNodes;
@@ -33,7 +33,7 @@ bool UInterchangeGenericLevelPipeline::ExecutePreImportPipeline(UInterchangeBase
 	{
 		switch(Node->GetNodeContainerType())
 		{
-		case EInterchangeNodeContainerType::NodeContainerType_TranslatedScene:
+		case EInterchangeNodeContainerType::TranslatedScene:
 		{
 			if (UInterchangeSceneNode* SceneNode = Cast<UInterchangeSceneNode>(Node))
 			{
@@ -46,17 +46,24 @@ bool UInterchangeGenericLevelPipeline::ExecutePreImportPipeline(UInterchangeBase
 
 	for (const UInterchangeSceneNode* SceneNode : SceneNodes)
 	{
-		//Ignore specialized types for now as they are used for bones hierarchies and other asset internal data
-		if (SceneNode && SceneNode->GetSpecializedTypeCount() == 0)
+		if (SceneNode)
 		{
-			CreateActorFactoryNode(SceneNode, InBaseNodeContainer);
+			if (SceneNode->GetSpecializedTypeCount() > 0)
+			{
+				TArray<FString> SpecializeTypes;
+				SceneNode->GetSpecializedTypes(SpecializeTypes);
+				if (!SpecializeTypes.Contains(UE::Interchange::FSceneNodeStaticData::GetTransformSpecializeTypeString()))
+				{
+					//Skip any scene node that have specialized types but not the "Transform" type.
+					continue;
+				}
+			}
+			CreateActorFactoryNode(InBaseNodeContainer, SceneNode, InBaseNodeContainer);
 		}
 	}
-
-	return true;
 }
 
-void UInterchangeGenericLevelPipeline::CreateActorFactoryNode(const UInterchangeSceneNode* SceneNode, UInterchangeBaseNodeContainer* FactoryNodeContainer)
+void UInterchangeGenericLevelPipeline::CreateActorFactoryNode(UInterchangeBaseNodeContainer* InBaseNodeContainer, const UInterchangeSceneNode* SceneNode, UInterchangeBaseNodeContainer* FactoryNodeContainer)
 {
 	if (!SceneNode)
 	{
@@ -86,7 +93,7 @@ void UInterchangeGenericLevelPipeline::CreateActorFactoryNode(const UInterchange
 		return;
 	}
 
-	ActorFactoryNode->InitializeNode(TEXT("Factory_") + SceneNode->GetUniqueID(), SceneNode->GetDisplayLabel(), EInterchangeNodeContainerType::NodeContainerType_FactoryData);
+	ActorFactoryNode->InitializeNode(TEXT("Factory_") + SceneNode->GetUniqueID(), SceneNode->GetDisplayLabel(), EInterchangeNodeContainerType::FactoryData);
 
 	if (!SceneNode->GetParentUid().IsEmpty())
 	{
@@ -96,7 +103,7 @@ void UInterchangeGenericLevelPipeline::CreateActorFactoryNode(const UInterchange
 	ActorFactoryNode->AddTargetNodeUid(SceneNode->GetUniqueID());
 
 	FTransform GlobalTransform;
-	if (SceneNode->GetCustomGlobalTransform(GlobalTransform))
+	if (SceneNode->GetCustomGlobalTransform(InBaseNodeContainer, GlobalTransform))
 	{
 		ActorFactoryNode->SetCustomGlobalTransform(GlobalTransform);
 	}

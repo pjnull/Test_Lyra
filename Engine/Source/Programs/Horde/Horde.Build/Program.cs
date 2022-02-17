@@ -145,7 +145,7 @@ namespace HordeServer
 			return SchemaTypes.ToArray();
 		}
 
-		public static void Main(string[] Args)
+		public static async Task Main(string[] Args)
 		{
 			CommandLineArguments Arguments = new CommandLineArguments(Args);
 
@@ -184,7 +184,7 @@ namespace HordeServer
 			{
 				using var _ = Datadog.Trace.Tracer.Instance.StartActive("Trace Test");
 				Serilog.Log.Logger.Information("Enabling datadog tracing");
-				GlobalTracer.Register(new TestTracer(Datadog.Trace.OpenTracing.OpenTracingTracerFactory.WrapTracer(Datadog.Trace.Tracer.Instance)));
+				GlobalTracer.Register(Datadog.Trace.OpenTracing.OpenTracingTracerFactory.WrapTracer(Datadog.Trace.Tracer.Instance));
 				using IScope Scope = GlobalTracer.Instance.BuildSpan("OpenTrace Test").StartActive();
 				Scope.Span.SetTag("TestProp", "hello");
 				Serilog.Log.Logger.Information("Enabling datadog tracing (OpenTrace)");
@@ -213,7 +213,21 @@ namespace HordeServer
 			{
 				using (X509Certificate2? GrpcCertificate = ReadGrpcCertificate(HordeSettings))
 				{
-					CreateHostBuilderWithCert(Args, Config, HordeSettings, GrpcCertificate).Build().Run();
+					List<IHost> Hosts = new List<IHost>();
+					Hosts.Add(CreateHostBuilderWithCert(Args, Config, HordeSettings, GrpcCertificate).Build());
+#if WITH_HORDE_STORAGE
+					IHostBuilder StorageHostBuilder = Horde.Storage.Program.CreateHostBuilder(Args);
+					StorageHostBuilder.ConfigureWebHostDefaults(Builder =>
+					{
+						Builder.ConfigureKestrel(Options =>
+						{
+							Options.ListenAnyIP(57000);
+							Options.ListenAnyIP(57001, Configure => Configure.UseHttps());
+						});
+					});
+					Hosts.Add(StorageHostBuilder.Build());
+#endif
+					await Task.WhenAll(Hosts.Select(x => x.RunAsync()));
 				}
 			}
 #pragma warning disable CA1031 // Do not catch general exception types
@@ -240,6 +254,8 @@ namespace HordeServer
 				{
 					WebBuilder.ConfigureKestrel(Options =>
 					{
+						Options.Limits.MaxRequestBodySize = 100 * 1024 * 1024;
+
 						if (ServerSettings.HttpPort != 0)
 						{
 							Options.ListenAnyIP(ServerSettings.HttpPort, Configure => { Configure.Protocols = HttpProtocols.Http1AndHttp2; });
@@ -267,9 +283,16 @@ namespace HordeServer
 		/// <returns>Custom certificate to use for Grpc endpoints, or null for the default.</returns>
 		public static X509Certificate2? ReadGrpcCertificate(ServerSettings HordeSettings)
 		{
+			string Base64Prefix = "base64:";
+			
 			if (HordeSettings.ServerPrivateCert == null)
 			{
 				return null;
+			}
+			else if (HordeSettings.ServerPrivateCert.StartsWith(Base64Prefix, StringComparison.Ordinal))
+			{
+				byte[] CertData = Convert.FromBase64String(HordeSettings.ServerPrivateCert.Replace(Base64Prefix, "", StringComparison.Ordinal));
+				return new X509Certificate2(CertData);
 			}
 			else
 			{

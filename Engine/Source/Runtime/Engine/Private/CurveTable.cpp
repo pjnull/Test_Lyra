@@ -587,6 +587,30 @@ FSimpleCurve& UCurveTable::AddSimpleCurve(FName RowName)
 	return *Result;
 }
 
+void UCurveTable::RenameRow(FName& CurveName, FName& NewCurveName)
+{
+	if (CurveName != NewCurveName && !RowMap.Contains(NewCurveName))
+	{
+		if (FRealCurve** Curve = RowMap.Find(CurveName))
+		{
+			RowMap.Add(NewCurveName, *Curve);
+			RowMap.Remove(CurveName);
+		}
+	}
+}
+
+void UCurveTable::DeleteRow(FName& CurveName)
+{
+	if (RowMap.Contains(CurveName))
+	{
+		FRealCurve** Curve = RowMap.Find(CurveName);
+		RowMap.Remove(CurveName);
+		if (Curve != nullptr && *Curve != nullptr)
+		{
+			delete *Curve;
+		}
+	}	
+}
 
 /** */
 void GetCurveValues(const TArray<const TCHAR*>& Cells, TArray<float>& Values)

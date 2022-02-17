@@ -739,6 +739,8 @@ void FVulkanDynamicRHI::SelectAndInitDevice()
 		GRHIAdapterInternalDriverVersion = FString::Printf(TEXT("%d.%d.%d (0x%X)"), VK_VERSION_MAJOR(Props.apiVersion), VK_VERSION_MINOR(Props.apiVersion), VK_VERSION_PATCH(Props.apiVersion), Props.apiVersion);
 		GRHIAdapterUserDriverVersion = FString::Printf(TEXT("%d.%d.%d (0x%X)"), VK_VERSION_MAJOR(Props.driverVersion), VK_VERSION_MINOR(Props.driverVersion), VK_VERSION_PATCH(Props.driverVersion), Props.driverVersion);
 		GRHIDeviceId = Props.deviceID;
+
+		UE_LOG(LogVulkanRHI, Display, TEXT("'%s' User Driver Version = %s"), *GRHIAdapterName, *GRHIAdapterUserDriverVersion);
 	}
 
 	GRHIPersistentThreadGroupCount = 1440; // TODO: Revisit based on vendor/adapter/perf query
@@ -1226,17 +1228,6 @@ FTextureCubeRHIRef FVulkanDynamicRHI::RHICreateTextureCubeFromResource(EPixelFor
 	return new FVulkanTextureCube(*Device, Format, Size, bArray, ArraySize, NumMips, Resource, Flags, ResourceCreateInfo);
 }
 
-void FVulkanDynamicRHI::RHIAliasTextureResources(FRHITexture* DestTextureRHI, FRHITexture* SrcTextureRHI)
-{
-	check(false);
-}
-
-FTextureRHIRef FVulkanDynamicRHI::RHICreateAliasedTexture(FRHITexture* SourceTexture)
-{
-	check(false);
-	return nullptr;
-}
-
 void FVulkanDynamicRHI::RHIAliasTextureResources(FTextureRHIRef& DestTextureRHI, FTextureRHIRef& SrcTextureRHI)
 {
 	if (DestTextureRHI && SrcTextureRHI)
@@ -1273,21 +1264,6 @@ FTextureRHIRef FVulkanDynamicRHI::RHICreateAliasedTexture(FTextureRHIRef& Source
 	}
 
 	return AliasedTexture;
-}
-
-void FVulkanDynamicRHI::RHICopySubTextureRegion(FRHITexture2D* SourceTexture, FRHITexture2D* DestinationTexture, FBox2D SourceBox, FBox2D DestinationBox)
-{
-	FRHICopyTextureInfo CopyInfo;
-
-	CopyInfo.Size.X = (int32)(SourceBox.Max.X - SourceBox.Min.X);
-	CopyInfo.Size.Y = (int32)(SourceBox.Max.Y - SourceBox.Min.Y);
-
-	CopyInfo.SourcePosition.X = (int32)(SourceBox.Min.X);
-	CopyInfo.SourcePosition.Y = (int32)(SourceBox.Min.Y);
-	CopyInfo.DestPosition.X = (int32)(DestinationBox.Min.X);
-	CopyInfo.DestPosition.Y = (int32)(DestinationBox.Min.Y);
-
-	RHIGetDefaultContext()->RHICopyTexture(SourceTexture, DestinationTexture, CopyInfo);
 }
 
 FVulkanDescriptorSetsLayout::FVulkanDescriptorSetsLayout(FVulkanDevice* InDevice) :

@@ -50,7 +50,7 @@ class FSetupRayTracingLightCullData : public FGlobalShader
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_SRV(StructuredBuffer<float4>, RankedLights)
-		SHADER_PARAMETER(FVector3f, WorldPos)
+		SHADER_PARAMETER(FVector3f, TranslatedWorldPos)
 		SHADER_PARAMETER(uint32, NumLightsToUse)
 		SHADER_PARAMETER(uint32, CellCount)
 		SHADER_PARAMETER(float, CellScale)
@@ -114,15 +114,15 @@ static void CreateRaytracingLightCullingStructure(
 	// setup light vector array sorted by rank
 	for (int32 LightIndex = 0; LightIndex < NumLightsToUse; LightIndex++)
 	{
-		VectorRegister BoundingSphere = Lights[LightIndices[LightIndex]].BoundingSphereVector;
-		RankedLights.Push(
-			FVector4f(
-				VectorGetComponentImpl<0>(BoundingSphere), 
-				VectorGetComponentImpl<1>(BoundingSphere), 
-				VectorGetComponentImpl<2>(BoundingSphere), 
-				VectorGetComponentImpl<3>(BoundingSphere)
-			)
+		VectorRegister BoundingSphereRegister = Lights[LightIndices[LightIndex]].BoundingSphereVector;
+		FVector4 BoundingSphere = FVector4(
+			VectorGetComponentImpl<0>(BoundingSphereRegister),
+			VectorGetComponentImpl<1>(BoundingSphereRegister),
+			VectorGetComponentImpl<2>(BoundingSphereRegister),
+			VectorGetComponentImpl<3>(BoundingSphereRegister)
 		);
+		FVector4f TranslatedBoundingSphere = FVector4f(BoundingSphere + View.ViewMatrices.GetPreViewTranslation());
+		RankedLights.Push(TranslatedBoundingSphere);
 	}
 
 	// push null vector to prevent failure in RHICreateStructuredBuffer due to requesting a zero sized allocation
@@ -162,7 +162,7 @@ static void CreateRaytracingLightCullingStructure(
 			FSetupRayTracingLightCullData::FParameters Params;
 			Params.RankedLights = RankedLightsSRV;
 
-			Params.WorldPos = (FVector3f)View.ViewMatrices.GetViewOrigin(); // View.ViewLocation; // LWC_TODO: Precision Loss
+			Params.TranslatedWorldPos = (FVector3f)(View.ViewMatrices.GetViewOrigin() + View.ViewMatrices.GetPreViewTranslation());
 			Params.NumLightsToUse = NumLightsToUse;
 			Params.LightCullingVolume = LightCullVolumeUAV;
 			Params.LightIndices = OutLightingData.LightIndices.UAV;
@@ -199,19 +199,6 @@ static void SetupRaytracingLightDataPacked(
 	TMap<FRHITexture*, uint32> RectTextureMap;
 
 	LightData->Count = 0;
-
-	FTextureRHIRef DymmyWhiteTexture = GWhiteTexture->TextureRHI;
-	LightData->RectLightTexture0 = DymmyWhiteTexture;
-	LightData->RectLightTexture1 = DymmyWhiteTexture;
-	LightData->RectLightTexture2 = DymmyWhiteTexture;
-	LightData->RectLightTexture3 = DymmyWhiteTexture;
-	LightData->RectLightTexture4 = DymmyWhiteTexture;
-	LightData->RectLightTexture5 = DymmyWhiteTexture;
-	LightData->RectLightTexture6 = DymmyWhiteTexture;
-	LightData->RectLightTexture7 = DymmyWhiteTexture;
-	static constexpr uint32 MaxRectLightTextureSlos = 8;
-	static constexpr uint32 InvalidTextureIndex = 99; // #dxr_todo: share this definition with ray tracing shaders
-
 	{
 		// IES profiles
 		FRHITexture* IESTextureRHI = nullptr;
@@ -270,16 +257,11 @@ static void SetupRaytracingLightDataPacked(
 
 		LightDataElement.Type = Light.LightType;
 		LightDataElement.LightProfileIndex = IESLightProfileIndex;
-		LightDataElement.RectLightTextureIndex = InvalidTextureIndex;
 
-		const FVector3f LightColor(LightParameters.Color);
-		for (int32 Element = 0; Element < 3; Element++)
-		{
-			LightDataElement.Direction[Element] = LightParameters.Direction[Element];
-			LightDataElement.LightPosition[Element] = (float)LightParameters.WorldPosition[Element]; // LWC_TODO
-			LightDataElement.LightColor[Element] = LightColor[Element];
-			LightDataElement.Tangent[Element] = LightParameters.Tangent[Element];
-		}
+		LightDataElement.Direction = LightParameters.Direction;
+		LightDataElement.TranslatedLightPosition = LightParameters.WorldPosition + View.ViewMatrices.GetPreViewTranslation();
+		LightDataElement.LightColor = FVector3f(LightParameters.Color);
+		LightDataElement.Tangent = LightParameters.Tangent;
 
 		// Ray tracing should compute fade parameters ignoring lightmaps
 		const FVector2D FadeParams = Light.LightSceneInfo->Proxy->GetDirectionalLightDistanceFadeParameters(View.GetFeatureLevel(), false, View.MaxShadowCascades);
@@ -299,6 +281,12 @@ static void SetupRaytracingLightDataPacked(
 		LightDataElement.SoftSourceRadius = LightParameters.SoftSourceRadius;
 		LightDataElement.RectLightBarnCosAngle = LightParameters.RectLightBarnCosAngle;
 		LightDataElement.RectLightBarnLength = LightParameters.RectLightBarnLength;
+
+		LightDataElement.RectLightAtlasUVOffset[0] = LightParameters.RectLightAtlasUVOffset.X;
+		LightDataElement.RectLightAtlasUVOffset[1] = LightParameters.RectLightAtlasUVOffset.Y;
+		LightDataElement.RectLightAtlasUVScale[0] = LightParameters.RectLightAtlasUVScale.X;
+		LightDataElement.RectLightAtlasUVScale[1] = LightParameters.RectLightAtlasUVScale.Y;
+		LightDataElement.RectLightAtlasMaxLevel = LightParameters.RectLightAtlasMaxLevel;
 		LightDataElement.Pad = 0;
 
 		// Stuff directional light's shadow angle factor into a RectLight parameter
@@ -308,41 +296,6 @@ static void SetupRaytracingLightDataPacked(
 		}
 
 		LightDataArray.Add(LightDataElement);
-
-		const bool bRequireTexture = Light.LightType == ELightComponentType::LightType_Rect && LightParameters.SourceTexture;
-		uint32 RectLightTextureIndex = InvalidTextureIndex;
-		if (bRequireTexture)
-		{
-			const uint32* IndexFound = RectTextureMap.Find(LightParameters.SourceTexture);
-			if (!IndexFound)
-			{
-				if (RectTextureMap.Num() < MaxRectLightTextureSlos)
-				{
-					RectLightTextureIndex = RectTextureMap.Num();
-					RectTextureMap.Add(LightParameters.SourceTexture, RectLightTextureIndex);
-				}
-			}
-			else
-			{
-				RectLightTextureIndex = *IndexFound;
-			}
-		}
-
-		if (RectLightTextureIndex != InvalidTextureIndex)
-		{
-			LightDataArray[LightData->Count].RectLightTextureIndex = RectLightTextureIndex;
-			switch (RectLightTextureIndex)
-			{
-			case 0: LightData->RectLightTexture0 = LightParameters.SourceTexture; break;
-			case 1: LightData->RectLightTexture1 = LightParameters.SourceTexture; break;
-			case 2: LightData->RectLightTexture2 = LightParameters.SourceTexture; break;
-			case 3: LightData->RectLightTexture3 = LightParameters.SourceTexture; break;
-			case 4: LightData->RectLightTexture4 = LightParameters.SourceTexture; break;
-			case 5: LightData->RectLightTexture5 = LightParameters.SourceTexture; break;
-			case 6: LightData->RectLightTexture6 = LightParameters.SourceTexture; break;
-			case 7: LightData->RectLightTexture7 = LightParameters.SourceTexture; break;
-			}
-		}
 
 		LightData->Count++;
 

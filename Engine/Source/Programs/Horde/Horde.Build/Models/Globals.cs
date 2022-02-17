@@ -16,6 +16,8 @@ using System.Threading.Tasks;
 
 namespace HordeServer.Models
 {
+	using UserId = ObjectId<IUser>;
+
 	/// <summary>
 	/// Base class for singleton documents
 	/// </summary>
@@ -153,32 +155,6 @@ namespace HordeServer.Models
 	}
 
 	/// <summary>
-	/// User notice
-	/// </summary>
-	public class Notice
-	{
-		/// <summary>
-		/// Unique id for this notice
-		/// </summary>
-		public string Id { get; set; } = String.Empty;
-
-		/// <summary>
-		/// Start time to display this message
-		/// </summary>
-		public DateTime? StartTime { get; set; }
-
-		/// <summary>
-		/// Finish time to display this message
-		/// </summary>
-		public DateTime? FinishTime { get; set; }
-
-		/// <summary>
-		/// Message to display
-		/// </summary>
-		public string Message { get; set; } = String.Empty;
-	}
-
-	/// <summary>
 	/// Path to a platform and stream to use for syncing AutoSDK
 	/// </summary>
 	public class AutoSdkWorkspace
@@ -311,19 +287,9 @@ namespace HordeServer.Models
 		public ObjectId InstanceId { get; set; }
 
 		/// <summary>
-		/// Set to true to drop the database on restart.
-		/// </summary>
-		public bool ForceReset { get; set; }
-
-		/// <summary>
 		/// The config revision
 		/// </summary>
 		public string? ConfigRevision { get; set; }
-
-		/// <summary>
-		/// Manually added status messages
-		/// </summary>
-		public List<Notice> Notices { get; set; } = new List<Notice>();
 
 		/// <summary>
 		/// List of Perforce clusters
@@ -334,6 +300,11 @@ namespace HordeServer.Models
 		/// Maximum number of simultaneous conforms
 		/// </summary>
 		public int MaxConformCount { get; set; }
+
+		/// <summary>
+		/// The root ACL
+		/// </summary>
+		public Acl? RootAcl { get; set; }
 
 		/// <summary>
 		/// Randomly generated JWT signing key
@@ -349,6 +320,11 @@ namespace HordeServer.Models
 		/// The scheduled downtime
 		/// </summary>
 		public List<ScheduledDowntime> ScheduledDowntime { get; set; } = new List<ScheduledDowntime>();
+
+		/// <summary>
+		/// List of compute profiles
+		/// </summary>
+		public List<ComputeClusterConfig> ComputeClusters { get; set; } = new List<ComputeClusterConfig>();
 
 		/// <summary>
 		/// Private constructor for serialization
@@ -367,13 +343,20 @@ namespace HordeServer.Models
 		}
 
 		/// <summary>
-		/// Finds a perforce cluster with the given name
+		/// Finds a perforce cluster with the given name or that contains the provided server
 		/// </summary>
 		/// <param name="Name">Name of the cluster</param>
+		/// <param name="ServerAndPort">Find cluster which contains server</param>
 		/// <returns></returns>
-		public PerforceCluster? FindPerforceCluster(string? Name)
+		public PerforceCluster? FindPerforceCluster(string? Name, string? ServerAndPort = null)
 		{
 			List<PerforceCluster> Clusters = PerforceClusters;
+
+			if (ServerAndPort != null)
+			{
+				return Clusters.FirstOrDefault(x => x.Servers.FirstOrDefault( server => string.Equals(server.ServerAndPort, ServerAndPort, StringComparison.OrdinalIgnoreCase)) != null);
+			}
+
 			if (Clusters.Count == 0)
 			{
 				Clusters = DefaultClusters;

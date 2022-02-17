@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using async_enumerable_dotnet;
 using Dasync.Collections;
+using EpicGames.Horde.Storage;
 using Jupiter;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
@@ -17,33 +18,26 @@ using Serilog;
 
 namespace Horde.Storage.Implementation
 {
-    public class RemovedBlobs
-    {
-        public RemovedBlobs(BlobIdentifier blobIdentifier)
-        {
-            BlobIdentifier = blobIdentifier;
-        }
-
-        public BlobIdentifier BlobIdentifier { get; set; }
-    }
-
     public interface IBlobCleanup
     {
-        Task<List<RemovedBlobs>> Cleanup(CancellationToken none);
+        bool ShouldRun();
+        Task<List<BlobIdentifier>> Cleanup(CancellationToken none);
     }
 
     public class OrphanBlobCleanup : IBlobCleanup
     {
-        private readonly IBlobStore _blobStore;
+        private readonly IBlobService _blobService;
         private readonly ILeaderElection _leaderElection;
+        private readonly IOptionsMonitor<GCSettings> _gcSettings;
         private readonly IRestClient _client;
         private readonly ILogger _logger = Log.ForContext<OrphanBlobCleanup>();
 
         // ReSharper disable once UnusedMember.Global
-        public OrphanBlobCleanup(IBlobStore blobStore, ILeaderElection leaderElection, IOptionsMonitor<CallistoTransactionLogSettings> callistoSettings, IServiceCredentials serviceCredentials)
+        public OrphanBlobCleanup(IBlobService blobService, ILeaderElection leaderElection, IOptionsMonitor<CallistoTransactionLogSettings> callistoSettings, IOptionsMonitor<GCSettings> gcSettings, IServiceCredentials serviceCredentials)
         {
-            _blobStore = blobStore;
+            _blobService = blobService;
             _leaderElection = leaderElection;
+            _gcSettings = gcSettings;
 
             _client = new RestClient(callistoSettings.CurrentValue.ConnectionString)
             {
@@ -51,11 +45,12 @@ namespace Horde.Storage.Implementation
             }.UseSerializer(() => new JsonNetSerializer());
         }
 
-        internal OrphanBlobCleanup(IBlobStore blobStore, ILeaderElection leaderElection, IRestClient callistoClient)
+        internal OrphanBlobCleanup(IBlobService blobService, ILeaderElection leaderElection, IRestClient callistoClient, IOptionsMonitor<GCSettings> gcSettings)
         {
-            _blobStore = blobStore;
+            _blobService = blobService;
             _leaderElection = leaderElection;
             _client = callistoClient;
+            _gcSettings = gcSettings;
         }
 
         private struct GCRootState
@@ -73,15 +68,25 @@ namespace Horde.Storage.Implementation
 
         }
 
-        public async Task<List<RemovedBlobs>> Cleanup(CancellationToken cancellationToken)
+        public bool ShouldRun()
+        {
+            if (!_leaderElection.IsThisInstanceLeader())
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public async Task<List<BlobIdentifier>> Cleanup(CancellationToken cancellationToken)
         {
             if (!_leaderElection.IsThisInstanceLeader())
             {
                 _logger.Information("Skipped orphan blob cleanup run as this instance is not the leader");
-                return new List<RemovedBlobs>();
+                return new List<BlobIdentifier>();
             }
 
-            List<NamespaceId> namespaces = await ListNamespaces().ToListAsync();
+            List<NamespaceId> namespaces = await ListNamespaces().Where(NamespaceShouldBeCleaned).ToListAsync();
             ConcurrentDictionary<NamespaceId, GCRootState> perNamespaceRoots = new();
             await namespaces.ParallelForEachAsync(async ns =>
             {
@@ -90,15 +95,18 @@ namespace Horde.Storage.Implementation
             }, cancellationToken);
 
             List<BlobIdentifier> blobsToRemove = new List<BlobIdentifier>();
-            List<RemovedBlobs> removedBlobs = new List<RemovedBlobs>();
+            List<BlobIdentifier> removedBlobs = new List<BlobIdentifier>();
 
             // enumerate all namespaces, and check if the old blob is valid in any of them to allow for a blob store to just store them in a single pile if it wants to
             foreach (NamespaceId @namespace in namespaces)
             {
                 // only consider blobs that have been around for 60 minutes
                 // this due to cases were blobs are uploaded first, and the GC roots specified after the fact for DDC keys
-                await foreach (BlobIdentifier blob in _blobStore.ListOldObjects(@namespace, DateTime.Now.AddMinutes(-60)).WithCancellation(cancellationToken))
+                await foreach ((BlobIdentifier blob, DateTime lastModified) in _blobService.ListObjects(@namespace).WithCancellation(cancellationToken))
                 {
+                    if (lastModified > DateTime.Now.AddMinutes(-60))
+                        continue;
+
                     // TODO: This could be turned into a parallel for as each iteration does not mutate the state
                     // there is no parallel for each for async enumerable yet
                     // we could manually build one, see https://github.com/dotnet/corefx/issues/34233 but lets wait until we know the time this takes is an issue
@@ -140,7 +148,7 @@ namespace Horde.Storage.Implementation
                 {
                     try
                     {
-                        await _blobStore.DeleteObject(ns, blob);
+                        await _blobService.DeleteObject(ns, blob);
                     }
                     catch (Exception e)
                     {
@@ -150,11 +158,16 @@ namespace Horde.Storage.Implementation
                 }
                 if (deleted)
                 {
-                    removedBlobs.Add(new RemovedBlobs(blob));
+                    removedBlobs.Add(blob);
                 }
             }
 
             return removedBlobs;
+        }
+
+        private bool NamespaceShouldBeCleaned(NamespaceId ns)
+        {
+            return _gcSettings.CurrentValue.CleanNamespacesV1.Contains(ns.ToString());
         }
 
         public virtual async IAsyncEnumerable<NamespaceId> ListNamespaces()

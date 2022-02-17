@@ -20,6 +20,7 @@ namespace HordeServer.Collections
 {
 	using PoolId = StringId<IPool>;
 	using AgentSoftwareChannelName = StringId<AgentSoftwareChannels>;
+	using SessionId = ObjectId<ISession>;
 
 	/// <summary>
 	/// Interface for a collection of agent documents
@@ -59,14 +60,13 @@ namespace HordeServer.Collections
 		/// <summary>
 		/// Finds all agents matching certain criteria
 		/// </summary>
-		/// <param name="Pool">The pool containing the agent</param>
 		/// <param name="PoolId">The pool ID in string form containing the agent</param>
 		/// <param name="ModifiedAfter">If set, only returns agents modified after this time</param>
 		/// <param name="Status">Status to look for</param>
 		/// <param name="Index">Index of the first result</param>
 		/// <param name="Count">Number of results to return</param>
 		/// <returns>List of agents matching the given criteria</returns>
-		Task<List<IAgent>> FindAsync(ObjectId? Pool = null, string? PoolId = null, DateTime? ModifiedAfter = null, AgentStatus? Status = null, int? Index = null, int? Count = null);
+		Task<List<IAgent>> FindAsync(PoolId? PoolId = null, DateTime? ModifiedAfter = null, AgentStatus? Status = null, int? Index = null, int? Count = null);
 
 		/// <summary>
 		/// Finds all the expried agents
@@ -82,14 +82,16 @@ namespace HordeServer.Collections
 		/// <param name="Agent">Agent instance</param>
 		/// <param name="bEnabled">Whether the agent is enabled or not</param>
 		/// <param name="bRequestConform">Whether to request a conform job be run</param>
+		/// <param name="bRequestFullConform">Whether to request a full conform job be run</param>
 		/// <param name="bRequestRestart">Whether to request the machine be restarted</param>
 		/// <param name="bRequestShutdown">Whether to request the machine be shut down</param>
+		/// <param name="ShutdownReason">The reason for shutting down agent, ex. Autoscaler/Manual/Unexpected</param>
 		/// <param name="Channel">Override for the desired software channel</param>
 		/// <param name="Pools">List of pools for the agent</param>
 		/// <param name="Acl">New ACL for this agent</param>
 		/// <param name="Comment">New comment</param>
 		/// <returns>Version of the software that needs to be installed on the agent. Null if the agent is running the correct version.</returns>
-		Task<IAgent?> TryUpdateSettingsAsync(IAgent Agent, bool? bEnabled = null, bool? bRequestConform = null, bool? bRequestRestart = null, bool? bRequestShutdown = null, AgentSoftwareChannelName? Channel = null, List<PoolId>? Pools = null, Acl? Acl = null, string? Comment = null);
+		Task<IAgent?> TryUpdateSettingsAsync(IAgent Agent, bool? bEnabled = null, bool? bRequestConform = null, bool? bRequestFullConform = null, bool? bRequestRestart = null, bool? bRequestShutdown = null, string? ShutdownReason = null, AgentSoftwareChannelName? Channel = null, List<PoolId>? Pools = null, Acl? Acl = null, string? Comment = null);
 
 		/// <summary>
 		/// Update the current workspaces for an agent.
@@ -112,7 +114,7 @@ namespace HordeServer.Collections
 		/// <param name="DynamicPools">New list of dynamic pools for the agent</param>
 		/// <param name="Version">Current version of the agent software</param>
 		/// <returns>New agent state</returns>
-		Task<IAgent?> TryStartSessionAsync(IAgent Agent, ObjectId SessionId, DateTime SessionExpiresAt, AgentStatus Status, IReadOnlyList<string> Properties, IReadOnlyDictionary<string, int> Resources, IReadOnlyList<PoolId> DynamicPools, string? Version);
+		Task<IAgent?> TryStartSessionAsync(IAgent Agent, SessionId SessionId, DateTime SessionExpiresAt, AgentStatus Status, IReadOnlyList<string> Properties, IReadOnlyDictionary<string, int> Resources, IReadOnlyList<PoolId> DynamicPools, string? Version);
 
 		/// <summary>
 		/// Attempt to update the agent state

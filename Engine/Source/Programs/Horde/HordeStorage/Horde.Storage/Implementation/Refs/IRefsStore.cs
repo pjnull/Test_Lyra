@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 
 namespace Horde.Storage.Implementation
@@ -29,7 +30,7 @@ namespace Horde.Storage.Implementation
 
         public BlobIdentifier[] Blobs { get; }
         public Dictionary<string, object>? Metadata { get; }
-        public DateTime? LastAccessTime { get; }
+        public DateTime? LastAccessTime { get; internal set; }
         public ContentHash ContentHash { get; }
 
         public TransactionEvent ToAddTransactionEvent()

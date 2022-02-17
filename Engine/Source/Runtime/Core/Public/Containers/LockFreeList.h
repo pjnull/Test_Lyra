@@ -50,17 +50,6 @@ CORE_API void LockFreeFreeLinks(SIZE_T AllocSize, void* Ptr);
 #define MAX_LOCK_FREE_LINKS_AS_BITS (26)
 #define MAX_LOCK_FREE_LINKS (1 << 26)
 
-template<int TPaddingForCacheContention>
-struct FPaddingForCacheContention
-{
-	uint8 PadToAvoidContention[TPaddingForCacheContention];
-};
-
-template<>
-struct FPaddingForCacheContention<0>
-{
-};
-
 template<class T, unsigned int MaxTotalItems, unsigned int ItemsPerPage>
 class TLockFreeAllocOnceIndexedAllocator
 {
@@ -128,11 +117,8 @@ private:
 		return (void*)(Pages[BlockIndex] + SubIndex);
 	}
 
-	uint8 PadToAvoidContention0[PLATFORM_CACHE_LINE_SIZE];
-	FThreadSafeCounter NextIndex;
-	uint8 PadToAvoidContention1[PLATFORM_CACHE_LINE_SIZE];
-	T* Pages[MaxBlocks];
-	uint8 PadToAvoidContention2[PLATFORM_CACHE_LINE_SIZE];
+	alignas(PLATFORM_CACHE_LINE_SIZE) FThreadSafeCounter NextIndex;
+	alignas(PLATFORM_CACHE_LINE_SIZE) T* Pages[MaxBlocks];
 };
 
 
@@ -266,8 +252,10 @@ struct FLockFreeLinkPolicy
 };
 
 template<int TPaddingForCacheContention, uint64 TABAInc = 1>
-class FLockFreePointerListLIFORoot : public FNoncopyable
+class FLockFreePointerListLIFORoot
 {
+	UE_NONCOPYABLE(FLockFreePointerListLIFORoot)
+
 	typedef FLockFreeLinkPolicy::TDoublePtr TDoublePtr;
 	typedef FLockFreeLinkPolicy::TLink TLink;
 	typedef FLockFreeLinkPolicy::TLinkPtr TLinkPtr;
@@ -413,19 +401,21 @@ public:
 	}
 
 private:
-
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention1;
-	TDoublePtr Head;
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention2;
+	alignas(TPaddingForCacheContention) TDoublePtr Head;
 };
 
 template<class T, int TPaddingForCacheContention, uint64 TABAInc = 1>
-class FLockFreePointerListLIFOBase : public FNoncopyable
+class FLockFreePointerListLIFOBase
 {
+	UE_NONCOPYABLE(FLockFreePointerListLIFOBase)
+
 	typedef FLockFreeLinkPolicy::TDoublePtr TDoublePtr;
 	typedef FLockFreeLinkPolicy::TLink TLink;
 	typedef FLockFreeLinkPolicy::TLinkPtr TLinkPtr;
+
 public:
+	FLockFreePointerListLIFOBase() = default;
+
 	void Reset()
 	{
 		RootList.Reset();
@@ -522,8 +512,10 @@ private:
 };
 
 template<class T, int TPaddingForCacheContention, uint64 TABAInc = 1>
-class FLockFreePointerFIFOBase : public FNoncopyable
+class FLockFreePointerFIFOBase
 {
+	UE_NONCOPYABLE(FLockFreePointerFIFOBase)
+
 	typedef FLockFreeLinkPolicy::TDoublePtr TDoublePtr;
 	typedef FLockFreeLinkPolicy::TLink TLink;
 	typedef FLockFreeLinkPolicy::TLinkPtr TLinkPtr;
@@ -652,18 +644,16 @@ public:
 	}
 
 private:
-
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention1;
-	TDoublePtr Head;
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention2;
-	TDoublePtr Tail;
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention3;
+	alignas(TPaddingForCacheContention) TDoublePtr Head;
+	alignas(TPaddingForCacheContention) TDoublePtr Tail;
 };
 
 
 template<class T, int TPaddingForCacheContention, int NumPriorities>
-class FStallingTaskQueue : public FNoncopyable
+class FStallingTaskQueue
 {
+	UE_NONCOPYABLE(FStallingTaskQueue)
+
 	typedef FLockFreeLinkPolicy::TDoublePtr TDoublePtr;
 	typedef FLockFreeLinkPolicy::TLink TLink;
 	typedef FLockFreeLinkPolicy::TLinkPtr TLinkPtr;
@@ -805,8 +795,7 @@ private:
 
 	FLockFreePointerFIFOBase<T, TPaddingForCacheContention> PriorityQueues[NumPriorities];
 	// not a pointer to anything, rather tracks the stall state of all threads servicing this queue.
-	TDoublePtr MasterState;
-	FPaddingForCacheContention<TPaddingForCacheContention> PadToAvoidContention1;
+	alignas(TPaddingForCacheContention) TDoublePtr MasterState;
 };
 
 

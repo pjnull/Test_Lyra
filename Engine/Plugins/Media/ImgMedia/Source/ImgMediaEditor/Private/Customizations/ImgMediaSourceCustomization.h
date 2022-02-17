@@ -42,41 +42,16 @@ public:
 		return MakeShareable(new FImgMediaSourceCustomization());
 	}
 
-protected:
-
 	/**
-	 * Adds custom UI for mipmap info.
+	 * Get the path to the currently selected image sequence.
 	 *
-	 * @param DetailBuilder Adds to this UI.
-	 */
-	void CustomizeMipMapInfo(IDetailLayoutBuilder& DetailBuilder);
-
-	/**
-	 * Adds info on objects to the UI.
-	 *
-	 * @param InCategory UI will be added here.
-	 * @param MipMapInfo Object info will be retrieved from this.
-	 */
-	void AddMipMapObjects(IDetailCategoryBuilder& InCategory, const FImgMediaMipMapInfo* MipMapInfo);
-
-	/**
-	 * Adds object info for a camera to the UI.
+	 * @param InPropertyHandle A property that is a child of the top level ImgMediaSource property.
 	 * 
-	 * @param InCameraGroup UI to add to.
-	 * @param InCameraInfo Camera to use.
-	 * @param InMipLevelDistances Distances for each mip map level in world space.
-	 * @param Objects List of objects to show info for.
+	 * @return Sequence path string.
 	 */
-	void AddCameraObjects(IDetailGroup& InCameraGroup, const FImgMediaMipMapCameraInfo& InCameraInfo, const TArray<float>& InMipLevelDistances, const TArray<FImgMediaMipMapObjectInfo*>& Objects);
-	
-	/**
-	 * Adds mip level distances for a camera to the UI.
-	 *
-	 * @param InCameraGroup UI to add to.
-	 * @param InCameraInfo Camera to use.
-	 * @param InMipLevelDistances Distances for each mip map level in world space.
-	 */
-	void AddCameraMipDistances(IDetailGroup& InCameraGroup, const FImgMediaMipMapCameraInfo& InCameraInfo, const TArray<float>& InMipLevelDistances);
+	static FString GetSequencePathFromChildProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle);
+
+protected:
 
 	/**
 	 * Get the path to the currently selected image sequence.
@@ -101,9 +76,9 @@ private:
 	EVisibility HandleSequencePathWarningIconVisibility() const;
 
 	/** Returns the property for SequencePath. */
-	TSharedPtr<IPropertyHandle> GetSequencePathProperty() const;
+	static TSharedPtr<IPropertyHandle> GetSequencePathProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle);
 	/** Returns the property for SequencePath->Path. */
-	TSharedPtr<IPropertyHandle> GetSequencePathPathProperty() const;
+	static TSharedPtr<IPropertyHandle> GetSequencePathPathProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle);
 	/** Returns the property for IsPathRelativeToProjectRoot. */
 	TSharedPtr<IPropertyHandle> GetPathRelativeToRootProperty() const;
 	/** Returns the value of IsPathRelativeToProjectRoot. */

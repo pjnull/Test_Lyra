@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Horde.Storage.Controllers;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
@@ -57,7 +58,7 @@ namespace Horde.Storage.Implementation
 
     public class DDCRefService : IDDCRefService
     {
-        private readonly IBlobStore _blobStore;
+        private readonly IBlobService _blobStore;
         private readonly IRefsStore _refsStore;
         private readonly ITransactionLogWriter _transactionLog;
         private readonly ILastAccessTracker<RefRecord> _lastAccessTracker;
@@ -65,7 +66,7 @@ namespace Horde.Storage.Implementation
         private readonly HordeStorageSettings _settings;
         private readonly ILogger _logger = Log.ForContext<DDCRefService>();
 
-        public DDCRefService(IBlobStore blobStore, IRefsStore refsStore, ITransactionLogWriter transactionLog, ILastAccessTracker<RefRecord> lastAccessTracker,
+        public DDCRefService(IBlobService blobStore, IRefsStore refsStore, ITransactionLogWriter transactionLog, ILastAccessTracker<RefRecord> lastAccessTracker,
             IDiagnosticContext diagnosticContext, IOptionsMonitor<HordeStorageSettings> settings)
         {
             _blobStore = blobStore;
@@ -94,7 +95,7 @@ namespace Horde.Storage.Implementation
 
             string resource = $"{ns}.{bucket}.{key}";
             RefRecord? record;
-            using (Scope scope = Tracer.Instance.StartActive("ref.get"))
+            using (IScope scope = Tracer.Instance.StartActive("ref.get"))
             {
                 scope.Span.ResourceName = resource;
                 record = await _refsStore.Get(ns, bucket, key, flags);
@@ -119,7 +120,7 @@ namespace Horde.Storage.Implementation
 
             if (needsBlob)
             {
-                using Scope scope = Tracer.Instance.StartActive("blob.get");
+                using IScope scope = Tracer.Instance.StartActive("blob.get");
                 scope.Span.ResourceName = resource;
                 scope.Span.SetTag("BlobCount", record.Blobs.Length.ToString());
 
@@ -237,7 +238,7 @@ namespace Horde.Storage.Implementation
                 Task[] insertTasks = new Task[countOfBlobs];
                 for (int i = 0; i < countOfBlobs; i++)
                 {
-                    insertTasks[i] = _blobStore.PutObject(ns, slices[i], blobReferences[i]);
+                    insertTasks[i] = _blobStore.PutObject(ns, slices[i].ToArray(), blobReferences[i]);
                 }
 
                 blobInsertTask = Task.WhenAll(insertTasks);

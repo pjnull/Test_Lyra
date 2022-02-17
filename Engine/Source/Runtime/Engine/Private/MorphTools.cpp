@@ -10,6 +10,8 @@
 #include "Animation/MorphTarget.h"
 #include "Rendering/SkeletalMeshModel.h"
 #include "Rendering/SkeletalMeshLODModel.h"
+#include "UObject/GarbageCollection.h"
+#include "Algo/AnyOf.h"
 #include "Interfaces/ITargetPlatform.h"
 
 FArchive& operator<<(FArchive& Ar, FMorphTargetLODModel& M)
@@ -217,15 +219,17 @@ TUniquePtr<FFinishBuildMorphTargetData> UMorphTarget::CreateFinishBuildMorphTarg
 	return MakeUnique<FFinishBuildMorphTargetData>();
 }
 
-void FFinishBuildMorphTargetData::ApplyEditorData(USkeletalMesh * SkeletalMesh) const
+void FFinishBuildMorphTargetData::ApplyEditorData(USkeletalMesh * SkeletalMesh, bool bIsSerializeSaving) const
 {
-	check(IsInGameThread());
 	//Return if we do not need to apply data
 	if (!bApplyMorphTargetsData)
 	{
 		return;
 	}
 	
+	//Make sure we do not create new morph target during a gc
+	FGCScopeGuard GCScopeGuard;
+
 	FSkeletalMeshModel * SkelMeshModel = SkeletalMesh->GetImportedModel();
 	check(SkelMeshModel);
 	
@@ -243,11 +247,30 @@ void FFinishBuildMorphTargetData::ApplyEditorData(USkeletalMesh * SkeletalMesh) 
 	for (const TPair<FName, TArray<FMorphTargetLODModel>>& TargetNameAndMorphLODModels : MorphLODModelsPerTargetName)
 	{
 		FName MorphTargetName = TargetNameAndMorphLODModels.Key;
+		const TArray<FMorphTargetLODModel>& MorphTargetLODModels = TargetNameAndMorphLODModels.Value;
+		int32 MorphLODModelNumber = MorphTargetLODModels.Num();
+
 		UMorphTarget * MorphTarget = ExistingMorphTargets.FindRef(MorphTargetName);
 		if (!MorphTarget)
 		{
-			MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, MorphTargetName);
-			check(MorphTarget);
+			if (!Algo::AnyOf(MorphTargetLODModels, [](const FMorphTargetLODModel& Model) { return Model.Vertices.Num() > 0;}))
+			{
+				//Skip this empty morphtarget
+				continue;
+			}
+			//When we save the cook result we should never have to build a new morph target
+			//When saving cook build, we call GetPlatformSkeletalMeshRenderData in USkeletalMesh::BeginCacheForCookedPlatformData
+			//which happen before the serialization of that cook skeletalmesh
+			if (!bIsSerializeSaving)
+			{
+				MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, MorphTargetName);
+				check(MorphTarget);
+			}
+			else
+			{
+				UE_ASSET_LOG(LogSkeletalMesh, Error, SkeletalMesh, TEXT("Cannot cache a skeletalmesh during a serialize if some morph targets need to be created. The solution is to Pre cache the skeletalmesh before the serialization so no morph target get created."));
+				continue;
+			}
 		}
 		else
 		{
@@ -255,8 +278,7 @@ void FFinishBuildMorphTargetData::ApplyEditorData(USkeletalMesh * SkeletalMesh) 
 		}
 		MorphTarget->EmptyMorphLODModels();
 		SkeletalMesh->GetMorphTargets().Add(MorphTarget);
-		const TArray<FMorphTargetLODModel>&MorphTargetLODModels = TargetNameAndMorphLODModels.Value;
-		int32 MorphLODModelNumber = MorphTargetLODModels.Num();
+		
 		MorphTarget->GetMorphLODModels().AddDefaulted(MorphLODModelNumber);
 		for (int32 MorphDataIndex = 0; MorphDataIndex < MorphLODModelNumber; ++MorphDataIndex)
 		{
@@ -266,13 +288,17 @@ void FFinishBuildMorphTargetData::ApplyEditorData(USkeletalMesh * SkeletalMesh) 
 	//Rebuild the mapping and rehook the curve data
 	SkeletalMesh->InitMorphTargets();
 	
+	//Clear any async flags after the morphtargets have been set to the skeletalmesh
+	for (UMorphTarget* MorphTarget : SkeletalMesh->GetMorphTargets())
+	{
+		const EInternalObjectFlags AsyncFlags = EInternalObjectFlags::Async | EInternalObjectFlags::AsyncLoading;
+		MorphTarget->ClearInternalFlags(AsyncFlags);
+	}
+
 	for (UMorphTarget* ToDeleteMorphTarget : ToDeleteMorphTargets)
 	{
 		ToDeleteMorphTarget->BaseSkelMesh = nullptr;
 		ToDeleteMorphTarget->EmptyMorphLODModels();
-		
-		//Move the unused asset in the transient package and mark it pending kill
-		ToDeleteMorphTarget->Rename(nullptr, GetTransientPackage(), REN_ForceNoResetLoaders | REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
 		ToDeleteMorphTarget->MarkAsGarbage();
 	}
 }

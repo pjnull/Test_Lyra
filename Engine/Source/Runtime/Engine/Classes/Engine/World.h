@@ -1607,6 +1607,9 @@ private:
 	/** Event to gather up all net drivers and call PostTickDispatch at once */
 	FOnTickFlushEvent PostTickDispatchEvent;
 
+	/** Event called prior to calling TickFlush */
+	FOnNetTickEvent PreTickFlushEvent;
+
 	/** Event to gather up all net drivers and call TickFlush at once */
 	FOnNetTickEvent TickFlushEvent;
 	
@@ -1622,6 +1625,11 @@ private:
 	void BroadcastPostTickDispatch()
 	{
 		PostTickDispatchEvent.Broadcast();
+	}
+	/** PreTickFlush */
+	void BroadcastPreTickFlush(float DeltaTime)
+	{
+		PreTickFlushEvent.Broadcast(DeltaTime);
 	}
 	/** All registered net drivers TickFlush() */
 	void BroadcastTickFlush(float DeltaTime)
@@ -3049,6 +3057,7 @@ public:
 	/** Network Tick events */
 	FOnNetTickEvent& OnTickDispatch() { return TickDispatchEvent; }
 	FOnTickFlushEvent& OnPostTickDispatch() { return PostTickDispatchEvent; }	
+	FOnNetTickEvent& OnPreTickFlush() { return PreTickFlushEvent; }
 	FOnNetTickEvent& OnTickFlush() { return TickFlushEvent; }
 	FOnTickFlushEvent& OnPostTickFlush() { return PostTickFlushEvent; }
 

@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 using Newtonsoft.Json;
 
@@ -37,7 +38,7 @@ namespace Horde.Storage.Implementation.TransactionLog
 
         public class SnapshotLiveObject
         {
-            public SnapshotLiveObject(BucketId bucket, KeyId key, BlobIdentifier blob)
+            public SnapshotLiveObject(BucketId bucket, IoHashKey key, BlobIdentifier blob)
             {
                 Bucket = bucket;
                 Key = key;
@@ -45,7 +46,7 @@ namespace Horde.Storage.Implementation.TransactionLog
             }
 
             public BucketId Bucket { get; set; }
-            public KeyId Key { get; set; }
+            public IoHashKey Key { get; set; }
             public BlobIdentifier Blob { get; set; }
         }
 
@@ -69,6 +70,11 @@ namespace Horde.Storage.Implementation.TransactionLog
         public IEnumerable<SnapshotLiveObject> LiveObjects
         {
             get { return _liveObjects.Values; }
+        }
+
+        public int LiveObjectsCount
+        {
+            get { return _liveObjects.Values.Count; }
         }
 
         public static async Task<ReplicationLogSnapshot> DeserializeSnapshot(Stream stream)
@@ -118,7 +124,7 @@ namespace Horde.Storage.Implementation.TransactionLog
             switch (entry.Op)
             {
                 case ReplicationLogEvent.OpType.Added:
-                    ProcessAddEvent(entry.Bucket, entry.Key, entry.Blob);
+                    ProcessAddEvent(entry.Bucket, entry.Key, entry.Blob!);
                     break;
                 case ReplicationLogEvent.OpType.Deleted:
                     ProcessDeleteEvent(entry.Bucket, entry.Key);
@@ -129,16 +135,16 @@ namespace Horde.Storage.Implementation.TransactionLog
         }
 
 
-        private string BuildObjectKey(BucketId bucket, KeyId key)
+        private string BuildObjectKey(BucketId bucket, IoHashKey key)
         {
             return $"{bucket}.{key}";
         }
 
-        private void ProcessAddEvent(BucketId bucket, KeyId key, BlobIdentifier blob)
+        private void ProcessAddEvent(BucketId bucket, IoHashKey key, BlobIdentifier blob)
         {
             _liveObjects.TryAdd(BuildObjectKey(bucket, key), new SnapshotLiveObject(bucket, key, blob));
         }
-        private void ProcessDeleteEvent(BucketId bucket, KeyId key)
+        private void ProcessDeleteEvent(BucketId bucket, IoHashKey key)
         {
             _liveObjects.Remove(BuildObjectKey(bucket, key));
         }

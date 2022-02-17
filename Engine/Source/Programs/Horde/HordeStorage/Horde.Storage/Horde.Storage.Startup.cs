@@ -13,6 +13,7 @@ using Amazon.SecretsManager;
 using Cassandra;
 using Horde.Storage.Controllers;
 using Horde.Storage.Implementation;
+using Horde.Storage.Implementation.Blob;
 using Horde.Storage.Implementation.LeaderElection;
 using Jupiter;
 using Jupiter.Common.Implementation;
@@ -130,18 +131,6 @@ namespace Horde.Storage
             });
         }
 
-        protected override void OnUseEndpoints(IWebHostEnvironment env, IEndpointRouteBuilder endpoints)
-        {
-            HordeStorageSettings settings = endpoints.ServiceProvider.GetService<IOptionsMonitor<HordeStorageSettings>>()!.CurrentValue!;
-
-            if (settings.UseNewDDCEndpoints)
-            {
-                DDCEndpoints ddcEndpoints = endpoints.ServiceProvider.GetService<DDCEndpoints>()!;
-
-                endpoints.Map(ddcEndpoints.GetRawRoute, ddcEndpoints.GetRaw).RequireAuthorization("Cache.read");
-            }
-        }
-
         protected override void OnAddService(IServiceCollection services)
         {
             // For requests served on the high-perf HTTP port there is not authn/authz.
@@ -153,7 +142,7 @@ namespace Horde.Storage
 
             services.AddHttpClient();
 
-            services.AddOptions<HordeStorageSettings>().Bind(Configuration.GetSection("Horde.Storage")).ValidateDataAnnotations();
+            services.AddOptions<HordeStorageSettings>().Bind(Configuration.GetSection("Horde_Storage")).ValidateDataAnnotations();
             services.AddOptions<MongoSettings>().Bind(Configuration.GetSection("Mongo")).ValidateDataAnnotations();
             services.AddOptions<CosmosSettings>().Bind(Configuration.GetSection("Cosmos")).ValidateDataAnnotations();
             services.AddOptions<DynamoDbSettings>().Bind(Configuration.GetSection("DynamoDb")).ValidateDataAnnotations();
@@ -168,6 +157,9 @@ namespace Horde.Storage
             services.AddOptions<FilesystemSettings>().Bind(Configuration.GetSection("Filesystem")).ValidateDataAnnotations();
 
             services.AddOptions<ConsistencyCheckSettings>().Bind(Configuration.GetSection("ConsistencyCheck")).ValidateDataAnnotations();
+
+            services.AddOptions<UpstreamRelaySettings>().Configure(o => Configuration.GetSection("Upstream").Bind(o)).ValidateDataAnnotations();
+            services.AddOptions<ClusterSettings>().Configure(o => Configuration.GetSection("Cluster").Bind(o)).ValidateDataAnnotations();
 
             services.AddOptions<GCSettings>().Configure(o => Configuration.GetSection("GC").Bind(o)).ValidateDataAnnotations();
             services.AddOptions<ReplicationSettings>().Configure(o => Configuration.GetSection("Replication").Bind(o)).ValidateDataAnnotations();
@@ -189,7 +181,9 @@ namespace Horde.Storage
                 return AWSCredentialsHelper.GetCredentials(awsSettings, "Horde.Storage");
             });
             services.AddSingleton(typeof(IAmazonDynamoDB), AddDynamo);
-            
+
+            services.AddSingleton<BufferedPayloadFactory>();
+
             services.AddSingleton<BlobCleanupService>();
             services.AddHostedService<BlobCleanupService>(p => p.GetService<BlobCleanupService>()!);
 
@@ -202,13 +196,21 @@ namespace Horde.Storage
             services.AddSingleton(serviceType: typeof(IContentIdStore), ContentIdStoreFactory);
 
             services.AddSingleton(serviceType: typeof(ITransactionLogWriter), TransactionLogWriterFactory);
+
+            services.AddSingleton(serviceType: typeof(IBlobIndex), BlobIndexFactory);
             services.AddSingleton(serviceType: typeof(IAmazonS3), CreateS3);
-            services.AddSingleton(serviceType: typeof(IBlobStore), StorageBackendFactory);
 
             services.AddSingleton<AmazonS3Store>();
             services.AddSingleton<FileSystemStore>();
             services.AddSingleton<AzureBlobStore>();
             services.AddSingleton<MemoryCacheBlobStore>();
+            services.AddSingleton<MemoryBlobStore>();
+            services.AddSingleton<RelayBlobStore>();
+
+            services.AddSingleton<OrphanBlobCleanup>();
+            services.AddSingleton<OrphanBlobCleanupRefs>();
+
+            services.AddSingleton(typeof(IBlobService), typeof(BlobService));
 
             services.AddSingleton(serviceType: typeof(IScyllaSessionManager), ScyllaFactory);
 
@@ -217,6 +219,10 @@ namespace Horde.Storage
             LastAccessTrackerRefRecord lastAccessTracker = new LastAccessTrackerRefRecord();
             services.AddSingleton(serviceType: typeof(ILastAccessCache<RefRecord>), lastAccessTracker);
             services.AddSingleton(serviceType: typeof(ILastAccessTracker<RefRecord>), lastAccessTracker);
+
+            LastAccessTrackerReference lastAccessTrackerReferences = new LastAccessTrackerReference();
+            services.AddSingleton(serviceType: typeof(ILastAccessCache<LastAccessRecord>), lastAccessTrackerReferences);
+            services.AddSingleton(serviceType: typeof(ILastAccessTracker<LastAccessRecord>), lastAccessTrackerReferences);
 
             services.AddSingleton(serviceType: typeof(ILeaderElection), CreateLeaderElection);
 
@@ -231,6 +237,9 @@ namespace Horde.Storage
 
             services.AddSingleton<LastAccessService>();
             services.AddHostedService<LastAccessService>(p => p.GetService<LastAccessService>()!);
+
+            services.AddSingleton<LastAccessServiceReferences>();
+            services.AddHostedService<LastAccessServiceReferences>(p => p.GetService<LastAccessServiceReferences>()!);
 
             services.AddSingleton<IServiceCredentials, ServiceCredentials>(p => ActivatorUtilities.CreateInstance<ServiceCredentials>(p));
             
@@ -258,6 +267,24 @@ namespace Horde.Storage
                 // add the kubernetes leader instance under its actual type as well to make it easier to find
                 services.AddSingleton<KubernetesLeaderElection>(p => (KubernetesLeaderElection)p.GetService<ILeaderElection>()!);
                 services.AddHostedService<KubernetesLeaderElection>(p => p.GetService<KubernetesLeaderElection>()!);
+            }
+        }
+
+        private IBlobIndex BlobIndexFactory(IServiceProvider provider)
+        {
+            HordeStorageSettings settings = provider.GetService<IOptionsMonitor<HordeStorageSettings>>()!.CurrentValue!;
+            switch (settings.BlobIndexImplementation)
+            {
+                case HordeStorageSettings.BlobIndexImplementations.Memory:
+                    return ActivatorUtilities.CreateInstance<MemoryBlobIndex>(provider);
+                case HordeStorageSettings.BlobIndexImplementations.Scylla:
+                    return ActivatorUtilities.CreateInstance<ScyllaBlobIndex>(provider);
+                case HordeStorageSettings.BlobIndexImplementations.Mongo:
+                    return ActivatorUtilities.CreateInstance<MongoBlobIndex>(provider);
+                case HordeStorageSettings.BlobIndexImplementations.Cache:
+                    return ActivatorUtilities.CreateInstance<CachedBlobIndex>(provider);
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
@@ -292,6 +319,10 @@ namespace Horde.Storage
                     return ActivatorUtilities.CreateInstance<MemoryContentIdStore>(provider);
                 case HordeStorageSettings.ContentIdStoreImplementations.Scylla:
                     return ActivatorUtilities.CreateInstance<ScyllaContentIdStore>(provider);
+                case HordeStorageSettings.ContentIdStoreImplementations.Mongo:
+                    return ActivatorUtilities.CreateInstance<MongoContentIdStore>(provider);
+                case HordeStorageSettings.ContentIdStoreImplementations.Cache:
+                    return ActivatorUtilities.CreateInstance<CacheContentIdStore>(provider);
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -326,6 +357,9 @@ namespace Horde.Storage
             replicatedSession.Execute(new SimpleStatement("CREATE TYPE IF NOT EXISTS blob_identifier (hash blob)"));
             replicatedSession.UserDefinedTypes.Define(UdtMap.For<ScyllaBlobIdentifier>("blob_identifier", DefaultKeyspaceName));
 
+            replicatedSession.Execute(new SimpleStatement("CREATE TYPE IF NOT EXISTS object_reference (bucket text, key text)"));
+            replicatedSession.UserDefinedTypes.Define(UdtMap.For<ScyllaObjectReference>("object_reference", DefaultKeyspaceName));
+
             string localKeyspaceName = $"jupiter_local_{settings.LocalKeyspaceSuffix}";
 
             Dictionary<string, string> replicationStrategyLocal = ReplicationStrategies.CreateSimpleStrategyReplicationProperty(2);
@@ -354,25 +388,15 @@ namespace Horde.Storage
                     return ActivatorUtilities.CreateInstance<MemoryReferencesStore>(provider);
                 case HordeStorageSettings.ReferencesDbImplementations.Scylla:
                     return ActivatorUtilities.CreateInstance<ScyllaReferencesStore>(provider);
+                case HordeStorageSettings.ReferencesDbImplementations.Mongo:
+                    return ActivatorUtilities.CreateInstance<MongoReferencesStore>(provider);
+                case HordeStorageSettings.ReferencesDbImplementations.Cache:
+                    return ActivatorUtilities.CreateInstance<CacheReferencesStore>(provider);
                 default:
                     throw new ArgumentOutOfRangeException();
             }
         }
-
-        protected override void OnConfigureAppEarly(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            HordeStorageSettings settings = app.ApplicationServices.GetService<IOptionsMonitor<HordeStorageSettings>>()!.CurrentValue!;
-            // Register two methods as middlewares for benchmarking purposes
-            // By circumventing the full ASP.NET stack we can measure the performance difference between these calls.
-            if (!settings.UseNewDDCEndpoints)
-            {
-                DDCRefController ddcRefController = ActivatorUtilities.CreateInstance<DDCRefController>(app.ApplicationServices);
-                DebugController debugController = ActivatorUtilities.CreateInstance<DebugController>(app.ApplicationServices);
-                app.Use(ddcRefController.FastGet);
-                app.Use(debugController.FastGetBytes);
-            }
-        }
-
+        
         private ILeaderElection CreateLeaderElection(IServiceProvider provider)
         {
             HordeStorageSettings settings = provider.GetService<IOptionsMonitor<HordeStorageSettings>>()!.CurrentValue!;
@@ -498,62 +522,13 @@ namespace Horde.Storage
             }
         }
 
-        private HordeStorageSettings.StorageBackendImplementations[] GetStorageImplementationEnums(string[]? storageImpls)
-        {
-            storageImpls ??= new[] {HordeStorageSettings.StorageBackendImplementations.Memory.ToString()};
-            return storageImpls.Select(x =>
-            {
-                if (Enum.TryParse(typeof(HordeStorageSettings.StorageBackendImplementations), x, true, out var backendType) && backendType is HordeStorageSettings.StorageBackendImplementations type)
-                {
-                    return type;
-                }
-
-                throw new ArgumentException($"Unable to find storage implementation for specified value '{x}'");
-            }).ToArray();
-        }
-        
-        private IBlobStore StorageBackendFactory(IServiceProvider provider)
-        {
-            IOptionsMonitor<HordeStorageSettings> settings = provider.GetService<IOptionsMonitor<HordeStorageSettings>>()!;
-            IOptionsMonitor<GCSettings> gcSettings = provider.GetService<IOptionsMonitor<GCSettings>>()!;
-            BlobCleanupService blobCleanupService = provider.GetService<BlobCleanupService>()!;
-
-            List<IBlobStore> storageBackends = GetStorageImplementationEnums(settings.CurrentValue.StorageImplementations)
-                    .Select<HordeStorageSettings.StorageBackendImplementations, IBlobStore?>(impl =>
-                    {
-                        switch (impl)
-                        {
-                            case HordeStorageSettings.StorageBackendImplementations.S3: return provider.GetService<AmazonS3Store>();
-                            case HordeStorageSettings.StorageBackendImplementations.Azure: return provider.GetService<AzureBlobStore>();
-                            case HordeStorageSettings.StorageBackendImplementations.Memory: return provider.GetService<MemoryCacheBlobStore>();
-                            case HordeStorageSettings.StorageBackendImplementations.FileSystem:
-                                FileSystemStore store = ActivatorUtilities.CreateInstance<FileSystemStore>(provider)!;
-                                blobCleanupService.RegisterCleanup(store);
-                                return store;
-                            default: throw new NotImplementedException();
-                        }
-                    })
-                    .Select(x => x ?? throw new ArgumentException("Unable to resolve all stores!"))
-                    .ToList();
-
-            // Only use the hierarchical backend if more than one backend is specified 
-            IBlobStore blobStore = storageBackends.Count == 1 ? storageBackends[0] : new HierarchicalBlobStore(storageBackends);
-            
-            if (gcSettings.CurrentValue.CleanOldBlobs)
-            {
-                OrphanBlobCleanup orphanBlobCleanup = ActivatorUtilities.CreateInstance<OrphanBlobCleanup>(provider, blobStore);
-                blobCleanupService.RegisterCleanup(orphanBlobCleanup);    
-            }
-
-            return blobStore;
-        }
-
         private static IRefsStore RefStoreFactory(IServiceProvider provider)
         {
             HordeStorageSettings settings = provider.GetService<IOptionsMonitor<HordeStorageSettings>>()!.CurrentValue;
 
             IRefsStore refsStore = settings.RefDbImplementation switch
             {
+                HordeStorageSettings.RefDbImplementations.Memory => ActivatorUtilities.CreateInstance<MemoryRefsStore>(provider),
                 HordeStorageSettings.RefDbImplementations.DynamoDb => ActivatorUtilities.CreateInstance<DynamoDbRefsStore>(provider),
                 HordeStorageSettings.RefDbImplementations.Mongo => ActivatorUtilities.CreateInstance<MongoRefsStore>(provider),
                 HordeStorageSettings.RefDbImplementations.Cosmos => ActivatorUtilities.CreateInstance<CosmosRefsStore>(provider),
@@ -577,6 +552,8 @@ namespace Horde.Storage
 
             switch (settings.RefDbImplementation)
             {
+                case HordeStorageSettings.RefDbImplementations.Memory:
+                    break;
                 case HordeStorageSettings.RefDbImplementations.Mongo:
                 case HordeStorageSettings.RefDbImplementations.Cosmos:
                     MongoSettings mongoSettings = provider.GetService<IOptionsMonitor<MongoSettings>>()!.CurrentValue;
@@ -605,7 +582,7 @@ namespace Horde.Storage
                     throw new ArgumentOutOfRangeException();
             }
 
-            foreach (HordeStorageSettings.StorageBackendImplementations impl in GetStorageImplementationEnums(settings.StorageImplementations))
+            foreach (HordeStorageSettings.StorageBackendImplementations impl in settings.GetStorageImplementations())
             {
                 switch (impl)
                 {
@@ -627,14 +604,16 @@ namespace Horde.Storage
                         break;
 
                     case HordeStorageSettings.StorageBackendImplementations.FileSystem:
-                        FilesystemSettings filesystemSettings = provider.GetService<IOptionsMonitor<FilesystemSettings>>()!.CurrentValue;
                         healthChecks.AddDiskStorageHealthCheck(options =>
                         {
-                            string? driveRoot = Path.GetPathRoot(filesystemSettings.RootDir);
+                            FilesystemSettings filesystemSettings = provider.GetService<IOptionsMonitor<FilesystemSettings>>()!.CurrentValue;
+                            string? driveRoot = Path.GetPathRoot(PathUtil.ResolvePath(filesystemSettings.RootDir));
                             options.AddDrive(driveRoot);
                         });
                         break;
                     case HordeStorageSettings.StorageBackendImplementations.Memory:
+                    case HordeStorageSettings.StorageBackendImplementations.MemoryBlobStore:
+                    case HordeStorageSettings.StorageBackendImplementations.Relay:
                         break;
                     default:
                         throw new ArgumentOutOfRangeException("Unhandled storage impl " + impl);
@@ -653,7 +632,7 @@ namespace Horde.Storage
                 healthChecks.AddCheck<RefCleanupServiceCheck>("RefCleanupCheck", tags: new[] {"services"});
             }
 
-            if (gcSettings.CleanOldBlobs)
+            if (gcSettings.BlobCleanupServiceEnabled)
             {
                 healthChecks.AddCheck<BlobCleanupServiceCheck>("BlobStoreCheck", tags: new[] {"services"});
             }

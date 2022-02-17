@@ -7,34 +7,9 @@ enum class EMaterialParameterType : uint8;
 
 namespace UE
 {
+
 namespace HLSLTree
 {
-
-enum class EBinaryOp : uint8
-{
-	None,
-	Add,
-	Sub,
-	Mul,
-	Div,
-	Less,
-};
-
-struct FBinaryOpDescription
-{
-	FBinaryOpDescription()
-		: Name(nullptr), Operator(nullptr)
-	{}
-
-	FBinaryOpDescription(const TCHAR* InName, const TCHAR* InOperator)
-		: Name(InName), Operator(InOperator)
-	{}
-
-	const TCHAR* Name;
-	const TCHAR* Operator;
-};
-
-FBinaryOpDescription GetBinaryOpDesription(EBinaryOp Op);
 
 class FExpressionConstant : public FExpression
 {
@@ -45,8 +20,9 @@ public:
 
 	Shader::FValue Value;
 
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override { return SetType(Context, Shader::MakeValueTypeWithRequestedNumComponents(Value.GetType(), InRequestedNumComponents)); }
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
 class FExpressionMaterialParameter : public FExpression
@@ -54,18 +30,22 @@ class FExpressionMaterialParameter : public FExpression
 public:
 	explicit FExpressionMaterialParameter(EMaterialParameterType InType, const FName& InName, const Shader::FValue& InDefaultValue)
 		: ParameterName(InName), DefaultValue(InDefaultValue), ParameterType(InType)
-	{}
+	{
+	}
 
 	FName ParameterName;
 	Shader::FValue DefaultValue;
 	EMaterialParameterType ParameterType;
 
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
-enum class EExternalInputType
+enum class EExternalInput : uint8
 {
+	None,
+
 	TexCoord0,
 	TexCoord1,
 	TexCoord2,
@@ -74,89 +54,207 @@ enum class EExternalInputType
 	TexCoord5,
 	TexCoord6,
 	TexCoord7,
+
+	TexCoord0_Ddx,
+	TexCoord1_Ddx,
+	TexCoord2_Ddx,
+	TexCoord3_Ddx,
+	TexCoord4_Ddx,
+	TexCoord5_Ddx,
+	TexCoord6_Ddx,
+	TexCoord7_Ddx,
+
+	TexCoord0_Ddy,
+	TexCoord1_Ddy,
+	TexCoord2_Ddy,
+	TexCoord3_Ddy,
+	TexCoord4_Ddy,
+	TexCoord5_Ddy,
+	TexCoord6_Ddy,
+	TexCoord7_Ddy,
+
+	WorldPosition,
+	WorldPosition_NoOffsets,
+	TranslatedWorldPosition,
+	TranslatedWorldPosition_NoOffsets,
+
+	PrevWorldPosition,
+	PrevWorldPosition_NoOffsets,
+	PrevTranslatedWorldPosition,
+	PrevTranslatedWorldPosition_NoOffsets,
+
+	WorldPosition_Ddx,
+	WorldPosition_Ddy,
+
+	ViewportUV,
+	PixelPosition,
+	ViewSize,
+	RcpViewSize,
+
+	CameraWorldPosition,
+	PreViewTranslation,
+	TangentToWorld,
+	LocalToWorld,
+	WorldToLocal,
+	TranslatedWorldToCameraView,
+	TranslatedWorldToView,
+	CameraViewToTranslatedWorld,
+	ViewToTranslatedWorld,
+	WorldToParticle,
+	WorldToInstance,
+	ParticleToWorld,
+	InstanceToWorld,
+
+	PrevCameraWorldPosition,
+	PrevPreViewTranslation,
+	PrevLocalToWorld,
+	PrevWorldToLocal,
+	PrevTranslatedWorldToCameraView,
+	PrevTranslatedWorldToView,
+	PrevCameraViewToTranslatedWorld,
+	PrevViewToTranslatedWorld,
+
+	PixelDepth,
+	PixelDepth_Ddx,
+	PixelDepth_Ddy,
+
+	GameTime,
+	RealTime,
+	DeltaTime,
+
+	PrevGameTime,
+	PrevRealTime,
 };
-inline Shader::EValueType GetInputExpressionType(EExternalInputType Type)
+static constexpr int32 NumTexCoords = 8;
+
+struct FExternalInputDescription
 {
-	return Shader::EValueType::Float2;
+	FExternalInputDescription(const TCHAR* InName, Shader::EValueType InType, EExternalInput InDdx = EExternalInput::None, EExternalInput InDdy = EExternalInput::None, EExternalInput InPreviousFrame = EExternalInput::None)
+		: Name(InName), Type(InType), Ddx(InDdx), Ddy(InDdy), PreviousFrame(InPreviousFrame)
+	{}
+
+	const TCHAR* Name;
+	Shader::EValueType Type;
+	EExternalInput Ddx;
+	EExternalInput Ddy;
+	EExternalInput PreviousFrame;
+};
+
+FExternalInputDescription GetExternalInputDescription(EExternalInput Input);
+
+inline bool IsTexCoord(EExternalInput Type)
+{
+	return FMath::IsWithin((int32)Type, (int32)EExternalInput::TexCoord0, (int32)EExternalInput::TexCoord0 + NumTexCoords);
 }
-inline EExternalInputType MakeInputTexCoord(int32 Index)
+inline bool IsTexCoord_Ddx(EExternalInput Type)
 {
-	check(Index >= 0 && Index < 8);
-	return (EExternalInputType)((int32)EExternalInputType::TexCoord0 + Index);
+	return FMath::IsWithin((int32)Type, (int32)EExternalInput::TexCoord0_Ddx, (int32)EExternalInput::TexCoord0_Ddx + NumTexCoords);
+}
+inline bool IsTexCoord_Ddy(EExternalInput Type)
+{
+	return FMath::IsWithin((int32)Type, (int32)EExternalInput::TexCoord0_Ddy, (int32)EExternalInput::TexCoord0_Ddy + NumTexCoords);
+}
+inline EExternalInput MakeInputTexCoord(int32 Index)
+{
+	check(Index >= 0 && Index < NumTexCoords);
+	return (EExternalInput)((int32)EExternalInput::TexCoord0 + Index);
 }
 
 class FExpressionExternalInput : public FExpression
 {
 public:
-	FExpressionExternalInput(EExternalInputType InInputType) : InputType(InInputType) {}
+	FExpressionExternalInput(EExternalInput InInputType) : InputType(InInputType) {}
 
-	EExternalInputType InputType;
+	EExternalInput InputType;
 
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override { return SetType(Context, GetInputExpressionType(InputType)); }
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+};
+
+class FExpressionMaterialSceneTexture : public FExpression
+{
+public:
+	FExpressionMaterialSceneTexture(FExpression* InTexCoordExpression, uint32 InSceneTextureId, bool bInFiltered)
+		: TexCoordExpression(InTexCoordExpression)
+		, SceneTextureId(InSceneTextureId)
+		, bFiltered(bInFiltered)
+	{}
+
+	FExpression* TexCoordExpression;
+	uint32 SceneTextureId;
+	bool bFiltered;
+
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
 };
 
 class FExpressionTextureSample : public FExpression
 {
 public:
-	FExpressionTextureSample(FTextureParameterDeclaration* InDeclaration, FExpression* InTexCoordExpression)
+	FExpressionTextureSample(FTextureParameterDeclaration* InDeclaration, FExpression* InTexCoordExpression, const FExpressionDerivatives& InTexCoordDerivatives, ESamplerSourceMode InSamplerSource, ETextureMipValueMode InMipValueMode)
 		: Declaration(InDeclaration)
 		, TexCoordExpression(InTexCoordExpression)
-		, SamplerSource(SSM_FromTextureAsset)
-		, MipValueMode(TMVM_None)
+		, TexCoordDerivatives(InTexCoordDerivatives)
+		, SamplerSource(InSamplerSource)
+		, MipValueMode(InMipValueMode)
 	{}
 
 	FTextureParameterDeclaration* Declaration;
 	FExpression* TexCoordExpression;
+	FExpressionDerivatives TexCoordDerivatives;
 	ESamplerSourceMode SamplerSource;
 	ETextureMipValueMode MipValueMode;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(Declaration);
-			Visitor.VisitNode(TexCoordExpression);
-		}
-		return Result;
-	}
-
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
 };
 
-class FExpressionDefaultMaterialAttributes : public FExpression
+class FExpressionGetStructField : public FExpression
 {
 public:
-	FExpressionDefaultMaterialAttributes() {}
-
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override { return SetType(Context, Shader::EValueType::MaterialAttributes); }
-	virtual bool PrepareValue(FEmitContext& Context) override;
-};
-
-class FExpressionSetMaterialAttribute : public FExpression
-{
-public:
-	FExpressionSetMaterialAttribute() {}
-
-	FGuid AttributeID;
-	FExpression* AttributesExpression;
-	FExpression* ValueExpression;
-
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
+	FExpressionGetStructField(const Shader::FStructType* InStructType, const Shader::FStructField* InField, FExpression* InStructExpression)
+		: StructType(InStructType)
+		, Field(InField)
+		, StructExpression(InStructExpression)
 	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(AttributesExpression);
-			Visitor.VisitNode(ValueExpression);
-		}
-		return Result;
 	}
 
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	const Shader::FStructType* StructType;
+	const Shader::FStructField* Field;
+	FExpression* StructExpression;
+
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
+};
+
+class FExpressionSetStructField : public FExpression
+{
+public:
+	FExpressionSetStructField(const Shader::FStructType* InStructType, const Shader::FStructField* InField, FExpression* InStructExpression, FExpression* InFieldExpression)
+		: StructType(InStructType)
+		, Field(InField)
+		, StructExpression(InStructExpression)
+		, FieldExpression(InFieldExpression)
+	{
+		check(InStructType);
+		check(InField);
+	}
+
+	const Shader::FStructType* StructType;
+	const Shader::FStructField* Field;
+	FExpression* StructExpression;
+	FExpression* FieldExpression;
+
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
 class FExpressionSelect : public FExpression
@@ -172,54 +270,35 @@ public:
 	FExpression* TrueExpression;
 	FExpression* FalseExpression;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(ConditionExpression);
-			Visitor.VisitNode(TrueExpression);
-			Visitor.VisitNode(FalseExpression);
-		}
-		return Result;
-	}
-
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
-class FExpressionBinaryOp : public FExpression
+class FExpressionOperation : public FExpression
 {
 public:
-	FExpressionBinaryOp(EBinaryOp InOp, FExpression* InLhs, FExpression* InRhs)
-		: Op(InOp)
-		, Lhs(InLhs)
-		, Rhs(InRhs)
-	{}
+	FExpressionOperation(EOperation InOp, TConstArrayView<FExpression*> InInputs);
 
-	EBinaryOp Op;
-	FExpression* Lhs;
-	FExpression* Rhs;
+	static constexpr int8 MaxInputs = 2;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(Lhs);
-			Visitor.VisitNode(Rhs);
-		}
-		return Result;
-	}
+	EOperation Op;
+	FExpression* Inputs[MaxInputs];
 
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
 struct FSwizzleParameters
 {
 	FSwizzleParameters() : NumComponents(0) { ComponentIndex[0] = ComponentIndex[1] = ComponentIndex[2] = ComponentIndex[3] = INDEX_NONE; }
 	FSwizzleParameters(int8 IndexR, int8 IndexG, int8 IndexB, int8 IndexA);
+
+	FRequestedType GetRequestedInputType(const FRequestedType& RequestedType) const;
+	bool HasSwizzle() const;
 
 	int8 ComponentIndex[4];
 	int32 NumComponents;
@@ -237,18 +316,11 @@ public:
 	FSwizzleParameters Parameters;
 	FExpression* Input;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(Input);
-		}
-		return Result;
-	}
-
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
 class FExpressionAppend : public FExpression
@@ -262,55 +334,54 @@ public:
 	FExpression* Lhs;
 	FExpression* Rhs;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FExpression::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(Lhs);
-			Visitor.VisitNode(Rhs);
-		}
-		return Result;
-	}
-
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override;
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual void ComputeAnalyticDerivatives(FTree& Tree, FExpressionDerivatives& OutResult) const override;
+	virtual FExpression* ComputePreviousFrame(FTree& Tree, const FRequestedType& RequestedType) const override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+	virtual void EmitValuePreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValuePreshaderResult& OutResult) const override;
 };
 
 class FExpressionReflectionVector : public FExpression
 {
 public:
-	virtual bool UpdateType(FUpdateTypeContext& Context, int8 InRequestedNumComponents) override { return SetType(Context, Shader::EValueType::Float3); }
-	virtual bool PrepareValue(FEmitContext& Context) override;
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+};
+
+class FExpressionCustomHLSL : public FExpression
+{
+public:
+	FExpressionCustomHLSL(FStringView InDeclarationCode, FStringView InFunctionCode, TArrayView<FCustomHLSLInput> InInputs, const Shader::FStructType* InOutputStructType)
+		: DeclarationCode(InDeclarationCode)
+		, FunctionCode(InFunctionCode)
+		, Inputs(InInputs)
+		, OutputStructType(InOutputStructType)
+	{}
+
+	virtual bool PrepareValue(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FPrepareValueResult& OutResult) const override;
+	virtual void EmitValueShader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, FEmitValueShaderResult& OutResult) const override;
+
+	FStringView DeclarationCode;
+	FStringView FunctionCode;
+	TArray<FCustomHLSLInput, TInlineAllocator<8>> Inputs;
+	const Shader::FStructType* OutputStructType = nullptr;
 };
 
 class FStatementReturn : public FStatement
 {
 public:
-	static constexpr bool MarkScopeLiveRecursive = true;
 	FExpression* Expression;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FStatement::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(Expression);
-		}
-		return Result;
-	}
-
-	virtual void RequestTypes(FUpdateTypeContext& Context) const override;
-	virtual void EmitHLSL(FEmitContext& Context) const override;
+	virtual bool Prepare(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitShader(FEmitContext& Context, FEmitScope& Scope) const override;
 };
 
 class FStatementBreak : public FStatement
 {
 public:
-	static constexpr bool MarkScopeLive = true;
-
-	virtual void RequestTypes(FUpdateTypeContext& Context) const override {}
-	virtual void EmitHLSL(FEmitContext& Context) const override;
+	virtual bool Prepare(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitShader(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitPreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, TArrayView<const FEmitPreshaderScope> Scopes, Shader::FPreshaderData& OutPreshader) const override;
 };
 
 class FStatementIf : public FStatement
@@ -321,42 +392,22 @@ public:
 	FScope* ElseScope;
 	FScope* NextScope;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FStatement::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(ConditionExpression);
-			Visitor.VisitNode(ThenScope);
-			Visitor.VisitNode(ElseScope);
-			Visitor.VisitNode(NextScope);
-		}
-		return Result;
-	}
-
-	virtual void RequestTypes(FUpdateTypeContext& Context) const override;
-	virtual void EmitHLSL(FEmitContext& Context) const override;
+	virtual bool Prepare(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitShader(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitPreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, TArrayView<const FEmitPreshaderScope> Scopes, Shader::FPreshaderData& OutPreshader) const override;
 };
 
 class FStatementLoop : public FStatement
 {
 public:
+	FStatement* BreakStatement;
 	FScope* LoopScope;
 	FScope* NextScope;
 
-	virtual ENodeVisitResult Visit(FNodeVisitor& Visitor) override
-	{
-		const ENodeVisitResult Result = FStatement::Visit(Visitor);
-		if (ShouldVisitDependentNodes(Result))
-		{
-			Visitor.VisitNode(LoopScope);
-			Visitor.VisitNode(NextScope);
-		}
-		return Result;
-	}
-
-	virtual void RequestTypes(FUpdateTypeContext& Context) const override;
-	virtual void EmitHLSL(FEmitContext& Context) const override;
+	virtual bool IsLoop() const override { return true; }
+	virtual bool Prepare(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitShader(FEmitContext& Context, FEmitScope& Scope) const override;
+	virtual void EmitPreshader(FEmitContext& Context, FEmitScope& Scope, const FRequestedType& RequestedType, TArrayView<const FEmitPreshaderScope> Scopes, Shader::FPreshaderData& OutPreshader) const override;
 };
 
 }

@@ -832,7 +832,7 @@ void SMaterialLayersFunctionsInstanceTreeItem::Construct(const FArguments& InArg
 					.HAlign(HAlign_Left)
 					.AutoWidth()
 					[
-						RMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+						RMaskProperty->CreatePropertyNameWidget()
 					]
 					+ SHorizontalBox::Slot()
 					.HAlign(HAlign_Left)
@@ -845,7 +845,7 @@ void SMaterialLayersFunctionsInstanceTreeItem::Construct(const FArguments& InArg
 					.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 					.AutoWidth()
 					[
-						GMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+						GMaskProperty->CreatePropertyNameWidget()
 					]
 					+ SHorizontalBox::Slot()
 					.HAlign(HAlign_Left)
@@ -858,7 +858,7 @@ void SMaterialLayersFunctionsInstanceTreeItem::Construct(const FArguments& InArg
 					.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 					.AutoWidth()
 					[
-						BMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+						BMaskProperty->CreatePropertyNameWidget()
 					]
 					+ SHorizontalBox::Slot()
 					.HAlign(HAlign_Left)
@@ -871,7 +871,7 @@ void SMaterialLayersFunctionsInstanceTreeItem::Construct(const FArguments& InArg
 					.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 					.AutoWidth()
 					[
-						AMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+						AMaskProperty->CreatePropertyNameWidget()
 					]
 					+ SHorizontalBox::Slot()
 					.HAlign(HAlign_Left)
@@ -2388,7 +2388,7 @@ void SMaterialLayersFunctionsMaterialTreeItem::Construct(const FArguments& InArg
 					.HAlign(HAlign_Left)
 					.AutoWidth()
 					[
-						RMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+						RMaskProperty->CreatePropertyNameWidget()
 					]
 			+ SHorizontalBox::Slot()
 				.HAlign(HAlign_Left)
@@ -2401,7 +2401,7 @@ void SMaterialLayersFunctionsMaterialTreeItem::Construct(const FArguments& InArg
 				.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 				.AutoWidth()
 				[
-					GMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+					GMaskProperty->CreatePropertyNameWidget()
 				]
 			+ SHorizontalBox::Slot()
 				.HAlign(HAlign_Left)
@@ -2414,7 +2414,7 @@ void SMaterialLayersFunctionsMaterialTreeItem::Construct(const FArguments& InArg
 				.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 				.AutoWidth()
 				[
-					BMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+					BMaskProperty->CreatePropertyNameWidget()
 				]
 			+ SHorizontalBox::Slot()
 				.HAlign(HAlign_Left)
@@ -2427,7 +2427,7 @@ void SMaterialLayersFunctionsMaterialTreeItem::Construct(const FArguments& InArg
 				.Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 				.AutoWidth()
 				[
-					AMaskProperty->CreatePropertyNameWidget(FText::GetEmpty(), FText::GetEmpty(), false)
+					AMaskProperty->CreatePropertyNameWidget()
 				]
 			+ SHorizontalBox::Slot()
 				.HAlign(HAlign_Left)

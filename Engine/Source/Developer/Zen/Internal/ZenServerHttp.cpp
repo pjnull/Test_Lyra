@@ -12,6 +12,10 @@
 #	include "Windows/AllowWindowsPlatformTypes.h"
 #endif
 
+#if PLATFORM_WINDOWS
+#	include <mstcpip.h>
+#endif
+
 #if !defined(PLATFORM_CURL_INCLUDE)
 	#include "curl/curl.h"
 #endif
@@ -24,6 +28,7 @@
 #include "Compression/CompressedBuffer.h"
 #include "Compression/OodleDataCompression.h"
 #include "Containers/StringFwd.h"
+#include "HAL/LowLevelMemTracker.h"
 #include "Memory/CompositeBuffer.h"
 #include "Serialization/CompactBinary.h"
 #include "Serialization/CompactBinaryPackage.h"
@@ -33,6 +38,8 @@
 #include "Serialization/LargeMemoryWriter.h"
 #include "HAL/PlatformProcess.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+
+LLM_DEFINE_TAG(ZenDDC, NAME_None, TEXT("DDCBackend"));
 
 DEFINE_LOG_CATEGORY_STATIC(LogZenHttp, Log, All);
 
@@ -48,6 +55,9 @@ namespace UE::Zen {
 		static size_t StaticWriteHeaderFn(void* Ptr, size_t SizeInBlocks, size_t BlockSizeInBytes, void* UserData);
 		static size_t StaticWriteBodyFn(void* Ptr, size_t SizeInBlocks, size_t BlockSizeInBytes, void* UserData);
 		static size_t StaticSeekFn(void* UserData, curl_off_t Offset, int Origin);
+#if PLATFORM_WINDOWS
+		static int StaticSockoptFn(void* UserData, curl_socket_t CurlFd, curlsocktype Purpose);
+#endif //PLATFORM_WINDOWS
 	};
 
 	FZenHttpRequest::FZenHttpRequest(FStringView InDomain, bool bInLogErrors)
@@ -94,6 +104,9 @@ namespace UE::Zen {
 		// Rewind method, handle special error case where request need to rewind data stream
 		curl_easy_setopt(Curl, CURLOPT_SEEKDATA, this);
 		curl_easy_setopt(Curl, CURLOPT_SEEKFUNCTION, &FZenHttpRequest::FStatics::StaticSeekFn);
+#if PLATFORM_WINDOWS
+		curl_easy_setopt(Curl, CURLOPT_SOCKOPTFUNCTION, &FZenHttpRequest::FStatics::StaticSockoptFn);
+#endif //PLATFORM_WINDOWS
 		// Debug hooks
 #if UE_ZENDDC_HTTP_DEBUG
 		curl_easy_setopt(Curl, CURLOPT_DEBUGDATA, this);
@@ -362,7 +375,7 @@ namespace UE::Zen {
 		uint64 ContentLength = 0u;
 
 		curl_easy_setopt(Curl, CURLOPT_POST, 1L);
-		curl_easy_setopt(Curl, CURLOPT_INFILESIZE, Payload.GetSize());
+		curl_easy_setopt(Curl, CURLOPT_POSTFIELDSIZE, Payload.GetSize());
 		curl_easy_setopt(Curl, CURLOPT_READDATA, this);
 		curl_easy_setopt(Curl, CURLOPT_READFUNCTION, &FZenHttpRequest::FStatics::StaticReadFn);
 
@@ -441,6 +454,7 @@ namespace UE::Zen {
 
 	FZenHttpRequest::Result FZenHttpRequest::PerformBlocking(FStringView Uri, RequestVerb Verb, uint32 ContentLength)
 	{
+		LLM_SCOPE_BYTAG(ZenDDC);
 		// Strip any leading slashes because we compose the prefix and the suffix with a separating slash below
 		while (Uri.StartsWith('/'))
 		{
@@ -779,6 +793,20 @@ namespace UE::Zen {
 		Request->BytesSent = NewPosition;
 		return CURL_SEEKFUNC_OK;
 	}
+
+#if PLATFORM_WINDOWS
+	int FZenHttpRequest::FStatics::StaticSockoptFn(void* UserData, curl_socket_t CurlFd, curlsocktype Purpose)
+	{
+		// On Windows, loopback connections can take advantage of a faster code path optionally with this flag.
+		// This must be used by both the client and server side, and is only effective in the absence of
+		// Windows Filtering Platform (WFP) callouts which can be installed by security software.
+		// https://docs.microsoft.com/en-us/windows/win32/winsock/sio-loopback-fast-path
+		int LoopbackOptionValue = 1;
+		DWORD OptionNumberOfBytesReturned = 0;
+		WSAIoctl(CurlFd, SIO_LOOPBACK_FAST_PATH, &LoopbackOptionValue, sizeof(LoopbackOptionValue), NULL, 0, &OptionNumberOfBytesReturned, 0, 0);
+		return CURL_SOCKOPT_OK;
+	}
+#endif //PLATFORM_WINDOWS
 
 	//////////////////////////////////////////////////////////////////////////
 

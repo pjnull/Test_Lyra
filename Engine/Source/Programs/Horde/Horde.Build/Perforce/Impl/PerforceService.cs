@@ -137,11 +137,11 @@ namespace HordeServer.Services
 			return User!;
 		}
 
-		async Task<PerforceCluster> GetClusterAsync(string? ClusterName)
+		async Task<PerforceCluster> GetClusterAsync(string? ClusterName, string? ServerAndPort = null)
 		{
 			Globals Globals = await CachedGlobals.GetCached();
 
-			PerforceCluster? Cluster = Globals.FindPerforceCluster(ClusterName);
+			PerforceCluster? Cluster = Globals.FindPerforceCluster(ClusterName, ServerAndPort);
 			if (Cluster == null)
 			{
 				throw new Exception($"Unknown Perforce cluster '{ClusterName}'");
@@ -200,12 +200,13 @@ namespace HordeServer.Services
 			return Repository;
 		}
 
+
 		/// <summary>
 		/// 
 		/// </summary>
 		/// <param name="ClusterName"></param>
 		/// <returns></returns>
-		public async Task<NativePerforceConnection?> GetServiceUserConnection(string? ClusterName)
+		public async Task<IPerforceConnection?> GetServiceUserConnection(string? ClusterName)
 		{
 			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.GetServiceUserConnection").StartActive();
 			Scope.Span.SetTag("ClusterName", ClusterName);
@@ -227,16 +228,13 @@ namespace HordeServer.Services
 
 			IPerforceServer Server = await SelectServer(Cluster);
 
-			PerforceSettings Settings = new PerforceSettings();
-			Settings.ServerAndPort = Server.ServerAndPort;
-			Settings.User = UserName;
+			PerforceSettings Settings = new PerforceSettings(Server.ServerAndPort, UserName);
 			Settings.Password = Password;
 			Settings.AppName = "Horde.Build";
-			Settings.Client = "__DOES_NOT_EXIST__";
+			Settings.ClientName = "__DOES_NOT_EXIST__";
+			Settings.PreferNativeClient = true;
 
-			NativePerforceConnection NativeConnection = new NativePerforceConnection(Logger);
-			await NativeConnection.ConnectAsync(Settings);
-			return NativeConnection;
+			return await PerforceConnection.CreateAsync(Settings, Logger);
 		}
 
 		async Task<P4.Repository> GetServiceUserConnection(PerforceCluster Cluster)
@@ -341,9 +339,67 @@ namespace HordeServer.Services
 			CachedTicketInfo TicketInfo = await GetImpersonateCredential(Cluster, ImpersonateUser);
 			return CreateConnection(TicketInfo.Server, TicketInfo.UserName, TicketInfo.Ticket.Ticket);
 		}
+		
+		async Task<string?> GetPortFromChange(PerforceCluster Cluster, int Change)
+		{
+			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.GetPortFromChange").StartActive();
+			Scope.Span.SetTag("ClusterName", Cluster.Name);
+			Scope.Span.SetTag("Change", Change);
+
+			string? ClientPort = null;
+
+			using (P4.Repository Repository = await GetConnection(Cluster, NoClient: true))
+			{				
+				P4.Changelist Changelist = Repository.GetChangelist(Change);
+				if (Changelist == null || string.IsNullOrEmpty(Changelist.ClientId))
+				{
+					throw new Exception($"GetPortFromChange - Unable to get changelist for {Change}");
+				}
+
+				P4.Client Client = Repository.GetClient(Changelist.ClientId);
+
+				if (Client == null)
+				{
+					throw new Exception($"GetPortFromChange - Unable to get client for {Change}");
+				}
+
+				// Check whether not restricted to a specific server
+				if (string.IsNullOrEmpty(Client.ServerID))
+				{
+					return null;
+				}
+
+				List<string> Args = new List<string> { "-o", Client.ServerID };
+
+				using (P4.P4Command Command = new P4.P4Command(Repository, "server", true, Args.ToArray()))
+				{
+					P4.P4CommandResult Result = Command.Run();
+
+					if (!Result.Success || Result.TaggedOutput == null || Result.TaggedOutput.Count == 0)
+					{
+						throw new Exception($"Unable to get tagged output for {Client.ServerID}");
+					}
+
+					foreach (P4.TaggedObject TaggedObject in Result.TaggedOutput)
+					{
+						if (TaggedObject.TryGetValue("Address", out ClientPort))
+						{
+							break;
+						}
+					}
+				}
+			}
+
+			if (string.IsNullOrEmpty(ClientPort))
+			{
+				throw new Exception($"GetPortFromChange - Unable to get client port for {Change}");
+			}
+
+			return ClientPort;
+		}
 
 		[SuppressMessage("Microsoft.Reliability", "CA2000:DisposeObjectsBeforeLosingScope")]
-		async Task<P4.Repository> GetConnection(PerforceCluster Cluster, string? Stream = null, string? Username = null, bool ReadOnly = true, bool CreateChange = false, int? ClientFromChange = null, bool UseClientFromChange = false, bool UsePortFromChange = false, string? ClientId = null, bool NoClient = false)
+		async Task<P4.Repository> GetConnection(PerforceCluster Cluster, string? Stream = null, string? Username = null, bool ReadOnly = true, bool CreateChange = false, int? ClientFromChange = null, bool UseClientFromChange = false, int? UsePortFromChange = null, string? ClientId = null, bool NoClient = false)
 		{
 			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.GetConnection").StartActive();
 			Scope.Span.SetTag("ClusterName", Cluster.Name);
@@ -351,7 +407,32 @@ namespace HordeServer.Services
 			Scope.Span.SetTag("Username", Username);
 			Scope.Span.SetTag("NoClient", NoClient);
 			Scope.Span.SetTag("ClientId", ClientId);
-			
+
+			if (UsePortFromChange.HasValue)
+			{
+				try
+				{
+					string? ClientPort = await GetPortFromChange(Cluster, UsePortFromChange.Value);
+					if (ClientPort != null)
+					{
+						PerforceCluster ClientCluster = await GetClusterAsync(null, ClientPort);
+						if (!string.Equals(ClientCluster.Name, Cluster.Name, StringComparison.OrdinalIgnoreCase))
+						{
+							Logger.LogInformation("Perforce: Overriding Cluster {Cluster} with Client Cluster {ClientCluster} for server restricted change {Change}", Cluster.Name, ClientCluster.Name, UsePortFromChange.Value);
+							Cluster = ClientCluster;
+						}
+					}
+					else
+					{
+						Logger.LogInformation("Change {UsePortFromChange} is not restricted to a server", UsePortFromChange.Value);
+					}
+				}
+				catch (Exception Ex)
+				{
+					Logger.LogError(Ex, "Unable to get client port for changelist {Change} using cluster {ClusterName}", UsePortFromChange, Cluster.Name);
+				}
+			}
+
 			P4.Repository Repository;
 			if (Username == null || !Cluster.CanImpersonate || Username.Equals(Cluster.ServiceAccount, StringComparison.OrdinalIgnoreCase))
 			{
@@ -372,7 +453,7 @@ namespace HordeServer.Services
 					}
 					else
 					{
-						P4.Client Client = GetOrCreateClient(Cluster.ServiceAccount, Repository, Stream, Username, ReadOnly, CreateChange, ClientFromChange, UseClientFromChange, UsePortFromChange);
+						P4.Client Client = GetOrCreateClient(Cluster.ServiceAccount, Repository, Stream, Username, ReadOnly, CreateChange, ClientFromChange, UseClientFromChange);
 						Repository.Connection.SetClient(Client.Name);
 
 					}
@@ -384,40 +465,7 @@ namespace HordeServer.Services
 						{
 							Repository.Connection.getP4Server().SetConnectionHost(ClientHost);
 						}
-					}
-
-					/*
-
-					This is disabled until https://jira.it.epicgames.com/servicedesk/customer/portal/1/ITH-144069 is resolved and edge server is sorted (required for things like deleting shelves)
-
-					string? ClientPort = null;
-
-					if (UsePortFromChange)
-					{
-						if (!Repository.Connection.Client.Name.StartsWith("horde-p4bridge-", StringComparison.OrdinalIgnoreCase))
-						{
-							using (P4.P4Command Cmd = new P4.P4Command(Repository, "info", true))
-							{
-								P4.P4CommandResult Results = Cmd.Run();
-
-								if (!Results.Success)
-								{
-									throw new Exception("Unable to get server info");
-								}
-
-								P4.TaggedObject? Tag = Results.TaggedOutput.Find(T => T.ContainsKey("changeServer"));
-
-								if (Tag != null)
-								{
-									if (!Tag.TryGetValue("changeServer", out ClientPort))
-									{
-										throw new Exception("Unable to get change server from tagged server info output");
-									}
-								}
-							}
-						}
-					}
-					*/
+					}					
 
 				}
 				catch
@@ -461,7 +509,21 @@ namespace HordeServer.Services
 
 		}
 
-		static P4.Client GetOrCreateClient(string? ServiceUserName, P4.Repository Repository, string? Stream, string? Username = null, bool ReadOnly = true, bool CreateChange = false, int? ClientFromChange = null, bool UseClientFromChange = false, bool UsePortFromChange = false)
+		static void ResetClient(P4.Repository Repository)
+		{
+			Repository.Connection.Client.RevertFiles(new P4.Options(), new P4.DepotPath("//..."));
+
+			IList<P4.Changelist> Changes = Repository.GetChangelists(new P4.ChangesCmdOptions(P4.ChangesCmdFlags.None, Repository.Connection.Client.Name, 100, P4.ChangeListStatus.Pending, null));
+			if (Changes != null)
+			{
+				foreach (P4.Changelist Change in Changes)
+				{
+					Repository.DeleteChangelist(Change, new P4.Options());
+				}
+			}
+		}
+
+		static P4.Client GetOrCreateClient(string? ServiceUserName, P4.Repository Repository, string? Stream, string? Username = null, bool ReadOnly = true, bool CreateChange = false, int? ClientFromChange = null, bool UseClientFromChange = false)
 		{
 			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.GetOrCreateClient").StartActive();
 			Scope.Span.SetTag("ServiceUserName", ServiceUserName);
@@ -489,11 +551,9 @@ namespace HordeServer.Services
 					throw new Exception($"Unable to get client for id {Changelist.ClientId}");
 				}
 
-
 				Stream = Client.Stream;
 				Username = Client.OwnerName;
 				ClientHost = Client.Host;
-
 
 			}
 
@@ -543,7 +603,7 @@ namespace HordeServer.Services
 
 			if (Client == null)
 			{
-				throw new Exception($"Unable to create client for Stream:{Stream} Username:{Username} ReadOnly:{ReadOnly} CreateChange:{CreateChange} ClientFromChange:{ClientFromChange} UseClientFromChange:{UseClientFromChange} UsePortFromChange:{UsePortFromChange}");
+				throw new Exception($"Unable to create client for Stream:{Stream} Username:{Username} ReadOnly:{ReadOnly} CreateChange:{CreateChange} ClientFromChange:{ClientFromChange} UseClientFromChange:{UseClientFromChange}");
 			}
 
 			return Client;
@@ -686,6 +746,7 @@ namespace HordeServer.Services
 					return HeadRev;
 				case P4.FileAction.Delete:
 				case P4.FileAction.MoveDelete:
+				case P4.FileAction.Purge:
 					return -1;
 				default:
 					throw new Exception($"Unrecognized P4 file change type '{HeadAction}' for file {Path}#{HeadRev}");
@@ -883,6 +944,53 @@ namespace HordeServer.Services
 					}
 				}
 			}
+		}
+
+		/// <inheritdoc/>
+		public async Task<CheckShelfResult> CheckShelfAsync(string ClusterName, string StreamName, int ChangeNumber, string? ImpersonateUser)
+		{
+			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.CheckPreflightAsync").StartActive();
+			Scope.Span.SetTag("ClusterName", ClusterName);
+			Scope.Span.SetTag("StreamName", StreamName);
+			Scope.Span.SetTag("ChangeNumber", ChangeNumber);
+			Scope.Span.SetTag("ImpersonateUser", ImpersonateUser);
+
+			PerforceCluster Cluster = await GetClusterAsync(ClusterName);
+			using (P4.Repository Repository = await GetConnection(Cluster, Stream: StreamName, Username: ImpersonateUser))
+			{
+				P4.Changelist Change = Repository.GetChangelist(ChangeNumber, new P4.DescribeCmdOptions(P4.DescribeChangelistCmdFlags.Omit | P4.DescribeChangelistCmdFlags.Shelved, 0, 0));
+				if(Change == null)
+				{
+					return CheckShelfResult.NoChange;
+				}
+				if (Change.ShelvedFiles == null || Change.ShelvedFiles.Count == 0)
+				{
+					return CheckShelfResult.NoShelvedFiles;
+				}
+
+				P4.Stream Stream = Repository.GetStream(StreamName, new P4.StreamCmdOptions(P4.StreamCmdFlags.View, null, null));
+				ViewMap Map = new ViewMap(Stream.View);
+
+				bool bHasMappedFile = false;
+				bool bHasUnmappedFile = false;
+				foreach (P4.ShelvedFile ShelvedFile in Change.ShelvedFiles)
+				{
+					if (Map.TryMapFile(ShelvedFile.Path.Path, Utf8StringComparer.OrdinalIgnoreCase, out Utf8String _))
+					{
+						bHasMappedFile = true;
+					}
+					else
+					{
+						bHasUnmappedFile = true;
+					}
+				}
+
+				if (bHasUnmappedFile)
+				{
+					return bHasMappedFile ? CheckShelfResult.MixedStream : CheckShelfResult.WrongStream;
+				}
+			}
+			return CheckShelfResult.Ok;
 		}
 
 		/// <inheritdoc/>
@@ -1098,7 +1206,7 @@ namespace HordeServer.Services
 				throw new Exception($"Unable to get owner for shelved change {ShelvedChange}");
 			}
 
-			using (P4.Repository Repository = await GetConnection(Cluster, ReadOnly: false, ClientFromChange: ShelvedChange, UseClientFromChange: false, Username: ChangeOwner))
+			using (P4.Repository Repository = await GetConnection(Cluster, ReadOnly: false, UsePortFromChange: ShelvedChange, ClientFromChange: ShelvedChange, UseClientFromChange: false, Username: ChangeOwner))
 			{
 				return ReshelveChange(Repository, ShelvedChange);
 			}
@@ -1131,7 +1239,7 @@ namespace HordeServer.Services
 					throw new Exception($"Unable to get shelved changelist client id for delete: {ShelvedChange}");
 				}
 
-				using (P4.Repository ClientRepository = await GetConnection(Cluster, Changelist.Stream, Changelist.OwnerName, ClientId: ClientId, UseClientFromChange: true, UsePortFromChange: true))
+				using (P4.Repository ClientRepository = await GetConnection(Cluster, Changelist.Stream, Changelist.OwnerName, ClientId: ClientId, UseClientFromChange: true, UsePortFromChange: ShelvedChange))
 				{
 
 					if (Changelist.Shelved)
@@ -1154,6 +1262,7 @@ namespace HordeServer.Services
 			try
 			{
 				PerforceCluster Cluster = await GetClusterAsync(ClusterName);
+
 				using (P4.Repository Repository = await GetConnection(Cluster, NoClient: true))
 				{
 					P4.Changelist Changelist = Repository.GetChangelist(Change);
@@ -1161,7 +1270,7 @@ namespace HordeServer.Services
 					Repository.Connection.Disconnect();
 
 					// the client must exist for the change list, otherwise will fail (for example, CreateNewChangeAsync deletes the client before returning)
-					using (P4.Repository UpdateRepository = await GetConnection(Cluster, ClientFromChange: Change, UseClientFromChange: true, Username: Changelist.OwnerName))
+					using (P4.Repository UpdateRepository = await GetConnection(Cluster, ClientFromChange: Change, UseClientFromChange: true, UsePortFromChange: Change, Username: Changelist.OwnerName))
 					{
 						P4.Changelist UpdatedChangelist = UpdateRepository.GetChangelist(Change);
 						UpdatedChangelist.Description = Description;
@@ -1176,7 +1285,7 @@ namespace HordeServer.Services
 		}
 
 		/// <inheritdoc/>
-		public async Task<int> CreateNewChangeAsync(string ClusterName, string StreamName, string FilePath)
+		public async Task<int> CreateNewChangeAsync(string ClusterName, string StreamName, string FilePath, string Description)
 		{
 			using IScope Scope = GlobalTracer.Instance.BuildSpan("PerforceService.CreateNewChangeAsync").StartActive();
 			Scope.Span.SetTag("ClusterName", ClusterName);
@@ -1200,11 +1309,13 @@ namespace HordeServer.Services
 				P4.Changelist? SubmitChangelist = null;
 				P4.DepotPath? DepotPath = null;
 
-				const int MaxRetries = 10;
+				const int MaxRetries = 5;
 				int Retry = 0;
 
 				for (; ; )
 				{
+					ResetClient(Repository);
+
 					DepotPath = null;
 
 					if (Retry == MaxRetries)
@@ -1286,17 +1397,14 @@ namespace HordeServer.Services
 						}
 
 						// create a new change
+						P4.Changelist Changelist = new P4.Changelist();
+						Changelist.Description = Description;
+						Changelist.Files.Add(new P4.FileMetaData(new P4.FileSpec(DepotPath)));
+						SubmitChangelist = Repository.CreateChangelist(Changelist);
+
 						if (SubmitChangelist == null)
 						{
-							P4.Changelist Changelist = new P4.Changelist();
-							Changelist.Description = "New change for Horde job";
-							Changelist.Files.Add(new P4.FileMetaData(new P4.FileSpec(DepotPath)));
-							SubmitChangelist = Repository.CreateChangelist(Changelist);
-
-							if (SubmitChangelist == null)
-							{
-								throw new Exception($"Unable to create a changelist for: {DepotPath}");
-							}
+							throw new Exception($"Unable to create a changelist for: {DepotPath}");
 						}
 
 						SubmitResults = SubmitChangelist.Submit(null);
@@ -1311,9 +1419,6 @@ namespace HordeServer.Services
 					catch
 					{
 						Retry++;
-
-						Client.RevertFiles(new P4.Options(), WorkspaceFileSpec);
-
 						continue;
 					}
 
@@ -1326,7 +1431,7 @@ namespace HordeServer.Services
 				}
 				catch
 				{
-					Logger.LogError($"Unable to delete client {ClientName}");
+					Logger.LogError("Unable to delete client {ClientName}", ClientName);
 				}
 
 			}
@@ -1407,7 +1512,7 @@ namespace HordeServer.Services
 
 					Repository.Connection.Disconnect();
 
-					using (P4.Repository SubmitRepository = await GetConnection(Cluster, ReadOnly: false, ClientFromChange: Change, UseClientFromChange: true, Username: Changelist.OwnerName))
+					using (P4.Repository SubmitRepository = await GetConnection(Cluster, ReadOnly: false, ClientFromChange: Change, UseClientFromChange: true, UsePortFromChange: Change, Username: Changelist.OwnerName))
 					{
 						// we might not need a client here, possibly -e below facilitates this, check!
 						using (P4.P4Command SubmitCommand = new P4.P4Command(SubmitRepository, "submit", null, true, new string[] { "-e", Change.ToString(CultureInfo.InvariantCulture) }))

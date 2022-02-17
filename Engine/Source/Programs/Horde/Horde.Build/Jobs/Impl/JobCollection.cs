@@ -26,6 +26,7 @@ namespace HordeServer.Collections.Impl
 	using JobId = ObjectId<IJob>;
 	using LeaseId = ObjectId<ILease>;
 	using LogId = ObjectId<ILogFile>;
+	using SessionId = ObjectId<ISession>;
 	using StreamId = StringId<IStream>;
 	using TemplateRefId = StringId<TemplateRef>;
 	using PoolId = StringId<IPool>;
@@ -134,7 +135,7 @@ namespace HordeServer.Collections.Impl
 			public AgentId? AgentId { get; set; }
 
 			[BsonIgnoreIfNull]
-			public ObjectId? SessionId { get; set; }
+			public SessionId? SessionId { get; set; }
 
 			[BsonIgnoreIfNull]
 			public LeaseId? LeaseId { get; set; }
@@ -312,6 +313,32 @@ namespace HordeServer.Collections.Impl
 			}
 		}
 
+		class DatabaseIndexes : BaseDatabaseIndexes
+		{
+			public readonly string StreamId;
+			public readonly string Change;
+			public readonly string PreflightChange;
+			public readonly string CreateTimeUtc;
+			public readonly string UpdateTimeUtc;
+			public readonly string Name;
+			public readonly string StartedByUserId;
+			public readonly string TemplateId;
+			public readonly string SchedulePriority;
+
+			public DatabaseIndexes(IMongoCollection<JobDocument> Jobs, bool DatabaseReadOnlyMode) : base(DatabaseReadOnlyMode)
+			{
+				StreamId = CreateOrGetIndex(Jobs, "StreamId_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.StreamId));
+				Change = CreateOrGetIndex(Jobs, "Change_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.Change));
+				PreflightChange = CreateOrGetIndex(Jobs, "PreflightChange_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.PreflightChange));
+				CreateTimeUtc = CreateOrGetIndex(Jobs, "CreateTimeUtc_-1", Builders<JobDocument>.IndexKeys.Descending(x => x.CreateTimeUtc));
+				UpdateTimeUtc = CreateOrGetIndex(Jobs, "UpdateTimeUtc_-1", Builders<JobDocument>.IndexKeys.Descending(x => x.UpdateTimeUtc));
+				Name = CreateOrGetIndex(Jobs, "Name_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.Name));
+				StartedByUserId = CreateOrGetIndex(Jobs, "StartedByUserId_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.StartedByUserId));
+				TemplateId = CreateOrGetIndex(Jobs, "TemplateId_1", Builders<JobDocument>.IndexKeys.Ascending(x => x.TemplateId));
+				SchedulePriority = CreateOrGetIndex(Jobs, "SchedulePriority_-1", Builders<JobDocument>.IndexKeys.Descending(x => x.SchedulePriority));
+			}
+		}
+
 		/// <summary>
 		/// Projection of a job definition to just include permissions info
 		/// </summary>
@@ -338,6 +365,11 @@ namespace HordeServer.Collections.Impl
 		/// The user collection
 		/// </summary>
 		IUserCollection UserCollection;
+		
+		/// <summary>
+		/// Clock representing wall-clock time
+		/// </summary>
+		IClock Clock;
 
 		/// <summary>
 		/// Logger for output
@@ -345,30 +377,25 @@ namespace HordeServer.Collections.Impl
 		ILogger<JobCollection> Logger;
 
 		/// <summary>
+		/// Creation and lookup of indexes
+		/// </summary>
+		DatabaseIndexes Indexes;
+
+		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="DatabaseService">The database service singleton</param>
 		/// <param name="UserCollection"></param>
+		/// <param name="Clock"></param>
 		/// <param name="Logger">The logger instance</param>
-		public JobCollection(DatabaseService DatabaseService, IUserCollection UserCollection, ILogger<JobCollection> Logger)
+		public JobCollection(DatabaseService DatabaseService, IUserCollection UserCollection, IClock Clock, ILogger<JobCollection> Logger)
 		{
 			this.UserCollection = UserCollection;
+			this.Clock = Clock;
 			this.Logger = Logger;
 
 			Jobs = DatabaseService.GetCollection<JobDocument>("Jobs");
-
-			if (!DatabaseService.ReadOnlyMode)
-			{
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.StreamId)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.Change)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.PreflightChange)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Descending(x => x.CreateTimeUtc)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Descending(x => x.UpdateTimeUtc)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.Name)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.StartedByUserId)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Ascending(x => x.TemplateId)));
-				Jobs.Indexes.CreateOne(new CreateIndexModel<JobDocument>(Builders<JobDocument>.IndexKeys.Descending(x => x.SchedulePriority)));
-			}
+			Indexes = new DatabaseIndexes(Jobs, DatabaseService.ReadOnlyMode);
 		}
 
 		async Task PostLoadAsync(JobDocument Job)
@@ -496,7 +523,7 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<List<IJob>> FindAsync(JobId[]? JobIds, StreamId? StreamId, string? Name, TemplateRefId[]? Templates, int? MinChange, int? MaxChange, int? PreflightChange, UserId? PreflightStartedByUser, UserId? StartedByUser, DateTimeOffset? MinCreateTime, DateTimeOffset? MaxCreateTime, DateTimeOffset? ModifiedBefore, DateTimeOffset? ModifiedAfter, int? Index, int? Count)
+		public async Task<List<IJob>> FindAsync(JobId[]? JobIds, StreamId? StreamId, string? Name, TemplateRefId[]? Templates, int? MinChange, int? MaxChange, int? PreflightChange, bool? PreflightOnly, UserId ? PreflightStartedByUser, UserId? StartedByUser, DateTimeOffset? MinCreateTime, DateTimeOffset? MaxCreateTime, DateTimeOffset? ModifiedBefore, DateTimeOffset? ModifiedAfter, int? Index, int? Count, bool ConsistentRead, string? IndexHint, bool? ExcludeUserJobs)
 		{
 			FilterDefinitionBuilder<JobDocument> FilterBuilder = Builders<JobDocument>.Filter;
 
@@ -511,7 +538,15 @@ namespace HordeServer.Collections.Impl
 			}
 			if (Name != null)
 			{
-				Filter &= FilterBuilder.Eq(x => x.Name, Name);
+				if (Name.StartsWith("$", StringComparison.InvariantCulture))
+				{
+					BsonRegularExpression Regex = new BsonRegularExpression(Name.Substring(1), "i");
+					Filter &= FilterBuilder.Regex(x => x.Name, Regex);
+				}
+				else
+				{
+					Filter &= FilterBuilder.Eq(x => x.Name, Name);
+				}				
 			}
 			if (Templates != null)
 			{
@@ -529,13 +564,24 @@ namespace HordeServer.Collections.Impl
 			{
 				Filter &= FilterBuilder.Eq(x => x.PreflightChange, PreflightChange);
 			}
-			if (PreflightStartedByUser != null)
+			if (PreflightOnly != null && PreflightOnly.Value)
 			{
-				Filter &= FilterBuilder.Or(FilterBuilder.Eq(x => x.PreflightChange, 0), FilterBuilder.Eq(x => x.StartedByUserId, PreflightStartedByUser));
+				Filter &= FilterBuilder.Ne(x => x.PreflightChange, 0);
 			}
-			if (StartedByUser != null)
+			if (ExcludeUserJobs != null && ExcludeUserJobs.Value)
 			{
-				Filter &= FilterBuilder.Eq(x => x.StartedByUserId, StartedByUser);
+				Filter &= FilterBuilder.Eq(x => x.StartedByUserId, null);
+			}
+			else
+			{
+				if (PreflightStartedByUser != null)
+				{
+					Filter &= FilterBuilder.Or(FilterBuilder.Eq(x => x.PreflightChange, 0), FilterBuilder.Eq(x => x.StartedByUserId, PreflightStartedByUser));
+				}
+				if (StartedByUser != null)
+				{
+					Filter &= FilterBuilder.Eq(x => x.StartedByUserId, StartedByUser);
+				}
 			}
 			if (MinCreateTime != null)
 			{
@@ -557,7 +603,16 @@ namespace HordeServer.Collections.Impl
 			List<JobDocument> Results;
 			using (IScope Scope = GlobalTracer.Instance.BuildSpan("Jobs.Find").StartActive())
 			{
-				IFindFluent<JobDocument, JobDocument> Query = Jobs.Find<JobDocument>(Filter).SortByDescending(x => x.CreateTimeUtc!);
+				IMongoCollection<JobDocument> Collection = ConsistentRead ? Jobs : Jobs.WithReadPreference(ReadPreference.SecondaryPreferred);
+
+				FindOptions? FindOptions = null;
+				if (IndexHint != null)
+				{
+					FindOptions = new FindOptions { Hint = new BsonString(IndexHint) };
+				}
+				
+				IFindFluent<JobDocument, JobDocument> Query = Collection.Find<JobDocument>(Filter, FindOptions).SortByDescending(x => x.CreateTimeUtc!);
+				
 				if (Index != null)
 				{
 					Query = Query.Skip(Index.Value);
@@ -573,6 +628,19 @@ namespace HordeServer.Collections.Impl
 				await PostLoadAsync(Result);
 			}
 			return Results.ConvertAll<JobDocument, IJob>(x => x);
+		}
+
+		/// <inheritdoc/>
+		public async Task<List<IJob>> FindLatestByStreamWithTemplatesAsync(StreamId StreamId, TemplateRefId[] Templates, UserId? PreflightStartedByUser, DateTimeOffset? MaxCreateTime, DateTimeOffset? ModifiedAfter, int? Index, int? Count, bool ConsistentRead)
+		{
+			string IndexHint = Indexes.CreateTimeUtc;
+			if (ModifiedAfter != null) IndexHint = Indexes.UpdateTimeUtc;
+			
+			// This find call uses an index hint. Modifying the parameter passed to FindAsync can affect execution time a lot as the query planner is forced to use the specified index.
+			// Casting to interface to benefit from default parameter values
+			return await (this as IJobCollection).FindAsync(
+				StreamId: StreamId, Templates: Templates, PreflightStartedByUser: PreflightStartedByUser, ModifiedAfter: ModifiedAfter, MaxCreateTime: MaxCreateTime,
+				Index: Index, Count: Count, IndexHint: IndexHint, ConsistentRead: ConsistentRead);
 		}
 
 		/// <inheritdoc/>
@@ -711,12 +779,12 @@ namespace HordeServer.Collections.Impl
 
 				if (Batch.StartTime == null && NewState >= JobStepBatchState.Starting)
 				{
-					Batch.StartTime = DateTimeOffset.Now;
+					Batch.StartTime = Clock.UtcNow;
 					Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].StartTime, Batch.StartTime));
 				}
 				if (NewState == JobStepBatchState.Complete)
 				{
-					Batch.FinishTime = DateTimeOffset.Now;
+					Batch.FinishTime = Clock.UtcNow;
 					Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].FinishTime, Batch.FinishTime));
 				}
 			}
@@ -797,12 +865,12 @@ namespace HordeServer.Collections.Impl
 
 								if (Step.State == JobStepState.Running)
 								{
-									Step.StartTime = DateTimeOffset.Now;
+									Step.StartTime = Clock.UtcNow;
 									Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].Steps[StepIdx].StartTime, Step.StartTime));
 								}
 								else if (Step.State == JobStepState.Completed || Step.State == JobStepState.Aborted)
 								{
-									Step.FinishTime = DateTimeOffset.Now;
+									Step.FinishTime = Clock.UtcNow;
 									Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].Steps[StepIdx].FinishTime, Step.FinishTime));
 								}
 
@@ -1116,7 +1184,7 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<IJob?> TryAssignLeaseAsync(IJob Job, int BatchIdx, PoolId PoolId, AgentId AgentId, ObjectId SessionId, LeaseId LeaseId, LogId LogId)
+		public async Task<IJob?> TryAssignLeaseAsync(IJob Job, int BatchIdx, PoolId PoolId, AgentId AgentId, SessionId SessionId, LeaseId LeaseId, LogId LogId)
 		{
 			// Try to update the job with this agent id
 			UpdateDefinitionBuilder<JobDocument> UpdateBuilder = Builders<JobDocument>.Update;
@@ -1154,6 +1222,8 @@ namespace HordeServer.Collections.Impl
 		/// <inheritdoc/>
 		public async Task<IJob?> TryCancelLeaseAsync(IJob Job, int BatchIdx)
 		{
+			Logger.LogDebug("Cancelling lease {LeaseId} for agent {AgentId}", Job.Batches[BatchIdx].LeaseId, Job.Batches[BatchIdx].AgentId);
+
 			JobDocument JobDocument = Clone((JobDocument)Job);
 
 			UpdateDefinition<JobDocument> Update = Builders<JobDocument>.Update.Unset(x => x.Batches[BatchIdx].AgentId).Unset(x => x.Batches[BatchIdx].SessionId).Unset(x => x.Batches[BatchIdx].LeaseId);
@@ -1171,10 +1241,11 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public Task<IJob?> TryFailBatchAsync(IJob Job, int BatchIdx, IGraph Graph)
+		public Task<IJob?> TryFailBatchAsync(IJob Job, int BatchIdx, IGraph Graph, JobStepBatchError Error)
 		{
 			JobDocument JobDocument = Clone((JobDocument)Job);
 			JobStepBatchDocument Batch = JobDocument.Batches[BatchIdx];
+			Logger.LogDebug("Failing batch {JobId}:{BatchId} with error {Error}", Job.Id, Batch.Id, Error);
 
 			UpdateDefinitionBuilder<JobDocument> UpdateBuilder = new UpdateDefinitionBuilder<JobDocument>();
 			List<UpdateDefinition<JobDocument>> Updates = new List<UpdateDefinition<JobDocument>>();
@@ -1184,7 +1255,7 @@ namespace HordeServer.Collections.Impl
 				Batch.State = JobStepBatchState.Complete;
 				Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].State, Batch.State));
 
-				Batch.Error = JobStepBatchError.LostConnection;
+				Batch.Error = Error;
 				Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].Error, Batch.Error));
 
 				Batch.FinishTime = DateTimeOffset.UtcNow;
@@ -1204,7 +1275,7 @@ namespace HordeServer.Collections.Impl
 					Step.Outcome = JobStepOutcome.Failure;
 					Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].Steps[StepIdxCopy].Outcome, Step.Outcome));
 
-					Step.FinishTime = DateTimeOffset.Now;
+					Step.FinishTime = Clock.UtcNow;
 					Updates.Add(UpdateBuilder.Set(x => x.Batches[BatchIdx].Steps[StepIdxCopy].FinishTime, Step.FinishTime));
 				}
 				else if (Step.State == JobStepState.Ready)

@@ -265,12 +265,13 @@ export function isExecP4Error(err: any): err is [Error, string] {
 }
 
 interface ExecOpts {
-	stdin?: string;
-	quiet?: boolean;
-	noCwd?: boolean;
-	noUsername?: boolean;
-	numRetries?: number;
-	trace?: boolean;
+	stdin?: string
+	quiet?: boolean
+	noCwd?: boolean
+	noUsername?: boolean
+	numRetries?: number
+	trace?: boolean
+	edgeServerAddress?: string
 }
 
 interface ExecZtagOpts extends ExecOpts {
@@ -280,6 +281,7 @@ interface ExecZtagOpts extends ExecOpts {
 export interface EditOwnerOpts {
 	newWorkspace?: string;
 	changeSubmitted?: boolean;
+	edgeServerAddress?: string
 }
 
 export interface ConflictedResolveNFile {
@@ -467,12 +469,17 @@ export class PerforceContext {
 	}
 
 	// get a list of all pending changes for this user
-	async get_pending_changes() {
+	async get_pending_changes(workspaceName?: string, edgeServerAddress?: string) {
 		if (!this.username) {
 			throw new Error("username not set");
 		}
 
-		return this._execP4Ztag(null, ['changes', '-u', this.username, '-s', 'pending'], { multiline: true });
+		let args = ['changes', '-u', this.username, '-s', 'pending']
+		if (workspaceName) {
+			args = [...args, '-c', workspaceName]
+		}
+
+		return this._execP4Ztag(null, args, { multiline: true, edgeServerAddress });
 	}
 
 	/** get a single change in the format of changes() */
@@ -548,8 +555,19 @@ export class PerforceContext {
 
 	// find a workspace for the given user
 	// output format is an array of workspace names
-	async find_workspaces(user?: string) {
-		let parsedClients = await this._execP4Ztag(null, ['clients', '-u', user || this.username], { multiline: true });
+	async find_workspaces(user?: string, edgeServerAddress?: string) {
+		// -a to include workspaces on edge servers
+
+
+		let args = ['clients', '-u', user || this.username]
+
+		if (!edgeServerAddress) {
+			// find all
+			args.push('-a')
+		}
+
+
+		let parsedClients = await this._execP4Ztag(null, args, { multiline: true, edgeServerAddress });
 		let workspaces = [];
 		for (let clientDef of parsedClients) {
 			if (clientDef.client) {
@@ -559,8 +577,25 @@ export class PerforceContext {
 		return workspaces as ClientSpec[];
 	}
 
-	async find_workspace_by_name(workspaceName: string) {
-		return await this._execP4Ztag(null, ['clients', '-E', workspaceName]);
+	find_workspace_by_name(workspaceName: string) {
+		return this._execP4Ztag(null, ['clients', '-E', workspaceName]);
+	}
+
+	async getWorkspaceEdgeServer(workspaceName: string): Promise<{id: string, address: string} | null> {
+		const serverIdLine = await this._execP4(null, ['-ztag', '-F', '%ServerID%', 'client', '-o', workspaceName]) 
+		if (serverIdLine) {
+			const serverId = serverIdLine.trim()
+			const address = await this.getEdgeServerAddress(serverId)
+			if (!address) {
+				throw new Error(`Couldn't find address for edge server '${serverId}'`)
+			}
+			return {id: serverId, address: address.trim()}
+		}
+		return null
+	}
+
+	getEdgeServerAddress(serverId: string): Promise<string> {
+		return this._execP4(null, ['-ztag', '-F', '%Address%', 'server', '-o', serverId])
 	}
 
 	async clean(roboWorkspace: RoboWorkspace) {
@@ -585,11 +620,16 @@ export class PerforceContext {
 	}
 
 	// sync the depot path specified
-	async sync(roboWorkspace: RoboWorkspace, depotPath: string, opts?: string[]) {
+	async sync(roboWorkspace: RoboWorkspace, depotPath: string, opts?: string[], edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
-		const args = ['sync', ...(opts || []), depotPath];
+		let args = edgeServerAddress ? ['-p', edgeServerAddress] : []
+		args.push('sync')
+		if (opts) {
+			args = [...args, ...opts]
+		}
+		args.push(depotPath)
 		try {
-			await this._execP4(workspace, args);
+			await this._execP4(workspace, args)
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -598,7 +638,7 @@ export class PerforceContext {
 			const [err, output] = reason
 			// this is an acceptable non-error case for us
 			if (!output || typeof output !== "string" || !output.trim().endsWith("up-to-date."))
-				throw err;
+				throw err
 		}
 	}
 
@@ -612,7 +652,7 @@ export class PerforceContext {
 		return change.change;
 	}
 
-	async newWorkspace(workspaceName: string, params: any) {
+	async newWorkspace(workspaceName: string, params: any, edgeServer?: {id: string, address: string}) {
 		params.Client = workspaceName
 		if (!('Root' in params)) {
 			params.Root = 'd:/ROBO/' + workspaceName // default windows path
@@ -634,6 +674,11 @@ export class PerforceContext {
 			params.LineEnd = 'local'
 		}
 
+		let args = ['client', '-i']
+		if (edgeServer) {
+			args = ['-p', edgeServer.address, ...args, `--serverid=${edgeServer.id}`]
+		}
+
 		let workspaceForm = ''
 		for (let key in params) {
 			let val = params[key];
@@ -650,12 +695,12 @@ export class PerforceContext {
 
 		// run the p4 client command
 		this.logger.info(`Executing: 'p4 client -i' to create workspace ${workspaceName}`);
-		return this._execP4(null, ['client', '-i'], { stdin: workspaceForm, quiet: true });
+		return this._execP4(null, args, { stdin: workspaceForm, quiet: true });
 	}
 
 	// Create a new workspace for Robomerge GraphBot
-	async newGraphBotWorkspace(name: string, extraParams: any) {
-		return this.newWorkspace(name, {Root: '/src/' + name, ...extraParams});
+	async newGraphBotWorkspace(name: string, extraParams: any, edgeServer?: {id: string, address: string}) {
+		return this.newWorkspace(name, {Root: '/src/' + name, ...extraParams}, edgeServer);
 	}
 
 	// Create a new workspace for Robomerge to read branchspecs from
@@ -684,7 +729,7 @@ export class PerforceContext {
 
 	// create a new CL with a specific description
 	// output format is just CL number
-	async new_cl(roboWorkspace: RoboWorkspace, description: string, files?: string[]) {
+	async new_cl(roboWorkspace: RoboWorkspace, description: string, files?: string[], edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
 		// build the minimal form
 		let form = 'Change:\tnew\nStatus:\tnew\nType:\tpublic\n';
@@ -701,7 +746,7 @@ export class PerforceContext {
 
 		// run the P4 change command
 		this.logger.info("Executing: 'p4 change -i' to create a new CL");
-		const output = await this._execP4(workspace, ['change', '-i'], { stdin: form, quiet: true });
+		const output = await this._execP4(workspace, ['change', '-i'], { stdin: form, quiet: true, edgeServerAddress });
 		// parse the CL out of output
 		const match = output.match(/Change (\d+) created./);
 		if (!match) {
@@ -715,7 +760,8 @@ export class PerforceContext {
 	// integrate a CL from source to destination, resolve, and place the results in a new CL
 	// output format is true if the integration resolved or false if the integration wasn't necessary (still considered a success)
 	// failure to resolve is treated as an error condition
-	async integrate(roboWorkspace: RoboWorkspace, source: IntegrationSource, dest_changelist: number, target: IntegrationTarget): Promise<[string, (Change | string)[]]> {
+	async integrate(roboWorkspace: RoboWorkspace, source: IntegrationSource, dest_changelist: number, target: IntegrationTarget, edgeServerAddress?: string)
+		: Promise<[string, (Change | string)[]]> {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
 		// build a command
 		let cmdList = [
@@ -757,7 +803,7 @@ export class PerforceContext {
 		// execute the P4 command
 		let changes;
 		try {
-			changes = await this._execP4Ztag(workspace, cmdList, { numRetries: 0 });
+			changes = await this._execP4Ztag(workspace, cmdList, { numRetries: 0, edgeServerAddress });
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -816,10 +862,10 @@ export class PerforceContext {
 		return ["integrated", <Change[]>changes];
 	}
 
-	async resolveHelper(workspace: Workspace | null, flag: string, changelist: number): Promise<any> {
+	async resolveHelper(workspace: Workspace | null, flag: string, changelist: number, edgeServerAddress?: string): Promise<any> {
 		try {
 			// Perform merge
-			return await this._execP4Ztag(workspace, ['resolve', flag, `-c${changelist}`])
+			return await this._execP4Ztag(workspace, ['resolve', flag, `-c${changelist}`], {edgeServerAddress})
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -849,7 +895,8 @@ export class PerforceContext {
 
 
 	// output format a list of conflicting files (p4 output)
-	async resolve(roboWorkspace: RoboWorkspace, changelist: number, resolution: string, disallowDashN?: boolean): Promise<ResolveResult> {
+	async resolve(roboWorkspace: RoboWorkspace, changelist: number, resolution: string, disallowDashN?: boolean, edgeServerAddress?: string)
+		: Promise<ResolveResult> {
 		const workspace = coercePerforceWorkspace(roboWorkspace)
 		let flag = null
 		switch (resolution) {
@@ -862,7 +909,7 @@ export class PerforceContext {
 		}
 
 		// Perform merge
-		let fileInfo = await this.resolveHelper(workspace, flag, changelist)
+		let fileInfo = await this.resolveHelper(workspace, flag, changelist, edgeServerAddress)
 
 		// Clobber remaining files after first merge, if requested
 		if (resolution === 'clobber') {
@@ -876,7 +923,7 @@ export class PerforceContext {
 			}
 
 			// Otherwise, fileInfo should be updated with the clobber result
-			fileInfo = await this.resolveHelper(workspace, '-at', changelist)
+			fileInfo = await this.resolveHelper(workspace, '-at', changelist, edgeServerAddress)
 		}
 
 		// If resolveHelper() returned a string, we do not need to return a dashNResult
@@ -892,7 +939,7 @@ export class PerforceContext {
 		let dashNresult: string[]
 		try {
 			//dashNresult = await this._execP4(workspace, ['resolve', '-N', `-c${changelist}`])
-			dashNresult = await this._execP4Ztag(workspace, ['resolve', '-N', `-c${changelist}`])
+			dashNresult = await this._execP4Ztag(workspace, ['resolve', '-N', `-c${changelist}`], {edgeServerAddress})
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -997,9 +1044,9 @@ export class PerforceContext {
 
 	// delete a CL
 	// output format is just error or not
-	deleteCl(roboWorkspace: RoboWorkspace, changelist: number) {
+	deleteCl(roboWorkspace: RoboWorkspace, changelist: number, edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
-		return this._execP4(workspace, ["change", "-d", changelist.toString()]);
+		return this._execP4(workspace, ["change", "-d", changelist.toString()], {edgeServerAddress});
 	}
 
 	// run p4 'opened' command: lists files in changelist with details of edit state (e.g. if a copy, provides source path)
@@ -1019,11 +1066,13 @@ export class PerforceContext {
 
 	// revert a CL deleting any files marked for add
 	// output format is just error or not
-	async revert(roboWorkspace: RoboWorkspace, changelist: number, opts?: string[]) {
+	async revert(roboWorkspace: RoboWorkspace, changelist: number, opts?: string[], edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
 		const path = workspace && workspace.name ? `//${workspace.name}/...` : ''
 		try {
-			await this._execP4(workspace, ['revert', /*"-w", seems to cause ENOENT occasionally*/ ...(opts || []), '-c', changelist.toString(), path]);
+			await this._execP4(workspace, ['revert',
+				/*"-w", seems to cause ENOENT occasionally*/ ...(opts || []), '-c', changelist.toString(), path],
+				{edgeServerAddress});
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -1070,10 +1119,11 @@ export class PerforceContext {
 
 	// shelve a CL
 	// output format is just error or not
-	async shelve(roboWorkspace: RoboWorkspace, changelist: number) {
+	async shelve(roboWorkspace: RoboWorkspace, changelist: number, edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace)
 		try {
-			await this._execP4(workspace, ['shelve', '-f', '-c', changelist.toString()], { numRetries: 0 })
+			await this._execP4(workspace, ['shelve', '-f', '-c', changelist.toString()],
+				{ numRetries: 0, edgeServerAddress })
 		}
 		catch (reason) {
 			if (!isExecP4Error(reason)) {
@@ -1171,18 +1221,18 @@ export class PerforceContext {
 
 	// change the description on an existing CL
 	// output format is just error or not
-	async editDescription(roboWorkspace: RoboWorkspace, changelist: number, description: string) {
+	async editDescription(roboWorkspace: RoboWorkspace, changelist: number, description: string, edgeServerAddress?: string) {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
 
 		// get the current changelist description
-		const output = await this._execP4(workspace, ['change', '-o', changelist.toString()]);
+		const output = await this._execP4(workspace, ['change', '-o', changelist.toString()], {edgeServerAddress});
 		// replace the description
 		let new_desc = '\nDescription:\n\t' + this._sanitizeDescription(description);
 		let form = output.replace(/\nDescription:\n(\t[^\n]*\n)*/, new_desc.replace(/\$/g, '$$$$'));
 
 		// run the P4 change command to update
 		this.logger.info("Executing: 'p4 change -i -u' to edit description on CL" + changelist);
-		await this._execP4(workspace, ['change', '-i', '-u'], { stdin: form, quiet: true });
+		await this._execP4(workspace, ['change', '-i', '-u'], { stdin: form, quiet: true, edgeServerAddress });
 	}
 
 	// change the owner of an existing CL
@@ -1192,7 +1242,8 @@ export class PerforceContext {
 
 		opts = opts || {}; // optional newWorkspace:string and/or changeSubmitted:boolean
 		// get the current changelist description
-		const output = await this._execP4(workspace, ['change', '-o', changelist.toString()]);
+		const output = await this._execP4(workspace, ['change', '-o', changelist.toString()],
+			{edgeServerAddress: opts.edgeServerAddress});
 
 		// replace the description
 		let form = output.replace(/\nUser:\t[^\n]*\n/, `\nUser:\t${newOwner}\n`);
@@ -1204,11 +1255,12 @@ export class PerforceContext {
 		const changeFlag = opts.changeSubmitted ? '-f' : '-u';
 		this.logger.info(`Executing: 'p4 change -i ${changeFlag}' to edit user/client on CL${changelist}`);
 
-		await this._execP4(workspace, ['change', '-i', changeFlag], { stdin: form, quiet: true })
+		await this._execP4(workspace, ['change', '-i', changeFlag],
+				{ stdin: form, quiet: true, edgeServerAddress: opts.edgeServerAddress })
 	}
 
-	async where(roboWorkspace: RoboWorkspace, clientPath: string) {
-		return await this._execP4Ztag(roboWorkspace, ['where', clientPath])
+	where(roboWorkspace: RoboWorkspace, clientPath: string) {
+		return this._execP4Ztag(roboWorkspace, ['where', clientPath])
 	}
 
 	async filelog(roboWorkspace: RoboWorkspace, depotPath: string, beginRev: string, endRev: string, longOutput = false) {
@@ -1267,15 +1319,19 @@ export class PerforceContext {
 		const workspace = coercePerforceWorkspace(roboWorkspace);
 		// add the client explicitly if one is set (should be done at call time)
 
-		const opts = optsIn || {};
+		const opts = optsIn || {}
 
 		// Perforce can get mighty confused if you log into multiple accounts at any point (only relevant to local debugging)
 		if (!opts.noUsername) {
-			args = ['-u', getPerforceUsername(), ...args];
+			args = ['-u', getPerforceUsername(), ...args]
 		}
 
 		if (workspace && workspace.name) {
-			args = ['-c', workspace.name, ...args];
+			args = ['-c', workspace.name, ...args]
+		}
+
+		if (opts.edgeServerAddress) {
+			args = ['-p', opts.edgeServerAddress, ...args]
 		}
 
 		args = ['-zprog=robomerge', '-zversion=' + robomergeVersion, ...args]

@@ -7,7 +7,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Datadog.Trace;
 using EpicGames.Core;
+using EpicGames.Horde.Storage;
 using HordeCommon;
+using Horde.Build.Storage.Services;
 using HordeServer;
 using HordeServer.Collections;
 using HordeServer.Collections.Impl;
@@ -24,8 +26,6 @@ using HordeServer.Services;
 using HordeServer.Services.Impl;
 using HordeServer.Storage;
 using HordeServer.Storage.Backends;
-using HordeServer.Storage.Collections;
-using HordeServer.Storage.Services;
 using HordeServer.Tasks.Impl;
 using HordeServer.Utilities;
 using HordeServerTests.Stubs.Collections;
@@ -98,6 +98,7 @@ namespace HordeServerTests
 
 		public JobsController JobsController => GetJobsController();
 		public AgentsController AgentsController => GetAgentsController();
+		public PoolsController PoolsController => GetPoolsController();
 
 		private static bool IsDatadogWriterPatched;
 
@@ -200,20 +201,13 @@ namespace HordeServerTests
 
 			Services.AddSingleton<ConformTaskSource>();
 
-			Services.AddSingleton<IBlobCollection, BlobCollection>();
-			Services.AddSingleton<IObjectCollection, ObjectCollection>();
-			Services.AddSingleton<IRefCollection, RefCollection>();
-			Services.AddSingleton<INamespaceCollection, NamespaceCollection>();
-			Services.AddSingleton<IBucketCollection, BucketCollection>();
-
 			Services.AddSingleton(new Startup.StorageBackendSettings<PersistentLogStorage> { Type = StorageProviderType.Transient });
 			Services.AddSingleton(new Startup.StorageBackendSettings<ArtifactCollection> { Type = StorageProviderType.Transient });
-			Services.AddSingleton(new Startup.StorageBackendSettings<BlobCollection> { Type = StorageProviderType.Transient });
+			Services.AddSingleton(new Startup.StorageBackendSettings<BasicStorageClient> { Type = StorageProviderType.Transient });
 			Services.AddSingleton(typeof(IStorageBackend<>), typeof(Startup.StorageBackendFactory<>));
 
-			Services.AddSingleton<IStorageService, SimpleStorageService>();
+			Services.AddSingleton<IStorageClient, BasicStorageClient>();
 
-			Services.AddSingleton<ISingletonDocument<GlobalPermissions>>(new SingletonDocumentStub<GlobalPermissions>());
 			Services.AddSingleton<ISingletonDocument<AgentSoftwareChannels>>(new SingletonDocumentStub<AgentSoftwareChannels>());
 		}
 
@@ -226,7 +220,7 @@ namespace HordeServerTests
         {
 			ILogger<JobsController> Logger = ServiceProvider.GetRequiredService<ILogger<JobsController>>();
 			JobsController JobsCtrl = new JobsController(AclService, GraphCollection, PerforceService, StreamService, JobService,
-		        TemplateCollection, ArtifactCollection, UserCollection, NotificationService, Logger);
+		        TemplateCollection, ArtifactCollection, UserCollection, NotificationService, AgentService, Logger);
 	        JobsCtrl.ControllerContext = GetControllerContext();
 	        return JobsCtrl;
         }
@@ -238,6 +232,13 @@ namespace HordeServerTests
 			return AgentCtrl;
 		}
 		
+		private PoolsController GetPoolsController()
+		{
+			PoolsController Controller = new PoolsController(AclService, PoolService);
+			Controller.ControllerContext = GetControllerContext();
+			return Controller;
+		}
+		
 		private ControllerContext GetControllerContext()
 		{
 			ControllerContext ControllerContext = new ControllerContext();
@@ -245,6 +246,14 @@ namespace HordeServerTests
 			ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
 				new List<Claim> {new Claim(ServerSettings.AdminClaimType, ServerSettings.AdminClaimValue)}, "TestAuthType"));
 			return ControllerContext;
+		}
+		
+		private static int AgentIdCounter = 1;
+		public async Task<IAgent> CreateAgentAsync(IPool Pool)
+		{
+			IAgent Agent = await AgentService.CreateAgentAsync("TestAgent" + AgentIdCounter++, true, null, new List<StringId<IPool>> { Pool.Id });
+			Agent = await AgentService.CreateSessionAsync(Agent, AgentStatus.Ok, new List<string>(), new Dictionary<string, int>(), null);
+			return Agent;
 		}
 
 		/// <summary>

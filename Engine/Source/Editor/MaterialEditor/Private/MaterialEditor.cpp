@@ -549,8 +549,15 @@ void FMaterialEditor::InitMaterialEditor( const EToolkitMode::Type Mode, const T
 		// Support undo/redo for the material function if it exists
 		MaterialFunction->SetFlags(RF_Transactional);
 
+		MaterialFunction->MaterialGraph = Material->MaterialGraph;
+		MaterialFunction->EditorMaterial = Material;
+
 		Material->Expressions = MaterialFunction->FunctionExpressions;
 		Material->EditorComments = MaterialFunction->FunctionEditorComments;
+		Material->ExpressionExecBegin = MaterialFunction->ExpressionExecBegin;
+		Material->ExpressionExecEnd = MaterialFunction->ExpressionExecEnd;
+		Material->bEnableExecWire = MaterialFunction->IsUsingControlFlow();
+		Material->bEnableNewHLSLGenerator = MaterialFunction->IsUsingNewHLSLGenerator();
 
 		// Remove NULL entries, so the rest of the material editor can assume all entries of Material->Expressions are valid
 		// This can happen if an expression class was removed
@@ -690,6 +697,8 @@ void FMaterialEditor::InitMaterialEditor( const EToolkitMode::Type Mode, const T
 				SetPreviewExpression(FirstOutput);
 			}
 		}
+
+		//Material->CreateExecutionFlowExpressions();
 	}
 
 	// Store the name of this material (for the tutorial widget meta)
@@ -1473,6 +1482,7 @@ void FMaterialEditor::CreateInternalWidgets()
 	MaterialDetailsView->OnFinishedChangingProperties().AddSP(this, &FMaterialEditor::OnFinishedChangingProperties);
 
 	PropertyEditorModule.RegisterCustomClassLayout( UMaterial::StaticClass()->GetFName(), FOnGetDetailCustomizationInstance::CreateStatic(&FMaterialDetailCustomization::MakeInstance ) );
+	PropertyEditorModule.RegisterCustomClassLayout( UMaterialFunction::StaticClass()->GetFName(), FOnGetDetailCustomizationInstance::CreateStatic(&FMaterialFunctionDetailCustomization::MakeInstance) );
 
 	MaterialEditorInstance = NewObject<UMaterialEditorPreviewParameters>(GetTransientPackage(), NAME_None, RF_Transactional);
 	MaterialEditorInstance->PreviewMaterial = Material;
@@ -2375,6 +2385,10 @@ void FMaterialEditor::UpdatePreviewMaterial( bool bForce )
 		// The preview material's expressions array must stay up to date before recompiling 
 		// So that RebuildMaterialFunctionInfo will see all the nested material functions that may need to be updated
 		ExpressionPreviewMaterial->Expressions = Material->Expressions;
+		ExpressionPreviewMaterial->ExpressionExecBegin = Material->ExpressionExecBegin;
+		ExpressionPreviewMaterial->ExpressionExecEnd = Material->ExpressionExecEnd;
+		ExpressionPreviewMaterial->bEnableExecWire = Material->IsUsingControlFlow();
+		ExpressionPreviewMaterial->bEnableNewHLSLGenerator = Material->IsUsingNewHLSLGenerator();
 
 		if (MaterialFunction)
 		{
@@ -4840,6 +4854,8 @@ void FMaterialEditor::SetPreviewExpression(UMaterialExpression* NewPreviewExpres
 			// Create the expression preview material if it hasnt already been created
 			ExpressionPreviewMaterial = NewObject<UPreviewMaterial>(GetTransientPackage(), NAME_None, RF_Public);
 			ExpressionPreviewMaterial->bIsPreviewMaterial = true;
+			ExpressionPreviewMaterial->bEnableNewHLSLGenerator = Material->IsUsingNewHLSLGenerator();
+			ExpressionPreviewMaterial->bEnableExecWire = Material->IsUsingControlFlow();
 			if (Material->IsUIMaterial())
 			{
 				ExpressionPreviewMaterial->MaterialDomain = MD_UI;
@@ -4867,6 +4883,8 @@ void FMaterialEditor::SetPreviewExpression(UMaterialExpression* NewPreviewExpres
 		// The expression preview material's expressions array must stay up to date before recompiling 
 		// So that RebuildMaterialFunctionInfo will see all the nested material functions that may need to be updated
 		ExpressionPreviewMaterial->Expressions = Material->Expressions;
+		ExpressionPreviewMaterial->ExpressionExecBegin = Material->ExpressionExecBegin;
+		ExpressionPreviewMaterial->ExpressionExecEnd = Material->ExpressionExecEnd;
 
 		// The preview window should now show the expression preview material
 		SetPreviewMaterial( ExpressionPreviewMaterial );

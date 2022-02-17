@@ -33,6 +33,10 @@
 #	include "Windows/HideWindowsPlatformTypes.h"
 #endif
 
+#if PLATFORM_UNIX || PLATFORM_MAC
+#	include <sys/sem.h>
+#endif
+
 #define ALLOW_SETTINGS_OVERRIDE_FROM_COMMANDLINE			(UE_SERVER || !(UE_BUILD_SHIPPING))
 
 namespace UE::Zen
@@ -430,20 +434,85 @@ ReadCbLockFile(FStringView FileName, FCbObject& OutLockObject)
 		}
 	}
 	return false;
-#else
-	// Generic lock reading path
-	if (TUniquePtr<FArchive> Ar{FileManager.CreateFileReader(*FileName, FILEREAD_AllowWrite | FILEREAD_Silent)})
+#elif PLATFORM_UNIX || PLATFORM_MAC
+	TAnsiStringBuilder<256> LockFilePath;
+	LockFilePath << FileName;
+	int32 Fd = open(LockFilePath.ToString(), O_RDONLY);
+	if (Fd < 0)
 	{
-		*Ar << OutLockObject;
-		FMemoryView View;
-		if (Ar.Close() &&
-			OutLockObject.TryGetView(View) &&
-			ValidateCompactBinary(View, ECbValidateMode::Default) == ECbValidateError::None)
+		return false;
+	}
+
+	// If we can claim the lock then it's an orphaned lock file and should be
+	// ignored. Not ideal as there's a period of time when the lock can be
+	// held unncessarily.
+	int32 LockRet = flock(Fd, LOCK_EX | LOCK_NB);
+	if (LockRet >= 0)
+	{
+		unlink(LockFilePath.ToString());
+		flock(Fd, LOCK_UN);
+		close(Fd);
+		return false;
+	}
+
+	if (errno != EWOULDBLOCK && errno != EAGAIN)
+	{
+		return false;
+	}
+
+	struct stat Stat;
+	fstat(Fd, &Stat);
+	uint64 FileSize = uint64(Stat.st_size);
+
+	bool bSuccess = false;
+	FUniqueBuffer FileBytes = FUniqueBuffer::Alloc(FileSize);
+	if (read(Fd, FileBytes.GetData(), FileSize) == FileSize)
+	{
+		if (ValidateCompactBinary(FileBytes, ECbValidateMode::Default) == ECbValidateError::None)
 		{
-			return true;
+			OutLockObject = FCbObject(FileBytes.MoveToShared());
+			bSuccess = true;
 		}
 	}
-	return false;
+
+	close(Fd);
+	return bSuccess;
+#endif
+}
+
+static bool
+IsLockFileLocked(const TCHAR* FileName, bool bAttemptCleanUp=false)
+{
+#if PLATFORM_WINDOWS
+	if (bAttemptCleanUp)
+	{
+		IFileManager::Get().Delete(FileName, false, false, true);
+	}
+	return IFileManager::Get().FileExists(FileName);
+#elif PLATFORM_UNIX || PLATFORM_MAC
+	TAnsiStringBuilder<256> LockFilePath;
+	LockFilePath << FileName;
+	int32 Fd = open(LockFilePath.ToString(), O_RDONLY);
+	if (Fd < 0)
+	{
+		return false;
+	}
+
+	int32 LockRet = flock(Fd, LOCK_EX | LOCK_NB);
+	if (LockRet < 0)
+	{
+		close(Fd);
+		return errno == EWOULDBLOCK || errno == EAGAIN;
+	}
+
+	// Consider the lock file as orphaned if we we managed to claim the lock for
+	// it. Might as well delete it while we own it.
+	unlink(LockFilePath.ToString());
+
+	flock(Fd, LOCK_UN);
+	close(Fd);
+
+	return true;
 #endif
 }
 
@@ -457,6 +526,24 @@ RequestZenShutdownOnPort(uint16 Port)
 		ON_SCOPE_EXIT{ CloseHandle(Handle); };
 		SetEvent(Handle);
 	}
+#elif PLATFORM_UNIX || PLATFORM_MAC
+	TAnsiStringBuilder<64> EventPath;
+	EventPath << "/tmp/Zen_" << Port << "_Shutdown";
+
+	key_t IpcKey = ftok(EventPath.ToString(), 1);
+	if (IpcKey < 0)
+	{
+		return;
+	}
+
+	int Semaphore = semget(IpcKey, 1, 0600);
+	if (Semaphore < 0)
+	{
+		return;
+	}
+
+	semctl(Semaphore, 0, SETVAL, 0);
+	semctl(Semaphore, 0, IPC_RMID);
 #else
 	static_assert(false, "Missing implementation for Zen named shutdown events");
 #endif
@@ -466,7 +553,7 @@ static bool
 WaitForZenShutdown(const TCHAR* LockFilePath, double MaximumWaitDurationSeconds)
 {
 	uint64 ZenShutdownWaitStartTime = FPlatformTime::Cycles64();
-	while (IFileManager::Get().FileExists(LockFilePath))
+	while (IsLockFileLocked(LockFilePath))
 	{
 		double ZenShutdownWaitDuration = FPlatformTime::ToSeconds64(FPlatformTime::Cycles64() - ZenShutdownWaitStartTime);
 		if (ZenShutdownWaitDuration < MaximumWaitDurationSeconds)
@@ -618,6 +705,12 @@ FZenServiceInstance::IsServiceReady()
 	return false;
 }
 
+uint16
+FZenServiceInstance::GetAutoLaunchedPort()
+{
+	return AutoLaunchedPort;
+}
+
 void
 FZenServiceInstance::Initialize()
 {
@@ -682,7 +775,7 @@ FZenServiceInstance::ConditionalUpdateLocalInstall()
 				}
 			}
 
-			if (FileManager.FileExists(*LockFilePath))
+			if (IsLockFileLocked(*LockFilePath))
 			{
 				PromptUserToStopRunningServerInstance(InstallFilePath);
 			}
@@ -712,11 +805,10 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 	IFileManager& FileManager = IFileManager::Get();
 	const FString LockFilePath = FPaths::Combine(InSettings.DataPath, TEXT(".lock"));
 	const FString CmdLineFilePath = FPaths::Combine(InSettings.DataPath, TEXT(".cmdline"));
-	FileManager.Delete(*LockFilePath, false, false, true);
 
 	bool bReUsingExistingInstance = false;
 
-	if (FileManager.FileExists(*LockFilePath))
+	if (IsLockFileLocked(*LockFilePath, true))
 	{
 		// If an instance is running with this data path, check if we can use it and what port it is on
 		uint16 CurrentPort = 0;
@@ -751,7 +843,7 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 	}
 
 
-	bool bProcessIsLive = FileManager.FileExists(*LockFilePath);
+	bool bProcessIsLive = IsLockFileLocked(*LockFilePath);
 
 	// When limiting process lifetime, always re-launch to add sponsor process IDs.
 	// When not limiting process lifetime, only launch if the process is not already live.
@@ -833,7 +925,7 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 			void* PipeWriteChild = nullptr;
 			void* PipeReadChild = nullptr;
 			Proc = FPlatformProcess::CreateProc(
-				*MainFilePath,
+				*ExecutablePath,
 				*Parms,
 				bLaunchDetached,
 				bLaunchHidden,
@@ -894,7 +986,7 @@ FZenServiceInstance::AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FS
 			{
 				if (DurationPhase == EWaitDurationPhase::Short)
 				{
-					if (!FileManager.FileExists(*LockFilePath))
+					if (!IsLockFileLocked(*LockFilePath))
 					{
 						if (FApp::IsUnattended())
 						{

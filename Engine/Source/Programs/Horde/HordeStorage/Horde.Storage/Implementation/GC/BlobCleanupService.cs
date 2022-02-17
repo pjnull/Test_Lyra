@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Jupiter;
 using Microsoft.Extensions.Options;
 using Datadog.Trace;
+using Jupiter.Implementation;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace Horde.Storage.Implementation
@@ -17,7 +19,7 @@ namespace Horde.Storage.Implementation
         private volatile bool _alreadyPolling;
         private readonly ILogger _logger = Log.ForContext<BlobCleanupService>();
 
-        public override bool ShouldStartPolling()
+        protected override bool ShouldStartPolling()
         {
             return _settings.CurrentValue.BlobCleanupServiceEnabled;
         }
@@ -27,11 +29,30 @@ namespace Horde.Storage.Implementation
             public List<IBlobCleanup> BlobCleanups { get; } = new List<IBlobCleanup>();
         }
 
-        public BlobCleanupService(IOptionsMonitor<GCSettings> settings) :
-            base(serviceName: nameof(RefCleanupService), settings.CurrentValue.BlobCleanupPollFrequency,
+        public BlobCleanupService(IServiceProvider provider, IOptionsMonitor<GCSettings> settings) :
+            base(serviceName: nameof(BlobCleanupService), settings.CurrentValue.BlobCleanupPollFrequency,
                 new BlobCleanupState())
         {
             _settings = settings;
+
+            if (settings.CurrentValue.CleanOldBlobsLegacy)
+            {
+                OrphanBlobCleanup orphanBlobCleanup = provider.GetService<OrphanBlobCleanup>()!;
+                RegisterCleanup(orphanBlobCleanup);
+            }
+
+            
+            if (settings.CurrentValue.CleanOldBlobs)
+            {
+                OrphanBlobCleanupRefs orphanBlobCleanupRefs = provider.GetService<OrphanBlobCleanupRefs>()!;
+                RegisterCleanup(orphanBlobCleanupRefs);
+            }
+
+            FileSystemStore? fileSystemStore = provider.GetService<FileSystemStore>();
+            if (fileSystemStore != null)
+            {
+                RegisterCleanup(fileSystemStore);
+            }
         }
 
         public void RegisterCleanup(IBlobCleanup cleanup)
@@ -56,21 +77,24 @@ namespace Horde.Storage.Implementation
             }
         }
 
-        public async Task<List<RemovedBlobs>> Cleanup(BlobCleanupState state, CancellationToken cancellationToken)
+        public async Task<List<BlobIdentifier>> Cleanup(BlobCleanupState state, CancellationToken cancellationToken)
         {
-            List<RemovedBlobs> removedBlobs = new List<RemovedBlobs>();
+            List<BlobIdentifier> removedBlobs = new List<BlobIdentifier>();
             
             foreach (IBlobCleanup blobCleanup in state.BlobCleanups)
             {
+                if (!blobCleanup.ShouldRun())
+                    continue;
+
                 string type = blobCleanup.GetType().ToString();
                 _logger.Information("Blob cleanup running for {BlobCleanup}", type);
-                using Scope scope = Tracer.Instance.StartActive("gc.blob");
+                using IScope scope = Tracer.Instance.StartActive("gc.blob");
                 scope.Span.SetTag("type", type);
 
                 _logger.Information("Attempting to run Blob Cleanup {BlobCleanup}. ", type);
                 try
                 {
-                    List<RemovedBlobs> tempBlobs = await blobCleanup.Cleanup(cancellationToken);
+                    List<BlobIdentifier> tempBlobs = await blobCleanup.Cleanup(cancellationToken);
                     _logger.Information("Ran blob cleanup {BlobCleanup}. Deleted {CountBlobRecords}", type, tempBlobs.Count);
                     removedBlobs.AddRange(tempBlobs);
                 }

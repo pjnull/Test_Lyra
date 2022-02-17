@@ -22,9 +22,10 @@ void FAnimNode_MotionMatching::Initialize_AnyThread(const FAnimationInitializeCo
 
 	GetEvaluateGraphExposedInputs().Execute(Context);
 
-	MotionMatchingState.InitNewDatabaseSearch(Database, Settings.SearchThrottleTime);
+	MotionMatchingState.InitNewDatabaseSearch(Database, Settings.SearchThrottleTime, nullptr /*OutError*/);
 
-	Source.SetLinkNode(&SequencePlayerNode);
+	Source.SetLinkNode(&MirrorNode);
+	MirrorNode.SetSourceLinkNode(&SequencePlayerNode);
 	Source.Initialize(Context);
 }
 
@@ -33,6 +34,10 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_ANIMNODE(Evaluate_AnyThread);
 
 	Source.Evaluate(Output);
+
+#if WITH_EDITORONLY_DATA
+	bWasEvaluated = true;
+#endif
 }
 
 void FAnimNode_MotionMatching::UpdateAssetPlayer(const FAnimationUpdateContext& Context)
@@ -45,31 +50,38 @@ void FAnimNode_MotionMatching::UpdateAssetPlayer(const FAnimationUpdateContext& 
 	MotionMatchingState.AssetPlayerTime = SequencePlayerNode.GetAccumulatedTime();
 
 	// Execute core motion matching algorithm and retain across frame state
-	UpdateMotionMatchingState(Context
-		, Database
-		, Trajectory
-		, Settings
-		, MotionMatchingState
+	UpdateMotionMatchingState(
+		Context,
+		Database,
+		bUseDatabaseTagQuery ? &DatabaseTagQuery : nullptr,
+		Trajectory,
+		Settings,
+		MotionMatchingState
 	);
 
 	// If a new pose is requested, jump to the pose by updating the embedded sequence player node
 	if ((MotionMatchingState.Flags & EMotionMatchingFlags::JumpedToPose) == EMotionMatchingFlags::JumpedToPose)
 	{
-		const FPoseSearchDatabaseSequence& ResultDbSequence = Database->Sequences[MotionMatchingState.DbSequenceIdx];
+		const FPoseSearchIndexAsset* SearchIndexAsset = MotionMatchingState.GetCurrentSearchIndexAsset();
+		const FPoseSearchDatabaseSequence& ResultDbSequence = Database->GetSourceAsset(SearchIndexAsset);
 		SequencePlayerNode.SetSequence(ResultDbSequence.Sequence);
 		SequencePlayerNode.SetAccumulatedTime(MotionMatchingState.AssetPlayerTime);
 		SequencePlayerNode.SetLoopAnimation(ResultDbSequence.bLoopAnimation);
-		SequencePlayerNode.SetPlayRate(1.f);
+		SequencePlayerNode.SetPlayRate(1.0f);
+
+		MirrorNode.SetMirrorDataTable(Database->Schema->MirrorDataTable.Get());
+		MirrorNode.SetMirror(SearchIndexAsset->bMirrored);
 	}
 
 	// Optionally applying dynamic play rate adjustment to chosen sequences based on predictive motion analysis
-	const float PlayRate = DynamicPlayRateAdjustment(Context
-		, Trajectory
-		, DynamicPlayRateSettings
-		, SequencePlayerNode.GetSequence()
-		, SequencePlayerNode.GetAccumulatedTime()
-		, SequencePlayerNode.GetPlayRate()
-		, SequencePlayerNode.GetLoopAnimation()
+	const float PlayRate = DynamicPlayRateAdjustment(
+		Context,
+		Trajectory,
+		DynamicPlayRateSettings,
+		SequencePlayerNode.GetSequence(),
+		SequencePlayerNode.GetAccumulatedTime(),
+		SequencePlayerNode.GetPlayRate(),
+		SequencePlayerNode.GetLoopAnimation()
 	);
 
 	SequencePlayerNode.SetPlayRate(PlayRate);
@@ -88,7 +100,7 @@ bool FAnimNode_MotionMatching::HasPreUpdate() const
 void FAnimNode_MotionMatching::PreUpdate(const UAnimInstance* InAnimInstance)
 {
 #if WITH_EDITORONLY_DATA
-	if (bDebugDraw)
+	if (bWasEvaluated && bDebugDraw)
 	{
 		USkeletalMeshComponent* SkeletalMeshComponent = InAnimInstance->GetSkelMeshComponent();
 		check(SkeletalMeshComponent);
@@ -111,6 +123,8 @@ void FAnimNode_MotionMatching::PreUpdate(const UAnimInstance* InAnimInstance)
 
 		UE::PoseSearch::Draw(DrawParams);
 	}
+
+	bWasEvaluated = false;
 #endif
 }
 

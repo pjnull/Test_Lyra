@@ -51,7 +51,7 @@ void FImgMediaSourceCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> I
 						SNew(STextBlock)
 							.Font(IDetailLayoutBuilder::GetDetailFont())
 							.Text(LOCTEXT("SequencePathPropertyName", "Sequence Path"))
-							.ToolTipText(GetSequencePathProperty()->GetToolTipText())
+							.ToolTipText(GetSequencePathProperty(PropertyHandle)->GetToolTipText())
 					]
 
 				+ SHorizontalBox::Slot()
@@ -96,200 +96,13 @@ void FImgMediaSourceCustomization::CustomizeChildren(TSharedRef<IPropertyHandle>
 {
 }
 
-void FImgMediaSourceCustomization::CustomizeMipMapInfo(IDetailLayoutBuilder& DetailBuilder)
-{
-	// Mipmap inspection only works for one object.
-	TArray<TWeakObjectPtr<UObject>> CustomizedObjects;
-	DetailBuilder.GetObjectsBeingCustomized(CustomizedObjects);
-	if (CustomizedObjects.Num() == 1)
-	{
-		UImgMediaSource* ImgMediaSource = Cast<UImgMediaSource>(CustomizedObjects[0].Get());
-		if (ImgMediaSource != nullptr)
-		{
-			const FImgMediaMipMapInfo* MipMapInfo = ImgMediaSource->GetMipMapInfo();
-			if (MipMapInfo != nullptr)
-			{
-				IDetailCategoryBuilder& MipMapInfoCategory = DetailBuilder.EditCategory("MipMapInfo", LOCTEXT("MipMapInfoCategoryName", "MipMapInfo"));
-
-				// Add objects.
-				AddMipMapObjects(MipMapInfoCategory, MipMapInfo);
-
-				// Loop over all cameras.
-				const TArray<FImgMediaMipMapCameraInfo>& CameraInfos = MipMapInfo->GetCameraInfo();
-				const TArray<float>& MipLevelDistances = MipMapInfo->GetMipLevelDistances();
-				float ViewportDistAdjust = MipMapInfo->GetViewportDistAdjust();
-				const TArray<FImgMediaMipMapObjectInfo*>& Objects = MipMapInfo->GetObjects();
-				if (CameraInfos.Num() > 0)
-				{
-					for (const FImgMediaMipMapCameraInfo& CameraInfo : CameraInfos)
-					{
-						// Add group for this camera.
-						IDetailGroup& Group = MipMapInfoCategory.AddGroup(*CameraInfo.Name, FText::FromString(CameraInfo.Name));
-
-						// Get mip level distances adjusted so they are in real space.
-						TArray<float> AdjustedMipLevelDistances;
-						for (float Dist : MipLevelDistances)
-						{
-							if (CameraInfo.ScreenSize == 0.0f)
-							{
-								Dist /= ViewportDistAdjust;
-							}
-							Dist /= CameraInfo.DistAdjust;
-							AdjustedMipLevelDistances.Add(Dist);
-						}
-
-						// Add info to UI.
-						AddCameraObjects(Group, CameraInfo, AdjustedMipLevelDistances, Objects);
-						AddCameraMipDistances(Group, CameraInfo, AdjustedMipLevelDistances);
-					}
-				}
-				else
-				{
-					FDetailWidgetRow& NoCamerasRow = MipMapInfoCategory.AddCustomRow(FText::GetEmpty());
-					NoCamerasRow.NameContent()
-						[
-							SNew(STextBlock)
-								.Text(LOCTEXT("MipMapNoCameras", "No Cameras"))
-						];
-				}
-			}
-		}
-	}
-}
-
-void FImgMediaSourceCustomization::AddMipMapObjects(IDetailCategoryBuilder& InCategory, const FImgMediaMipMapInfo* MipMapInfo)
-{
-	IDetailGroup& MainObjGroup = InCategory.AddGroup("MainObjects", LOCTEXT("MipMapObjects", "Objects"));
-
-	// Loop over all objects.
-	const TArray<FImgMediaMipMapObjectInfo*>& Objects = MipMapInfo->GetObjects();
-	for (const FImgMediaMipMapObjectInfo* ObjectInfo : Objects)
-	{
-		AActor* Object = ObjectInfo->Object.Get();
-		if (Object != nullptr)
-		{
-			IDetailGroup& ObjGroup = MainObjGroup.AddGroup(*Object->GetName(), FText::FromString(Object->GetName()));
-
-			// Show auto width.
-			FDetailWidgetRow& AutoWidthRow = ObjGroup.AddWidgetRow();
-			AutoWidthRow.NameContent()
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("MipMapAutoWidth", "AutoWidth"))
-						.ToolTipText(LOCTEXT("MipMapAutoWidthToolTip", "This will be used for the width of the object if not set manually."))
-				];
-			AutoWidthRow.ValueContent()
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(FString::Printf(TEXT("%f"), FImgMediaMipMapInfo::GetObjectWidth(Object))))
-						.ToolTipText(LOCTEXT("MipMapAutoWidthToolTip", "This will be used for the width of the object if not set manually."))
-				];
-
-			// Show width.
-			FDetailWidgetRow& WidthRow = ObjGroup.AddWidgetRow();
-			WidthRow.NameContent()
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("MipMapWidth", "Width"))
-						.ToolTipText(LOCTEXT("MipMapWidthToolTip", "Width of this object that is currently used for mipmap calculations."))
-				];
-			WidthRow.ValueContent()
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(FString::Printf(TEXT("%f"), ObjectInfo->Width)))
-						.ToolTipText(LOCTEXT("MipMapWidthToolTip", "Width of this object that is currently used for mipmap calculations."))
-				];
-		}
-	}
-}
-
-
-void FImgMediaSourceCustomization::AddCameraObjects(IDetailGroup& InCameraGroup, const FImgMediaMipMapCameraInfo& InCameraInfo, const TArray<float>& InMipLevelDistances, const TArray<FImgMediaMipMapObjectInfo*>& InObjects)
-{
-	IDetailGroup& Group = InCameraGroup.AddGroup("Objects", LOCTEXT("MipMapObjects", "Objects"));
-
-	// Loop over all objects.
-	for (const FImgMediaMipMapObjectInfo* ObjectInfo : InObjects)
-	{
-		AActor* Object = ObjectInfo->Object.Get();
-		if (Object != nullptr)
-		{
-			IDetailGroup& ObjGroup = Group.AddGroup(*Object->GetName(), FText::FromString(Object->GetName()));
-
-			// Show distance to camera.
-			float DistToCamera = FImgMediaMipMapInfo::GetObjectDistToCamera(InCameraInfo.Location, Object->GetActorLocation());
-			FDetailWidgetRow& DistToCameraRow = ObjGroup.AddWidgetRow();
-			DistToCameraRow.NameContent()
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("MipMapObjDistToCamera", "Distance To Camera"))
-				];
-			DistToCameraRow.ValueContent()
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(FString::Printf(TEXT("%f"), DistToCamera)))
-				];
-
-			// Show adjusted distance to camera.
-			DistToCamera -= ObjectInfo->Width;
-			DistToCamera *= ObjectInfo->DistAdjust; 
-			FDetailWidgetRow& AdjustedDistToCameraRow = ObjGroup.AddWidgetRow();
-			AdjustedDistToCameraRow.NameContent()
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("MipMapObjAdjustedDistToCamera", "Adjusted Distance To Camera"))
-				];
-			AdjustedDistToCameraRow.ValueContent()
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(FString::Printf(TEXT("%f"), DistToCamera)))
-				];
-
-			// Show mip level.
-			int MipLevel = FImgMediaMipMapInfo::GetMipLevelForDistance(DistToCamera, InMipLevelDistances);
-			FDetailWidgetRow& MipLevelRow = ObjGroup.AddWidgetRow();
-			MipLevelRow.NameContent()
-				[
-					SNew(STextBlock)
-						.Text(LOCTEXT("MipMapObjMipLevel", "Mip Level"))
-				];
-			MipLevelRow.ValueContent()
-				[
-					SNew(STextBlock)
-						.Text(FText::FromString(FString::Printf(TEXT("%d"), MipLevel)))
-				];
-		}
-	}
-}
-
-void FImgMediaSourceCustomization::AddCameraMipDistances(IDetailGroup& InCameraGroup, const FImgMediaMipMapCameraInfo& InCameraInfo, const TArray<float>& InMipLevelDistances)
-{
-	IDetailGroup& Group = InCameraGroup.AddGroup("MipLevelDistances", LOCTEXT("MipMapLevelDistances", "MipLevelDistances"));
-
-	for (int Index = 0; Index < InMipLevelDistances.Num(); ++Index)
-	{
-		float Distance = InMipLevelDistances[Index];
-		FDetailWidgetRow& DistancesRow = Group.AddWidgetRow();
-		DistancesRow.NameContent()
-			[
-				SNew(STextBlock)
-					.Text(FText::FromString(FString::Printf(TEXT("%d"), Index)))
-			];
-		DistancesRow.ValueContent()
-			[
-				SNew(STextBlock)
-					.Text(FText::FromString(FString::Printf(TEXT("%f"), Distance)))
-			];
-	}
-}
-
 /* FImgMediaSourceCustomization implementation
  *****************************************************************************/
 
-FString FImgMediaSourceCustomization::GetSequencePath() const
+FString FImgMediaSourceCustomization::GetSequencePathFromChildProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle)
 {
 	FString FilePath;
-	TSharedPtr<IPropertyHandle> SequencePathProperty = GetSequencePathPathProperty();
+	TSharedPtr<IPropertyHandle> SequencePathProperty = GetSequencePathPathProperty(InPropertyHandle);
 	if (SequencePathProperty.IsValid())
 	{
 		if (SequencePathProperty->GetValue(FilePath) != FPropertyAccess::Success)
@@ -297,6 +110,13 @@ FString FImgMediaSourceCustomization::GetSequencePath() const
 			UE_LOG(LogImgMediaEditor, Error, TEXT("FImgMediaSourceCustomization could not get SequencePath."));
 		}
 	}
+
+	return FilePath;
+}
+
+FString FImgMediaSourceCustomization::GetSequencePath() const
+{
+	FString FilePath = GetSequencePathFromChildProperty(PropertyHandle);
 
 	return FilePath;
 }
@@ -318,13 +138,13 @@ FString FImgMediaSourceCustomization::GetRelativePathRoot() const
 }
 
 
-TSharedPtr<IPropertyHandle> FImgMediaSourceCustomization::GetSequencePathProperty() const
+TSharedPtr<IPropertyHandle> FImgMediaSourceCustomization::GetSequencePathProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle)
 {
 	TSharedPtr<IPropertyHandle> SequencePathProperty;
 
-	if ((PropertyHandle.IsValid()) && (PropertyHandle->IsValidHandle()))
+	if ((InPropertyHandle.IsValid()) && (InPropertyHandle->IsValidHandle()))
 	{
-		TSharedPtr<IPropertyHandle> ParentHandle = PropertyHandle->GetParentHandle();
+		TSharedPtr<IPropertyHandle> ParentHandle = InPropertyHandle->GetParentHandle();
 		if (ParentHandle.IsValid())
 		{
 			SequencePathProperty = ParentHandle->GetChildHandle("SequencePath");
@@ -334,11 +154,11 @@ TSharedPtr<IPropertyHandle> FImgMediaSourceCustomization::GetSequencePathPropert
 	return SequencePathProperty;
 }
 
-TSharedPtr<IPropertyHandle> FImgMediaSourceCustomization::GetSequencePathPathProperty() const
+TSharedPtr<IPropertyHandle> FImgMediaSourceCustomization::GetSequencePathPathProperty(const TSharedPtr<IPropertyHandle>& InPropertyHandle)
 {
 	TSharedPtr<IPropertyHandle> SequencePathPathProperty;
 
-	TSharedPtr<IPropertyHandle> SequencePathProperty = GetSequencePathProperty();
+	TSharedPtr<IPropertyHandle> SequencePathProperty = GetSequencePathProperty(InPropertyHandle);
 	if (SequencePathProperty.IsValid())
 	{
 		SequencePathPathProperty = SequencePathProperty->GetChildHandle("Path");
@@ -421,7 +241,7 @@ void FImgMediaSourceCustomization::HandleSequencePathPickerPathPicked(const FStr
 	SetPathRelativeToRoot(bIsRelativePath);
 
 	// update property
-	TSharedPtr<IPropertyHandle> SequencePathPathProperty = GetSequencePathPathProperty();
+	TSharedPtr<IPropertyHandle> SequencePathPathProperty = GetSequencePathPathProperty(PropertyHandle);
 	if (SequencePathPathProperty.IsValid())
 	{
 		if (SequencePathPathProperty->SetValue(PickedDir) != FPropertyAccess::Success)

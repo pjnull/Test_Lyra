@@ -122,14 +122,6 @@ struct FHairStrandsVisibilityData
 ////////////////////////////////////////////////////////////////////////////////////
 // Voxel data
 
-struct FHairStrandsVoxelNodeDesc
-{
-	FVector3f TranslatedWorldMinAABB = FVector3f::ZeroVector;
-	FVector3f TranslatedWorldMaxAABB = FVector3f::ZeroVector;
-	FIntVector PageIndexResolution = FIntVector::ZeroValue;
-	FMatrix TranslatedWorldToClip;
-};
-
 struct FPackedVirtualVoxelNodeDesc
 {
 	// This is just a placeholder having the correct size. The actual definition is in HairStradsNVoxelPageCommon.ush
@@ -148,10 +140,11 @@ struct FPackedVirtualVoxelNodeDesc
 // at the moment
 BEGIN_SHADER_PARAMETER_STRUCT(FHairStrandsVoxelCommonParameters, )
 	SHADER_PARAMETER(FIntVector, PageCountResolution)
-	SHADER_PARAMETER(float, VoxelWorldSize)
+	SHADER_PARAMETER(float, CPUMinVoxelWorldSize)
 	SHADER_PARAMETER(FIntVector, PageTextureResolution)
 	SHADER_PARAMETER(uint32, PageCount)
 	SHADER_PARAMETER(uint32, PageResolution)
+	SHADER_PARAMETER(uint32, PageResolutionLog2)
 	SHADER_PARAMETER(uint32, PageIndexCount)
 	SHADER_PARAMETER(uint32, IndirectDispatchGroupSize)
 	SHADER_PARAMETER(uint32, NodeDescCount)
@@ -179,14 +172,16 @@ BEGIN_SHADER_PARAMETER_STRUCT(FHairStrandsVoxelCommonParameters, )
 
 	SHADER_PARAMETER(FVector3f, TranslatedWorldOffset) // For debug purpose
 
-	SHADER_PARAMETER(uint32, AdaptiveEnable)
-	SHADER_PARAMETER(float, AdaptiveRequestedVoxelWorldSize)
-	SHADER_PARAMETER(float, AdaptiveTargetVoxelWorldSize)
+	SHADER_PARAMETER(uint32, AllocationFeedbackEnable)
 
 	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, PageIndexBuffer)
 	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint2>, PageIndexOccupancyBuffer)
 	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, PageIndexCoordBuffer)
 	SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FPackedVirtualVoxelNodeDesc>, NodeDescBuffer) // Packed into 2 x uint4
+
+	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<float>, CurrGPUMinVoxelSize)
+	SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<float>, NextGPUMinVoxelSize)
+
 END_SHADER_PARAMETER_STRUCT()
 
 BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FVirtualVoxelParameters, RENDERER_API)
@@ -276,6 +271,7 @@ struct FHairStrandsMacroGroupResources
 {
 	uint32 MacroGroupCount = 0;
 	FRDGBufferRef MacroGroupAABBsBuffer = nullptr;
+	FRDGBufferRef MacroGroupVoxelSizeBuffer = nullptr;
 };
 
 class FHairGroupPublicData;
@@ -298,7 +294,6 @@ struct FHairStrandsMacroGroupData
 	};
 	typedef TArray<PrimitiveInfo, SceneRenderingAllocator> TPrimitiveInfos;
 
-	FHairStrandsVoxelNodeDesc VirtualVoxelNodeDesc;
 	FHairStrandsDeepShadowDatas DeepShadowDatas;
 	TPrimitiveInfos PrimitivesInfos;
 	FBoxSphereBounds Bounds;
@@ -402,21 +397,15 @@ struct FHairStrandsViewData
 	TArray<FSphere> VisibleShadowCastingBounds;
 };
 
-// View State data (i.e., persistent accross fram)
+// View State data (i.e., persistent across frame)
 struct FHairStrandsViewStateData
 {
-	FRHIGPUBufferReadback* GetBuffer() const { return VoxelPageAllocationCountReadback; }
-	bool IsReady() const { return VoxelPageAllocationCountReadback->IsReady(); }
-	bool IsInit() const { return VoxelPageAllocationCountReadback != nullptr; }
-
+	bool IsInit() const { return PositionsChangedDatas.Num() > 0; }
 	void Init();
 	void Release();
 
-	float VoxelWorldSize = 0; // Voxel size used during the last frame allocation
-	uint32 VoxelAllocatedPageCount = 0; // Number of voxels allocated last frame
-
-	// Buffer used for reading back the number of voxels allocated on the GPU
-	FRHIGPUBufferReadback* VoxelPageAllocationCountReadback = nullptr;
+	// Buffer used for reading back the number of allocated voxels on the GPU
+	TRefCountPtr<FRDGPooledBuffer> VoxelFeedbackBuffer = nullptr;
 
 	// Buffer used for reading back hair strands position changed on the GPU
 	struct FPositionChangedData

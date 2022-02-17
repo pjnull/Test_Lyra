@@ -47,6 +47,9 @@ struct POSESEARCH_API FTraceMotionMatchingState
 	/** Runtime weights */
 	FPoseSearchDynamicWeightParams Weights;
 
+	/** If true, groups are being filtered by DatabaseGroupQuery */
+	TArrayView<const bool> DatabaseSequenceFilter;
+
 	/** Index of the pose in our database */
 	int32 DbPoseIdx = 0;
 
@@ -60,6 +63,14 @@ struct POSESEARCH_API FTraceMotionMatchingState
 	 *  Used for retrieval of traced root transforms from the animation provider.
 	 */
 	uint64 SkeletalMeshComponentId = 0;
+
+	float AssetPlayerTime = 0.0f;
+	float DeltaTime = 0.0f;
+	float SimLinearVelocity = 0.0f;
+	float SimAngularVelocity = 0.0f;
+	float AnimLinearVelocity = 0.0f;
+	float AnimAngularVelocity = 0.0f;
+
 
 	/** Output the current state info to the logger */
 	static void Output(const FAnimationBaseContext& InContext, const FTraceMotionMatchingState& State);

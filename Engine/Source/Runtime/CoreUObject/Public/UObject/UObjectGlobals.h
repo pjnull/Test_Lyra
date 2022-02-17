@@ -2749,6 +2749,16 @@ namespace UECodeGen_Private
 		int32          ArrayDim;
 	};
 
+	struct FPropertyParamsBaseWithoutOffset // : FPropertyParamsBase
+	{
+		const char* NameUTF8;
+		const char* RepNotifyFuncUTF8;
+		EPropertyFlags    PropertyFlags;
+		EPropertyGenFlags Flags;
+		EObjectFlags   ObjectFlags;
+		int32          ArrayDim;
+	};
+
 	struct FPropertyParamsBaseWithOffset // : FPropertyParamsBase
 	{
 		const char*    NameUTF8;
@@ -2791,7 +2801,7 @@ namespace UECodeGen_Private
 #endif
 	};
 
-	struct FBoolPropertyParams // : FPropertyParamsBase
+	struct FBoolPropertyParams // : FPropertyParamsBaseWithoutOffset
 	{
 		const char*      NameUTF8;
 		const char*         RepNotifyFuncUTF8;
@@ -2808,7 +2818,38 @@ namespace UECodeGen_Private
 #endif
 	};
 
-	struct FObjectPropertyParams // : FPropertyParamsBaseWithOffset
+	struct FObjectPropertyParamsWithoutClass // : FPropertyParamsBaseWithOffset
+	{
+		const char* NameUTF8;
+		const char* RepNotifyFuncUTF8;
+		EPropertyFlags      PropertyFlags;
+		EPropertyGenFlags   Flags;
+		EObjectFlags     ObjectFlags;
+		int32            ArrayDim;
+		int32            Offset;
+#if WITH_METADATA
+		const FMetaDataPairParam* MetaDataArray;
+		int32                               NumMetaData;
+#endif
+	};
+
+	struct FObjectPropertyParamsWithClass // : FPropertyParamsBaseWithOffset
+	{
+		const char* NameUTF8;
+		const char* RepNotifyFuncUTF8;
+		EPropertyFlags      PropertyFlags;
+		EPropertyGenFlags   Flags;
+		EObjectFlags     ObjectFlags;
+		int32            ArrayDim;
+		int32            Offset;
+		UClass*        (*ClassFunc)();
+#if WITH_METADATA
+		const FMetaDataPairParam* MetaDataArray;
+		int32                               NumMetaData;
+#endif
+	};
+
+	struct FObjectPropertyParams // : FObjectPropertyParamsWithClass
 	{
 		const char*      NameUTF8;
 		const char*         RepNotifyFuncUTF8;
@@ -2824,7 +2865,7 @@ namespace UECodeGen_Private
 #endif
 	};
 
-	struct FClassPropertyParams // : FPropertyParamsBaseWithOffset
+	struct FClassPropertyParams // : FObjectPropertyParams
 	{
 		const char*      NameUTF8;
 		const char*         RepNotifyFuncUTF8;
@@ -2833,15 +2874,15 @@ namespace UECodeGen_Private
 		EObjectFlags     ObjectFlags;
 		int32            ArrayDim;
 		int32            Offset;
-		UClass*        (*MetaClassFunc)();
 		UClass*        (*ClassFunc)();
+		UClass*        (*MetaClassFunc)();		
 #if WITH_METADATA
 		const FMetaDataPairParam*           MetaDataArray;
 		int32                               NumMetaData;
 #endif
 	};
 
-	struct FSoftClassPropertyParams // : FPropertyParamsBaseWithOffset
+	struct FSoftClassPropertyParams // : FObjectPropertyParamsWithoutClass
 	{
 		const char*      NameUTF8;
 		const char*         RepNotifyFuncUTF8;

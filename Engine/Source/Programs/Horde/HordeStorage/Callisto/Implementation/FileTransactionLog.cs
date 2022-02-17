@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Jupiter;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
@@ -85,8 +86,8 @@ namespace Callisto.Implementation
         private async Task<long> CommitNewEvent(OpRecord eventRecord)
         {
             // datadog instrumentation of this method
-            using Scope scope = Tracer.Instance.StartActive("log.write");
-            Span span = scope.Span;
+            using IScope scope = Tracer.Instance.StartActive("log.write");
+            ISpan span = scope.Span;
             span.ResourceName = $"write {_namespace}";
             span.OperationName = "WRITE";
 
@@ -175,8 +176,8 @@ namespace Callisto.Implementation
         public async Task<TransactionEvents> Get(long index, int count, string? notSeenAtSite = null)
         {
             // datadog instrumentation of this method
-            using Scope scope = Tracer.Instance.StartActive("log.get");
-            Span span = scope.Span;
+            using IScope scope = Tracer.Instance.StartActive("log.get");
+            ISpan span = scope.Span;
             span.ResourceName = $"get {_namespace}";
             span.OperationName = "GET";
 
@@ -195,6 +196,10 @@ namespace Callisto.Implementation
             _transactionLogHandle.Refresh();
             if (!_transactionLogHandle.Exists)
                 throw new FileNotFoundException("Transaction log is empty");
+
+            // we set a max amount of events to skip to make sure we actually move the current event counter forward for the replicator and do not have to start from the beginning again
+            const int maxEventsSkippedDueToLocation = 1000;
+            int countOfEventsSkipped = 0;
 
             // we allow parallel reads from the file, we only need to lock on writes.
             // ReSharper disable once InconsistentlySynchronizedField
@@ -238,7 +243,7 @@ namespace Callisto.Implementation
                 {
                     string headerMd5 = StringUtils.FormatAsHexString(opHeader.Md5hash);
                     string calculatedMd5 = StringUtils.FormatAsHexString(md5Hash);
-                    _logger.Warning("Reading header {@Header}, mismatching hash found {CalculatedHash} expected {ExpectedHash}", opHeader, calculatedMd5, headerMd5);
+                    _logger.Warning("Reading header {@Header}, mismatching hash found {CalculatedHash} expected {ExpectedHash} . Was read at offset {Offset}", opHeader, calculatedMd5, headerMd5, offset);
                     throw new EventHashMismatchException(opHeader.Offset, headerMd5, calculatedMd5);
                 }
 
@@ -249,8 +254,14 @@ namespace Callisto.Implementation
                 {
                     // we have a site filter, lets check that the event has not been seen at this site (flag is set)
                     bool hasBeenSeen = (op.Op!.Locations & siteFilter) != 0;
+                    if (hasBeenSeen && countOfEventsSkipped > maxEventsSkippedDueToLocation)
+                    {
+                        // we have reached the maximum number of events we skip, lets stop searching for more events for now.
+                        break;
+                    }
                     if (hasBeenSeen)
                     {
+                        ++countOfEventsSkipped;
                         continue;
                     }
                 }

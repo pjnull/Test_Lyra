@@ -397,8 +397,6 @@ export class BotNotifications implements BotEventHandler {
 			return
 		}
 
-		const cl = changeInfo.cl
-
 		// TODO: Support DMs if we don't have a channel configured
 		if (!this.slackMessages) {
 			// doing nothing at the moment - don't want to complicate things with fallbacks
@@ -406,6 +404,8 @@ export class BotNotifications implements BotEventHandler {
 			// (in that case would have to show bot as well as branch)
 			return
 		}
+
+		const cl = blockage.approval ? blockage.approval.shelfCl : changeInfo.cl
 
 		// or integration failure (better wording? exclusive check-out?)
 		const sourceBranch = changeInfo.branch
@@ -420,9 +420,11 @@ export class BotNotifications implements BotEventHandler {
 		const channelPing = userEmail ? blockage.owner : `@${blockage.owner}`
 
 		const isBotUser = isUserAKnownBot(blockage.owner)
-		const text = isBotUser ? `Blockage caused by \`${blockage.owner}\` commit!` :
-			blockage.failure.kind === 'Too many files' ? `${channelPing}, please request a shelf for this large changelist` :
-			`${channelPing}, please resolve the following ${issue}:`
+		const text =
+			blockage.approval ?				`${channelPing}'s change needs to be approved in ${blockage.approval.settings.channelName}` :
+			isBotUser ? 									`Blockage caused by \`${blockage.owner}\` commit!` :
+			blockage.failure.kind === 'Too many files' ?	`${channelPing}, please request a shelf for this large changelist` :
+															`${channelPing}, please resolve the following ${issue}:`
 
 		const message = this.makeSlackChannelMessage(
 			`${sourceBranch.name} blocked! (${issue})`,
@@ -454,19 +456,32 @@ export class BotNotifications implements BotEventHandler {
 
 		// Post message to owner in DM
 		if (DIRECT_MESSAGING_ENABLED && !isBotUser && targetBranch && userEmail) {
-			const dmText = `Your change (${makeClLink(changeInfo.source_cl)}) ` +
-				`hit '${issue}' while merging from *${sourceBranch.name}* to *${targetBranch.name}*.\n\n` +
-				'`' + blockage.change.description.substr(0, 80) + '`\n\n' +
-				"*_Resolving this blockage is time sensitive._ Please select one of the following:*"
-			
-			const urls = this.blockageUrlGenerator(blockage)
-			if (!urls) {
-				const error = `Could not get blockage URLs for blockage -- CL ${blockage.change.cl}`
-				this.botNotificationsLogger.printException(error)
-				throw error
+			let dm: SlackMessage
+			if (blockage.approval) {
+				dm = {
+					title: 'Approval needed to commit to ' + targetBranch.name,
+					text: `Your change has been shelved in ${makeClLink(cl)} and sent to ${blockage.approval.settings.channelName} for approval\n\n` +
+							blockage.approval.settings.description,
+					channel: "",
+					mrkdwn: false
+				}
+			}
+			else {
+				const dmText = `Your change (${makeClLink(changeInfo.source_cl)}) ` +
+					`hit '${issue}' while merging from *${sourceBranch.name}* to *${targetBranch.name}*.\n\n` +
+					'`' + blockage.change.description.substr(0, 80) + '`\n\n' +
+					"*_Resolving this blockage is time sensitive._ Please select one of the following:*"
+				
+				const urls = this.blockageUrlGenerator(blockage)
+				if (!urls) {
+					const error = `Could not get blockage URLs for blockage -- CL ${blockage.change.cl}`
+					this.botNotificationsLogger.printException(error)
+					throw error
+				}
+
+				dm = this.makeSlackDirectMessage(dmText, changeInfo.source_cl, cl, targetBranch.name, urls)
 			}
 
-			const dm = this.makeSlackDirectMessage(dmText, changeInfo.source_cl, cl, targetBranch.name, urls)
 			this.slackMessages.postDM(userEmail, changeInfo.source_cl, targetBranch, dm)
 		}
 	}

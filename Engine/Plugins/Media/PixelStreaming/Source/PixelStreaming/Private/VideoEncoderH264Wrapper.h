@@ -4,6 +4,11 @@
 #include "VideoEncoder.h"
 #include "EncoderFrameFactory.h"
 
+namespace webrtc
+{
+	class VideoFrame;
+}
+
 namespace UE {
 	namespace PixelStreaming {
 		class FVideoEncoderFactory;
@@ -11,7 +16,7 @@ namespace UE {
 		class FVideoEncoderH264Wrapper
 		{
 		public:
-			FVideoEncoderH264Wrapper(uint64 EncoderId, TUniquePtr<FEncoderFrameFactory> FrameFactory, TUniquePtr<AVEncoder::FVideoEncoder> Encoder);
+			FVideoEncoderH264Wrapper(TUniquePtr<FEncoderFrameFactory> FrameFactory, TUniquePtr<AVEncoder::FVideoEncoder> Encoder);
 			~FVideoEncoderH264Wrapper();
 
 			uint64 GetId() const { return Id; }
@@ -23,9 +28,8 @@ namespace UE {
 			AVEncoder::FVideoEncoder::FLayerConfig GetCurrentConfig();
 			void SetConfig(const AVEncoder::FVideoEncoder::FLayerConfig& NewConfig);
 
-			static void OnEncodedPacket(uint64 SourceEncoderId, 
-				UE::PixelStreaming::FVideoEncoderFactory* Factory, 
-				uint32 InLayerIndex, const AVEncoder::FVideoEncoderInputFrame* InFrame, 
+			static void OnEncodedPacket(UE::PixelStreaming::FVideoEncoderFactory* Factory, 
+				uint32 InLayerIndex, const TSharedPtr<AVEncoder::FVideoEncoderInputFrame> InFrame, 
 				const AVEncoder::FCodecPacket& InPacket);
 
 		private:

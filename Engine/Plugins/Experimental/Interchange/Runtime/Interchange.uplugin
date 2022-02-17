@@ -11,13 +11,18 @@
 	"MarketplaceURL": "",
 	"SupportURL": "",
 	"EnabledByDefault": false,
-	"CanContainContent": false,
+	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"Installed": false,
 	"IsHidden": true,
 	"Modules": [
 		{
 			"Name": "InterchangeNodes",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "InterchangeFactoryNodes",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		},
@@ -54,7 +59,17 @@
 				"Win64",
 				"Linux",
 				"Mac"
+			],
+			"TargetAllowList": [
+				"Editor",
+				"Program"
 			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "GLTFImporter",
+			"Enabled": true
 		}
 	],
 	"IsExperimentalVersion": false,

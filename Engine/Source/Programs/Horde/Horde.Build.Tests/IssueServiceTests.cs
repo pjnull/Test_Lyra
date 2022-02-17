@@ -71,7 +71,7 @@ namespace HordeServerTests
 				}
 			}
 
-			protected override void WriteFormattedEvent(LogLevel Level, byte[] Line)
+			protected override void WriteFormattedEvent(LogLevel Level, int LineIndex, int LineCount, byte[] Line)
 			{
 				Events.Add((Level, Line));
 			}
@@ -230,7 +230,7 @@ namespace HordeServerTests
 
 			JobStepRefId JobStepRefId = new JobStepRefId(Job.Id, Batch.Id, Step.Id);
 			string NodeName = Graph.Groups[Batch.GroupIdx].Nodes[Step.NodeIdx].Name;
-			await JobStepRefCollection.InsertOrReplaceAsync(JobStepRefId, "TestJob", NodeName, Job.StreamId, Job.TemplateId, Job.Change, Step.LogId, null, null, Outcome, 0.0f, 0.0f, Step.StartTimeUtc!.Value, Step.StartTimeUtc);
+			await JobStepRefCollection.InsertOrReplaceAsync(JobStepRefId, "TestJob", NodeName, Job.StreamId, Job.TemplateId, Job.Change, Step.LogId, null, null, Outcome, null, null, 0.0f, 0.0f, Step.StartTimeUtc!.Value, Step.StartTimeUtc);
 		}
 
 		async Task AddEvent(IJob Job, int BatchIdx, int StepIdx, object Data, EventSeverity Severity = EventSeverity.Error)
@@ -1159,6 +1159,7 @@ namespace HordeServerTests
 				ILogFile? Log = await LogFileService.GetLogFileAsync(Job.Batches[0].Steps[0].LogId!.Value);
 				List<ILogEvent> Events = await LogFileService.FindLogEventsAsync(Log!);
 				Assert.AreEqual(1, Events.Count);
+				Assert.AreEqual(40, Events[0].LineCount);
 				ILogEventData EventData = await LogFileService.GetEventDataAsync(Log!, Events[0].LineIndex, Events[0].LineCount);
 
 				List<IIssue> Issues = await IssueService.FindIssuesAsync();

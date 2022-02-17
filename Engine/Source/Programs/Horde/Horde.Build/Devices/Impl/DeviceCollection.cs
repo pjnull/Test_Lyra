@@ -130,9 +130,11 @@ namespace HordeServer.Collections.Impl
 			public string? ReservationDetails { get; set; }
 
 			/// <summary>
-			/// 
+			/// DeviceIds in the reservation
 			/// </summary>
 			public List<DeviceId> Devices { get; set; } = new List<DeviceId>();
+
+			public List<string> RequestedDevicePlatforms { get; set; } = new List<string>();
 
 			public DateTime CreateTimeUtc { get; set; }
 
@@ -147,11 +149,12 @@ namespace HordeServer.Collections.Impl
 
 			}
 
-			public DeviceReservationDocument(ObjectId Id, DevicePoolId PoolId, List<DeviceId> Devices, DateTime CreateTimeUtc, string? Hostname, string? ReservationDetails, string? JobId, string? StepId)
+			public DeviceReservationDocument(ObjectId Id, DevicePoolId PoolId, List<DeviceId> Devices, List<string> RequestedDevicePlatforms, DateTime CreateTimeUtc, string? Hostname, string? ReservationDetails, string? JobId, string? StepId)
 			{
 				this.Id = Id;
 				this.PoolId = PoolId;
 				this.Devices = Devices;
+				this.RequestedDevicePlatforms = RequestedDevicePlatforms;
 				this.CreateTimeUtc = CreateTimeUtc;
 				this.UpdateTimeUtc = CreateTimeUtc;
 				this.Hostname = Hostname;
@@ -193,6 +196,9 @@ namespace HordeServer.Collections.Impl
 
 			[BsonIgnoreIfNull]
 			public DateTime? CheckOutTime { get; set; }
+
+			[BsonIgnoreIfNull]
+			public bool? CheckoutExpiringNotificationSent { get; set; }
 
 			[BsonIgnoreIfNull]
 			public DateTime? ProblemTimeUtc { get; set; }
@@ -245,6 +251,8 @@ namespace HordeServer.Collections.Impl
 		readonly IMongoCollection<DevicePoolDocument> Pools;
 
 		readonly IMongoCollection<DeviceReservationDocument> Reservations;
+
+		readonly int CheckoutDays = 7;
 
 		/// <summary>
 		/// Constructor
@@ -418,11 +426,16 @@ namespace HordeServer.Collections.Impl
 
             string? UserId = CheckedOutByUserId?.ToString();
 
-            Updates.Add(UpdateBuilder.Set(x => x.CheckedOutByUser, string.IsNullOrEmpty(UserId) ? null : UserId));
+            Updates.Add(UpdateBuilder.Set(x => x.CheckedOutByUser, string.IsNullOrEmpty(UserId) ? null : UserId));			
 
 			if (CheckedOutByUserId != null)
 			{
 				Updates.Add(UpdateBuilder.Set(x => x.CheckOutTime, DateTime.UtcNow));
+				Updates.Add(UpdateBuilder.Set(x => x.CheckoutExpiringNotificationSent, false));
+			}
+			else
+			{
+				Updates.Add(UpdateBuilder.Set(x => x.CheckoutExpiringNotificationSent, true));
 			}
 
 			await Devices.FindOneAndUpdateAsync<DeviceDocument>(x => x.Id == DeviceId, UpdateBuilder.Combine(Updates));
@@ -541,6 +554,7 @@ namespace HordeServer.Collections.Impl
             }
 			
 			HashSet<DeviceId> Allocated = new HashSet<DeviceId>();
+			Dictionary<DeviceId, string> PlatformRequestMap = new Dictionary<DeviceId, string>();
 
 			List<DeviceReservationDocument> PoolReservations = await Reservations.Find(x => x.PoolId == PoolId).ToListAsync();
 
@@ -613,6 +627,7 @@ namespace HordeServer.Collections.Impl
 				}
 
 				Allocated.Add(Device.Id);
+				PlatformRequestMap.Add(Device.Id, Data.RequestedPlatform);
 			}
 
 			// update reservation time and utilization for allocated devices 
@@ -644,8 +659,11 @@ namespace HordeServer.Collections.Impl
 				await Devices.FindOneAndUpdateAsync<DeviceDocument>(x => x.Id == Id, DeviceBuilder.Combine(DeviceUpdates));
 			}
 
+			List<DeviceId> DeviceIds = Allocated.ToList();
+			List<string> RequestedPlatforms = DeviceIds.Select(x => PlatformRequestMap[x]).ToList();
+
 			// Create new reservation
-			DeviceReservationDocument NewReservation = new DeviceReservationDocument(ObjectId.GenerateNewId(), PoolId, Allocated.ToList(), ReservationTimeUtc, Hostname, ReservationDetails, JobId, StepId);
+			DeviceReservationDocument NewReservation = new DeviceReservationDocument(ObjectId.GenerateNewId(), PoolId, DeviceIds, RequestedPlatforms, ReservationTimeUtc, Hostname, ReservationDetails, JobId, StepId);
 			await Reservations.InsertOneAsync(NewReservation);
 
 			return NewReservation;
@@ -687,6 +705,80 @@ namespace HordeServer.Collections.Impl
 			return false;
 
 		}
+
+		/// <summary>
+		/// Deletes expired user checkouts
+		/// </summary>
+		public async Task<List<(UserId, IDevice)>?> ExpireCheckedOutAsync()
+		{
+			FilterDefinition<DeviceDocument> Filter = Builders<DeviceDocument>.Filter.Empty;
+			Filter &= Builders<DeviceDocument>.Filter.Where(x => x.CheckedOutByUser != null && x.CheckOutTime != null);
+
+			List<DeviceDocument> CheckedOutDevices = await Devices.Find(Filter).ToListAsync();
+
+			DateTime UtcNow = DateTime.UtcNow;
+			List<DeviceDocument> ExpiredDevices = CheckedOutDevices.FindAll(x => (UtcNow - x.CheckOutTime!.Value).TotalDays >= CheckoutDays).ToList();
+
+			if (ExpiredDevices.Count > 0)
+			{
+
+				FilterDefinition<DeviceDocument> UpdateFilter = Builders<DeviceDocument>.Filter.In(x => x.Id, ExpiredDevices.Select(y => y.Id));
+
+				UpdateDefinitionBuilder<DeviceDocument> DeviceBuilder = Builders<DeviceDocument>.Update;
+				List<UpdateDefinition<DeviceDocument>> DeviceUpdates = new List<UpdateDefinition<DeviceDocument>>();
+
+				DeviceUpdates.Add(DeviceBuilder.Set(x => x.CheckedOutByUser, null));
+				DeviceUpdates.Add(DeviceBuilder.Set(x => x.CheckOutTime, null));
+				DeviceUpdates.Add(DeviceBuilder.Set(x => x.CheckoutExpiringNotificationSent, true));
+
+				UpdateResult Result = await Devices.UpdateManyAsync(Builders<DeviceDocument>.Filter.In(x => x.Id, ExpiredDevices.Select(y => y.Id)), DeviceBuilder.Combine(DeviceUpdates));
+
+				if (Result.ModifiedCount > 0)
+				{
+					return ExpiredDevices.Select(x => (UserId.Parse(x.CheckedOutByUser!), (IDevice) x)).ToList();
+				}
+
+			}
+
+			return null;
+
+		}
+
+		/// <summary>
+		/// Gets a list of users to notify  that their device is about to expire in the next 24 hours
+		/// </summary>
+		public async Task<List<(UserId, IDevice)>?> ExpireNotificatonsAsync()
+		{
+			FilterDefinition<DeviceDocument> Filter = Builders<DeviceDocument>.Filter.Empty;
+			Filter &= Builders<DeviceDocument>.Filter.Where(x => x.CheckedOutByUser != null && x.CheckoutExpiringNotificationSent != true);
+
+			List<DeviceDocument> CheckedOutDevices = await Devices.Find(Filter).ToListAsync();
+
+			DateTime UtcNow = DateTime.UtcNow;
+			List<DeviceDocument> ExpiredDevices = CheckedOutDevices.FindAll(x => (UtcNow - x.CheckOutTime!.Value).TotalDays >= (CheckoutDays - 1)).ToList();
+
+			if (ExpiredDevices.Count > 0)
+			{
+				FilterDefinition<DeviceDocument> UpdateFilter = Builders<DeviceDocument>.Filter.In(x => x.Id, ExpiredDevices.Select(y => y.Id));
+
+				UpdateDefinitionBuilder<DeviceDocument> DeviceBuilder = Builders<DeviceDocument>.Update;
+				List<UpdateDefinition<DeviceDocument>> DeviceUpdates = new List<UpdateDefinition<DeviceDocument>>();
+
+				DeviceUpdates.Add(DeviceBuilder.Set(x => x.CheckoutExpiringNotificationSent, true));
+
+				UpdateResult Result = await Devices.UpdateManyAsync(Builders<DeviceDocument>.Filter.In(x => x.Id, ExpiredDevices.Select(y => y.Id)), DeviceBuilder.Combine(DeviceUpdates));
+
+				if (Result.ModifiedCount > 0)
+				{
+					return ExpiredDevices.Select(x => (UserId.Parse(x.CheckedOutByUser!), (IDevice)x)).ToList();
+				}
+
+			}
+
+			return null;
+
+		}
+
 
 		/// <inheritdoc/>
 		public async Task<List<IDeviceReservation>> FindAllReservationsAsync()

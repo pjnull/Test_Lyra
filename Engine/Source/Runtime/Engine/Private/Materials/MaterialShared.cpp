@@ -49,7 +49,6 @@
 #if WITH_EDITOR
 #include "Rendering/StaticLightingSystemInterface.h"
 #include "MaterialHLSLGenerator.h"
-#include "MaterialHLSLTree.h"
 #include "MaterialHLSLEmitter.h"
 #include "HLSLTree/HLSLTreeCommon.h"
 #include "Misc/ScopeLock.h"
@@ -70,6 +69,7 @@ IMPLEMENT_TYPE_LAYOUT(FMeshMaterialShaderMap);
 IMPLEMENT_TYPE_LAYOUT(FMaterialProcessedSource);
 IMPLEMENT_TYPE_LAYOUT(FMaterialShaderMapContent);
 IMPLEMENT_TYPE_LAYOUT(FMaterialUniformPreshaderHeader);
+IMPLEMENT_TYPE_LAYOUT(FMaterialUniformPreshaderField);
 IMPLEMENT_TYPE_LAYOUT(FMaterialNumericParameterInfo);
 IMPLEMENT_TYPE_LAYOUT(FMaterialTextureParameterInfo);
 IMPLEMENT_TYPE_LAYOUT(FMaterialExternalTextureParameterInfo);
@@ -275,7 +275,7 @@ int32 FExpressionInput::Compile(class FMaterialCompiler* Compiler)
 		return INDEX_NONE;
 }
 
-UE::HLSLTree::FExpression* FExpressionInput::AcquireHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const
+UE::HLSLTree::FExpression* FExpressionInput::TryAcquireHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const
 {
 	UE::HLSLTree::FExpression* Result = nullptr;
 	if (Expression)
@@ -285,17 +285,43 @@ UE::HLSLTree::FExpression* FExpressionInput::AcquireHLSLExpression(FMaterialHLSL
 		if (Mask && Result)
 		{
 			const UE::HLSLTree::FSwizzleParameters SwizzleParams = UE::HLSLTree::MakeSwizzleMask(!!MaskR, !!MaskG, !!MaskB, !!MaskA);
-			Result = Generator.NewSwizzle(Scope, SwizzleParams, Result);
+			Result = Generator.NewSwizzle(SwizzleParams, Result);
 		}
 	}
-	
+
 	return Result;
+}
+
+UE::HLSLTree::FExpression* FExpressionInput::AcquireHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const
+{
+	const FExpressionInput TracedInput = GetTracedInput();
+	if (!TracedInput.Expression)
+	{
+		Generator.GetErrors().AddError(TEXT("Missing input"));
+		return nullptr;
+	}
+	return TryAcquireHLSLExpression(Generator, Scope);
+}
+
+UE::HLSLTree::FExpression* FExpressionInput::AcquireHLSLExpressionOrConstant(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, const UE::Shader::FValue& ConstantValue) const
+{
+	const FExpressionInput TracedInput = GetTracedInput();
+	if (!TracedInput.Expression)
+	{
+		return Generator.NewConstant(ConstantValue);
+	}
+	return TryAcquireHLSLExpression(Generator, Scope);
 }
 
 UE::HLSLTree::FTextureParameterDeclaration* FExpressionInput::AcquireHLSLTexture(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const
 {
 	UE::HLSLTree::FTextureParameterDeclaration* Result = nullptr;
-	if (Expression)
+	const FExpressionInput TracedInput = GetTracedInput();
+	if (!TracedInput.Expression)
+	{
+		Generator.GetErrors().AddError(TEXT("Missing input"));
+	}
+	else if (Expression)
 	{
 		Expression->ValidateState();
 		Result = Generator.AcquireTextureDeclaration(Scope, Expression, OutputIndex);
@@ -363,9 +389,17 @@ bool FExpressionExecOutput::GenerateHLSLStatements(FMaterialHLSLGenerator& Gener
 	return bResult;
 }
 
-UE::HLSLTree::FScope* FExpressionExecOutput::NewScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const
+UE::HLSLTree::FScope* FExpressionExecOutput::NewOwnedScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FStatement& Owner) const
 {
-	return NewScopeWithStatements(Generator, Scope, EMaterialNewScopeFlag::None);
+	UE::HLSLTree::FScope* Result = nullptr;
+	if (Expression)
+	{
+		Expression->ValidateState();
+		Result = Generator.NewOwnedScope(Owner); // Create a new scope for the statements
+		Generator.GenerateStatements(*Result, Expression);
+	}
+
+	return Result;
 }
 
 UE::HLSLTree::FScope* FExpressionExecOutput::NewScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, EMaterialNewScopeFlag Flags) const
@@ -1310,7 +1344,7 @@ bool FMaterialResource::IsVolumetricPrimitive() const { return Material->Materia
 bool FMaterialResource::IsSpecialEngineMaterial() const { return Material->bUsedAsSpecialEngineMaterial; }
 bool FMaterialResource::HasVertexPositionOffsetConnected() const { return Material->HasVertexPositionOffsetConnected(); }
 bool FMaterialResource::HasPixelDepthOffsetConnected() const { return Material->HasPixelDepthOffsetConnected(); }
-bool FMaterialResource::HasMaterialAttributesConnected() const { return (Material->bUseMaterialAttributes && Material->MaterialAttributes.IsConnected()) || Material->bEnableExecWire; }
+bool FMaterialResource::HasMaterialAttributesConnected() const { return (Material->bUseMaterialAttributes && Material->MaterialAttributes.IsConnected()); }
 EMaterialShadingRate FMaterialResource::GetShadingRate() const { return Material->ShadingRate; }
 FString FMaterialResource::GetBaseMaterialPathName() const { return Material->GetPathName(); }
 FString FMaterialResource::GetDebugName() const
@@ -1669,6 +1703,56 @@ bool FMaterialResource::IsStrataMaterial() const
 	return bStrataEnabled;
 }
 
+bool Engine_IsStrataEnabled();
+
+bool FMaterialResource::HasMaterialPropertyConnected(EMaterialProperty In) const
+{
+	// STRATA_TODO: temporary validation until we have converted all domains
+	const bool bIsStrataSupportedDomain = 
+		Material->MaterialDomain == MD_PostProcess || 
+		Material->MaterialDomain == MD_LightFunction ||
+		Material->MaterialDomain == MD_DeferredDecal || 
+		Material->MaterialDomain == MD_Surface || 
+		Material->MaterialDomain == MD_Volume;
+
+	if (Engine_IsStrataEnabled() && bIsStrataSupportedDomain)
+	{
+		// Strata material traversal is cached as this is an expensive operation
+		#if WITH_EDITOR
+		if (Material->HasStrataFrontMaterialConnected())
+		{
+			if (!CachedStrataMaterialInfo.IsValid())
+			{
+				check(Material->HasStrataFrontMaterialConnected());
+				if (Material->FrontMaterial.Expression->IsResultStrataMaterial(Material->FrontMaterial.OutputIndex))
+				{
+					Material->FrontMaterial.Expression->GatherStrataMaterialInfo(CachedStrataMaterialInfo, Material->FrontMaterial.OutputIndex);
+				}
+			}
+		}
+		return CachedStrataMaterialInfo.HasPropertyConnected(In);
+		#else
+		return FStrataMaterialInfo::HasPropertyConnected(Material->CachedConnectedInputs, In);
+		#endif
+	}
+	else
+	{
+		switch (In)
+		{
+		case MP_EmissiveColor: 		return Material->HasEmissiveColorConnected();
+		case MP_Opacity: 			return Material->HasEmissiveColorConnected();
+		case MP_BaseColor: 			return Material->HasBaseColorConnected();
+		case MP_Normal: 			return Material->HasNormalConnected();
+		case MP_Roughness: 			return Material->HasRoughnessConnected();
+		case MP_Specular: 			return Material->HasSpecularConnected();
+		case MP_Metallic: 			return HasMaterialAttributesConnected() || Material->HasMetallicConnected();
+		case MP_Anisotropy: 		return Material->HasAnisotropyConnected();
+		case MP_AmbientOcclusion: 	return Material->HasAmbientOcclusionConnected();
+		}
+	}
+	return false;
+}
+
 bool FMaterialResource::RequiresSynchronousCompilation() const
 {
 	return Material->IsDefaultMaterial();
@@ -1808,11 +1892,11 @@ bool FMaterialResource::ShouldInlineShaderCode() const
 	return bNeedsToBeInlined;
 }
 
-bool FMaterialResource::IsCompiledWithExecutionFlow() const
+bool FMaterialResource::IsUsingControlFlow() const
 {
 	if (Material)
 	{
-		return Material->IsCompiledWithExecutionFlow();
+		return Material->IsUsingControlFlow();
 	}
 	return false;
 }
@@ -2327,8 +2411,19 @@ bool FMaterial::CacheShaders(const FMaterialShaderMapId& ShaderMapId, EShaderPla
 	else
 	{
 #if WITH_EDITOR
-		// Clear outdated compile errors as we're not calling Translate on this path
-		CompileErrors.Empty();
+		// We have a shader map, the shader map is incomplete, and we've been asked to compile.
+		if (AllowShaderCompiling() && 
+			!IsGameThreadShaderMapComplete() && 
+			(PrecompileMode != EMaterialShaderPrecompileMode::None))
+		{
+			// Submit the remaining shaders in the map for compilation.
+			SubmitCompileJobs(EShaderCompileJobPriority::High);
+		}
+		else
+		{
+			// Clear outdated compile errors as we're not calling Translate on this path
+			CompileErrors.Empty();
+		}
 #endif // WITH_EDITOR
 	}
 
@@ -2371,11 +2466,7 @@ bool FMaterial::Translate_New(const FMaterialShaderMapId& ShaderMapId,
 {
 #if WITH_EDITOR
 	const FMaterialCompileTargetParameters TargetParams(InPlatform, ShaderMapId.FeatureLevel, InTargetPlatform);
-
-	FMaterialHLSLTree Tree;
-	Tree.InitializeForMaterial(TargetParams, *this);
-
-	return MaterialEmitHLSL(TargetParams, *this, InStaticParameters, Tree.GetTree(), OutCompilationOutput, OutMaterialEnvironment);
+	return MaterialEmitHLSL(TargetParams, InStaticParameters, *this, OutCompilationOutput, OutMaterialEnvironment);
 #else
 	checkNoEntry();
 	return false;
@@ -5167,6 +5258,86 @@ bool FMaterialParameterInfo::RemapLayerIndex(TArrayView<const int32> IndexRemap,
 bool FMemoryImageMaterialParameterInfo::RemapLayerIndex(TArrayView<const int32> IndexRemap, FMemoryImageMaterialParameterInfo& OutResult) const
 {
 	return RemapParameterLayerIndex(IndexRemap, *this, OutResult);
+}
+
+FMaterialShaderParameters::FMaterialShaderParameters(const FMaterial* InMaterial)
+{
+	// Make sure to zero-initialize so we get consistent hashes
+	FMemory::Memzero(*this);
+
+	MaterialDomain = InMaterial->GetMaterialDomain();
+	ShadingModels = InMaterial->GetShadingModels();
+	BlendMode = InMaterial->GetBlendMode();
+	FeatureLevel = InMaterial->GetFeatureLevel();
+	QualityLevel = InMaterial->GetQualityLevel();
+	BlendableLocation = InMaterial->GetBlendableLocation();
+	NumCustomizedUVs = InMaterial->GetNumCustomizedUVs();
+	StencilCompare = InMaterial->GetStencilCompare();
+	bIsDefaultMaterial = InMaterial->IsDefaultMaterial();
+	bIsSpecialEngineMaterial = InMaterial->IsSpecialEngineMaterial();
+	bIsMasked = InMaterial->IsMasked();
+	bIsTwoSided = InMaterial->IsTwoSided();
+	bIsDistorted = InMaterial->IsDistorted();
+	bShouldCastDynamicShadows = InMaterial->ShouldCastDynamicShadows();
+	bWritesEveryPixel = InMaterial->WritesEveryPixel(false);
+	bWritesEveryPixelShadowPass = InMaterial->WritesEveryPixel(true);
+	if (Engine_IsStrataEnabled())
+	{
+		bHasDiffuseAlbedoConnected  = InMaterial->HasMaterialPropertyConnected(MP_DiffuseColor);
+		bHasF0Connected = InMaterial->HasMaterialPropertyConnected(MP_SpecularColor);
+		bHasBaseColorConnected = InMaterial->HasMaterialPropertyConnected(MP_BaseColor);
+		bHasNormalConnected = InMaterial->HasMaterialPropertyConnected(MP_Normal);
+		bHasRoughnessConnected = InMaterial->HasMaterialPropertyConnected(MP_Roughness);
+		bHasSpecularConnected = InMaterial->HasMaterialPropertyConnected(MP_Specular);
+		bHasMetallicConnected = InMaterial->HasMaterialPropertyConnected(MP_Metallic);
+		bHasEmissiveColorConnected = InMaterial->HasMaterialPropertyConnected(MP_EmissiveColor);
+		bHasAmbientOcclusionConnected = InMaterial->HasMaterialPropertyConnected(MP_AmbientOcclusion);
+		bHasAnisotropyConnected = InMaterial->HasMaterialPropertyConnected(MP_Anisotropy);
+	}
+	else
+	{
+		bHasBaseColorConnected = InMaterial->HasBaseColorConnected();
+		bHasNormalConnected = InMaterial->HasNormalConnected();
+		bHasRoughnessConnected = InMaterial->HasRoughnessConnected();
+		bHasSpecularConnected = InMaterial->HasSpecularConnected();
+		bHasMetallicConnected = InMaterial->HasMetallicConnected();
+		bHasEmissiveColorConnected = InMaterial->HasEmissiveColorConnected();
+		bHasAmbientOcclusionConnected = InMaterial->HasAmbientOcclusionConnected();
+		bHasAnisotropyConnected = InMaterial->HasAnisotropyConnected();
+	}
+	bHasVertexPositionOffsetConnected = InMaterial->HasVertexPositionOffsetConnected();
+	bHasPixelDepthOffsetConnected = InMaterial->HasPixelDepthOffsetConnected();
+	bMaterialMayModifyMeshPosition = InMaterial->MaterialMayModifyMeshPosition();
+	bIsUsedWithStaticLighting = InMaterial->IsUsedWithStaticLighting();
+	bIsUsedWithParticleSprites = InMaterial->IsUsedWithParticleSprites();
+	bIsUsedWithMeshParticles = InMaterial->IsUsedWithMeshParticles();
+	bIsUsedWithNiagaraSprites = InMaterial->IsUsedWithNiagaraSprites();
+	bIsUsedWithNiagaraMeshParticles = InMaterial->IsUsedWithNiagaraMeshParticles();
+	bIsUsedWithNiagaraRibbons = InMaterial->IsUsedWithNiagaraRibbons();
+	bIsUsedWithLandscape = InMaterial->IsUsedWithLandscape();
+	bIsUsedWithBeamTrails = InMaterial->IsUsedWithBeamTrails();
+	bIsUsedWithSplineMeshes = InMaterial->IsUsedWithSplineMeshes();
+	bIsUsedWithSkeletalMesh = InMaterial->IsUsedWithSkeletalMesh();
+	bIsUsedWithMorphTargets = InMaterial->IsUsedWithMorphTargets();
+	bIsUsedWithAPEXCloth = InMaterial->IsUsedWithAPEXCloth();
+	bIsUsedWithGeometryCache = InMaterial->IsUsedWithGeometryCache();
+	bIsUsedWithGeometryCollections = InMaterial->IsUsedWithGeometryCollections();
+	bIsUsedWithHairStrands = InMaterial->IsUsedWithHairStrands();
+	bIsUsedWithWater = InMaterial->IsUsedWithWater();
+	bIsTranslucencyWritingVelocity = InMaterial->IsTranslucencyWritingVelocity();
+	bIsTranslucencyWritingCustomDepth = InMaterial->IsTranslucencyWritingCustomDepth();
+	bIsDitheredLODTransition = InMaterial->IsDitheredLODTransition();
+	bIsUsedWithInstancedStaticMeshes = InMaterial->IsUsedWithInstancedStaticMeshes();
+	bHasPerInstanceCustomData = InMaterial->HasPerInstanceCustomData();
+	bHasPerInstanceRandom = InMaterial->HasPerInstanceRandom();
+	bHasVertexInterpolator = InMaterial->HasVertexInterpolator();
+	bHasRuntimeVirtualTextureOutput = InMaterial->HasRuntimeVirtualTextureOutput();
+	bIsUsedWithLidarPointCloud = InMaterial->IsUsedWithLidarPointCloud();
+	bIsUsedWithVirtualHeightfieldMesh = InMaterial->IsUsedWithVirtualHeightfieldMesh();
+	bIsUsedWithNanite = InMaterial->IsUsedWithNanite();
+	bIsStencilTestEnabled = InMaterial->IsStencilTestEnabled();
+	bIsTranslucencySurface = InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_Surface || InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_SurfacePerPixelLighting;
+	bShouldDisableDepthTest = InMaterial->ShouldDisableDepthTest();
 }
 
 #undef LOCTEXT_NAMESPACE

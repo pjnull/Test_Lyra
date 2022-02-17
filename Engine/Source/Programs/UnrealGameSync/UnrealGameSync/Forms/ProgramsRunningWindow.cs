@@ -1,5 +1,6 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
+using EpicGames.Core;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,12 +17,12 @@ namespace UnrealGameSync
 	public partial class ProgramsRunningWindow : Form
 	{
 		object SyncObject = new object();
-		string[] Programs;
-		Func<string[]> EnumeratePrograms;
-		ManualResetEvent TerminateEvent;
-		Thread BackgroundThread;
+		FileReference[] Programs;
+		Func<FileReference[]> EnumeratePrograms;
+		ManualResetEvent? TerminateEvent;
+		Thread? BackgroundThread;
 
-		public ProgramsRunningWindow(Func<string[]> EnumeratePrograms, string[] Programs)
+		public ProgramsRunningWindow(Func<FileReference[]> EnumeratePrograms, FileReference[] Programs)
 		{
 			InitializeComponent();
 
@@ -42,12 +43,12 @@ namespace UnrealGameSync
 		{
 			for(;;)
 			{
-				if(TerminateEvent.WaitOne(TimeSpan.FromSeconds(2.0)))
+				if(TerminateEvent!.WaitOne(TimeSpan.FromSeconds(2.0)))
 				{
 					break;
 				}
 
-				string[] NewPrograms = EnumeratePrograms().OrderBy(x => x).ToArray();
+				FileReference[] NewPrograms = EnumeratePrograms().OrderBy(x => x).ToArray();
 				lock(SyncObject)
 				{
 					if(!Enumerable.SequenceEqual(Programs, NewPrograms))
@@ -75,7 +76,7 @@ namespace UnrealGameSync
 		{
 			if(BackgroundThread != null)
 			{
-				TerminateEvent.Set();
+				TerminateEvent!.Set();
 
 				BackgroundThread.Join();
 				BackgroundThread = null;

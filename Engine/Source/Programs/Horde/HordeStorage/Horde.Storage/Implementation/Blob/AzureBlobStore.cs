@@ -11,6 +11,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Jupiter.Implementation;
 using Serilog;
+using EpicGames.Horde.Storage;
 
 namespace Horde.Storage.Implementation
 {
@@ -146,7 +147,7 @@ namespace Horde.Storage.Implementation
             }
         }
 
-        public async IAsyncEnumerable<BlobIdentifier> ListOldObjects(NamespaceId ns, DateTime cutoff)
+        public async IAsyncEnumerable<(BlobIdentifier, DateTime)> ListObjects(NamespaceId ns)
         {
             string fixedNamespace = SanitizeNamespace(ns);
             BlobContainerClient container = new BlobContainerClient(_connectionString, fixedNamespace);
@@ -156,13 +157,7 @@ namespace Horde.Storage.Implementation
 
             await foreach (var item in container.GetBlobsAsync(BlobTraits.Metadata))
             {
-                // ignore any recent blob
-                if ((item.Properties?.LastModified ?? DateTime.Now) > cutoff)
-                {
-                    continue;
-                }
-
-                yield return new BlobIdentifier(item.Name);
+                yield return (new BlobIdentifier(item.Name), item.Properties?.LastModified?.DateTime ?? DateTime.Now);
             }
         }
 

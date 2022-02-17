@@ -9,6 +9,7 @@
 #include "ControlRigObjectVersion.h"
 #include "Units/RigUnit.h"
 #include "EdGraphNode_Comment.h"
+#include "GraphEditAction.h"
 #include "ControlRig/Private/Units/Execution/RigUnit_BeginExecution.h"
 #include "RigVMModel/Nodes/RigVMLibraryNode.h"
 #include "RigVMModel/Nodes/RigVMFunctionEntryNode.h"
@@ -411,8 +412,14 @@ void UControlRigGraph::HandleModifiedEvent(ERigVMGraphNotifType InNotifType, URi
 						while (ExistingObject);
 						EdNode->Rename(*DeletedName, NewOuter, REN_ForceNoResetLoaders | REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
 					}
-					RemoveNode(EdNode, true);
-					NotifyGraphChanged();
+
+					// Remove the node and notify of the removal
+					{
+						Nodes.Remove(EdNode);
+						EdNode->BreakAllNodeLinks();
+						
+						NotifyGraphChanged();
+					}
 				}
 			}
 			break;
@@ -460,7 +467,8 @@ void UControlRigGraph::HandleModifiedEvent(ERigVMGraphNotifType InNotifType, URi
 						{
 							RigNode->Pins[PinIndex]->bHidden = !ModelNode->GetShowsAsFullNode();
 						}
-						NotifyGraphChanged();
+						NotifyGraphChanged(FEdGraphEditAction(EEdGraphActionType::GRAPHACTION_RemoveNode, EdNode->GetGraph(), EdNode, true));
+						NotifyGraphChanged(FEdGraphEditAction(EEdGraphActionType::GRAPHACTION_AddNode, EdNode->GetGraph(), EdNode, true));
 					}
 				}
 			}
@@ -847,22 +855,28 @@ UEdGraphNode* UControlRigGraph::FindNodeForModelNodeName(const FName& InModelNod
 		{
 			if (RigNode->ModelNodePath == InModelNodePath)
 			{
-				if (bCacheIfRequired)
+				if (RigNode->GetOuter() == this)
 				{
-					ModelNodePathToEdNode.Add(InModelNodeName, EdNode);
+					if (bCacheIfRequired)
+					{
+						ModelNodePathToEdNode.Add(InModelNodeName, EdNode);
+					}
+					return EdNode;
 				}
-				return EdNode;
 			}
 		}
-		else
+		else if (EdNode)
 		{
 			if (EdNode->GetFName() == InModelNodeName)
 			{
-				if (bCacheIfRequired)
+				if (EdNode->GetOuter() == this)
 				{
-					ModelNodePathToEdNode.Add(InModelNodeName, EdNode);
+					if (bCacheIfRequired)
+					{
+						ModelNodePathToEdNode.Add(InModelNodeName, EdNode);
+					}
+					return EdNode;
 				}
-				return EdNode;
 			}
 		}
 	}

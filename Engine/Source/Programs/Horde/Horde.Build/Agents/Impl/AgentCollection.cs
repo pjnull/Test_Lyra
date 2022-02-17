@@ -21,6 +21,7 @@ namespace HordeServer.Collections.Impl
 {
 	using AgentSoftwareChannelName = StringId<AgentSoftwareChannels>;
 	using PoolId = StringId<IPool>;
+	using SessionId = ObjectId<ISession>;
 
 	/// <summary>
 	/// Collection of agent documents
@@ -60,7 +61,7 @@ namespace HordeServer.Collections.Impl
 			[BsonRequired, BsonId]
 			public AgentId Id { get; set; }
 
-			public ObjectId? SessionId { get; set; }
+			public SessionId? SessionId { get; set; }
 			public DateTime? SessionExpiresAt { get; set; }
 
 			public AgentStatus Status { get; set; }
@@ -90,13 +91,21 @@ namespace HordeServer.Collections.Impl
 
 			public List<PoolId> DynamicPools { get; set; } = new List<PoolId>();
 			public List<PoolId> Pools { get; set; } = new List<PoolId>();
+
+			[BsonIgnoreIfDefault, BsonDefaultValue(false)]
 			public bool RequestConform { get; set; }
 
-			[BsonIgnoreIfNull]
+			[BsonIgnoreIfDefault, BsonDefaultValue(false)]
+			public bool RequestFullConform { get; set; }
+
+			[BsonIgnoreIfDefault, BsonDefaultValue(false)]
 			public bool RequestRestart { get; set; }
 
-			[BsonIgnoreIfNull]
+			[BsonIgnoreIfDefault, BsonDefaultValue(false)]
 			public bool RequestShutdown { get; set; }
+
+			[BsonIgnoreIfNull]
+			public string? LastShutdownReason { get; set; }
 
 			public List<AgentWorkspace> Workspaces { get; set; } = new List<AgentWorkspace>();
 			public DateTime LastConformTime { get; set; }
@@ -184,15 +193,11 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<List<IAgent>> FindAsync(ObjectId? Pool, string? PoolId, DateTime? ModifiedAfter, AgentStatus? Status, int? Index, int? Count)
+		public async Task<List<IAgent>> FindAsync(PoolId? PoolId, DateTime? ModifiedAfter, AgentStatus? Status, int? Index, int? Count)
 		{
 			FilterDefinitionBuilder<AgentDocument> FilterBuilder = new FilterDefinitionBuilder<AgentDocument>();
 
 			FilterDefinition<AgentDocument> Filter = FilterBuilder.Ne(x => x.Deleted, true);
-			if (Pool != null)
-			{
-				Filter &= FilterBuilder.Eq(nameof(AgentDocument.Pools), Pool);
-			}
 			
 			if (PoolId != null)
 			{
@@ -248,7 +253,7 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<IAgent?> TryUpdateSettingsAsync(IAgent AgentInterface, bool? Enabled = null, bool? RequestConform = null, bool? RequestRestart = null, bool? RequestShutdown = null, AgentSoftwareChannelName? Channel = null, List<PoolId>? Pools = null, Acl? Acl = null, string? Comment = null)
+		public async Task<IAgent?> TryUpdateSettingsAsync(IAgent AgentInterface, bool? Enabled = null, bool? RequestConform = null, bool? RequestFullConform = null, bool? RequestRestart = null, bool? RequestShutdown = null, string? ShutdownReason = null, AgentSoftwareChannelName? Channel = null, List<PoolId>? Pools = null, Acl? Acl = null, string? Comment = null)
 		{
 			AgentDocument Agent = (AgentDocument)AgentInterface;
 
@@ -267,6 +272,11 @@ namespace HordeServer.Collections.Impl
 			if (RequestConform != null)
 			{
 				Updates.Add(UpdateBuilder.Set(x => x.RequestConform, RequestConform.Value));
+				Updates.Add(UpdateBuilder.Unset(x => x.ConformAttemptCount));
+			}
+			if (RequestFullConform != null)
+			{
+				Updates.Add(UpdateBuilder.Set(x => x.RequestFullConform, RequestFullConform.Value));
 				Updates.Add(UpdateBuilder.Unset(x => x.ConformAttemptCount));
 			}
 			if (RequestRestart != null)
@@ -291,6 +301,12 @@ namespace HordeServer.Collections.Impl
 					Updates.Add(UpdateBuilder.Unset(x => x.RequestShutdown));
 				}
 			}
+
+			if (ShutdownReason != null)
+			{
+				Updates.Add(UpdateBuilder.Set(x => x.LastShutdownReason, ShutdownReason));
+			}
+
 			if (Channel != null)
 			{
 				if (Channel.Value == AgentSoftwareService.DefaultChannelName)
@@ -419,14 +435,18 @@ namespace HordeServer.Collections.Impl
 			UpdateDefinition<AgentDocument> Update = Builders<AgentDocument>.Update.Set(x => x.Workspaces, Workspaces);
 			Update = Update.Set(x => x.LastConformTime, LastConformTime);
 			Update = Update.Unset(x => x.ConformAttemptCount);
-			Update = Update.Set(x => x.RequestConform, RequestConform);
+			if (!RequestConform)
+			{
+				Update = Update.Unset(x => x.RequestConform);
+				Update = Update.Unset(x => x.RequestFullConform);
+			}
 
 			// Update the agent
 			return await TryUpdateAsync(Agent, Update);
 		}
 
 		/// <inheritdoc/>
-		public async Task<IAgent?> TryStartSessionAsync(IAgent AgentInterface, ObjectId SessionId, DateTime SessionExpiresAt, AgentStatus Status, IReadOnlyList<string> Properties, IReadOnlyDictionary<string, int> Resources, IReadOnlyList<PoolId> DynamicPools, string? Version)
+		public async Task<IAgent?> TryStartSessionAsync(IAgent AgentInterface, SessionId SessionId, DateTime SessionExpiresAt, AgentStatus Status, IReadOnlyList<string> Properties, IReadOnlyDictionary<string, int> Resources, IReadOnlyList<PoolId> DynamicPools, string? Version)
 		{
 			AgentDocument Agent = (AgentDocument)AgentInterface;
 			List<string> NewProperties = Properties.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
@@ -448,6 +468,7 @@ namespace HordeServer.Collections.Impl
 			Updates.Add(UpdateBuilder.Set(x => x.Version, Version));
 			Updates.Add(UpdateBuilder.Unset(x => x.RequestRestart));
 			Updates.Add(UpdateBuilder.Unset(x => x.RequestShutdown));
+			Updates.Add(UpdateBuilder.Set(x => x.LastShutdownReason, "Unexpected"));
 
 			// Apply the update
 			return await TryUpdateAsync(Agent, UpdateBuilder.Combine(Updates));
@@ -462,6 +483,7 @@ namespace HordeServer.Collections.Impl
 			Update = Update.Unset(x => x.SessionId);
 			Update = Update.Unset(x => x.SessionExpiresAt);
 			Update = Update.Unset(x => x.Leases);
+			Update = Update.Set(x => x.Status, AgentStatus.Stopped);
 
 			bool bDeleted = Agent.Deleted || Agent.Ephemeral;
 			if (bDeleted != Agent.Deleted)

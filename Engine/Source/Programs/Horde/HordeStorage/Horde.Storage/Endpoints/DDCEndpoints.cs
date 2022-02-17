@@ -4,6 +4,7 @@ using System;
 using System.Net.Mime;
 using System.Threading.Tasks;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Horde.Storage.Controllers;
 using Horde.Storage.Implementation;
 using Jupiter;
@@ -14,6 +15,8 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Horde.Storage
 {
+    using BlobNotFoundException = Horde.Storage.Implementation.BlobNotFoundException;
+
     public class DDCEndpoints
     {
         private readonly IDDCRefService _ddcRefService;
@@ -36,7 +39,7 @@ namespace Horde.Storage
                 return;
             }
             
-            using (Scope _ = Tracer.Instance.StartActive("authorize"))
+            using (IScope _ = Tracer.Instance.StartActive("authorize"))
             {
                 {
                     AuthorizationResult authorizationResult = await _authorizationService.AuthorizeAsync(httpContext.User, ns, NamespaceAccessRequirement.Name);
@@ -74,7 +77,7 @@ namespace Horde.Storage
                 httpContext.Response.Headers["Content-Length"] = Convert.ToString(blob.Length);
                 httpContext.Response.Headers[CommonHeaders.HashHeaderName] = refRes.ContentHash.ToString();
 
-                using (Scope _ = Tracer.Instance.StartActive("body.write"))
+                using (IScope _ = Tracer.Instance.StartActive("body.write"))
                 {
                     await blob.Stream.CopyToAsync(httpContext.Response.Body);
                 }

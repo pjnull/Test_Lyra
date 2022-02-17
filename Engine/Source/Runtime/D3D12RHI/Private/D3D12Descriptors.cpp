@@ -51,166 +51,13 @@ FD3D12DescriptorHeap::FD3D12DescriptorHeap(FD3D12DescriptorHeap* SubAllocateSour
 FD3D12DescriptorHeap::~FD3D12DescriptorHeap() = default;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FDescriptorAllocator
-
-struct FDescriptorAllocatorRange
-{
-	FDescriptorAllocatorRange(uint32 InFirst, uint32 InLast) : First(InFirst), Last(InLast) {}
-	uint32 First;
-	uint32 Last;
-};
-
-FDescriptorAllocator::FDescriptorAllocator()
-{
-}
-
-FDescriptorAllocator::~FDescriptorAllocator()
-{
-}
-
-void FDescriptorAllocator::Init(uint32 InNumDescriptors)
-{
-	Capacity = InNumDescriptors;
-	Ranges.Emplace(0, InNumDescriptors - 1);
-}
-
-bool FDescriptorAllocator::Allocate(uint32 NumDescriptors, uint32& OutSlot)
-{
-	FScopeLock Lock(&CriticalSection);
-
-	if (const uint32 NumRanges = Ranges.Num(); NumRanges > 0)
-	{
-		uint32 Index = 0;
-		do
-		{
-			FDescriptorAllocatorRange& CurrentRange = Ranges[Index];
-			const uint32 Size = 1 + CurrentRange.Last - CurrentRange.First;
-			if (NumDescriptors <= Size)
-			{
-				uint32 First = CurrentRange.First;
-				if (NumDescriptors == Size && Index + 1 < NumRanges)
-				{
-					// Range is full and a new range exists, so move on to that one
-					Ranges.RemoveAt(Index);
-				}
-				else
-				{
-					CurrentRange.First += NumDescriptors;
-				}
-				OutSlot = First;
-				return true;
-			}
-			++Index;
-		} while (Index < NumRanges);
-	}
-
-	OutSlot = UINT_MAX;
-	return false;
-}
-
-void FDescriptorAllocator::Free(uint32 Offset, uint32 NumDescriptors)
-{
-	if (Offset == UINT_MAX || NumDescriptors == 0)
-	{
-		return;
-	}
-
-	FScopeLock Lock(&CriticalSection);
-
-	const uint32 End = Offset + NumDescriptors;
-	// Binary search of the range list
-	uint32 Index0 = 0;
-	uint32 Index1 = Ranges.Num() -1;
-	for (;;)
-	{
-		const uint32 Index = (Index0 + Index1) / 2;
-		if (Offset < Ranges[Index].First)
-		{
-			// Before current range, check if neighboring
-			if (End >= Ranges[Index].First)
-			{
-				check(End == Ranges[Index].First); // Can't overlap a range of free IDs
-				// Neighbor id, check if neighboring previous range too
-				if (Index > Index0 && Offset - 1 == Ranges[Index - 1].Last)
-				{
-					// Merge with previous range
-					Ranges[Index - 1].Last = Ranges[Index].Last;
-					Ranges.RemoveAt(Index);
-				}
-				else
-				{
-					// Just grow range
-					Ranges[Index].First = Offset;
-				}
-				return;
-			}
-			else
-			{
-				// Non-neighbor id
-				if (Index != Index0)
-				{
-					// Cull upper half of list
-					Index1 = Index - 1;
-				}
-				else
-				{
-					// Found our position in the list, insert the deleted range here
-					Ranges.EmplaceAt(Index, Offset, End -1);
-					return;
-				}
-			}
-		}
-		else if (Offset > Ranges[Index].Last)
-		{
-			// After current range, check if neighboring
-			if (Offset - 1 == Ranges[Index].Last)
-			{
-				// Neighbor id, check if neighboring next range too
-				if (Index < Index1 && End == Ranges[Index + 1].First)
-				{
-					// Merge with next range
-					Ranges[Index].Last = Ranges[Index + 1].Last;
-					Ranges.RemoveAt(Index);
-				}
-				else
-				{
-					// Just grow range
-					Ranges[Index].Last += NumDescriptors;
-				}
-				return;
-			}
-			else
-			{
-				// Non-neighbor id
-				if (Index != Index1)
-				{
-					// Cull bottom half of list
-					Index0 = Index + 1;
-				}
-				else
-				{
-					// Found our position in the list, insert the deleted range here
-					Ranges.EmplaceAt(Index + 1, Offset, End - 1);
-					return;
-				}
-			}
-		}
-		else
-		{
-			// Inside a free block, not a valid offset
-			checkNoEntry();
-		}
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FD3D12DescriptorManager
 
 FD3D12DescriptorManager::FD3D12DescriptorManager(FD3D12Device* Device, FD3D12DescriptorHeap* InHeap)
 	: FD3D12DeviceChild(Device)
+	, FRHIHeapDescriptorAllocator(InHeap->GetType(), InHeap->GetNumDescriptors())
 	, Heap(InHeap)
 {
-	Allocator.Init(InHeap->GetNumDescriptors());
 }
 
 FD3D12DescriptorManager::~FD3D12DescriptorManager() = default;
@@ -226,7 +73,7 @@ void FD3D12DescriptorManager::Init(TCHAR* InName, ERHIDescriptorHeapType InType,
 			D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 		);
 
-		Allocator.Init(InNumDescriptors);
+		FRHIDescriptorAllocator::Init(InNumDescriptors);
 	}
 }
 
@@ -239,30 +86,15 @@ void FD3D12DescriptorManager::Destroy()
 	}
 }
 
-FRHIDescriptorHandle FD3D12DescriptorManager::AllocateDescriptor()
+void FD3D12DescriptorManager::UpdateImmediately(FRHIDescriptorHandle InHandle, D3D12_CPU_DESCRIPTOR_HANDLE InSourceCpuHandle)
 {
-	uint32 Index{};
-	if (Allocator.Allocate(1, Index))
+	if (InHandle.IsValid())
 	{
-		return FRHIDescriptorHandle(Heap->GetType(), Index);
+		const D3D12_CPU_DESCRIPTOR_HANDLE DestCpuHandle = Heap->GetCPUSlotHandle(InHandle.GetIndex());
+		const D3D12_DESCRIPTOR_HEAP_TYPE D3DHeapType = Translate(GetType());
+
+		GetParentDevice()->GetDevice()->CopyDescriptorsSimple(1, DestCpuHandle, InSourceCpuHandle, D3DHeapType);
 	}
-	return FRHIDescriptorHandle();
-}
-
-bool FD3D12DescriptorManager::AllocateDescriptors(uint32 NumDescriptors, uint32& OutSlot)
-{
-	return Allocator.Allocate(NumDescriptors, OutSlot);
-}
-
-void FD3D12DescriptorManager::FreeDescriptor(FRHIDescriptorHandle InHandle)
-{
-	check(InHandle.GetType() == Heap->GetType());
-	Allocator.Free(InHandle.GetIndex(), 1);
-}
-
-void FD3D12DescriptorManager::FreeDescriptors(uint32 Slot, uint32 NumDescriptors)
-{
-	Allocator.Free(Slot, NumDescriptors);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,25 +132,25 @@ void FD3D12BindlessDescriptorManager::Init(uint32 InNumResourceDescriptors, uint
 	}
 }
 
-FRHIDescriptorHandle FD3D12BindlessDescriptorManager::AllocateDescriptor(ERHIDescriptorHeapType InType)
+FRHIDescriptorHandle FD3D12BindlessDescriptorManager::Allocate(ERHIDescriptorHeapType InType)
 {
 	for (FD3D12DescriptorManager& Manager : Managers)
 	{
 		if (Manager.HandlesAllocation(InType))
 		{
-			return Manager.AllocateDescriptor();
+			return Manager.Allocate();
 		}
 	}
 	return FRHIDescriptorHandle();
 }
 
-void FD3D12BindlessDescriptorManager::FreeDescriptor(FRHIDescriptorHandle InHandle)
+void FD3D12BindlessDescriptorManager::ImmediateFree(FRHIDescriptorHandle InHandle)
 {
 	for (FD3D12DescriptorManager& Manager : Managers)
 	{
 		if (Manager.HandlesAllocation(InHandle.GetType()))
 		{
-			Manager.FreeDescriptor(InHandle);
+			Manager.Free(InHandle);
 			return;
 		}
 	}
@@ -327,20 +159,34 @@ void FD3D12BindlessDescriptorManager::FreeDescriptor(FRHIDescriptorHandle InHand
 	checkNoEntry();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FD3D12BindlessDescriptorManager::GetCpuDescriptorHandle(FRHIDescriptorHandle InHandle) const
+void FD3D12BindlessDescriptorManager::DeferredFreeFromDestructor(FRHIDescriptorHandle InHandle)
 {
-	for (const FD3D12DescriptorManager& Manager : Managers)
+	if (InHandle.IsValid())
+	{
+		FD3D12Fence& Fence = GetParentDevice()->GetCommandListManager().GetFence();
+		GetParentDevice()->GetParentAdapter()->GetDeferredDeletionQueue().EnqueueBindlessDescriptor(InHandle, &Fence, GetParentDevice()->GetGPUIndex());
+	}
+}
+
+void FD3D12BindlessDescriptorManager::UpdateImmediately(FRHIDescriptorHandle InHandle, D3D12_CPU_DESCRIPTOR_HANDLE InSourceCpuHandle)
+{
+	for (FD3D12DescriptorManager& Manager : Managers)
 	{
 		if (Manager.HandlesAllocation(InHandle.GetType()))
 		{
-			return Manager.GetCpuDescriptorHandle(InHandle.GetIndex());
+			Manager.UpdateImmediately(InHandle, InSourceCpuHandle);
+			return;
 		}
 	}
 
+	// Bad configuration?
 	checkNoEntry();
+}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE NullHandle{};
-	return NullHandle;
+void FD3D12BindlessDescriptorManager::UpdateDeferred(FRHIDescriptorHandle InHandle, D3D12_CPU_DESCRIPTOR_HANDLE InSourceCpuHandle)
+{
+	// TODO: implement deferred updates
+	UpdateImmediately(InHandle, InSourceCpuHandle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -662,10 +508,10 @@ FD3D12DescriptorHeap* FD3D12DescriptorHeapManager::AllocateHeap(const TCHAR* InD
 {
 	for (FD3D12DescriptorManager& GlobalHeap : GlobalHeaps)
 	{
-		if (GlobalHeap.HandlesAllocation(InHeapType, InHeapFlags))
+		if (GlobalHeap.HandlesAllocationWithFlags(InHeapType, InHeapFlags))
 		{
 			uint32 Offset = 0;
-			if (GlobalHeap.AllocateDescriptors(InNumDescriptors, Offset))
+			if (GlobalHeap.Allocate(InNumDescriptors, Offset))
 			{
 				return new FD3D12DescriptorHeap(GlobalHeap.GetHeap(), Offset, InNumDescriptors);
 			}
@@ -684,7 +530,7 @@ void FD3D12DescriptorHeapManager::FreeHeap(FD3D12DescriptorHeap* InHeap)
 	{
 		if (GlobalHeap.IsHeapAChild(InHeap))
 		{
-			GlobalHeap.FreeDescriptors(InHeap->GetOffset(), InHeap->GetNumDescriptors());
+			GlobalHeap.Free(InHeap->GetOffset(), InHeap->GetNumDescriptors());
 			return;
 		}
 	}

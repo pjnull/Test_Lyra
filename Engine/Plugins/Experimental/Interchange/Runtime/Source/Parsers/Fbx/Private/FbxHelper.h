@@ -32,6 +32,11 @@ namespace UE
 				static FString GetNodeAttributeUniqueID(FbxNodeAttribute* NodeAttribute, const FStringView Prefix);
 
 				/**
+				 * Return the name of an FbxProperty, return empty string if the property is null.
+				 */
+				static FString GetFbxPropertyName(const FbxProperty& Property);
+
+				/**
 				 * Return the name of an FbxObject, return empty string if the object is null.
 				 */
 				static FString GetFbxObjectName(const FbxObject* Object);
@@ -45,33 +50,6 @@ namespace UE
 
 			protected:
 				static FString GetUniqueIDString(const uint64 UniqueID);
-
-#if 0
-				// This stuff is moved to FbxSkelMesh.h
-				// 
-				//Skeletalmesh helper
-				static void FindSkeletalMeshes(FbxScene* SDKScene, TArray< TArray<FbxNode*> >& outSkelMeshArray, bool bCombineSkeletalMesh, bool bForceFindRigid);
-				static void FindAllLODGroupNode(TArray<FbxNode*>& OutNodeInLod, FbxNode* NodeLodGroup, int32 LodIndex);
-				static bool FindSkeletonJoints(FbxScene* SDKScene, TArray<FbxNode*>& NodeArray, TArray<FbxNode*>& SortedLinks, FbxArray<FbxAMatrix>& LocalsPerLink);
-				static FbxNode* FindLODGroupNode(FbxNode* NodeLodGroup, int32 LodIndex, FbxNode* NodeToFind);
-
-			private:
-
-				/* Skletalmesh private helper begin */
-
-				static void RecursiveGetAllMeshNode(TArray<FbxNode*>& OutAllNode, FbxNode* Node);
-				static bool IsUnrealBone(FbxNode* Link);
-				static void RecursiveBuildSkeleton(FbxNode* Link, TArray<FbxNode*>& OutSortedLinks);
-				static bool RetrievePoseFromBindPose(FbxScene* SDKScene, const TArray<FbxNode*>& NodeArray, FbxArray<FbxPose*>& PoseArray);
-				static FbxNode* GetRootSkeleton(FbxScene* SDKScene, FbxNode* Link);
-				static void BuildSkeletonSystem(FbxScene* SDKScene, TArray<FbxCluster*>& ClusterArray, TArray<FbxNode*>& OutSortedLinks);
-				static FbxNode* RecursiveGetFirstMeshNode(FbxNode* Node, FbxNode* NodeToFind);
-				static void RecursiveFindFbxSkelMesh(FbxScene* SDKScene, FbxNode* Node, TArray< TArray<FbxNode*> >& outSkelMeshArray, TArray<FbxNode*>& SkeletonArray);
-				static void RecursiveFindRigidMesh(FbxScene* SDKScene, FbxNode* Node, TArray< TArray<FbxNode*> >& outSkelMeshArray, TArray<FbxNode*>& SkeletonArray);
-				static void RecursiveFixSkeleton(FbxScene* SDKScene, FbxNode* Node, TArray<FbxNode*>& SkelMeshes, bool bImportNestedMeshes);
-
-				/* Skletalmesh private helper end */
-#endif
 			};
 		}//ns Private
 	}//ns Interchange

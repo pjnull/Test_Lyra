@@ -692,6 +692,7 @@ struct FHLODSceneNodeVisibilityState
 struct FShaderDrawDebugStateData
 {
 	TRefCountPtr<FRDGPooledBuffer> Buffer;
+	FVector PreViewTranslation = FVector::ZeroVector;
 	bool bIsLocked = false;
 
 	void Release()
@@ -2700,8 +2701,11 @@ public:
 	void RefreshRayTracingInstances();
 #endif
 
-	/** Nanite material commands. These are stored on the scene as they are computed at FPrimitiveSceneInfo::AddToScene time. */
+	/** Nanite shading material commands. These are stored on the scene as they are computed at FPrimitiveSceneInfo::AddToScene time. */
 	FNaniteMaterialCommands NaniteMaterials[ENaniteMeshPass::Num];
+
+	/** Nanite raster material pipelines. These are stored on the scene as they are computed at FPrimitiveSceneInfo::AddToScene time. */
+	FNaniteRasterPipelines NaniteRasterPipelines;
 
 	/**
 	 * The following arrays are densely packed primitive data needed by various
@@ -3093,6 +3097,8 @@ public:
 
 	virtual void AddHairStrands(FHairStrandsInstance* Proxy) override;
 	virtual void RemoveHairStrands(FHairStrandsInstance* Proxy) override;
+
+	virtual void GetRectLightAtlasSlot(const FRectLightSceneProxy* Proxy, FLightRenderParameters* Out) override;
 
 	virtual void AddSkyAtmosphere(FSkyAtmosphereSceneProxy* SkyAtmosphereSceneProxy, bool bStaticLightingBuilt) override;
 	virtual void RemoveSkyAtmosphere(FSkyAtmosphereSceneProxy* SkyAtmosphereSceneProxy) override;

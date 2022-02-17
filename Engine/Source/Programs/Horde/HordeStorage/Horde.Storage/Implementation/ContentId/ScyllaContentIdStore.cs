@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Cassandra;
 using Cassandra.Mapping;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 
 namespace Horde.Storage.Implementation
@@ -14,10 +15,10 @@ namespace Horde.Storage.Implementation
     public class ScyllaContentIdStore : IContentIdStore
     {
         private readonly ISession _session;
-        private readonly IBlobStore _blobStore;
+        private readonly IBlobService _blobStore;
         private Mapper _mapper;
 
-        public ScyllaContentIdStore(IScyllaSessionManager scyllaSessionManager, IBlobStore blobStore)
+        public ScyllaContentIdStore(IScyllaSessionManager scyllaSessionManager, IBlobService blobStore)
         {
             _session = scyllaSessionManager.GetSessionForReplicatedKeyspace();
             _blobStore = blobStore;
@@ -34,12 +35,13 @@ namespace Horde.Storage.Implementation
         }
 
 
-        public async Task<BlobIdentifier[]?> Resolve(NamespaceId ns, BlobIdentifier contentId)
+        public async Task<BlobIdentifier[]?> Resolve(NamespaceId ns, ContentId contentId)
         {
-            using Scope scope = Tracer.Instance.StartActive("ScyllaContentIdStore.ResolveContentId");
+            using IScope scope = Tracer.Instance.StartActive("ScyllaContentIdStore.ResolveContentId");
             scope.Span.ResourceName = contentId.ToString();
 
-            Task<bool> blobStoreExistsTask = _blobStore.Exists(ns, contentId);
+            BlobIdentifier contentIdBlob = contentId.AsBlobIdentifier();
+            Task<bool> blobStoreExistsTask = _blobStore.Exists(ns, contentIdBlob);
 
             // lower content_weight means its a better candidate to resolve to
             foreach (ScyllaContentId? resolvedContentId in await _mapper.FetchAsync<ScyllaContentId>("WHERE content_id = ? ORDER BY content_weight DESC", new ScyllaBlobIdentifier(contentId)))
@@ -50,7 +52,7 @@ namespace Horde.Storage.Implementation
                 BlobIdentifier[] blobs = resolvedContentId.Chunks.Select(b => b.AsBlobIdentifier()).ToArray();
 
                 {
-                    using Scope _ = Tracer.Instance.StartActive("ScyllaContentIdStore.FindMissingBlobs");
+                    using IScope _ = Tracer.Instance.StartActive("ScyllaContentIdStore.FindMissingBlobs");
 
                     BlobIdentifier[] missingBlobs = await _blobStore.FilterOutKnownBlobs(ns, blobs);
                     if (missingBlobs.Length == 0)
@@ -63,13 +65,13 @@ namespace Horde.Storage.Implementation
             bool contentIdBlobExists = await blobStoreExistsTask;
 
             if (contentIdBlobExists)
-                return new[] { contentId };
-
+                return new[] { contentIdBlob };
+            
             // unable to resolve the content id
             return null;
         }
 
-        public async Task Put(NamespaceId ns, BlobIdentifier contentId, BlobIdentifier blobIdentifier, int contentWeight)
+        public async Task Put(NamespaceId ns, ContentId contentId, BlobIdentifier blobIdentifier, int contentWeight)
         {
             await _mapper.UpdateAsync<ScyllaContentId>("SET chunks = ? WHERE content_id = ? AND content_weight = ?", new [] {new ScyllaBlobIdentifier(blobIdentifier)}, new ScyllaBlobIdentifier(contentId), contentWeight);
         }

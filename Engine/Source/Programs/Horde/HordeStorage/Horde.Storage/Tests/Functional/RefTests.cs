@@ -28,6 +28,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Serilog;
 using Serilog.Core;
+using EpicGames.Horde.Storage;
 
 namespace Horde.Storage.FunctionalTests.Ref
 {
@@ -35,7 +36,6 @@ namespace Horde.Storage.FunctionalTests.Ref
     [TestClass]
     public class MongoRefTests : RefTests
     {
-        private static readonly string MongoTestDatabase = "Europa_TestNamespace";
         private static MongoSettings? _mongoSettings;
         private MongoRefsStore? _refsStore;
 
@@ -49,18 +49,22 @@ namespace Horde.Storage.FunctionalTests.Ref
             _mongoSettings = provider.GetService<IOptionsMonitor<MongoSettings>>()!.CurrentValue;
 
             MongoClient client = GetMongoClient();
-            if (client.GetDatabase(MongoTestDatabase) != null)
+            foreach (NamespaceId ns in new[] {TestNamespace, LastAccessTestNamespace})
             {
-                await client.DropDatabaseAsync(MongoTestDatabase);
+                string dbName = $"Europa_{ns}";
+                if (client.GetDatabase(dbName) != null)
+                {
+                    await client.DropDatabaseAsync(dbName);
+                }
             }
 
-            
+
             //verify we are using the expected refs store
             IRefsStore? refStore = provider.GetService<IRefsStore>();
             Assert.IsTrue(RefStoreIs(refStore, typeof(MongoRefsStore)));
 
             _refsStore = new MongoRefsStore(provider.GetService<IOptionsMonitor<MongoSettings>>()!);
-            IBlobStore blobStore = (IBlobStore)provider.GetService(typeof(IBlobStore))!;
+            IBlobService blobStore = (IBlobService)provider.GetService(typeof(IBlobService))!;
 
             await SeedRefTestData(_refsStore, blobStore);
 
@@ -81,10 +85,53 @@ namespace Horde.Storage.FunctionalTests.Ref
         }
         protected override IEnumerable<KeyValuePair<string, string>> GetSettings()
         {
-            return new[] {new KeyValuePair<string, string>("Horde.Storage:RefDbImplementation", HordeStorageSettings.RefDbImplementations.Mongo.ToString())};
+            return new[] {new KeyValuePair<string, string>("Horde_Storage:RefDbImplementation", HordeStorageSettings.RefDbImplementations.Mongo.ToString())};
         }
     }
 
+    [TestClass]
+    public class MemoryRefTests : RefTests
+    {
+        private MemoryRefsStore? _refsStore;
+
+        protected override async Task SeedDb(IServiceProvider provider)
+        {
+            //verify we are using the expected refs store
+            IRefsStore? refStore = provider.GetService<IRefsStore>();
+            Assert.IsTrue(RefStoreIs(refStore, typeof(MemoryRefsStore)));
+            if (refStore is CachedRefStore cachedRefStore)
+            {
+                _refsStore = (MemoryRefsStore)cachedRefStore.BackingStore;
+            }
+            else
+            {
+                _refsStore = (MemoryRefsStore)refStore!;
+            }
+
+            IBlobService blobStore = (IBlobService)provider.GetService(typeof(IBlobService))!;
+
+            await SeedRefTestData(_refsStore, blobStore);
+
+        }
+
+        protected override Task TeardownDb(IServiceProvider provider)
+        {
+            return Task.CompletedTask;
+        }
+
+        protected override async Task<RefRecord> GetTestRecord(BucketId bucket, KeyId name, IRefsStore.ExtraFieldsFlag fields)
+        {
+            var record = await _refsStore!.Get(TestNamespace, bucket, name, fields);
+            if (record == null)
+                throw new Exception("Unable to find record");
+
+            return record;
+        }
+        protected override IEnumerable<KeyValuePair<string, string>> GetSettings()
+        {
+            return new[] {new KeyValuePair<string, string>("Horde_Storage:RefDbImplementation", HordeStorageSettings.RefDbImplementations.Memory.ToString())};
+        }
+    }
 
     [TestClass]
     public class DynamoRefTests : RefTests
@@ -94,7 +141,7 @@ namespace Horde.Storage.FunctionalTests.Ref
 
         protected override IEnumerable<KeyValuePair<string, string>> GetSettings()
         {
-            return new[] {new KeyValuePair<string, string>("Horde.Storage:RefDbImplementation", HordeStorageSettings.RefDbImplementations.DynamoDb.ToString())};
+            return new[] {new KeyValuePair<string, string>("Horde_Storage:RefDbImplementation", HordeStorageSettings.RefDbImplementations.DynamoDb.ToString())};
         }
 
         protected override async Task SeedDb(IServiceProvider provider)
@@ -107,9 +154,9 @@ namespace Horde.Storage.FunctionalTests.Ref
             Assert.IsTrue(RefStoreIs(cacheStore, typeof(DynamoDbRefsStore)));
 
             _refStore = new DynamoDbRefsStore(dynamoSettings, provider.GetService<IAmazonDynamoDB>()!, provider.GetService<DynamoNamespaceStore>()!);
-            IBlobStore blobStore = (IBlobStore)provider.GetService(typeof(IBlobStore))!;
+            IBlobService blobService = provider.GetService<IBlobService>()!;
 
-            await SeedRefTestData(_refStore, blobStore);
+            await SeedRefTestData(_refStore, blobService);
         }
 
         protected override async Task TeardownDb(IServiceProvider provider)
@@ -135,13 +182,6 @@ namespace Horde.Storage.FunctionalTests.Ref
 
             return record;
         }
-
-        // removing batch test using dynamo as it hangs the test runner for unknown reasons when run with a lot of other tests
-        [TestMethod]
-        public new Task Batch()
-        {
-            return Task.CompletedTask;
-        }
     }
     
     public abstract class RefTests
@@ -156,6 +196,7 @@ namespace Horde.Storage.FunctionalTests.Ref
         protected static readonly BlobIdentifier TestObjectBlobHash = BlobIdentifier.FromContentHash(TestObjectHash);
         
         protected readonly NamespaceId TestNamespace = new NamespaceId("test-namespace");
+        protected readonly NamespaceId LastAccessTestNamespace = new NamespaceId("test-namespace-last-access");
 
         [TestInitialize]
         public async Task Setup()
@@ -186,33 +227,35 @@ namespace Horde.Storage.FunctionalTests.Ref
             await SeedDb(server.Services);
         }
 
-        protected async Task SeedRefTestData(IRefsStore refsStore, IBlobStore blobStore)
+        protected async Task SeedRefTestData(IRefsStore refsStore, IBlobService blobStore)
         {
             // add the objects as if they were last accessed a day ago
             DateTime lastAccessTime = DateTime.Now.AddDays(-1);
 
             BucketId bucket = new BucketId("bucket");
 
-            await refsStore.Add(new RefRecord(TestNamespace, bucket, new KeyId("testObject"), blobs: new[] { TestObjectBlobHash },
-                lastAccessTime: lastAccessTime, contentHash: TestObjectHash, metadata: null));
-            await blobStore.PutObject(TestNamespace, TestObjectData, TestObjectBlobHash);
+            foreach (NamespaceId ns in new [] {TestNamespace, LastAccessTestNamespace})
+            {
+                await refsStore.Add(new RefRecord(ns, bucket, new KeyId("testObject"), blobs: new[] { TestObjectBlobHash },
+                    lastAccessTime: lastAccessTime, contentHash: TestObjectHash, metadata: null));
+                await blobStore.PutObject(ns, TestObjectData, TestObjectBlobHash);
 
-            // a object with metadata
-            await refsStore.Add(new RefRecord(TestNamespace, bucket, new KeyId("testObjectWithMetadata"), blobs: new[] { TestObjectBlobHash },
-                lastAccessTime: lastAccessTime, contentHash: TestObjectHash, metadata: new Dictionary<string, object>() {{"Foo", "Bar"}}));
-            await blobStore.PutObject(TestNamespace, TestObjectData, TestObjectBlobHash);
+                // a object with metadata
+                await refsStore.Add(new RefRecord(ns, bucket, new KeyId("testObjectWithMetadata"), blobs: new[] { TestObjectBlobHash },
+                    lastAccessTime: lastAccessTime, contentHash: TestObjectHash, metadata: new Dictionary<string, object>() {{"Foo", "Bar"}}));
+                await blobStore.PutObject(ns, TestObjectData, TestObjectBlobHash);
 
-            // the deletableObject should be slightly newer then testObject to control sorting for last access
-            await refsStore.Add(new RefRecord(TestNamespace, bucket, new KeyId("deletableObject"),
-                blobs: new[] { TestObjectBlobHash }, contentHash: TestObjectHash,lastAccessTime: lastAccessTime.AddMinutes(2), metadata: null));
-            await blobStore.PutObject(TestNamespace, TestObjectData, TestObjectBlobHash);
+                // the deletableObject should be slightly newer then testObject to control sorting for last access
+                await refsStore.Add(new RefRecord(ns, bucket, new KeyId("deletableObject"),
+                    blobs: new[] { TestObjectBlobHash }, contentHash: TestObjectHash,lastAccessTime: lastAccessTime.AddMinutes(2), metadata: null));
+                await blobStore.PutObject(ns, TestObjectData, TestObjectBlobHash);
 
-            byte[] contents = Encoding.ASCII.GetBytes("This content will only be hashed");
-            BlobIdentifier newContentIdentifier = BlobIdentifier.FromBlob(contents);
-            await refsStore.Add(new RefRecord(TestNamespace, bucket, new KeyId("notUploadedToIo"), blobs: new[] { newContentIdentifier },
-                lastAccessTime: lastAccessTime, contentHash: newContentIdentifier, metadata: null));
-            // this object should not be uploaded to IO, and is considered recently uploaded for last access filtering
-
+                byte[] contents = Encoding.ASCII.GetBytes("This content will only be hashed");
+                BlobIdentifier newContentIdentifier = BlobIdentifier.FromBlob(contents);
+                await refsStore.Add(new RefRecord(ns, bucket, new KeyId("notUploadedToIo"), blobs: new[] { newContentIdentifier },
+                    lastAccessTime: lastAccessTime, contentHash: newContentIdentifier, metadata: null));
+                // this object should not be uploaded to IO, and is considered recently uploaded for last access filtering 
+            }
         }
 
 
@@ -300,10 +343,12 @@ namespace Horde.Storage.FunctionalTests.Ref
             ReadOnlyMemory<byte> memory = new ReadOnlyMemory<byte>(buffer);
             CompactBinaryObject o = CompactBinaryObject.Load(ref memory);
             List<CompactBinaryField> fields = o.GetFields().ToList();
-            Assert.AreEqual(4, fields.Count);
+            Assert.AreEqual(5, fields.Count);
             Assert.AreEqual($"{TestNamespace}.bucket.testObjectWithMetadata", o["name"]!.AsString());
             // we do not support serializing random dictionaries to compact binary
             Assert.IsNull(o["metadata"]);
+
+            Assert.IsNotNull(o["contentHash"]);
 
             Assert.IsNotNull(o["lastAccessTime"]);
 
@@ -593,12 +638,12 @@ namespace Horde.Storage.FunctionalTests.Ref
         {
             IRefsStore refsStore = _server!.Services.GetService<IRefsStore>()!;
 
-            OldRecord[] emptyRecords = await refsStore.GetOldRecords(TestNamespace, TimeSpan.FromDays(7)).ToArrayAsync();
+            OldRecord[] emptyRecords = await refsStore.GetOldRecords(LastAccessTestNamespace, TimeSpan.FromDays(7)).ToArrayAsync();
             // no content older then 7 days as we just insert it
             Assert.AreEqual(0, emptyRecords.Length);
 
             // check content inserted in the last hour, which should return the 3 objects set as inserted a day ago, but not the one that just got inserted
-            OldRecord[] oldRecords = await refsStore.GetOldRecords(TestNamespace, TimeSpan.FromHours(1)).ToArrayAsync();
+            OldRecord[] oldRecords = await refsStore.GetOldRecords(LastAccessTestNamespace, TimeSpan.FromHours(1)).ToArrayAsync();
 
             List<KeyId> validRefs = new List<KeyId>()
             {
@@ -609,7 +654,7 @@ namespace Horde.Storage.FunctionalTests.Ref
             };
             foreach(OldRecord record in oldRecords)
             {
-                Assert.IsTrue(validRefs.Contains(record.RefName));
+                Assert.IsTrue(validRefs.Contains(record.RefName), $"ValidRefs did not contain ref {record.RefName}");
             }
 
             // we should have our 4 pre-seeded objects
@@ -631,6 +676,9 @@ namespace Horde.Storage.FunctionalTests.Ref
         [TestMethod]
         public async Task Batch()
         {
+            if (this is DynamoRefTests)
+                Assert.Inconclusive();
+
             // we chunk at 1 kb to lets generate a 3kb string
             string content = string.Concat(Enumerable.Repeat("Duplicate string", 200));
             byte[] payload = Encoding.ASCII.GetBytes(content);

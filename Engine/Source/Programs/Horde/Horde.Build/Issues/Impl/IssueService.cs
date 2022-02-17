@@ -130,7 +130,7 @@ namespace HordeServer.Services.Impl
 	/// <summary>
 	/// Wraps funtionality for manipulating build health issues
 	/// </summary>
-	public class IssueService : ElectedBackgroundService, IIssueService
+	public sealed class IssueService : IIssueService, IHostedService, IDisposable
 	{
 		/// <summary>
 		/// Maximum number of changes to query from Perforce in one go
@@ -145,6 +145,8 @@ namespace HordeServer.Services.Impl
 		IUserCollection UserCollection;
 		IPerforceService Perforce;
 		ILogFileService LogFileService;
+		IClock Clock;
+		ITicker Ticker;
 
 		/// <summary>
 		/// 
@@ -184,8 +186,7 @@ namespace HordeServer.Services.Impl
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public IssueService(DatabaseService DatabaseService, RedisService RedisService, IIssueCollection IssueCollection, IJobCollection Jobs, IJobStepRefCollection JobStepRefs, StreamService Streams, IUserCollection UserCollection, IPerforceService Perforce, ILogFileService LogFileService, ILogger<IssueService> Logger)
-			: base(DatabaseService, ObjectId.Parse("609542152fb0794700a6c3df"), Logger)
+		public IssueService(RedisService RedisService, IIssueCollection IssueCollection, IJobCollection Jobs, IJobStepRefCollection JobStepRefs, StreamService Streams, IUserCollection UserCollection, IPerforceService Perforce, ILogFileService LogFileService, IClock Clock, ILogger<IssueService> Logger)
 		{
 			this.RedisService = RedisService;
 
@@ -203,17 +204,16 @@ namespace HordeServer.Services.Impl
 			this.UserCollection = UserCollection;
 			this.Perforce = Perforce;
 			this.LogFileService = LogFileService;
+			this.Clock = Clock;
+			this.Ticker = Clock.AddTicker(TimeSpan.FromMinutes(1.0), TickAsync, Logger);
 			this.Logger = Logger;
 
 			// Create all the issue factories
 			Type[] MatcherTypes = Assembly.GetExecutingAssembly().GetTypes().Where(x => !x.IsAbstract && typeof(IIssueHandler).IsAssignableFrom(x)).ToArray();
 			foreach (Type MatcherType in MatcherTypes)
 			{
-				IIssueHandler? Matcher = (IIssueHandler?)Activator.CreateInstance(MatcherType);
-				if (Matcher != null)
-				{
-					Matchers.Add(Matcher);
-				}
+				IIssueHandler Matcher = (IIssueHandler)Activator.CreateInstance(MatcherType)!;
+				Matchers.Add(Matcher);
 			}
 			Matchers.SortBy(x => -x.Priority);
 
@@ -221,14 +221,23 @@ namespace HordeServer.Services.Impl
 			TypeToHandler = Matchers.ToDictionary(x => x.Type, x => x, StringComparer.Ordinal);
 		}
 
+		/// <inheritdoc/>
+		public Task StartAsync(CancellationToken cancellationToken) => Ticker.StartAsync();
+
+		/// <inheritdoc/>
+		public Task StopAsync(CancellationToken cancellationToken) => Ticker.StopAsync();
+
+		/// <inheritdoc/>
+		public void Dispose() => Ticker.Dispose();
+
 		/// <summary>
 		/// Periodically update the list of cached open issues
 		/// </summary>
 		/// <param name="StoppingToken">Token to indicate that the service should stop</param>
 		/// <returns>Async task</returns>
-		protected override async Task<DateTime> TickLeaderAsync(CancellationToken StoppingToken)
+		async ValueTask TickAsync(CancellationToken StoppingToken)
 		{
-			DateTime UtcNow = DateTime.UtcNow;
+			DateTime UtcNow = Clock.UtcNow;
 
 			Dictionary<StreamId, HashSet<TemplateRefId>> NewCachedDesktopAlerts = new Dictionary<StreamId, HashSet<TemplateRefId>>();
 
@@ -263,8 +272,6 @@ namespace HordeServer.Services.Impl
 				NewCachedOpenIssues.Add(await GetIssueDetailsAsync(OpenIssue));
 			}
 			CachedIssues = NewCachedOpenIssues;
-
-			return UtcNow + TimeSpan.FromMinutes(1.0);
 		}
 
 		/// <inheritdoc/>
@@ -536,6 +543,8 @@ namespace HordeServer.Services.Impl
 			Scope.Span.SetTag("BatchId", BatchId.ToString());
 			Scope.Span.SetTag("StepId", StepId.ToString());
 
+			Logger.LogInformation("Updating issues for {JobId}:{BatchId}:{StepId}", Job.Id, BatchId, StepId);
+
 			IStream? Stream = await Streams.GetStreamAsync(Job.StreamId);
 			if (Stream == null)
 			{
@@ -670,6 +679,17 @@ namespace HordeServer.Services.Impl
 						FingerprintToEventGroup.Add(Fingerprint, EventGroup);
 					}
 					EventGroup.Events.Add(new NewEvent(StepEvent, StepEventData));
+				}
+			}
+			
+			List<NewIssueFingerprint> SystemicFingerprints = FingerprintToEventGroup.Keys.Where(x => x.Type == "Systemic").ToList();
+
+			// Only generate user issues for systemic issues where there are no other failures, otherwise this leads to many false positives (Experimental)
+			if ((SystemicFingerprints.Count != 0) && (SystemicFingerprints.Count != FingerprintToEventGroup.Values.Count))
+			{
+				for (int i = 0; i < SystemicFingerprints.Count; i++)
+				{
+					FingerprintToEventGroup.Remove(SystemicFingerprints[i]);
 				}
 			}
 
@@ -1034,7 +1054,7 @@ namespace HordeServer.Services.Impl
 		async ValueTask<bool> ContainsFixChange(StreamId StreamId, int FixChange, Dictionary<(StreamId, int), bool> CachedContainsFixChange)
 		{
 			bool bContainsFixChange;
-			if (!CachedContainsFixChange.TryGetValue((StreamId, FixChange), out bContainsFixChange))
+			if (!CachedContainsFixChange.TryGetValue((StreamId, FixChange), out bContainsFixChange) && FixChange > 0)
 			{
 				IStream? Stream = await Streams.GetCachedStream(StreamId);
 				if (Stream != null)

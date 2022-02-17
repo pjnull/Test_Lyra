@@ -21,6 +21,8 @@ rem ## Change the CWD to /Engine/Source.  We always need to run UnrealBuildTool 
 pushd "%~dp0..\..\Source"
 if not exist ..\Build\BatchFiles\Clean.bat goto Error_BatchFileInWrongLocation
 
+set UBTPath="..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll"
+
 rem ## If this is an installed build, we don't need to rebuild UBT. Go straight to cleaning.
 if exist ..\Build\InstalledBuild.txt goto ReadyToClean
 
@@ -32,7 +34,6 @@ if errorlevel 1 goto Error_NoVisualStudioEnvironment
 rem ## Compile UBT if the project file exists
 
 set ProjectFile="Programs\UnrealBuildTool\UnrealBuildTool.csproj"
-set UBTPath="..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll"
 if not exist %ProjectFile% goto NoProjectFile
 dotnet build Programs\UnrealBuildTool\UnrealBuildTool.csproj -c Development -v quiet
 if errorlevel 1 goto Error_UBTCompileFailed

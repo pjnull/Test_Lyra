@@ -12,7 +12,7 @@ using System.Xml;
 using EpicGames.Core;
 using OpenTracing;
 
-namespace AutomationTool
+namespace AutomationTool.Tasks
 {
 	/// <summary>
 	/// Parameters for a compile task
@@ -113,7 +113,7 @@ namespace AutomationTool
 		/// </summary>
 		/// <param name="Task">Task to add</param>
 		/// <returns>True if the task could be added, false otherwise</returns>
-		public bool Add(CustomTask Task)
+		public bool Add(BgTaskImpl Task)
 		{
 			CompileTask CompileTask = Task as CompileTask;
 			if(CompileTask == null)
@@ -154,7 +154,7 @@ namespace AutomationTool
 		/// <param name="BuildProducts">Set of build products produced by this node.</param>
 		/// <param name="TagNameToFileSet">Mapping from tag names to the set of files they include</param>
 		/// <returns>Whether the task succeeded or not. Exiting with an exception will be caught and treated as a failure.</returns>
-		public void Execute(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
+		public Task ExecuteAsync(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
 		{
 			// Create the agenda
 			UnrealBuild.BuildAgenda Agenda = new UnrealBuild.BuildAgenda();
@@ -187,6 +187,7 @@ namespace AutomationTool
 
 			// Add everything to the list of build products
 			BuildProducts.UnionWith(Builder.BuildProductFiles.Select(x => new FileReference(x)));
+			return Task.CompletedTask;
 		}
 	}
 
@@ -194,7 +195,7 @@ namespace AutomationTool
 	/// Compiles a target with UnrealBuildTool.
 	/// </summary>
 	[TaskElement("Compile", typeof(CompileTaskParameters))]
-	public class CompileTask : CustomTask
+	public class CompileTask : BgTaskImpl
 	{
 		/// <summary>
 		/// Parameters for this task
@@ -249,13 +250,13 @@ namespace AutomationTool
 		/// <param name="Job">Information about the current job</param>
 		/// <param name="BuildProducts">Set of build products produced by this node.</param>
 		/// <param name="TagNameToFileSet">Mapping from tag names to the set of files they include</param>
-		public override void Execute(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
+		public override Task ExecuteAsync(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
 		{
 			//
 			// Don't do any logic here. You have to do it in the ctor or a getter
 			//  otherwise you break the ParallelExecutor pathway, which doesn't call this function!
 			//
-			GetExecutor().Execute(Job, BuildProducts, TagNameToFileSet);
+			return GetExecutor().ExecuteAsync(Job, BuildProducts, TagNameToFileSet);
 		}
 
 		/// <summary>
@@ -329,6 +330,35 @@ namespace AutomationTool
 		public override IEnumerable<string> FindProducedTagNames()
 		{
 			return FindTagNamesFromList(Parameters.Tag);
+		}
+	}
+
+	public static partial class StandardTasks
+	{
+		/// <summary>
+		/// Compiles a target
+		/// </summary>
+		/// <param name="Target">The target to compile</param>
+		/// <param name="Configuration">The configuration to compile</param>
+		/// <param name="Platform">The platform to compile for</param>
+		/// <param name="Project">The project to compile with</param>
+		/// <param name="Arguments">Additional arguments for UnrealBuildTool</param>
+		/// <param name="AllowXGE">Whether to allow using XGE for compilation</param>
+		/// <param name="AllowParallelExecutor">Whether to allow using the parallel executor for this compile</param>
+		/// <param name="Clean">Whether to allow cleaning this target. If unspecified, targets are cleaned if the -Clean argument is passed on the command line</param>
+		/// <returns>Build products from the compile</returns>
+		public static async Task<FileSet> CompileAsync(string Target, UnrealTargetPlatform Platform, UnrealTargetConfiguration Configuration, FileReference Project = null, string Arguments = null, bool AllowXGE = true, bool AllowParallelExecutor = true, bool? Clean = null)
+		{
+			CompileTaskParameters Parameters = new CompileTaskParameters();
+			Parameters.Target = Target;
+			Parameters.Platform = Platform;
+			Parameters.Configuration = Configuration;
+			Parameters.Project = Project?.FullName;
+			Parameters.Arguments = Arguments;
+			Parameters.AllowXGE = AllowXGE;
+			Parameters.AllowParallelExecutor = AllowParallelExecutor;
+			Parameters.Clean = Clean;
+			return await ExecuteAsync(new CompileTask(Parameters));
 		}
 	}
 }

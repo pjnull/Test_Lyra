@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved. 
 #include "Texture/InterchangeJPGTranslator.h"
 
+#include "Algo/Find.h"
+#include "Containers/StaticArray.h"
 #include "Engine/Texture.h"
 #include "Engine/Texture2D.h"
 #include "IImageWrapper.h"
@@ -15,11 +17,15 @@
 #include "Nodes/InterchangeBaseNodeContainer.h"
 #include "Texture/TextureTranslatorUtilities.h"
 
-bool UInterchangeJPGTranslator::CanImportSourceData(const UInterchangeSourceData* InSourceData) const
+TArray<FString> UInterchangeJPGTranslator::GetSupportedFormats() const
 {
-	FString Extension = FPaths::GetExtension(InSourceData->GetFilename());
-	FString JPGExtension = (TEXT("jpg;Texture"));
-	return JPGExtension.StartsWith(Extension);
+	TArray<FString> Formats;
+	Formats.Reserve(2);
+
+	Formats.Add(TEXT("jpg;JPEG image"));
+	Formats.Add(TEXT("jpeg;JPEG image"));
+
+	return Formats;
 }
 
 bool UInterchangeJPGTranslator::Translate(UInterchangeBaseNodeContainer& BaseNodeContainer) const

@@ -5150,6 +5150,23 @@ bool FHeaderParser::CheckForSerialize(FUnrealStructDefinitionInfo& StructDef, co
 	
 	return false;
 }
+static const TArray<FStringView> GSkipDeclarationWarningStrings =
+{
+	TEXT("GENERATED_BODY"),
+	TEXT("GENERATED_IINTERFACE_BODY"),
+	TEXT("GENERATED_UCLASS_BODY"),
+	TEXT("GENERATED_UINTERFACE_BODY"),
+	TEXT("GENERATED_USTRUCT_BODY"),
+	// Leaving these disabled ATM since they can exist in the code without causing compile issues
+	//TEXT("RIGVM_METHOD"),
+	//TEXT("UCLASS"),
+	//TEXT("UDELEGATE"),
+	//TEXT("UENUM"),
+	//TEXT("UFUNCTION"),
+	//TEXT("UINTERFACE"),
+	//TEXT("UPROPERTY"),
+	//TEXT("USTRUCT"),
+};
 
 bool FHeaderParser::SkipDeclaration(FToken& Token)
 {
@@ -5181,6 +5198,19 @@ bool FHeaderParser::SkipDeclaration(FToken& Token)
 		{
 			bEndOfDeclarationFound = true;
 			break;
+		}
+
+		if (Token.IsIdentifier())
+		{
+			// Use a trivial prefilter to avoid doing the search on things that aren't UE keywords we care about
+			if (Token.Value[0] == 'G' || Token.Value[0] == 'R' || Token.Value[0] == 'U')
+			{
+				if (Algo::BinarySearch(GSkipDeclarationWarningStrings, Token.Value, 
+					[](const FStringView& Lhs, const FStringView& Rhs) { return Lhs.Compare(Rhs, ESearchCase::CaseSensitive) < 0; }) >= 0)
+				{
+					LogWarning(FString::Printf(TEXT("The identifier \'%s\' was detected in a block being skipped. Was this intentional?"), *FString(Token.Value)));
+				}
+			}
 		}
 
 		if (!bMacroDeclaration && Token.IsIdentifier(TEXT("PURE_VIRTUAL"), ESearchCase::CaseSensitive) && NestedScopes == 0)
@@ -5762,33 +5792,16 @@ const FName FHeaderParser::NAME_OutputText(TEXT("Output"));
 const FName FHeaderParser::NAME_ConstantText(TEXT("Constant"));
 const FName FHeaderParser::NAME_VisibleText(TEXT("Visible"));
 
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-
-const FName FHeaderParser::NAME_ArraySizeText(TEXT("ArraySize"));
-
-#endif
-
 const FName FHeaderParser::NAME_SingletonText(TEXT("Singleton"));
 
 const TCHAR* FHeaderParser::TArrayText = TEXT("TArray");
 const TCHAR* FHeaderParser::TEnumAsByteText = TEXT("TEnumAsByte");
 const TCHAR* FHeaderParser::GetRefText = TEXT("GetRef");
 
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-
-const TCHAR* FHeaderParser::FFixedArrayText = TEXT("FRigVMFixedArray");
-const TCHAR* FHeaderParser::FDynamicArrayText = TEXT("FRigVMDynamicArray");
-const TCHAR* FHeaderParser::GetFixedArrayText = TEXT("GetFixedArray");
-const TCHAR* FHeaderParser::GetDynamicArrayText = TEXT("GetDynamicArray");
-
-#else
-
 const TCHAR* FHeaderParser::FTArrayText = TEXT("TArray");
 const TCHAR* FHeaderParser::FTArrayViewText = TEXT("TArrayView");
 const TCHAR* FHeaderParser::GetArrayText = TEXT("GetArray");
 const TCHAR* FHeaderParser::GetArrayViewText = TEXT("GetArrayView");
-
-#endif
 
 void FHeaderParser::ParseRigVMMethodParameters(FUnrealStructDefinitionInfo& StructDef)
 {
@@ -5816,9 +5829,6 @@ void FHeaderParser::ParseRigVMMethodParameters(FUnrealStructDefinitionInfo& Stru
 		Parameter.bConstant = PropertyDef->HasMetaData(NAME_ConstantText);
 		Parameter.bInput = PropertyDef->HasMetaData(NAME_InputText);
 		Parameter.bOutput = PropertyDef->HasMetaData(NAME_OutputText);
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-		Parameter.ArraySize = PropertyDef->GetMetaData(NAME_ArraySizeText);
-#endif
 		Parameter.Getter = GetRefText;
 		Parameter.bEditorOnly = PropertyDef->IsEditorOnlyProperty();
 		Parameter.bSingleton = PropertyDef->HasMetaData(NAME_SingletonText);
@@ -5850,31 +5860,12 @@ void FHeaderParser::ParseRigVMMethodParameters(FUnrealStructDefinitionInfo& Stru
 		{
 			ExtendedCPPType = FString::Printf(TEXT("<%s>"), *ExtendedCPPType.LeftChop(1).RightChop(1));
 			
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-
-			Parameter.CastName = FString::Printf(TEXT("%s_%d_Array"), *Parameter.Name, StructRigVMInfo.Members.Num());
-
-			if (Parameter.IsConst() || !Parameter.ArraySize.IsEmpty())
-			{
-				Parameter.CastType = FString::Printf(TEXT("%s%s"), FFixedArrayText, *ExtendedCPPType);
-				Parameter.Getter = GetFixedArrayText;
-			}
-			else
-			{
-				Parameter.CastType = FString::Printf(TEXT("%s%s"), FDynamicArrayText, *ExtendedCPPType);
-				Parameter.Getter = GetDynamicArrayText;
-			}				
-
-#else
-
 			if(Parameter.IsConst())
 			{
 				ExtendedCPPType = FString::Printf(TEXT("<const %s>"), *ExtendedCPPType.LeftChop(1).RightChop(1));
 				Parameter.CastName = FString::Printf(TEXT("%s_%d_Array"), *Parameter.Name, StructRigVMInfo.Members.Num());
 				Parameter.CastType = FString::Printf(TEXT("%s%s"), FTArrayViewText, *ExtendedCPPType);
 			}
-
-#endif
 		}
 
 		StructRigVMInfo.Members.Add(MoveTemp(Parameter));

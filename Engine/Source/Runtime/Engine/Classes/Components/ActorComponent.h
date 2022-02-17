@@ -298,6 +298,10 @@ private:
 	uint8 bMarkedForPreEndOfFrameSync : 1;
 
 public:
+
+	/** Whether to use use the async physics tick with this component. Requires async physics to be enabled (see project settings) */
+	uint8 bAsyncPhysicsTickEnabled : 1;
+
 	/** Describes how a component instance will be created */
 	UPROPERTY()
 	EComponentCreationMethod CreationMethod;
@@ -706,6 +710,16 @@ public:
 	 * @param ThisTickFunction - Internal tick function struct that caused this to run
 	 */
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction);
+
+	/**
+	 * Override this function to implement custom logic to be executed every async physics step.
+	 * Only executes if the component is registered, and also bAsyncPhysicsTick must be set to true.
+	 * Requires async physics to be enabled (see physics project settings)
+	 *	
+	 * @param DeltaTime - The async physics time associated with each step (see project settings)
+	 * @param SimTime - This is the total sim time since the sim began, it is an integer multiple of DeltaTime
+	 */
+	virtual void AsyncPhysicsTickComponent(float DeltaTime, float SimTime) { ReceiveAsyncPhysicsTick(DeltaTime, SimTime); }
 	
 	/** 
 	 * Set up a tick function for a component in the standard way. 
@@ -1021,6 +1035,10 @@ public:
 	/** Event called every frame if tick is enabled */
 	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName = "Tick"))
 	void ReceiveTick(float DeltaSeconds);
+
+	/** Event called every async physics tick if bAsyncPhysicsTickEnabled is true and async physics is enabled (see physics project settings)*/
+	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "Async Physics Tick"))
+	void ReceiveAsyncPhysicsTick(float DeltaSeconds, float SimSeconds);
 	
 	/** 
 	 *  Called by owner actor on position shifting

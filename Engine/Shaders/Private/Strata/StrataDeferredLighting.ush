@@ -12,6 +12,20 @@
 #define STRATA_SINGLEPATH 0
 #endif
 
+float4 StrataReadPrecomputedShadowFactors(FStrataPixelHeader StrataPixelHeader, int2 PixelPos, Texture2D PrecomputedShadowTexture)
+{
+	if (HasPrecShadowMask(StrataPixelHeader))
+	{
+	#if ALLOW_STATIC_LIGHTING
+		float4 GBufferE = PrecomputedShadowTexture.Load(int3(PixelPos, 0));
+	#else
+		float4 GBufferE = 1;
+	#endif
+		return GBufferE;
+	}
+	return HasZeroPrecShadowMask(StrataPixelHeader) ? 0.0f : 1.0f;
+}
+
 // Analytical lighting evaluation for strata material.
 // Unpack BSDF on-the-fly
 float4 StrataDeferredLighting(
@@ -21,13 +35,14 @@ float4 StrataDeferredLighting(
 	float3 ToLight,
 	float LightMask,
 	FShadowTerms ShadowTerms,
-	FRectTexture RectTexture,
 	FStrataMaterialContainer MaterialBuffer,
 	FStrataAddressing StrataAddressing,
 	FStrataPixelHeader StrataPixelHeader)
 {
 	FLightAccumulator Out = (FLightAccumulator)0;
 	const bool bForceFullyRough = false;
+
+	FRectTexture RectTexture = InitRectTexture(LightData);
 
 #if STRATA_FASTPATH == 0 && STRATA_SINGLEPATH == 0
 	LOOP
@@ -71,7 +86,7 @@ float4 StrataDeferredLighting(
 		float3 SpecularLuminance = BSDFEvaluate.IntegratedSpecularValue;
 
 		const bool bNeedsSeparateSubsurfaceLightAccumulation = BSDFEvaluate.bSubsurface;
-		const float3 CommonMultiplier = LightData.Color * LightMask * BSDF.FinalWeight;
+		const float3 CommonMultiplier = LightData.Color * LightMask * BSDF.LuminanceWeight;
 		LightAccumulator_AddSplit(Out, DiffuseLuminance, SpecularLuminance, DiffuseLuminance, CommonMultiplier, bNeedsSeparateSubsurfaceLightAccumulation);
 	}
 

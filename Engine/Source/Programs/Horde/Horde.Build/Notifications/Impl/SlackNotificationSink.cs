@@ -278,6 +278,40 @@ namespace HordeServer.Notifications.Impl
 		}
 
 		#endregion
+		
+		/// <inheritdoc/>
+		public async Task NotifyJobScheduledAsync(List<JobScheduledNotification> Notifications)
+		{
+			if (Settings.JobNotificationChannel != null)
+			{
+				string JobIds = string.Join(", ", Notifications.Select(x => x.JobId));
+				Logger.LogInformation("Sending Slack notification for scheduled job IDs {JobIds} to channel {SlackChannel}", JobIds, Settings.JobNotificationChannel);
+				await SendJobScheduledOnEmptyAutoScaledPoolMessageAsync($"#{Settings.JobNotificationChannel}", Notifications);
+			}
+		}
+		
+		private async Task SendJobScheduledOnEmptyAutoScaledPoolMessageAsync(string Recipient, List<JobScheduledNotification> Notifications)
+		{
+			string JobIds = string.Join(", ", Notifications.Select(x => x.JobId));
+				
+			StringBuilder Sb = new();
+			foreach (JobScheduledNotification Notification in Notifications)
+			{
+				string JobUrl = Settings.DashboardUrl + "/job/" + Notification.JobId;
+				Sb.AppendLine($"Job `{Notification.JobName}` with ID <{JobUrl}|{Notification.JobId}> in pool `{Notification.PoolName}`");
+			}
+			
+			Color OutcomeColor = BlockKitAttachmentColors.Warning;
+			BlockKitAttachment Attachment = new BlockKitAttachment();
+			Attachment.Color = OutcomeColor;
+			Attachment.FallbackText = $"Job(s) scheduled in an auto-scaled pool with no agents online. Job IDs {JobIds}";
+
+			Attachment.Blocks.Add(new HeaderBlock($"Jobs scheduled in empty pool", false, true));
+			Attachment.Blocks.Add(new SectionBlock($"One or more jobs were scheduled in an auto-scaled pool but with no current agents online."));
+			Attachment.Blocks.Add(new SectionBlock(Sb.ToString()));
+			
+			await SendMessageAsync(Recipient, Attachments: new[] { Attachment });
+		}
 
 		#region Job Complete
 
@@ -614,12 +648,6 @@ namespace HordeServer.Notifications.Impl
 
 		async Task NotifyIssueUpdatedAsync(IUser User, IIssue Issue, IIssueDetails Details)
 		{
-			IUserSettings UserSettings = await UserCollection.GetSettingsAsync(User.Id);
-			if (!UserSettings.EnableIssueNotifications)
-			{
-				Logger.LogInformation("Issue notifications are disabled for user {UserId} ({UserName})", User.Id, User.Name);
-				return;
-			}
 
 			string? SlackUserId = await GetSlackUserId(User);
 			if (SlackUserId == null)
@@ -985,61 +1013,85 @@ namespace HordeServer.Notifications.Impl
 		#region Device notifications
 
 		/// <inheritdoc/>
-		public async Task NotifyDeviceServiceAsync(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null)
+		public async Task NotifyDeviceServiceAsync(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null, IUser? User = null)
 		{
-			Logger.LogDebug("Sending device service failure notification for {DeviceName} in pool {PoolName}", Device?.Name, Pool?.Name);
+			string Recipient = $"#{Settings.DeviceServiceNotificationChannel}";
+
+			if (User != null)
+			{
+				string? SlackRecipient = await GetSlackUserId(User);
+
+				if (SlackRecipient == null)
+				{
+					Logger.LogError("NotifyDeviceServiceAsync - Unable to send user slack notification, user {UserId} slack user id not found", User.Id);
+					return;
+				}
+
+				Recipient = SlackRecipient;
+			}
+
+			Logger.LogDebug("Sending device service notification to {Recipient}", Recipient);
+
 			if (Settings.DeviceServiceNotificationChannel != null)
 			{
-				await SendDeviceServiceMessage($"#{Settings.DeviceServiceNotificationChannel}", Message, Device, Pool, Stream, Job, Step, Node);
+				await SendDeviceServiceMessage(Recipient, Message, Device, Pool, Stream, Job, Step, Node, User);
 			}
 		}
 
 		/// <summary>
-		/// Creates a Slack message about a completed step job.
+		/// Creates a Slack message for a device service notification
 		/// </summary>
 		/// <param name="Recipient"></param>
-        /// <param name="Message"></param>
-        /// <param name="Device"></param>
-        /// <param name="Pool"></param>
+		/// <param name="Message"></param>
+		/// <param name="Device"></param>
+		/// <param name="Pool"></param>
 		/// <param name="Stream"></param>
 		/// <param name="Job">The job that contains the step that completed.</param>
 		/// <param name="Step">The job step that completed.</param>
 		/// <param name="Node">The node for the job step.</param>
-		private Task SendDeviceServiceMessage(string Recipient, string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null)
+		/// <param name="User">The user to notify.</param>
+		private Task SendDeviceServiceMessage(string Recipient, string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null, IUser? User = null)
 		{
-			BlockKitAttachment Attachment = new BlockKitAttachment();
+
+			if (User != null)
+			{
+				return SendMessageAsync(Recipient, Message);
+			}
 
 			// truncate message to avoid slack error on message length
 			if (Message.Length > 150)
 			{
 				Message = Message.Substring(0, 146) + "...";
 			}
-            
-            Attachment.FallbackText = $"{Message}";
+
+			BlockKitAttachment Attachment = new BlockKitAttachment();
+							
+			Attachment.FallbackText = $"{Message}";
 
 			if (Device != null && Pool != null)
 			{
-                Attachment.FallbackText += $" - Device: {Device.Name} Pool: {Pool.Name}";
-            }
-
+				Attachment.FallbackText += $" - Device: {Device.Name} Pool: {Pool.Name}";
+			}
+				
 			Attachment.Blocks.Add(new HeaderBlock($"{Message}", false, false));
 
 			if (Stream != null && Job != null && Step != null && Node != null)
 			{
 				Uri JobStepLink = new Uri($"{Settings.DashboardUrl}job/{Job.Id}?step={Step.Id}");
 				Uri JobStepLogLink = new Uri($"{Settings.DashboardUrl}log/{Step.LogId}");
-				
-				Attachment.FallbackText += $" - {Stream.Name} - {GetJobChangeText(Job)} - {Job.Name} - {Node.Name}";				
+
+				Attachment.FallbackText += $" - {Stream.Name} - {GetJobChangeText(Job)} - {Job.Name} - {Node.Name}";
 				Attachment.Blocks.Add(new SectionBlock($"*<{JobStepLink}|{Stream.Name} - {GetJobChangeText(Job)} - {Job.Name} - {Node.Name}>*"));
 				Attachment.Blocks.Add(new SectionBlock($"<{JobStepLogLink}|View Job Step Log>"));
 			}
 			else
-			{				
-				Attachment.FallbackText += " - No job information (Gauntlet might need to be updated in stream)";				
+			{
+				Attachment.FallbackText += " - No job information (Gauntlet might need to be updated in stream)";
 				Attachment.Blocks.Add(new SectionBlock("*No job information (Gauntlet might need to be updated in stream)*"));
 			}
 
 			return SendMessageAsync(Recipient, Attachments: new[] { Attachment });
+
 		}
 		
 		#endregion
@@ -1290,7 +1342,7 @@ namespace HordeServer.Notifications.Impl
 			using FormUrlEncodedContent Content = new FormUrlEncodedContent(Array.Empty<KeyValuePair<string?, string?>>());
 			HttpResponseMessage Response = await Client.PostAsync(new Uri("https://slack.com/api/apps.connections.open"), Content, StoppingToken);
 
-			byte[] ResponseData = await Response.Content.ReadAsByteArrayAsync();
+			byte[] ResponseData = await Response.Content.ReadAsByteArrayAsync(StoppingToken);
 
 			SocketResponse SocketResponse = JsonSerializer.Deserialize<SocketResponse>(ResponseData)!;
 			if (!SocketResponse.Ok)

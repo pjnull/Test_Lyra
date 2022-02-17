@@ -185,28 +185,6 @@ namespace HordeServer.Services
 				Singletons = GetCollection<BsonDocument>("Singletons");
 
 				Globals Globals = GetGlobalsAsync().Result;
-				if (Globals.ForceReset)
-				{
-					Logger.LogInformation("Performing DB reset...");
-
-					// Drop all the collections
-					List<string> CollectionNames = Database.ListCollectionNames().ToList();
-					foreach (string CollectionName in CollectionNames)
-					{
-						Logger.LogInformation("Dropping {CollectionName}", CollectionName);
-						Database.DropCollection(CollectionName);
-					}
-
-					// Create the new singletons collection
-					Singletons = GetCollection<BsonDocument>("Singletons");
-
-					// Create the new globals object
-					Globals NewGlobals = new Globals();
-					NewGlobals.JwtSigningKey = Globals.JwtSigningKey; // Ensure agents can still register
-					Singletons.InsertOne(NewGlobals.ToBsonDocument());
-					Globals = NewGlobals;
-				}
-
 				while (Globals.JwtSigningKey == null)
 				{
 					Globals.RotateSigningKey();
@@ -256,7 +234,7 @@ namespace HordeServer.Services
 			}
 			if(MongoProcessGroup != null)
 			{
-				MongoProcessGroup?.Dispose();
+				MongoProcessGroup.Dispose();
 				MongoProcessGroup = null;
 			}
 		}
@@ -367,11 +345,11 @@ namespace HordeServer.Services
 							ChannelLogger = LoggerFactory.CreateLogger($"MongoDB.{Match.Groups[2].Value}");
 							ChannelLoggers.Add(Match.Groups[2].Value, ChannelLogger);
 						}
-						ChannelLogger.Log(ParseMongoLogLevel(Match.Groups[1].Value), Match.Groups[3].Value.TrimEnd());
+						ChannelLogger.Log(ParseMongoLogLevel(Match.Groups[1].Value), "{Message}", Match.Groups[3].Value.TrimEnd());
 					}
 					else
 					{
-						MongoLogger.Log(LogLevel.Information, Line);
+						MongoLogger.Log(LogLevel.Information, "{Message}", Line);
 					}
 				}
 			}
@@ -412,7 +390,9 @@ namespace HordeServer.Services
 				}
 			}
 
+#pragma warning disable CA2254 // Template should be a static expression
 			Logger.LogTrace($"MongoDB: {String.Join(", ", Params)}", Values.ToArray());
+#pragma warning restore CA2254 // Template should be a static expression
 		}
 
 		/// <summary>

@@ -9,35 +9,41 @@ using System.Linq;
 using System.Net.Mime;
 using System.Threading.Tasks;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Horde.Storage.Implementation;
 using Jupiter;
+using Jupiter.Common.Implementation;
 using Jupiter.Implementation;
+using Jupiter.Utils;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 namespace Horde.Storage.Controllers
 {
+    using BlobNotFoundException = Horde.Storage.Implementation.BlobNotFoundException;
+
     [ApiController]
     [Route("api/v1/compressed-blobs")]
     public class CompressedBlobController : ControllerBase
     {
-        private readonly IBlobStore _storage;
+        private readonly IBlobService _storage;
         private readonly IContentIdStore _contentIdStore;
         private readonly IDiagnosticContext _diagnosticContext;
         private readonly IAuthorizationService _authorizationService;
         private readonly CompressedBufferUtils _compressedBufferUtils;
+        private readonly BufferedPayloadFactory _bufferedPayloadFactory;
 
         private readonly ILogger _logger = Log.ForContext<CompressedBlobController>();
 
-        public CompressedBlobController(IBlobStore storage, IContentIdStore contentIdStore, IDiagnosticContext diagnosticContext, IAuthorizationService authorizationService, CompressedBufferUtils compressedBufferUtils)
+        public CompressedBlobController(IBlobService storage, IContentIdStore contentIdStore, IDiagnosticContext diagnosticContext, IAuthorizationService authorizationService, CompressedBufferUtils compressedBufferUtils, BufferedPayloadFactory bufferedPayloadFactory)
         {
             _storage = storage;
             _contentIdStore = contentIdStore;
             _diagnosticContext = diagnosticContext;
             _authorizationService = authorizationService;
             _compressedBufferUtils = compressedBufferUtils;
+            _bufferedPayloadFactory = bufferedPayloadFactory;
         }
 
 
@@ -45,11 +51,11 @@ namespace Horde.Storage.Controllers
         [Authorize("Storage.read")]
         [ProducesResponseType(type: typeof(byte[]), 200)]
         [ProducesResponseType(type: typeof(ValidationProblemDetails), 400)]
-        [Produces(MediaTypeNames.Application.Json, CustomMediaTypeNames.UnrealCompactBinary, CustomMediaTypeNames.UnrealCompressedBuffer)]
+        [Produces(CustomMediaTypeNames.UnrealCompressedBuffer)]
 
         public async Task<IActionResult> Get(
             [Required] NamespaceId ns,
-            [Required] BlobIdentifier id)
+            [Required] ContentId id)
         {
             AuthorizationResult authorizationResult = await _authorizationService.AuthorizeAsync(User, ns, NamespaceAccessRequirement.Name);
 
@@ -79,7 +85,7 @@ namespace Horde.Storage.Controllers
         [ProducesDefaultResponseType]
         public async Task<IActionResult> Head(
             [Required] NamespaceId ns,
-            [Required] BlobIdentifier id)
+            [Required] ContentId id)
         {
             AuthorizationResult authorizationResult = await _authorizationService.AuthorizeAsync(User, ns, NamespaceAccessRequirement.Name);
 
@@ -88,15 +94,15 @@ namespace Horde.Storage.Controllers
                 return Forbid();
             }
             BlobIdentifier[]? chunks = await _contentIdStore.Resolve(ns, id);
-            if (chunks == null)
+            if (chunks == null || chunks.Length == 0)
             {
-                return NotFound(new ValidationProblemDetails { Title = $"Content-id {id} not found"});
+                return NotFound();
             }
 
             Task<bool>[] tasks = new Task<bool>[chunks.Length];
             for (int i = 0; i < chunks.Length; i++)
             {
-                tasks[i] = _storage.Exists(ns, id);
+                tasks[i] = _storage.Exists(ns, chunks[i]);
             }
 
             await Task.WhenAll(tasks);
@@ -105,7 +111,7 @@ namespace Horde.Storage.Controllers
 
             if (!exists)
             {
-                return NotFound(new ValidationProblemDetails { Title = $"Object {id} not found"});
+                return NotFound();
             }
 
             return Ok();
@@ -116,7 +122,7 @@ namespace Horde.Storage.Controllers
         [ProducesDefaultResponseType]
         public async Task<IActionResult> ExistsMultiple(
             [Required] NamespaceId ns,
-            [Required] [FromQuery] List<BlobIdentifier> id)
+            [Required] [FromQuery] List<ContentId> id)
         {
             AuthorizationResult authorizationResult = await _authorizationService.AuthorizeAsync(User, ns, NamespaceAccessRequirement.Name);
 
@@ -125,8 +131,8 @@ namespace Horde.Storage.Controllers
                 return Forbid();
             }
 
-            ConcurrentBag<BlobIdentifier> missingBlobs = new ConcurrentBag<BlobIdentifier>();
-            ConcurrentBag<BlobIdentifier> invalidContentIds = new ConcurrentBag<BlobIdentifier>();
+            ConcurrentBag<ContentId> partialContentIds = new ConcurrentBag<ContentId>();
+            ConcurrentBag<ContentId> invalidContentIds = new ConcurrentBag<ContentId>();
 
             IEnumerable<Task> tasks = id.Select(async blob =>
             {
@@ -142,7 +148,8 @@ namespace Horde.Storage.Controllers
                 {
                     if (!await _storage.Exists(ns, chunk))
                     {
-                        missingBlobs.Add(blob);
+                        partialContentIds.Add(blob);
+                        break;
                     }
                 }
             });
@@ -151,18 +158,25 @@ namespace Horde.Storage.Controllers
             if (invalidContentIds.Count != 0)
                 return NotFound(new ValidationProblemDetails { Title = $"Missing content ids {string.Join(" ,", invalidContentIds)}"});
 
-            return Ok(new HeadMultipleResponse { Needs = missingBlobs.ToArray()});
+            return Ok(new ExistCheckMultipleContentIdResponse { Needs = partialContentIds.ToArray()});
         }
 
-        private async Task<BlobContents> GetImpl(NamespaceId ns, BlobIdentifier contentId)
+        private async Task<BlobContents> GetImpl(NamespaceId ns, ContentId contentId)
         {
             BlobIdentifier[]? chunks = await _contentIdStore.Resolve(ns, contentId);
-            if (chunks == null)
+            if (chunks == null || chunks.Length == 0)
             {
                 throw new ContentIdResolveException(contentId);
             }
 
-            using Scope _ = Tracer.Instance.StartActive("blob.combine");
+            // single chunk, we just return that chunk
+            if (chunks.Length == 1)
+            {
+                return await _storage.GetObject(ns, chunks[0]);
+            }
+
+            // chunked content, combine the chunks into a single stream
+            using IScope _ = Tracer.Instance.StartActive("blob.combine");
             Task<BlobContents>[] tasks = new Task<BlobContents>[chunks.Length];
             for (int i = 0; i < chunks.Length; i++)
             {
@@ -188,7 +202,7 @@ namespace Horde.Storage.Controllers
         [RequiredContentType(CustomMediaTypeNames.UnrealCompressedBuffer)]
         public async Task<IActionResult> Put(
             [Required] NamespaceId ns,
-            [Required] BlobIdentifier id)
+            [Required] ContentId id)
         {
             AuthorizationResult authorizationResult = await _authorizationService.AuthorizeAsync(User, ns, NamespaceAccessRequirement.Name);
 
@@ -197,56 +211,54 @@ namespace Horde.Storage.Controllers
                 return Forbid();
             }
 
-            byte[] blob;
-            try
-            {
-                blob = await RequestUtil.ReadRawBody(Request);
-            }
-            catch (BadHttpRequestException e)
-            {
-                const string msg = "Partial content transfer when reading request body.";
-                _logger.Warning(e, msg);
-                return BadRequest(msg);
-            }
             _diagnosticContext.Set("Content-Length", Request.ContentLength ?? -1);
 
-            BlobIdentifier identifier = await PutImpl(ns, id, blob);
-            return Ok(new
+            using IBufferedPayload payload = await _bufferedPayloadFactory.CreateFromRequest(Request);
+
+            try
             {
-                Identifier = identifier.ToString()
-            });
+                ContentId identifier = await PutImpl(ns, id, payload);
+
+                return Ok(new
+                {
+                    Identifier = identifier.ToString()
+                });
+            }
+            catch (HashMismatchException e)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = $"Incorrect hash, got hash \"{e.SuppliedHash}\" but hash of content was determined to be \"{e.ContentHash}\""
+                });
+            }
         }
 
-        private async Task<BlobIdentifier> PutImpl(NamespaceId ns, BlobIdentifier? id, byte[] content)
+        private async Task<ContentId> PutImpl(NamespaceId ns, ContentId id, IBufferedPayload payload)
         {
-            BlobIdentifier identifier;
-            {
-                using Scope _ = Tracer.Instance.StartActive("web.hash");
-                identifier = BlobIdentifier.FromBlob(content);
-            }
             // decompress the content and generate a identifier from it to verify the identifier we got
-            byte[] decompressedContent = _compressedBufferUtils.DecompressContent(content);
+            await using Stream decompressStream = payload.GetStream();
+            // TODO: we should add a overload for decompress content that can work on streams, otherwise we are still limited to 2GB compressed blobs
+            byte[] decompressedContent = _compressedBufferUtils.DecompressContent(await decompressStream.ToByteArray());
 
-            BlobIdentifier identifierDecompressedPayload;
+            MemoryStream decompressedStream = new MemoryStream(decompressedContent);
+            ContentId identifierDecompressedPayload = ContentId.FromContentHash(await _storage.VerifyContentMatchesHash(decompressedStream, id));
+
+            BlobIdentifier identifierCompressedPayload;
             {
-                using Scope _ = Tracer.Instance.StartActive("web.hash");
-                identifierDecompressedPayload = BlobIdentifier.FromBlob(decompressedContent);
-            }
-
-            if (id != null && !id.Equals(identifierDecompressedPayload))
-            {
-                _logger.Debug("ID {@Id} was not the same as identifier {@Identifier} {Content}", id, identifierDecompressedPayload,
-                    content);
-
-                throw new ArgumentException("ID was not a hash of the content uploaded.", paramName: nameof(id));
+                using IScope _ = Tracer.Instance.StartActive("web.hash");
+                await using Stream hashStream = payload.GetStream();
+                identifierCompressedPayload = await BlobIdentifier.FromStream(hashStream);
             }
 
             // commit the mapping from the decompressed hash to the compressed hash, we run this in parallel with the blob store submit
             // TODO: let users specify weight of the blob compared to previously submitted content ids
-            Task contentIdStoreTask = _contentIdStore.Put(ns, identifierDecompressedPayload, identifier, content.Length);
+            int contentIdWeight = (int)payload.Length;
+            Task contentIdStoreTask = _contentIdStore.Put(ns, identifierDecompressedPayload, identifierCompressedPayload, contentIdWeight);
 
-            // we still commit the compressed buffer to the object store
-            await _storage.PutObject(ns, content, identifier);
+            // we still commit the compressed buffer to the object store using the hash of the compressed content
+            {
+                await _storage.PutObjectKnownHash(ns, payload, identifierCompressedPayload);
+            }
 
             await contentIdStoreTask;
 
@@ -294,5 +306,11 @@ namespace Horde.Storage.Controllers
         {
             await _storage.DeleteObject(ns, id);
         }*/
+    }
+
+    
+    public class ExistCheckMultipleContentIdResponse
+    {
+        public ContentId[] Needs { get; set; } = null!;
     }
 }

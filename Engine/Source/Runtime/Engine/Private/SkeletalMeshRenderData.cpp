@@ -6,7 +6,6 @@
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Engine/SkeletalMesh.h"
 #include "UObject/Package.h"
-#include "Algo/AnyOf.h"
 
 #if WITH_EDITOR
 #include "ProfilingDebugging/CookStats.h"
@@ -22,7 +21,6 @@
 #include "Serialization/LargeMemoryReader.h"
 #include "Serialization/LargeMemoryWriter.h"
 #include "Async/Async.h"
-#include "UObject/GarbageCollection.h"
 
 #if ENABLE_COOK_STATS
 namespace SkeletalMeshCookStats
@@ -159,87 +157,6 @@ namespace DDCUtils64Bit
 	}
 } //namespace DDCUtils64Bit
 
-namespace MorphTargetUtils
-{
-	void ApplyMorphTargetsEditorData(USkeletalMesh* SkeletalMesh, TMap<FName, TArray<FMorphTargetLODModel> >& MorphLODModelsPerTargetName, bool bIsSerializeSaving)
-	{
-		//Make sure we do not create new morph target during a gc
-		FGCScopeGuard GCScopeGuard;
-
-		FSkeletalMeshModel* SkelMeshModel = SkeletalMesh->GetImportedModel();
-		check(SkelMeshModel);
-
-		TMap<FName, UMorphTarget*> ExistingMorphTargets;
-		ExistingMorphTargets.Reserve(SkeletalMesh->GetMorphTargets().Num());
-		for (UMorphTarget* MorphTarget : SkeletalMesh->GetMorphTargets())
-		{
-			ExistingMorphTargets.Add(MorphTarget->GetFName(), MorphTarget);
-		}
-		int32 MorphTargetNumber = MorphLODModelsPerTargetName.Num();
-		TArray<UMorphTarget*> ToDeleteMorphTargets;
-		ToDeleteMorphTargets.Append(SkeletalMesh->GetMorphTargets());
-		SkeletalMesh->GetMorphTargets().Empty();
-		//Rebuild the MorphTarget object
-		for (TPair<FName, TArray<FMorphTargetLODModel>> TargetNameAndMorphLODModels : MorphLODModelsPerTargetName)
-		{
-			FName MorphTargetName = TargetNameAndMorphLODModels.Key;
-			const TArray<FMorphTargetLODModel>& MorphTargetLODModels = TargetNameAndMorphLODModels.Value;
-			int32 MorphLODModelNumber = MorphTargetLODModels.Num();
-
-			UMorphTarget* MorphTarget = ExistingMorphTargets.FindRef(MorphTargetName);
-			if (!MorphTarget)
-			{
-				if (!Algo::AnyOf(MorphTargetLODModels, [](const FMorphTargetLODModel& Model) { return Model.Vertices.Num() > 0;}))
-				{
-					//Skip this empty morphtarget
-					continue;
-				}
-				//When we save the cook result we should never have to build a new morph target
-				//When saving cook build, we call GetPlatformSkeletalMeshRenderData in USkeletalMesh::BeginCacheForCookedPlatformData
-				//which happen before the serialization of that cook skeletalmesh
-				if (!bIsSerializeSaving)
-				{
-					MorphTarget = NewObject<UMorphTarget>(SkeletalMesh, MorphTargetName);
-					check(MorphTarget);
-				}
-				else
-				{
-					UE_ASSET_LOG(LogSkeletalMesh, Error, SkeletalMesh, TEXT("Cannot cache a skeletalmesh during a serialize if some morph targets need to be created. The solution is to Pre cache the skeletalmesh before the serialization so no morph target get created."));
-					continue;
-				}
-			}
-			else
-			{
-				ToDeleteMorphTargets.Remove(MorphTarget);
-			}
-			MorphTarget->EmptyMorphLODModels();
-			SkeletalMesh->GetMorphTargets().Add(MorphTarget);
-			
-			MorphTarget->GetMorphLODModels().AddDefaulted(MorphLODModelNumber);
-			for (int32 MorphDataIndex = 0; MorphDataIndex < MorphLODModelNumber; ++MorphDataIndex)
-			{
-				MorphTarget->GetMorphLODModels()[MorphDataIndex] = MorphTargetLODModels[MorphDataIndex];
-			}
-		}
-		//Rebuild the mapping and rehook the curve data
-		SkeletalMesh->InitMorphTargets();
-
-		//Clear any async flags after the morphtargets have been set to the skeletalmesh
-		for (UMorphTarget* MorphTarget : SkeletalMesh->GetMorphTargets())
-		{
-			const EInternalObjectFlags AsyncFlags = EInternalObjectFlags::Async | EInternalObjectFlags::AsyncLoading;
-			MorphTarget->ClearInternalFlags(AsyncFlags);
-		}
-
-		//Make sure the old unused morph targets are clean up properly
-		for (UMorphTarget* ToDeleteMorphTarget : ToDeleteMorphTargets)
-		{
-			ToDeleteMorphTarget->BaseSkelMesh = nullptr;
-			ToDeleteMorphTarget->EmptyMorphLODModels();
-			ToDeleteMorphTarget->MarkAsGarbage();
-		}
-	}
-}
 //Serialize the LODInfo and append the result to the KeySuffix to build the LODInfo part of the DDC KEY
 //Note: this serializer is only used to build the mesh DDC key, no versioning is required
 static void SerializeLODInfoForDDC(USkeletalMesh* SkeletalMesh, FString& KeySuffix)
@@ -443,7 +360,7 @@ void FSkeletalMeshRenderData::Cache(const ITargetPlatform* TargetPlatform, USkel
 			FLargeMemoryReader Ar(DerivedData.GetData(), DerivedData.Num(), ELargeMemoryReaderFlags::Persistent);
 
 			//Helper structure to change the morph targets
-			TMap<FName, TArray<FMorphTargetLODModel> > MorphLODModelsPerTargetName;
+			TUniquePtr<FFinishBuildMorphTargetData> FinishBuildMorphTargetData;
 
 			//With skeletal mesh build refactor we serialize the LODModel data into the DDC
 			//We need to store those so we do not have to rerun the reduction to make them up to date
@@ -456,24 +373,17 @@ void FSkeletalMeshRenderData::Cache(const ITargetPlatform* TargetPlatform, USkel
 
 				//Get the morph target data, we put it in the compilation context to apply them in the game thread before the InitResources
 				{
-					int32 MorphTargetNumber = 0;
-					Ar << MorphTargetNumber;
-					MorphLODModelsPerTargetName.Reserve(MorphTargetNumber);
-					//We cannot serialize directly the UMorphTarget with a FMemoryArchive. This is not supported.
-					for (int32 MorphTargetIndex = 0; MorphTargetIndex < MorphTargetNumber; ++MorphTargetIndex)
+					if (Owner->GetMorphTargets().Num() > 0)
 					{
-						FName MorphTargetName = NAME_None;
-						Ar << MorphTargetName;
-						TArray<FMorphTargetLODModel>& MorphTargetLODModels = MorphLODModelsPerTargetName.FindOrAdd(MorphTargetName);
-						int32 MorphLODModelNumber = 0;
-						Ar << MorphLODModelNumber;
-						MorphTargetLODModels.Empty(MorphLODModelNumber);
-						MorphTargetLODModels.AddDefaulted(MorphLODModelNumber);
-						for (int32 MorphDataIndex = 0; MorphDataIndex < MorphLODModelNumber; ++MorphDataIndex)
-						{
-							Ar << MorphTargetLODModels[MorphDataIndex];
-						}
+						FinishBuildMorphTargetData = Owner->GetMorphTargets()[0]->CreateFinishBuildMorphTargetData();
 					}
+					else
+					{
+						// Create and initialize the FinishBuildInternalData, use the class default object to call the virtual function
+						FinishBuildMorphTargetData = UMorphTarget::StaticClass()->GetDefaultObject<UMorphTarget>()->CreateFinishBuildMorphTargetData();
+					}
+					check(FinishBuildMorphTargetData);
+					FinishBuildMorphTargetData->LoadFromMemoryArchive(Ar);
 				}
 
 				//Serialize the LODModel sections since they are dependent on the reduction
@@ -500,9 +410,9 @@ void FSkeletalMeshRenderData::Cache(const ITargetPlatform* TargetPlatform, USkel
 			}
 
 			//Apply the morphtargets change if any
-			if (MorphLODModelsPerTargetName.Num() > 0)
+			if (FinishBuildMorphTargetData.IsValid())
 			{
-				MorphTargetUtils::ApplyMorphTargetsEditorData(Owner, MorphLODModelsPerTargetName, ContextPtr->bIsSerializeSaving);
+				FinishBuildMorphTargetData->ApplyEditorData(Owner, ContextPtr->bIsSerializeSaving);
 			}
 
 			int32 T1 = FPlatformTime::Cycles();

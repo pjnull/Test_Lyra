@@ -3,7 +3,7 @@
 import { configure } from "mobx";
 import { isNumber } from 'util';
 import templateCache from '../backend/TemplateCache';
-import { AgentData, ArtifactData, AuditLogEntry, AuditLogQuery, BatchUpdatePoolRequest, ChangeSummaryData, CreateDeviceRequest, CreateDeviceResponse, CreateJobRequest, CreateJobResponse, CreatePoolRequest, CreateSoftwareResponse, CreateSubscriptionRequest, CreateSubscriptionResponse, DashboardPreference, EventData, GetArtifactZipRequest, GetDevicePlatformResponse, GetDevicePoolResponse, GetDeviceReservationResponse, GetDeviceResponse, GetGraphResponse, GetIssueStreamResponse, GetJobsTabResponse, GetJobStepRefResponse, GetJobStepTraceResponse, GetJobTimingResponse, GetLogEventResponse, GetNotificationResponse, GetPerforceServerStatusResponse, GetServerInfoResponse, GetServerSettingsResponse, GetSoftwareResponse, GetSubscriptionResponse, GetUserResponse, GetUtilizationTelemetryResponse, GlobalConfig, IssueData, IssueQuery, JobData, JobQuery, JobsTabColumnType, LeaseData, LogData, LogLineData, PoolData, ProjectData, ScheduleData, ScheduleQuery, SearchLogFileResponse, ServerUpdateResponse, SessionData, StreamData, TabType, TemplateData, TestData, UpdateAgentRequest, UpdateDeviceRequest, UpdateGlobalConfigRequest, UpdateIssueRequest, UpdateJobRequest, UpdateLeaseRequest, UpdateNotificationsRequest, UpdatePoolRequest, UpdateServerSettingsRequest, UpdateStepRequest, UpdateStepResponse, UpdateUserRequest, UsersQuery } from './Api';
+import { AgentData, ArtifactData, AuditLogEntry, AuditLogQuery, BatchUpdatePoolRequest, ChangeSummaryData, CreateDeviceRequest, CreateDeviceResponse, CreateJobRequest, CreateJobResponse, CreatePoolRequest, CreateSoftwareResponse, CreateSubscriptionRequest, CreateSubscriptionResponse, DashboardPreference, EventData, FindIssueResponse, FindJobTimingsResponse, GetAgentSoftwareChannelResponse, GetArtifactZipRequest, GetDevicePlatformResponse, GetDevicePoolResponse, GetDeviceReservationResponse, GetDeviceResponse, GetGraphResponse, GetIssueStreamResponse, GetJiraIssueResponse, GetJobsTabResponse, GetJobStepRefResponse, GetJobStepTraceResponse, GetJobTimingResponse, GetLogEventResponse, GetNotificationResponse, GetPerforceServerStatusResponse, GetServerInfoResponse, GetServerSettingsResponse, GetSoftwareResponse, GetSubscriptionResponse, GetUserResponse, GetUtilizationTelemetryResponse, GlobalConfig, IssueData, IssueQuery, IssueQueryV2, JobData, JobQuery, JobsTabColumnType, JobStreamQuery, JobTimingsQuery, LeaseData, LogData, LogLineData, PoolData, ProjectData, ScheduleData, ScheduleQuery, SearchLogFileResponse, ServerUpdateResponse, SessionData, StreamData, TabType, TemplateData, TestData, UpdateAgentRequest, UpdateDeviceRequest, UpdateGlobalConfigRequest, UpdateIssueRequest, UpdateJobRequest, UpdateLeaseRequest, UpdateNotificationsRequest, UpdatePoolRequest, UpdateServerSettingsRequest, UpdateStepRequest, UpdateStepResponse, UpdateUserRequest, UsersQuery } from './Api';
 import dashboard from './Dashboard';
 import { ChallengeStatus, Fetch } from './Fetch';
 import graphCache, { GraphQuery } from './GraphCache';
@@ -325,6 +325,55 @@ export class Backend {
 
     }
 
+    getStreamJobs(streamId: string, query: JobStreamQuery, queryGraph: boolean = false): Promise<JobData[]> {
+
+        if (typeof query.index === 'number') {
+            query.index = 0;
+        }
+
+        if (typeof query.count !== 'number') {
+            query.count = 100;
+        }
+
+        return new Promise<JobData[]>((resolve, reject) => {
+
+            this.backend.get(`/api/v1/jobs/streams/${streamId}`, {
+                params: query
+            }).then((value) => {
+                const jobs = value.data as JobData[];
+
+                if (!queryGraph) {
+                    resolve(jobs);
+                    return;
+                }
+
+                const query: GraphQuery[] = [];
+                jobs.forEach(j => {
+                    if (!j.graphHash) {
+                        console.error(`Job ${j.id} has no graph hash`);
+                        return;
+                    }
+
+                    if (!query.find(q => q.graphHash === j.graphHash)) {
+                        query.push({ graphHash: j.graphHash!, jobId: j.id });
+                    }
+                });
+
+                graphCache.getGraphs(query).then(graphs => {
+                    jobs.forEach(j => {
+                        j.graphRef = graphs.find(g => g.hash === j.graphHash);
+                    });
+                    resolve(jobs);
+                }).catch(reason => reject(reason));
+
+            }).catch((reason) => {
+                reject(reason);
+            });
+        });
+
+    }
+
+
     getJobs(query: JobQuery, queryGraph: boolean = false): Promise<JobData[]> {
 
         if (typeof query.index === 'number') {
@@ -378,6 +427,34 @@ export class Backend {
         return new Promise<GetJobTimingResponse>((resolve, reject) => {
             this.backend.get(`/api/v1/jobs/${jobId}/timing`).then((value) => {
                 resolve(value.data as GetJobTimingResponse);
+            }).catch(reason => {
+                reject(reason);
+            });
+        });
+
+    }
+
+    getBatchJobTiming(query: JobTimingsQuery): Promise<FindJobTimingsResponse> {
+
+        return new Promise<FindJobTimingsResponse>((resolve, reject) => {
+            this.backend.get(`/api/v1/jobs/timing`, { 
+                params: query
+            }).then((response) => {
+                let timingsWrapper = response.data as FindJobTimingsResponse;
+                let graphCalls: { jobResponse: JobData, call: any }[] = [];
+                Object.values(timingsWrapper.timings).forEach(timing => {
+                    if(!timing.jobResponse.graphHash) {
+                        return reject(`Job ${timing.job.id} has undefined graph hash`);
+                    }
+                    graphCalls.push( { jobResponse: timing.jobResponse, call: graphCache.get({ graphHash: timing.jobResponse.graphHash, jobId: timing.jobResponse.id }) });
+                });
+                let allPromises = graphCalls.map(item => item.call);
+                Promise.all(allPromises).then(responses => {
+                    for(let idx = 0; idx < responses.length; idx++) {
+                        graphCalls[idx].jobResponse.graphRef = responses[idx] as GetGraphResponse;
+                    }
+                    resolve(timingsWrapper);
+                });
             }).catch(reason => {
                 reject(reason);
             });
@@ -838,7 +915,15 @@ export class Backend {
 
                     data.dashboardSettings.preferences = preferences;
                 }
+
+                // apply defaults
+                const current = data.dashboardSettings.preferences.get(DashboardPreference.Darktheme);
+                if (current !== "true" && current !== "false") {
+                    data.dashboardSettings.preferences.set(DashboardPreference.Darktheme, "true");
+                }
+
                 resolve(data);
+
             }).catch(reason => reject(reason));
 
         });
@@ -866,6 +951,23 @@ export class Backend {
         });
     }
 
+
+    getIssuesV2(queryIn?: IssueQueryV2): Promise<FindIssueResponse[]> {
+
+        const query = queryIn ?? {};
+
+        return new Promise<FindIssueResponse[]>((resolve, reject) => {
+
+            this.backend.get("/api/v2/issues", {
+                params: query
+            }).then((value) => {
+                resolve(value.data as FindIssueResponse[]);
+            }).catch((reason) => {
+                reject(reason);
+            });
+        });
+
+    }
 
     getIssues(queryIn?: IssueQuery): Promise<IssueData[]> {
 
@@ -937,6 +1039,23 @@ export class Backend {
                 reject(reason);
             });
         });
+    }
+
+    getJiraIssues(streamId: string, jiraKeys: string[]): Promise<GetJiraIssueResponse[]> {
+
+        const params = {
+            streamId: streamId,
+            jiraKeys: jiraKeys
+        };
+
+        return new Promise<GetJiraIssueResponse[]>((resolve, reject) => {
+            this.backend.get(`/api/v1/jira`, { params: params }).then((value) => {
+                resolve(value.data as GetJiraIssueResponse[]);
+            }).catch((reason) => {
+                reject(reason);
+            });
+        });
+
     }
 
     getJobStepTestDataByKey(jobId: string, stepId: string, key: string): Promise<TestData[]> {
@@ -1022,8 +1141,8 @@ export class Backend {
     }
 
     downloadAgentZip() {
-        try {            
-            const url = `${this.serverUrl}/api/v1/agentsoftware/default/zip`;            
+        try {
+            const url = `${this.serverUrl}/api/v1/agentsoftware/default/zip`;
             const link = document.createElement('a');
             link.href = url;
             document.body.appendChild(link);
@@ -1032,6 +1151,17 @@ export class Backend {
             console.error(reason);
         }
     }
+
+    getAgentSoftwareChannel(name: string = "default"): Promise<GetAgentSoftwareChannelResponse> {
+        return new Promise<GetAgentSoftwareChannelResponse>((resolve, reject) => {
+            this.backend.get(`/api/v1/agentsoftware/${name}`, { suppress404: true }).then((value) => {
+                resolve(value.data as GetAgentSoftwareChannelResponse);
+            }).catch(reason => {
+                reject(reason);
+            });
+        });
+    }
+
 
     updateJobStep(jobId: string, batchId: string, stepId: string, request: UpdateStepRequest): Promise<UpdateStepResponse> {
         return new Promise<UpdateStepResponse>((resolve, reject) => {
@@ -1161,14 +1291,14 @@ export class Backend {
         });
     }
 
-    checkoutDevice(deviceId: string, checkout:boolean): Promise<void> {
+    checkoutDevice(deviceId: string, checkout: boolean): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            this.backend.put(`/api/v2/devices/${deviceId}/checkout`, {checkout: checkout}).then(() => {
+            this.backend.put(`/api/v2/devices/${deviceId}/checkout`, { checkout: checkout }).then(() => {
                 resolve();
             }).catch(reason => {
                 reject(reason);
             });
-        });        
+        });
     }
 
 
@@ -1249,7 +1379,7 @@ export class Backend {
         });
     }
 
-    updateServerSettings(request: UpdateServerSettingsRequest): Promise< ServerUpdateResponse> {
+    updateServerSettings(request: UpdateServerSettingsRequest): Promise<ServerUpdateResponse> {
         return new Promise<ServerUpdateResponse>((resolve, reject) => {
             this.backend.put(`/api/v1/config/serversettings`, request).then((value) => {
                 resolve(value.data as ServerUpdateResponse);
@@ -1266,7 +1396,7 @@ export class Backend {
             }).catch(reason => {
                 reject(reason);
             });
-        });        
+        });
     }
 
     // updates global configuation
@@ -1289,6 +1419,7 @@ export class Backend {
             });
         });
     }
+
 
     private async update() {
 
@@ -1343,7 +1474,10 @@ export class Backend {
 
     }
 
+
     init() {
+
+
         return new Promise<boolean>(async (resolve, reject) => {
 
             this.backend.setBaseUrl(this.serverUrl);
@@ -1355,8 +1489,6 @@ export class Backend {
                 this.backend.login(window.location.toString());
                 return;
             }
-
-            this.serverInfo = await this.getServerInfo();
 
             await dashboard.update();
 
@@ -1381,9 +1513,6 @@ export class Backend {
 
     updateID?: any;
     logout: boolean = false;
-
-    serverInfo: GetServerInfoResponse = {serverVersion: "0", osDescription: "Unknown", singleInstance: false};
-
 
     private backend: Fetch;
 

@@ -16,7 +16,9 @@ $ ProjectFile (FileReference): Path to the project file for the project containi
 
 $ Version (ReadOnlyBuildVersion): The current build version
 
-$ ExcludePlugins (List&lt;String&gt;): Accessor for
+$ NameSuffix (String): Optional suffix to append to Name
+
+$ bIncludeAllTests (Boolean): Decides whether to compile with all the "Tests" folders from all dependent modules.
 
 $ HostPlatform (UnrealTargetPlatform): Gets the host platform being built on
 
@@ -44,8 +46,6 @@ $ bLegalToDistributeBinary (Boolean): Whether the output from this target can be
 
 $ UndecoratedConfiguration (UnrealTargetConfiguration): Specifies the configuration whose binaries do not require a "-Platform-Configuration" suffix.
 
-$ bBuildAllPlugins (Boolean): Build all the plugins that we can find, even if they're not enabled. This is particularly useful for content-only projects, where you're building the UnrealEditor target but running it with a game that enables a plugin.
-
 $ bBuildAllModules (Boolean): Build all the modules that are valid for this target type. Used for CIS and making installed engine builds.
 
 $ BuildPlugins (List&lt;String&gt;): Additional plugins that are built for this target type but not enabled.
@@ -57,6 +57,8 @@ $ AdditionalPlugins (List&lt;String&gt;): A list of additional plugins which nee
 $ EnablePlugins (List&lt;String&gt;): Additional plugins that should be included for this target.
 
 $ DisablePlugins (List&lt;String&gt;): List of plugins to be disabled for this target. Note that the project file may still reference them, so they should be marked as optional to avoid failing to find them at runtime.
+
+$ InternalPluginDependencies (List&lt;String&gt;): A list of Plugin names that are allowed to exist as dependencies without being defined in the uplugin descriptor
 
 $ PakSigningKeysFile (String): Path to the set of pak signing keys to embed in the executable.
 
@@ -84,7 +86,7 @@ $ bUseChaosChecked (Boolean): Whether to compile in checked chaos features for d
 
 $ bUseChaosMemoryTracking (Boolean): Whether to compile in chaos memory tracking features
 
-$ bCustomSceneQueryStructure (Boolean): Whether scene query acceleration is done by UE4. The physx scene query structure is still created, but we do not use it.
+$ bCustomSceneQueryStructure (Boolean): Whether scene query acceleration is done by UE. The physx scene query structure is still created, but we do not use it.
 
 $ bCompilePhysX (Boolean): Whether to include PhysX support.
 
@@ -103,6 +105,8 @@ $ bCompilePython (Boolean): Whether to compile in python support
 $ bForceBuildTargetPlatforms (Boolean): Whether to force compiling the target platform modules, even if they wouldn't normally be built.
 
 $ bForceBuildShaderFormats (Boolean): Whether to force compiling shader format modules, even if they wouldn't normally be built.
+
+$ bNeedsExtraShaderFormatsOverride (Nullable&lt;Boolean&gt;): Override for including extra shader formats
 
 $ bCompileCustomSQLitePlatform (Boolean): Whether we should compile SQLite using the custom "Unreal" platform (true), or using the native platform (false).
 
@@ -200,7 +204,7 @@ $ UnsafeTypeCastWarningLevel (WarningLevel): Indicates what warning/error level 
 
 $ bUndefinedIdentifierErrors (Boolean): Forces the use of undefined identifiers in conditional expressions to be treated as errors.
 
-$ bRetainFramePointers (Boolean): Forces frame pointers to be retained this is usually required when you want reliable callstacks e.g. mallocframeprofiler
+$ bRetainFramePointersOverride (Nullable&lt;Boolean&gt;): Forces frame pointers to be retained this is usually required when you want reliable callstacks e.g. mallocframeprofiler
 
 $ bUseFastMonoCalls (Boolean): New Monolithic Graphics drivers have optional "fast calls" replacing various D3d functions
 
@@ -230,6 +234,8 @@ $ bUseIncrementalLinking (Boolean): Whether to use incremental linking or not. I
 
 $ bAllowLTCG (Boolean): Whether to allow the use of link time code generation (LTCG).
 
+$ bPreferThinLTO (Boolean): When Link Time Code Generation (LTCG) is enabled, whether to prefer using the lighter weight version on supported platforms.
+
 $ bPGOProfile (Boolean): Whether to enable Profile Guided Optimization (PGO) instrumentation in this build.
 
 $ bPGOOptimize (Boolean): Whether to optimize this build with Profile Guided Optimization (PGO).
@@ -239,6 +245,8 @@ $ bSupportEditAndContinue (Boolean): Whether to support edit and continue.  Only
 $ bOmitFramePointers (Boolean): Whether to omit frame pointers or not. Disabling is useful for e.g. memory profiling on the PC.
 
 $ bEnableCppModules (Boolean): Whether to enable support for C++20 modules
+
+$ bEnableCppCoroutinesForEvaluation (Boolean): Whether to enable support for C++20 coroutines This option is provided to facilitate evaluation of the feature. Expect the name of the option to change. Use of coroutines in with UE is untested and unsupported.
 
 $ bUseMallocProfiler (Boolean): If true, then enable memory profiling in the build (defines USE_MALLOC_PROFILER=1 and forces bOmitFramePointers=false).
 
@@ -316,7 +324,7 @@ $ AdditionalCompilerArguments (String): Additional arguments to pass to the comp
 
 $ AdditionalLinkerArguments (String): Additional arguments to pass to the linker
 
-$ MemoryPerActionGB (Double): Max amount of memory that each compile action may require. Used by ParallelExecutor and TaskExecutor to decide the maximum number of parallel actions to start at one time.
+$ MemoryPerActionGB (Double): Max amount of memory that each compile action may require. Used by ParallelExecutor to decide the maximum number of parallel actions to start at one time.
 
 $ DisableUnityBuildForModules (String[]): List of modules to disable unity builds for
 
@@ -332,11 +340,9 @@ $ Name (String): The name of this target
 
 $ DefaultBuildSettings (BuildSettingsVersion): Specifies the engine version to maintain backwards-compatible default build settings with (eg. DefaultSettingsVersion.Release_4_23, DefaultSettingsVersion.Release_4_24). Specify DefaultSettingsVersion.Latest to always use defaults for the current engine version, at the risk of introducing build errors while upgrading.
 
-$ bOutputPubliclyDistributable (Boolean): Obsolete. Use bLegalToDistributeBinary instead.
-
 $ bAllowHotReload (Boolean): Whether this target supports hot reload
 
-$ bBuildEditor (Boolean): Whether to compile the editor or not. Only desktop platforms (Windows or Mac) will use this, other platforms force this to false.
+$ bBuildEditor (Boolean): Whether we are compiling editor code or not. Prefer the more explicit bCompileAgainstEditor instead.
 
 $ bBuildRequiresCookedData (Boolean): Whether to compile code related to building assets. Consoles generally cannot build assets. Desktop platforms generally can.
 
@@ -346,9 +352,11 @@ $ bBuildDeveloperTools (Boolean): Whether to compile the developer tools.
 
 $ bBuildTargetDeveloperTools (Boolean): Whether to compile the developer tools that are for target platforms or connected devices (defaults to bBuildDeveloperTools)
 
-$ bCompileLeanAndMeanUE (Boolean): Whether to compile lean and mean version of UE.
+$ bNeedsExtraShaderFormats (Boolean): Whether we should include any extra shader formats. By default this is only enabled for Program and Editor targets.
 
-$ bCompileSpeedTree (Boolean): Whether we should compile in support for Simplygon or not.
+$ bCompileAgainstEditor (Boolean): Enabled for editor builds (TargetType.Editor). Can be overridden for programs (TargetType.Program) that would need to compile against editor code. Not available for other target types. Mainly drives the value of WITH_EDITOR.
+
+$ bCompileSpeedTree (Boolean): Whether we should compile in support for SpeedTree or not.
 
 $ bWithServerCode (Boolean): Compile server-only code.
 
@@ -359,8 +367,6 @@ $ bIncludePluginsForTargetPlatforms (Boolean): Whether to allow plugins which su
 $ bWithPerfCounters (Boolean): Whether to include PerfCounters support.
 
 $ bWithLiveCoding (Boolean): Whether to enable support for live coding
-
-$ bUseBackwardsCompatibleDefaults (Boolean): Whether to use backwards compatible defaults for this module. By default, engine modules always use the latest default settings, while project modules do not (to support an easier migration path).
 
 $ bHasExports (Boolean): Whether the final executable should export symbols.
 
@@ -374,11 +380,7 @@ $ DefaultWarningLevel (WarningLevel): Default treatment of uncategorized warning
 
 $ DeprecationWarningLevel (WarningLevel): Level to report deprecation warnings as errors
 
-$ bShadowVariableErrors (Boolean): Forces shadow variable warnings to be treated as errors on platforms that support it.
-
-$ bStripSymbolsOnIOS (Boolean): Whether to strip iOS symbols or not (implied by bGeneratedSYMFile).
-
-$ bCreateStubIPA (Boolean): If true, then a stub IPA will be generated when compiling is done (minimal files needed for a valid IPA).
+$ bRetainFramePointers (Boolean): Forces frame pointers to be retained this is usually required when you want reliable callstacks e.g. mallocframeprofiler
 
 $ bLegacyPublicIncludePaths (Boolean): Add all the public folders as include paths for the compile environment.
 

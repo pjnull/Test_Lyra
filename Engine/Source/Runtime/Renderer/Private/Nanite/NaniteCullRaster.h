@@ -104,6 +104,7 @@ struct FCullingContext
 		uint32 bIsGameView : 1;
 		uint32 bEditorShowFlag : 1;
 		uint32 bGameShowFlag : 1;
+		uint32 bProgrammableRaster : 1;
 
 		void SetViewFlags(const FViewInfo& View);
 	}
@@ -124,6 +125,8 @@ struct FCullingContext
 
 	FRDGBufferRef	SafeMainRasterizeArgsSWHW;
 	FRDGBufferRef	SafePostRasterizeArgsSWHW;
+
+	FRDGBufferRef	ClusterCountSWHW;
 
 	FRDGBufferRef	QueueState;
 	FRDGBufferRef	VisibleClustersSWHW;
@@ -207,6 +210,7 @@ struct FRasterState
 
 void CullRasterize(
 	FRDGBuilder& GraphBuilder,
+	FNaniteRasterPipelines& RasterPipelines,
 	const FScene& Scene,
 	const FViewInfo& SceneView,
 	const TArray<FPackedView, SceneRenderingAllocator>& Views,
@@ -225,6 +229,7 @@ void CullRasterize(
  */
 void CullRasterize(
 	FRDGBuilder& GraphBuilder,
+	FNaniteRasterPipelines& RasterPipelines,
 	const FScene& Scene,
 	const FViewInfo& SceneView,
 	const TArray<FPackedView, SceneRenderingAllocator>& Views,

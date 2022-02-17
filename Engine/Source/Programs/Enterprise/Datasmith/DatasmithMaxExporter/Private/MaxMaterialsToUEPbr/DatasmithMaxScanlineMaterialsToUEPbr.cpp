@@ -76,7 +76,7 @@ namespace DatasmithMaxScanlineMaterialsToUEPbrImpl
 		ScanlineMaterialProperties.SpecularLevel = Material.GetShinStr();
 		ScanlineMaterialProperties.Glossiness = Material.GetShininess();
 		ScanlineMaterialProperties.bUseSelfIllumColor = ( Material.GetSelfIllumColorOn() != 0 );
-		ScanlineMaterialProperties.SelfIllumColor = FDatasmithMaxMatHelper::MaxColorToFLinearColor( (BMM_Color_fl)Material.GetSelfIllumColor() );
+		ScanlineMaterialProperties.SelfIllumColor = FDatasmithMaxMatHelper::MaxColorToFLinearColor( (BMM_Color_fl)Material.GetSelfIllumColor() ); // todo: this seems wrong(converting color to gamme space)
 
 		const TimeValue CurrentTime = GetCOREInterface()->GetTime();
 
@@ -295,13 +295,13 @@ bool FDatasmithMaxBlendMaterialsToUEPbr::IsSupported( Mtl* Material )
 	if ( Mtl* BaseMaterial = Material->GetSubMtl(0) )
 	{
 		FDatasmithMaxMaterialsToUEPbr* MaterialConverter = FDatasmithMaxMaterialsToUEPbrManager::GetMaterialConverter( BaseMaterial );
-		bAllMaterialsSupported &= MaterialConverter && MaterialConverter->IsSupported( BaseMaterial );
+		bAllMaterialsSupported &= MaterialConverter != nullptr;
 	}
 
 	if ( Mtl* CoatMaterial = Material->GetSubMtl(1) )
 	{
 		FDatasmithMaxMaterialsToUEPbr* MaterialConverter = FDatasmithMaxMaterialsToUEPbrManager::GetMaterialConverter( CoatMaterial );
-		bAllMaterialsSupported &= MaterialConverter && MaterialConverter->IsSupported( CoatMaterial );
+		bAllMaterialsSupported &= MaterialConverter != nullptr;
 	}
 
 	return bAllMaterialsSupported;

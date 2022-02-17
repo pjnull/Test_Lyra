@@ -46,7 +46,7 @@ void FCurveReferenceCustomization::SetSkeleton(TSharedRef<IPropertyHandle> Struc
 
 	// Get the skeleton.
 	bool bInvalidSkeletonIsError = false;
-	Skeleton = DeformerAsset->GetSkeleton(bInvalidSkeletonIsError);
+	Skeleton = DeformerAsset->GetSkeleton(bInvalidSkeletonIsError, nullptr);
 }
 
 TSharedPtr<IPropertyHandle> FCurveReferenceCustomization::FindStructMemberProperty(TSharedRef<IPropertyHandle> PropertyHandle, const FName& PropertyName)

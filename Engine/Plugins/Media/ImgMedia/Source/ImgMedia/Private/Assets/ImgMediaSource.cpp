@@ -113,6 +113,16 @@ int64 UImgMediaSource::GetMediaOption(const FName& Key, int64 DefaultValue) cons
 		return FrameRateOverride.Numerator;
 	}
 
+	if (Key == ImgMedia::NumTilesXOption)
+	{
+		return ImportInfo.NumTilesX;
+	}
+
+	if (Key == ImgMedia::NumTilesYOption)
+	{
+		return ImportInfo.NumTilesY;
+	}
+
 	return Super::GetMediaOption(Key, DefaultValue);
 }
 
@@ -143,7 +153,9 @@ bool UImgMediaSource::HasMediaOption(const FName& Key) const
 		(Key == ImgMedia::FrameRateOverrideDenonimatorOption) ||
 		(Key == ImgMedia::FrameRateOverrideNumeratorOption) ||
 		(Key == ImgMedia::ProxyOverrideOption) ||
-		(Key == ImgMedia::MipMapInfoOption))
+		(Key == ImgMedia::MipMapInfoOption) ||
+		(Key == ImgMedia::NumTilesXOption) ||
+		(Key == ImgMedia::NumTilesYOption))
 	{
 		return true;
 	}
@@ -189,6 +201,12 @@ void UImgMediaSource::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 
 FString UImgMediaSource::GetFullPath() const
 {
+	// Use the import path?
+	if ((ImportInfo.bIsUsable) && (ImportInfo.DestinationPath.Path.IsEmpty() == false))
+	{
+		return ImportInfo.DestinationPath.Path;
+	}
+
 	if (!FPaths::IsRelative(SequencePath.Path))
 	{
 		return SequencePath.Path;

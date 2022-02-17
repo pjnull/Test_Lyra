@@ -122,6 +122,12 @@ void UControlRig::BeginDestroy()
 	}
 #endif
 
+	// on destruction clear out the initialized snapshots
+	if (HasAnyFlags(RF_ClassDefaultObject))
+	{
+		InitializedVMSnapshots.Reset();
+	}
+
 	TRACE_OBJECT_LIFETIME_END(this);
 }
 
@@ -429,6 +435,11 @@ TArray<FName> UControlRig::GetSupportedEvents() const
 		return VM->GetEntryNames();
 	}
 	return TArray<FName>();
+}
+
+AActor* UControlRig::GetHostingActor() const
+{
+	return ObjectBinding ? ObjectBinding->GetHostingActor() : nullptr;
 }
 
 #if WITH_EDITOR
@@ -1147,20 +1158,12 @@ void UControlRig::ExecuteUnits(FRigUnitContext& InOutContext, const FName& InEve
 {
 	if (VM)
 	{
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-		FRigVMMemoryContainer* LocalMemory[] = { VM->WorkMemoryPtr, VM->LiteralMemoryPtr, VM->DebugMemoryPtr };
-#else
 		TArray<URigVMMemoryStorage*> LocalMemory = VM->GetLocalMemoryArray();
-#endif
 		TArray<void*> AdditionalArguments;
 		AdditionalArguments.Add(&InOutContext);
 
 		if (InOutContext.State == EControlRigState::Init)
 		{
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-			VM->Initialize(FRigVMMemoryContainerPtrArray(LocalMemory, 3), AdditionalArguments);
-#else
-
 			if(IsInGameThread())
 			{
 				const uint32 SnapshotHash = GetHashForInitializeVMSnapShot();
@@ -1201,7 +1204,6 @@ void UControlRig::ExecuteUnits(FRigUnitContext& InOutContext, const FName& InEve
 			{
 				VM->Initialize(LocalMemory, AdditionalArguments);
 			}
-#endif
 		}
 		else
 		{
@@ -1228,11 +1230,7 @@ void UControlRig::ExecuteUnits(FRigUnitContext& InOutContext, const FName& InEve
 			TGuardValue<const FRigVMExecuteContext*> HierarchyContextGuard(Hierarchy->ExecuteContext, &VM->GetContext());
 #endif
 
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-			VM->Execute(FRigVMMemoryContainerPtrArray(LocalMemory, 3), AdditionalArguments, InEventName);
-#else
 			VM->Execute(LocalMemory, AdditionalArguments, InEventName);
-#endif
 		}
 	}
 }
@@ -1714,6 +1712,8 @@ void UControlRig::HandleHierarchyModified(ERigHierarchyNotification InNotificati
 			{
 				const bool bSelected = InNotification == ERigHierarchyNotification::ElementSelected;
 				ControlSelected().Broadcast(this, ControlElement, bSelected);
+
+				OnControlSelected_BP.Broadcast(this, *ControlElement, bSelected);
 			}
 			break;
 		}
@@ -2832,6 +2832,9 @@ void UControlRig::PostInitInstance(UControlRig* InCDO)
 			VM->AddToRoot();
 			DynamicHierarchy->AddToRoot();
 		}
+
+		// Clear the initialized VM snapshots
+		InitializedVMSnapshots.Reset();
 	}
 }
 

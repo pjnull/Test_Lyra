@@ -203,10 +203,13 @@ public:
 			OutEnvironment.SetDefine(TEXT("POST_PROCESS_MATERIAL_BEFORE_TONEMAP"), (Parameters.MaterialParameters.BlendableLocation != BL_AfterTonemapping) ? 1 : 0);
 		}
 
+
 		if (IsMobileSupportFetchBindedCustomStencilBuffer(Parameters.Platform))
 		{
 			OutEnvironment.SetDefine(TEXT("MOBILE_SUPPORT_FETCH_BINDED_CUSTOM_STENCIL_BUFFER"), 1);
 		}
+
+		OutEnvironment.SetDefine(TEXT("STRATA_ENABLED"), Strata::IsStrataEnabled() ? 1u : 0u);
 	}
 
 protected:
@@ -591,6 +594,10 @@ FScreenPassTexture AddPostProcessMaterialPass(
 	}
 
 	PostProcessMaterialParameters->bFlipYAxis = Inputs.bFlipYAxis && !bForceIntermediateTarget;
+	if (Strata::IsStrataEnabled())
+	{
+		PostProcessMaterialParameters->Strata = Strata::BindStrataGlobalUniformParameters(View.StrataSceneData);
+	}
 
 	ClearUnusedGraphResources(VertexShader, PixelShader, PostProcessMaterialParameters);
 

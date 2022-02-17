@@ -4,6 +4,7 @@
 
 #include "Animation/AnimNode_AssetPlayerBase.h"
 #include "Animation/AnimNode_SequencePlayer.h"
+#include "AnimNodes/AnimNode_Mirror.h"
 #include "Animation/MotionTrajectoryTypes.h"
 #include "DynamicPlayRate/DynamicPlayRateLibrary.h"
 #include "PoseSearch/PoseSearch.h"
@@ -24,6 +25,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(PinShownByDefault))
 	TObjectPtr<const UPoseSearchDatabase> Database = nullptr;
 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PinHiddenByDefault))
+	bool bUseDatabaseTagQuery = false;
+
+	// Query used to filter database groups which can be searched
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PinShownByDefault))
+	FGameplayTagQuery DatabaseTagQuery;
+
 	// Motion trajectory samples for pose search queries
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(PinShownByDefault))
 	FTrajectorySampleRange Trajectory;
@@ -37,13 +46,13 @@ public:
 	FMotionMatchingSettings Settings;
 
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(EditAnywhere, Category=Debug)
+	UPROPERTY(EditAnywhere, Category=Debug, meta = (PinShownByDefault))
 	bool bDebugDraw = false;
 
-	UPROPERTY(EditAnywhere, Category=Debug)
+	UPROPERTY(EditAnywhere, Category=Debug, meta = (PinShownByDefault))
 	bool bDebugDrawQuery = true;
 
-	UPROPERTY(EditAnywhere, Category=Debug)
+	UPROPERTY(EditAnywhere, Category=Debug, meta = (PinShownByDefault))
 	bool bDebugDrawMatch = true;
 #endif
 
@@ -59,6 +68,9 @@ private:
 
 	// Embedded sequence player node for playing animations from the motion matching database
 	FAnimNode_SequencePlayer_Standalone SequencePlayerNode;
+
+	// Embedded mirror node to handle mirroring if the pose search results in a mirrored sequence
+	FAnimNode_Mirror MirrorNode;
 
 	// Encapsulated motion matching algorithm and internal state
 	FMotionMatchingState MotionMatchingState;
@@ -82,5 +94,8 @@ private:
 	// If true, "Relevant anim" nodes that look for the highest weighted animation in a state will ignore this node
 	UPROPERTY(EditAnywhere, Category=Relevancy, meta=(FoldProperty, PinHiddenByDefault))
 	bool bIgnoreForRelevancyTest = false;
+
+	// Whether this node was evaluated last frame
+	bool bWasEvaluated = false;
 #endif // WITH_EDITORONLY_DATA
 };

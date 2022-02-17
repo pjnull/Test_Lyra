@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Threading.Tasks;
 using async_enumerable_dotnet;
+using EpicGames.Horde.Storage;
 using Horde.Storage.Implementation;
 using Horde.Storage.Implementation.TransactionLog;
 using Jupiter;
@@ -20,6 +21,7 @@ namespace Horde.Storage.Controllers
 {
     [ApiController]
     [Route("api/v1/replication-log")]
+    [InternalApiFilter]
     public class ReplicationLogController : ControllerBase
     {
         private readonly IServiceProvider _provider;
@@ -93,7 +95,7 @@ namespace Horde.Storage.Controllers
                 return Forbid();
             }
 
-            if ((lastBucket == null && lastEvent.HasValue) || (lastBucket != null && !lastEvent.HasValue))
+            if (((lastBucket == null && lastEvent.HasValue) || (lastBucket != null && !lastEvent.HasValue)) && lastBucket != "now")
             {
                 return BadRequest(new ProblemDetails
                 {

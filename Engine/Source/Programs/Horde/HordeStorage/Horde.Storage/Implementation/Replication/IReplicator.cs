@@ -2,6 +2,7 @@
 
 using System;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 
 namespace Horde.Storage.Implementation
@@ -12,6 +13,8 @@ namespace Horde.Storage.Implementation
         {
             public long? ReplicatorOffset { get; set; }
             public Guid? ReplicatingGeneration { get; set; }
+            public string? LastBucket { get; set; }
+            public Guid? LastEvent { get; set; }
         }
 
         public class ReplicatorInfo

@@ -40,7 +40,7 @@ namespace HordeServer.Controllers
 	[ApiController]
 	[Authorize]
 	[Route("[controller]")]
-	public class JobsController : ControllerBase
+	public class JobsController : HordeControllerBase
 	{
 		private readonly AclService AclService;
 		private readonly IGraphCollection Graphs;
@@ -51,12 +51,13 @@ namespace HordeServer.Controllers
 		private readonly IArtifactCollection ArtifactCollection;
 		private readonly IUserCollection UserCollection;
 		private readonly INotificationService NotificationService;
+		private readonly AgentService AgentService;
 		private ILogger<JobsController> Logger;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public JobsController(AclService AclService, IGraphCollection Graphs, IPerforceService Perforce, StreamService StreamService, JobService JobService, ITemplateCollection TemplateCollection, IArtifactCollection ArtifactCollection, IUserCollection UserCollection, INotificationService NotificationService, ILogger<JobsController> Logger)
+		public JobsController(AclService AclService, IGraphCollection Graphs, IPerforceService Perforce, StreamService StreamService, JobService JobService, ITemplateCollection TemplateCollection, IArtifactCollection ArtifactCollection, IUserCollection UserCollection, INotificationService NotificationService, AgentService AgentService, ILogger<JobsController> Logger)
 		{
 			this.AclService = AclService;
 			this.Graphs = Graphs;
@@ -67,6 +68,7 @@ namespace HordeServer.Controllers
 			this.ArtifactCollection = ArtifactCollection;
 			this.UserCollection = UserCollection;
 			this.NotificationService = NotificationService;
+			this.AgentService = AgentService;
 			this.Logger = Logger;
 		}
 
@@ -82,11 +84,11 @@ namespace HordeServer.Controllers
 			IStream? Stream = await StreamService.GetStreamAsync(new StreamId(Create.StreamId));
 			if (Stream == null)
 			{
-				return BadRequest("Invalid StreamId parameter");
+				return NotFound(Create.StreamId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.CreateJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateJob, Stream.Id);
 			}
 
 			// Get the name of the template ref
@@ -100,17 +102,17 @@ namespace HordeServer.Controllers
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, TemplateRef, AclAction.CreateJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateJob, Stream.Id);
 			}
 
 			ITemplate? Template = await TemplateCollection.GetAsync(TemplateRef.Hash);
 			if (Template == null)
 			{
-				return BadRequest($"Missing template referenced by {Create.TemplateId}");
+				return BadRequest("Missing template referenced by {TemplateId}", Create.TemplateId);
 			}
 			if (!Template.AllowPreflights && Create.PreflightChange > 0)
 			{
-				return BadRequest("Template does not allow preflights");
+				return BadRequest("Template {TemplateId} does not allow preflights", Create.TemplateId);
 			}
 
 			// Get the name of the new job
@@ -169,8 +171,39 @@ namespace HordeServer.Controllers
 				}
 			}
 
+			// Check the preflight change is valid
+			if (Create.PreflightChange != null)
+			{
+				CheckShelfResult Result = await Perforce.CheckShelfAsync(Stream.ClusterName, Stream.Name, Create.PreflightChange.Value, null);
+				switch (Result)
+				{
+					case CheckShelfResult.Ok:
+						break;
+					case CheckShelfResult.NoChange:
+						return BadRequest(KnownLogEvents.Horde_InvalidPreflight, "CL {Change} does not exist", Create.PreflightChange);
+					case CheckShelfResult.NoShelvedFiles:
+						return BadRequest(KnownLogEvents.Horde_InvalidPreflight, "CL {Change} does not contain any shelved files", Create.PreflightChange);
+					case CheckShelfResult.WrongStream:
+						return BadRequest(KnownLogEvents.Horde_InvalidPreflight, "CL {Change} does not contain files in {Stream}", Create.PreflightChange, Stream.Name);
+					case CheckShelfResult.MixedStream:
+						return BadRequest(KnownLogEvents.Horde_InvalidPreflight, "CL {Change} contains files from multiple streams", Create.PreflightChange);
+					default:
+						return BadRequest(KnownLogEvents.Horde_InvalidPreflight, "CL {Change} cannot be preflighted ({Result})", Create.PreflightChange, Result);
+				}
+			}
+
+			bool? UpdateIssues = null;
+			if (Template.UpdateIssues)
+			{
+				UpdateIssues = true;
+			}
+			else if (Create.UpdateIssues.HasValue)
+			{
+				UpdateIssues = Create.UpdateIssues.Value;
+			}
+
 			// Create the job
-			IJob Job = await JobService.CreateJobAsync(null, Stream, TemplateRefId, Template.Id, Graph, Name, Change, CodeChange, Create.PreflightChange, null, User.GetUserId(), Priority, Create.AutoSubmit, Create.UpdateIssues, TemplateRef.ChainedJobs, TemplateRef.ShowUgsBadges, TemplateRef.ShowUgsAlerts, TemplateRef.NotificationChannel, TemplateRef.NotificationChannelFilter, Arguments);
+			IJob Job = await JobService.CreateJobAsync(null, Stream, TemplateRefId, Template.Id, Graph, Name, Change, CodeChange, Create.PreflightChange, null, User.GetUserId(), Priority, Create.AutoSubmit, UpdateIssues, TemplateRef.ChainedJobs, TemplateRef.ShowUgsBadges, TemplateRef.ShowUgsAlerts, TemplateRef.NotificationChannel, TemplateRef.NotificationChannelFilter, Arguments);
 			await UpdateNotificationsAsync(Job.Id, new UpdateNotificationsRequest { Slack = true });
 			return new CreateJobResponse(Job.Id.ToString());
 		}
@@ -185,15 +218,15 @@ namespace HordeServer.Controllers
 		/// <returns></returns>
 		async Task<int> ExecuteChangeQueryAsync(IStream Stream, TemplateRefId TemplateId, string? Target, List<JobStepOutcome> Outcomes)
 		{
-			IList<IJob> Jobs = await JobService.FindJobsAsync(StreamId: Stream.Id, Templates: new[] { TemplateId }, Target: Target, State: new[] { JobStepState.Completed }, Outcome: Outcomes.ToArray(), Count: 1);
+			IList<IJob> Jobs = await JobService.FindJobsAsync(StreamId: Stream.Id, Templates: new[] { TemplateId }, Target: Target, State: new[] { JobStepState.Completed }, Outcome: Outcomes.ToArray(), Count: 1, ExcludeUserJobs: true);
 			if (Jobs.Count == 0)
 			{
-				Logger.LogInformation("Unable to find successful build of {TemplateRefId} target {Target}. Using latest change instead", TemplateId, Target);
+				Logger.LogInformation("Unable to find successful build of {TemplateId} target {Target}. Using latest change instead", TemplateId, Target);
 				return await Perforce.GetLatestChangeAsync(Stream.ClusterName, Stream.Name, null);
 			}
 			else
 			{
-				Logger.LogInformation("Last successful build of {TemplateRefId} target {Target} was job {JobId} at change {Change}", TemplateId, Target, Jobs[0].Id, Jobs[0].Change);
+				Logger.LogInformation("Last successful build of {TemplateId} target {Target} was job {JobId} at change {Change}", TemplateId, Target, Jobs[0].Id, Jobs[0].Change);
 				return Jobs[0].Change;
 			}
 		}
@@ -210,15 +243,15 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.DeleteJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.DeleteJob, JobId);
 			}
 			if (!await JobService.DeleteJobAsync(Job))
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			return Ok();
 		}
@@ -236,17 +269,17 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			StreamPermissionsCache PermissionsCache = new StreamPermissionsCache();
 			if (!await JobService.AuthorizeAsync(Job, AclAction.UpdateJob, User, PermissionsCache))
 			{
-				return Forbid();
+				return Forbid(AclAction.UpdateJob, JobId);
 			}
 			if (Request.Acl != null && !await JobService.AuthorizeAsync(Job, AclAction.ChangePermissions, User, PermissionsCache))
 			{
-				return Forbid();
+				return Forbid(AclAction.ChangePermissions, JobId);
 			}
 
 			// Convert legacy behavior of clearing out the argument to setting the aborted flag
@@ -265,7 +298,7 @@ namespace HordeServer.Controllers
 			IJob? NewJob = await JobService.UpdateJobAsync(Job, Name: Request.Name, Priority: Request.Priority, AutoSubmit: Request.AutoSubmit, AbortedByUserId: AbortedByUserId, Arguments: Request.Arguments);
 			if (NewJob == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			return Ok();
 		}
@@ -283,11 +316,11 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.CreateSubscription, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateSubscription, JobId);
 			}
 
 			ObjectId TriggerId = Job.NotificationTriggerId ?? ObjectId.GenerateNewId();
@@ -295,7 +328,7 @@ namespace HordeServer.Controllers
 			Job = await JobService.UpdateJobAsync(Job, null, null, null, null, TriggerId, null, null);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			await NotificationService.UpdateSubscriptionsAsync(TriggerId, User, Request.Email, Request.Slack);
@@ -314,11 +347,11 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.CreateSubscription, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateSubscription, JobId);
 			}
 
 			INotificationSubscription? Subscription;
@@ -348,13 +381,13 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			StreamPermissionsCache Cache = new StreamPermissionsCache();
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, Cache))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 			if (ModifiedAfter != null && Job.UpdateTimeUtc <= ModifiedAfter.Value)
 			{
@@ -363,7 +396,8 @@ namespace HordeServer.Controllers
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
 			bool bIncludeAcl = await JobService.AuthorizeAsync(Job, AclAction.ViewPermissions, User, Cache);
-			return await CreateJobResponseAsync(Job, Graph, bIncludeAcl, Filter);
+			bool bIncludeCosts = await JobService.AuthorizeAsync(Job, AclAction.ViewCosts, User, Cache);
+			return await CreateJobResponseAsync(Job, Graph, bIncludeAcl, bIncludeCosts, Filter);
 		}
 
 		/// <summary>
@@ -372,17 +406,18 @@ namespace HordeServer.Controllers
 		/// <param name="Job">The job document</param>
 		/// <param name="Graph">The graph for this job</param>
 		/// <param name="bIncludeAcl">Whether to include the ACL in the response</param>
+		/// <param name="bIncludeCosts">Whether to include costs in the response</param>
 		/// <param name="Filter">Filter for the properties to return</param>
 		/// <returns>Object containing the requested properties</returns>
-		async Task<object> CreateJobResponseAsync(IJob Job, IGraph Graph, bool bIncludeAcl, PropertyFilter? Filter)
+		async Task<object> CreateJobResponseAsync(IJob Job, IGraph Graph, bool bIncludeAcl, bool bIncludeCosts, PropertyFilter? Filter)
 		{
 			if (Filter == null)
 			{
-				return await CreateJobResponseAsync(Job, Graph, true, true, bIncludeAcl);
+				return await CreateJobResponseAsync(Job, Graph, true, true, bIncludeAcl, bIncludeCosts);
 			}
 			else
 			{
-				return Filter.ApplyTo(await CreateJobResponseAsync(Job, Graph, Filter.Includes(nameof(GetJobResponse.Batches)), Filter.Includes(nameof(GetJobResponse.Labels)) || Filter.Includes(nameof(GetJobResponse.DefaultLabel)), bIncludeAcl));
+				return Filter.ApplyTo(await CreateJobResponseAsync(Job, Graph, Filter.Includes(nameof(GetJobResponse.Batches)), Filter.Includes(nameof(GetJobResponse.Labels)) || Filter.Includes(nameof(GetJobResponse.DefaultLabel)), bIncludeAcl, bIncludeCosts));
 			}
 		}
 
@@ -394,8 +429,9 @@ namespace HordeServer.Controllers
 		/// <param name="bIncludeBatches">Whether to include the job batches in the response</param>
 		/// <param name="bIncludeLabels">Whether to include the job aggregates in the response</param>
 		/// <param name="bIncludeAcl">Whether to include the ACL in the response</param>
+		/// <param name="bIncludeCosts">Whether to include costs of running particular agents</param>
 		/// <returns>The response object</returns>
-		async ValueTask<GetJobResponse> CreateJobResponseAsync(IJob Job, IGraph Graph, bool bIncludeBatches, bool bIncludeLabels, bool bIncludeAcl)
+		async ValueTask<GetJobResponse> CreateJobResponseAsync(IJob Job, IGraph Graph, bool bIncludeBatches, bool bIncludeLabels, bool bIncludeAcl, bool bIncludeCosts)
 		{
 			GetThinUserInfoResponse? StartedByUserInfo = null;
 			if (Job.StartedByUserId != null)
@@ -423,7 +459,7 @@ namespace HordeServer.Controllers
 					Response.Batches = new List<GetBatchResponse>();
 					foreach (IJobStepBatch Batch in Job.Batches)
 					{
-						Response.Batches.Add(await CreateBatchResponseAsync(Batch));
+						Response.Batches.Add(await CreateBatchResponseAsync(Batch, bIncludeCosts));
 					}
 				}
 				if (bIncludeLabels)
@@ -439,15 +475,23 @@ namespace HordeServer.Controllers
 		/// Get the response object for a batch
 		/// </summary>
 		/// <param name="Batch"></param>
+		/// <param name="bIncludeCosts"></param>
 		/// <returns></returns>
-		async ValueTask<GetBatchResponse> CreateBatchResponseAsync(IJobStepBatch Batch)
+		async ValueTask<GetBatchResponse> CreateBatchResponseAsync(IJobStepBatch Batch, bool bIncludeCosts)
 		{
 			List<GetStepResponse> Steps = new List<GetStepResponse>();
 			foreach (IJobStep Step in Batch.Steps)
 			{
 				Steps.Add(await CreateStepResponseAsync(Step));
 			}
-			return new GetBatchResponse(Batch, Steps);
+
+			double? AgentRate = null;
+			if (Batch.AgentId != null && bIncludeCosts)
+			{
+				AgentRate = await AgentService.GetRateAsync(Batch.AgentId.Value);
+			}
+
+			return new GetBatchResponse(Batch, Steps, AgentRate);
 		}
 
 		/// <summary>
@@ -486,11 +530,11 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, Job.Id);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
@@ -511,16 +555,20 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IJobTiming JobTiming = await JobService.GetJobTimingAsync(Job);
-
 			IGraph Graph = await JobService.GetGraphAsync(Job);
+			return PropertyFilter.Apply(await CreateJobTimingResponse(Job, Graph, JobTiming), Filter);
+		}
+
+		private async Task<GetJobTimingResponse> CreateJobTimingResponse(IJob Job, IGraph Graph, IJobTiming JobTiming, bool IncludeJobResponse = false)
+		{
 			Dictionary<INode, TimingInfo> NodeToTimingInfo = Job.GetTimingInfo(Graph, JobTiming);
 
 			Dictionary<string, GetStepTimingInfoResponse> Steps = new Dictionary<string, GetStepTimingInfoResponse>();
@@ -540,7 +588,55 @@ namespace HordeServer.Controllers
 				Labels.Add(new GetLabelTimingInfoResponse(Label, TimingInfo));
 			}
 
-			return PropertyFilter.Apply(new GetJobTimingResponse(Steps, Labels), Filter);
+			GetJobResponse? JobResponse = null;
+			if (IncludeJobResponse)
+			{
+				JobResponse = await CreateJobResponseAsync(Job, Graph, true, true, false, true);
+			}
+
+			return new GetJobTimingResponse(Job, JobResponse, Steps, Labels);
+		}
+		
+		/// <summary>
+		/// Find timing information about the graph for multiple jobs
+		/// </summary>
+		/// <param name="StreamId">The stream to search in</param>
+		/// <param name="Templates">List of templates to find</param>
+		/// <param name="Filter">Filter for the fields to return</param>
+		/// <param name="Count">Number of results to return</param>
+		/// <returns>Job timings for each job ID</returns>
+		[HttpGet]
+		[Route("/api/v1/jobs/timing")]
+		[ProducesResponseType(typeof(FindJobTimingsResponse), 200)]
+		public async Task<ActionResult<object>> FindJobTimingsAsync(
+			[FromQuery] string? StreamId = null,
+			[FromQuery(Name = "template")] string[]? Templates = null,
+			[FromQuery] PropertyFilter? Filter = null,
+			[FromQuery] int Count = 100)
+		{
+			if (StreamId == null)
+			{
+				return BadRequest("Missing/invalid query parameter streamId");
+			}
+
+			TemplateRefId[] TemplateRefIds = Templates switch
+			{
+				{ Length: > 0 } => Templates.Select(x => new TemplateRefId(x)).ToArray(),
+				_ => Array.Empty<TemplateRefId>()
+			};
+
+			List<IJob> Jobs = await JobService.FindJobsByStreamWithTemplatesAsync(new StreamId(StreamId), TemplateRefIds, Count: Count, ConsistentRead: false);
+
+			Dictionary<string, GetJobTimingResponse> JobTimings = await Jobs.ToAsyncEnumerable()
+				.WhereAwait(async Job => await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
+				.ToDictionaryAwaitAsync(x => ValueTask.FromResult(x.Id.ToString()), async Job =>
+				{
+					IJobTiming JobTiming = await JobService.GetJobTimingAsync(Job);
+					IGraph Graph = await JobService.GetGraphAsync(Job);
+					return await CreateJobTimingResponse(Job, Graph, JobTiming, true);
+				});
+			
+			return PropertyFilter.Apply(new FindJobTimingsResponse(JobTimings), Filter);
 		}
 
 		/// <summary>
@@ -557,17 +653,17 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null || Job.TemplateHash == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			ITemplate? Template = await TemplateCollection.GetAsync(Job.TemplateHash);
 			if(Template == null)
 			{
-				return NotFound();
+				return NotFound(Job.StreamId, Job.TemplateId);
 			}
 
 			return new GetTemplateResponse(Template).ApplyFilter(Filter);
@@ -583,6 +679,7 @@ namespace HordeServer.Controllers
 		/// <param name="MinChange">The minimum changelist number</param>
 		/// <param name="MaxChange">The maximum changelist number</param>
 		/// <param name="IncludePreflight">Whether to include preflight jobs</param>
+		/// <param name="PreflightOnly">Whether to only include preflight jobs</param>
 		/// <param name="PreflightChange">The preflighted changelist</param>
 		/// <param name="StartedByUserId">User id for which to include jobs</param>
 		/// <param name="PreflightStartedByUserId">User id for which to include preflight jobs</param>
@@ -608,6 +705,7 @@ namespace HordeServer.Controllers
 			[FromQuery] int? MinChange = null,
 			[FromQuery] int? MaxChange = null,
 			[FromQuery] bool IncludePreflight = true,
+			[FromQuery] bool? PreflightOnly = null,
 			[FromQuery] int? PreflightChange = null,
 			[FromQuery] string? PreflightStartedByUserId = null,
 			[FromQuery] string? StartedByUserId = null,
@@ -650,13 +748,99 @@ namespace HordeServer.Controllers
 			using (IScope _ = GlobalTracer.Instance.BuildSpan("FindJobs").StartActive())
 			{
 				Jobs = await JobService.FindJobsAsync(JobIdValues, StreamIdValue, Name, TemplateRefIds, MinChange,
-					MaxChange, PreflightChange, PreflightStartedByUserIdValue, StartedByUserIdValue, MinCreateTime?.UtcDateTime, MaxCreateTime?.UtcDateTime, Target, State, Outcome,
-					ModifiedBefore, ModifiedAfter, Index, Count);
+					MaxChange, PreflightChange, PreflightOnly, PreflightStartedByUserIdValue, StartedByUserIdValue, MinCreateTime?.UtcDateTime, MaxCreateTime?.UtcDateTime, Target, State, Outcome,
+					ModifiedBefore, ModifiedAfter, Index, Count, false);
 			}
 
 			StreamPermissionsCache PermissionsCache = new StreamPermissionsCache();
 
 			List<object> Responses = new List<object>();
+			foreach (IJob Job in Jobs)
+			{
+				using IScope JobScope = GlobalTracer.Instance.BuildSpan("JobIteration").StartActive();
+				JobScope.Span.SetTag("jobId", Job.Id.ToString());
+
+				if (Job.GraphHash == null)
+				{
+					Logger.LogWarning("Job {JobId} has no GraphHash", Job.Id);
+					continue;
+				}
+
+				bool ViewJobAuthorized;
+				using (IScope _ = GlobalTracer.Instance.BuildSpan("AuthorizeViewJob").StartActive())
+				{
+					ViewJobAuthorized = await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, PermissionsCache);
+				}
+				
+				if (ViewJobAuthorized)
+				{
+					IGraph Graph;
+					using (IScope _ = GlobalTracer.Instance.BuildSpan("GetGraph").StartActive())
+					{
+						Graph = await JobService.GetGraphAsync(Job);
+					}
+
+					bool bIncludeAcl;
+					using (IScope _ = GlobalTracer.Instance.BuildSpan("AuthorizeViewPermissions").StartActive())
+					{
+						bIncludeAcl = await JobService.AuthorizeAsync(Job, AclAction.ViewPermissions, User, PermissionsCache);
+					}
+
+					bool bIncludeCosts;
+					using (IScope _ = GlobalTracer.Instance.BuildSpan("AuthorizeViewCosts").StartActive())
+					{
+						bIncludeCosts = await JobService.AuthorizeAsync(Job, AclAction.ViewCosts, User, PermissionsCache);
+					}
+
+					using (IScope _ = GlobalTracer.Instance.BuildSpan("CreateResponse").StartActive())
+					{
+						Responses.Add(await CreateJobResponseAsync(Job, Graph, bIncludeAcl, bIncludeCosts, Filter));
+					}
+				}
+			}
+			return Responses;
+		}
+
+		/// <summary>
+		/// Find jobs for a stream with given templates, sorted by creation date
+		/// </summary>
+		/// <param name="StreamId">The stream to search for</param>
+		/// <param name="Templates">List of templates to find</param>
+		/// <param name="PreflightStartedByUserId">User id for which to include preflight jobs</param>
+		/// <param name="MaxCreateTime">Maximum creation time</param>
+		/// <param name="ModifiedAfter">If specified, only jobs updated after the given time will be returned</param>
+		/// <param name="Filter">Filter for properties to return</param>
+		/// <param name="Index">Index of the first result to be returned</param>
+		/// <param name="Count">Number of results to return</param>
+		/// <param name="ConsistentRead">If a read to the primary database is required, for read consistency. Usually not required.</param>
+		/// <returns>List of jobs</returns>
+		[HttpGet]
+		[Route("/api/v1/jobs/streams/{StreamId}")]
+		[ProducesResponseType(typeof(List<GetJobResponse>), 200)]
+		public async Task<ActionResult<List<object>>> FindJobsByStreamWithTemplatesAsync(
+			string StreamId,
+			[FromQuery(Name = "template")] string[] Templates,
+			[FromQuery] string? PreflightStartedByUserId = null,
+			[FromQuery] DateTimeOffset? MaxCreateTime = null,
+			[FromQuery] DateTimeOffset? ModifiedAfter = null,
+			[FromQuery] PropertyFilter? Filter = null,
+			[FromQuery] int Index = 0,
+			[FromQuery] int Count = 100,
+			[FromQuery] bool ConsistentRead = false)
+		{
+			StreamId StreamIdValue = new StreamId(StreamId);
+			TemplateRefId[] TemplateRefIds = Templates.Select(x => new TemplateRefId(x)).ToArray();
+			UserId? PreflightStartedByUserIdValue = PreflightStartedByUserId != null ? new UserId(PreflightStartedByUserId) : null;
+			Count = Math.Min(1000, Count);
+
+			List<IJob> Jobs = await JobService.FindJobsByStreamWithTemplatesAsync(StreamIdValue, TemplateRefIds, PreflightStartedByUserIdValue, MaxCreateTime, ModifiedAfter, Index, Count, ConsistentRead);
+			return await CreateAuthorizedJobResponses(Jobs, Filter);
+		}
+
+		private async Task<List<object>> CreateAuthorizedJobResponses(List<IJob> Jobs, PropertyFilter? Filter = null)
+		{
+			StreamPermissionsCache PermissionsCache = new ();
+			List<object> Responses = new ();
 			foreach (IJob Job in Jobs)
 			{
 				using IScope JobScope = GlobalTracer.Instance.BuildSpan("JobIteration").StartActive();
@@ -682,12 +866,20 @@ namespace HordeServer.Controllers
 						bIncludeAcl = await JobService.AuthorizeAsync(Job, AclAction.ViewPermissions, User, PermissionsCache);
 					}
 
+					bool bIncludeCosts;
+					using (IScope _ = GlobalTracer.Instance.BuildSpan("AuthorizeViewCosts").StartActive())
+					{
+						bIncludeCosts = await JobService.AuthorizeAsync(Job, AclAction.ViewCosts, User, PermissionsCache);
+					}
+
 					using (IScope _ = GlobalTracer.Instance.BuildSpan("CreateResponse").StartActive())
 					{
-						Responses.Add(await CreateJobResponseAsync(Job, Graph, bIncludeAcl, Filter));
+						Responses.Add(await CreateJobResponseAsync(Job, Graph, bIncludeAcl, bIncludeCosts, Filter));
 					}
 				}
 			}
+
+			
 			return Responses;
 		}
 
@@ -708,11 +900,11 @@ namespace HordeServer.Controllers
 				IJob? Job = await JobService.GetJobAsync(JobId);
 				if (Job == null)
 				{
-					return NotFound();
+					return NotFound(JobId);
 				}
 				if (!await JobService.AuthorizeAsync(Job, AclAction.ExecuteJob, User, null))
 				{
-					return Forbid();
+					return Forbid(AclAction.ExecuteJob, JobId);
 				}
 
 				IGraph Graph = await JobService.GetGraphAsync(Job);
@@ -740,11 +932,11 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
@@ -766,17 +958,17 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
 			if (GroupIdx < 0 || GroupIdx >= Graph.Groups.Count)
 			{
-				return NotFound();
+				return NotFound(JobId, GroupIdx);
 			}
 
 			return new GetGroupResponse(Graph.Groups[GroupIdx], Graph.Groups).ApplyFilter(Filter);
@@ -796,17 +988,17 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
 			if (GroupIdx < 0 || GroupIdx >= Graph.Groups.Count)
 			{
-				return NotFound();
+				return NotFound(JobId, GroupIdx);
 			}
 
 			return Graph.Groups[GroupIdx].Nodes.ConvertAll(x => new GetNodeResponse(x, Graph.Groups).ApplyFilter(Filter));
@@ -827,17 +1019,21 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
-			if (GroupIdx < 0 || GroupIdx >= Graph.Groups.Count || NodeIdx < 0 || NodeIdx >= Graph.Groups[GroupIdx].Nodes.Count)
+			if (GroupIdx < 0 || GroupIdx >= Graph.Groups.Count)
 			{
-				return NotFound();
+				return NotFound(JobId, GroupIdx);
+			}
+			if(NodeIdx < 0 || NodeIdx >= Graph.Groups[GroupIdx].Nodes.Count)
+			{
+				return NotFound(JobId, GroupIdx, NodeIdx);
 			}
 
 			return new GetNodeResponse(Graph.Groups[GroupIdx].Nodes[NodeIdx], Graph.Groups).ApplyFilter(Filter);
@@ -857,19 +1053,21 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
-			}
-			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
-			{
-				return Forbid();
+				return NotFound(JobId);
 			}
 
-			IGraph Graph = await JobService.GetGraphAsync(Job);
+			StreamPermissionsCache Cache = new StreamPermissionsCache();
+			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, Cache))
+			{
+				return Forbid(AclAction.ViewJob, JobId);
+			}
+
+			bool bIncludeCosts = await JobService.AuthorizeAsync(Job, AclAction.ViewCosts, User, Cache);
 
 			List<object> Responses = new List<object>();
 			foreach (IJobStepBatch Batch in Job.Batches)
 			{
-				GetBatchResponse Response = await CreateBatchResponseAsync(Batch);
+				GetBatchResponse Response = await CreateBatchResponseAsync(Batch, bIncludeCosts);
 				Responses.Add(Response.ApplyFilter(Filter));
 			}
 			return Responses;
@@ -883,30 +1081,28 @@ namespace HordeServer.Controllers
 		/// <param name="Request">Updates to apply to the node</param>
 		[HttpPut]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}")]
-		public async Task<ActionResult> UpdateBatchAsync(JobId JobId, string BatchId, [FromBody] UpdateBatchRequest Request)
+		public async Task<ActionResult> UpdateBatchAsync(JobId JobId, SubResourceId BatchId, [FromBody] UpdateBatchRequest Request)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
-			IJobStepBatch? Batch = Job.Batches.FirstOrDefault(x => x.Id == BatchIdValue);
+			IJobStepBatch? Batch = Job.Batches.FirstOrDefault(x => x.Id == BatchId);
 			if (Batch == null)
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId);
 			}
 			if (Batch.SessionId == null || !User.HasSessionClaim(Batch.SessionId.Value))
 			{
-				return Forbid();
+				return Forbid("Missing session claim for job {JobId} batch {BatchId}", JobId, BatchId);
 			}
 
-			IJob? NewJob = await JobService.UpdateBatchAsync(Job, BatchIdValue, Request.LogId?.ToObjectId<ILogFile>(), Request.State);
+			IJob? NewJob = await JobService.UpdateBatchAsync(Job, BatchId, Request.LogId?.ToObjectId<ILogFile>(), Request.State);
 			if (NewJob == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			return Ok();
 		}
@@ -921,31 +1117,33 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}")]
 		[ProducesResponseType(typeof(GetBatchResponse), 200)]
-		public async Task<ActionResult<object>> GetBatchAsync(JobId JobId, string BatchId, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<object>> GetBatchAsync(JobId JobId, SubResourceId BatchId, [FromQuery] PropertyFilter? Filter = null)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
-			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
+
+			StreamPermissionsCache Cache = new StreamPermissionsCache();
+			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, Cache))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
+
+			bool bIncludeCosts = await JobService.AuthorizeAsync(Job, AclAction.ViewCosts, User, Cache);
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
 			foreach (IJobStepBatch Batch in Job.Batches)
 			{
-				if (Batch.Id == BatchIdValue)
+				if (Batch.Id == BatchId)
 				{
-					GetBatchResponse Response = await CreateBatchResponseAsync(Batch);
+					GetBatchResponse Response = await CreateBatchResponseAsync(Batch, bIncludeCosts);
 					return Response.ApplyFilter(Filter);
 				}
 			}
 
-			return NotFound();
+			return NotFound(JobId, BatchId);
 		}
 
 		/// <summary>
@@ -958,27 +1156,23 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps")]
 		[ProducesResponseType(typeof(List<GetStepResponse>), 200)]
-		public async Task<ActionResult<List<object>>> GetStepsAsync(JobId JobId, string BatchId, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<List<object>>> GetStepsAsync(JobId JobId, SubResourceId BatchId, [FromQuery] PropertyFilter? Filter = null)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			IGraph Graph = await JobService.GetGraphAsync(Job);
 			foreach (IJobStepBatch Batch in Job.Batches)
 			{
-				if (Batch.Id == BatchIdValue)
+				if (Batch.Id == BatchId)
 				{
-					INodeGroup Group = Graph.Groups[Batch.GroupIdx];
-
 					List<object> Responses = new List<object>();
 					foreach (IJobStep Step in Batch.Steps)
 					{
@@ -989,7 +1183,7 @@ namespace HordeServer.Controllers
 				}
 			}
 
-			return NotFound();
+			return NotFound(JobId, BatchId);
 		}
 
 		/// <summary>
@@ -1001,24 +1195,21 @@ namespace HordeServer.Controllers
 		/// <param name="Request">Updates to apply to the node</param>
 		[HttpPut]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}")]
-		public async Task<ActionResult<UpdateStepResponse>> UpdateStepAsync(JobId JobId, string BatchId, string StepId, [FromBody] UpdateStepRequest Request)
+		public async Task<ActionResult<UpdateStepResponse>> UpdateStepAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId, [FromBody] UpdateStepRequest Request)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-			SubResourceId StepIdValue = StepId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			// Check permissions for updating this step. Only the agent executing the step can modify the state of it.
 			if (Request.State != JobStepState.Unspecified || Request.Outcome != JobStepOutcome.Unspecified)
 			{
-				IJobStepBatch? Batch = Job.Batches.FirstOrDefault(x => x.Id == BatchIdValue);
+				IJobStepBatch? Batch = Job.Batches.FirstOrDefault(x => x.Id == BatchId);
 				if (Batch == null)
 				{
-					return NotFound();
+					return NotFound(JobId, BatchId);
 				}
 				if (!Batch.SessionId.HasValue || !User.HasSessionClaim(Batch.SessionId.Value))
 				{
@@ -1029,14 +1220,14 @@ namespace HordeServer.Controllers
 			{
 				if (!await JobService.AuthorizeAsync(Job, AclAction.RetryJobStep, User, null))
 				{
-					return Forbid();
+					return Forbid(AclAction.RetryJobStep, JobId);
 				}
 			}
 			if (Request.Properties != null)
 			{
 				if (!await JobService.AuthorizeAsync(Job, AclAction.UpdateJob, User, null))
 				{
-					return Forbid();
+					return Forbid(AclAction.UpdateJob, JobId);
 				}
 			}
 
@@ -1045,16 +1236,16 @@ namespace HordeServer.Controllers
 
 			try
 			{
-				IJob? NewJob = await JobService.UpdateStepAsync(Job, BatchIdValue, StepIdValue, Request.State, Request.Outcome, Request.AbortRequested, AbortByUser, Request.LogId?.ToObjectId<ILogFile>(), null, RetryByUser, Request.Priority, null, Request.Properties);
+				IJob? NewJob = await JobService.UpdateStepAsync(Job, BatchId, StepId, Request.State, Request.Outcome, Request.AbortRequested, AbortByUser, Request.LogId?.ToObjectId<ILogFile>(), null, RetryByUser, Request.Priority, null, Request.Properties);
 				if (NewJob == null)
 				{
-					return NotFound();
+					return NotFound(JobId);
 				}
 
 				UpdateStepResponse Response = new UpdateStepResponse();
 				if (Request.Retry ?? false)
 				{
-					JobStepRefId? RetriedStepId = FindRetriedStep(Job, BatchIdValue, StepIdValue);
+					JobStepRefId? RetriedStepId = FindRetriedStep(Job, BatchId, StepId);
 					if (RetriedStepId != null)
 					{
 						Response.BatchId = RetriedStepId.Value.BatchId.ToString();
@@ -1110,38 +1301,35 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}")]
 		[ProducesResponseType(typeof(GetStepResponse), 200)]
-		public async Task<ActionResult<object>> GetStepAsync(JobId JobId, string BatchId, string StepId, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<object>> GetStepAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId, [FromQuery] PropertyFilter? Filter = null)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-			SubResourceId StepIdValue = StepId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
 
 			foreach (IJobStepBatch Batch in Job.Batches)
 			{
-				if (Batch.Id == BatchIdValue)
+				if (Batch.Id == BatchId)
 				{
 					foreach (IJobStep Step in Batch.Steps)
 					{
-						if (Step.Id == StepIdValue)
+						if (Step.Id == StepId)
 						{
 							GetStepResponse Response = await CreateStepResponseAsync(Step);
 							return Response.ApplyFilter(Filter);
 						}
 					}
-					break;
+					return NotFound(JobId, BatchId, StepId);
 				}
 			}
 
-			return NotFound();
+			return NotFound(JobId, BatchId);
 		}
 
 		/// <summary>
@@ -1154,38 +1342,35 @@ namespace HordeServer.Controllers
 		/// <returns>Information about the requested job</returns>
 		[HttpPut]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}/notifications")]
-		public async Task<ActionResult> UpdateStepNotificationsAsync(JobId JobId, string BatchId, string StepId, [FromBody] UpdateNotificationsRequest Request)
+		public async Task<ActionResult> UpdateStepNotificationsAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId, [FromBody] UpdateNotificationsRequest Request)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-			SubResourceId StepIdValue = StepId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.CreateSubscription, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateSubscription, JobId);
 			}
 
-			if (!Job.TryGetBatch(BatchIdValue, out IJobStepBatch? Batch))
+			if (!Job.TryGetBatch(BatchId, out IJobStepBatch? Batch))
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId);
 			}
 
-			if (!Batch.TryGetStep(StepIdValue, out IJobStep? Step))
+			if (!Batch.TryGetStep(StepId, out IJobStep? Step))
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId, StepId);
 			}
 
 			ObjectId? TriggerId = Step.NotificationTriggerId;
 			if (TriggerId == null)
 			{
 				TriggerId = ObjectId.GenerateNewId();
-				if (await JobService.UpdateStepAsync(Job, BatchIdValue, StepIdValue, JobStepState.Unspecified, JobStepOutcome.Unspecified, null, null, null, TriggerId, null, null, null) == null)
+				if (await JobService.UpdateStepAsync(Job, BatchId, StepId, JobStepState.Unspecified, JobStepOutcome.Unspecified, null, null, null, TriggerId, null, null, null) == null)
 				{
-					return NotFound();
+					return NotFound(JobId, BatchId, StepId);
 				}
 			}
 
@@ -1202,22 +1387,26 @@ namespace HordeServer.Controllers
 		/// <returns>Information about the requested job</returns>
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}/notifications")]
-		public async Task<ActionResult<GetNotificationResponse>> GetStepNotificationsAsync(JobId JobId, string BatchId, string StepId)
+		public async Task<ActionResult<GetNotificationResponse>> GetStepNotificationsAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId)
 		{
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			IJobStep? Step;
-			if(!Job.TryGetStep(BatchId.ToSubResourceId(), StepId.ToSubResourceId(), out Step))
+			if (!Job.TryGetBatch(BatchId, out IJobStepBatch? Batch))
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId);
+			}
+			if (!Batch.TryGetStep(StepId, out Step))
+			{
+				return NotFound(JobId, BatchId, StepId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.CreateSubscription, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.CreateSubscription, JobId);
 			}
 
 			INotificationSubscription? Subscription;
@@ -1242,26 +1431,27 @@ namespace HordeServer.Controllers
 		/// <returns>List of nodes to be executed</returns>
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}/artifacts/{*Name}")]
-		public async Task<ActionResult> GetArtifactAsync(JobId JobId, string BatchId, string StepId, string Name)
+		public async Task<ActionResult> GetArtifactAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId, string Name)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-			SubResourceId StepIdValue = StepId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
-			if (!Job.TryGetStep(BatchId.ToSubResourceId(), StepId.ToSubResourceId(), out _))
+			if (!Job.TryGetBatch(BatchId, out IJobStepBatch? Batch))
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId);
+			}
+			if (!Batch.TryGetStep(StepId, out _))
+			{
+				return NotFound(JobId, BatchId, StepId);
 			}
 
-			List<IArtifact> Artifacts = await ArtifactCollection.GetArtifactsAsync(JobId, StepIdValue, Name);
+			List<IArtifact> Artifacts = await ArtifactCollection.GetArtifactsAsync(JobId, StepId, Name);
 			if (Artifacts.Count == 0)
 			{
 				return NotFound();
@@ -1280,26 +1470,27 @@ namespace HordeServer.Controllers
 		/// <returns>List of nodes to be executed</returns>
 		[HttpGet]
 		[Route("/api/v1/jobs/{JobId}/batches/{BatchId}/steps/{StepId}/trace")]
-		public async Task<ActionResult> GetStepTraceAsync(JobId JobId, string BatchId, string StepId)
+		public async Task<ActionResult> GetStepTraceAsync(JobId JobId, SubResourceId BatchId, SubResourceId StepId)
 		{
-			SubResourceId BatchIdValue = BatchId.ToSubResourceId();
-			SubResourceId StepIdValue = StepId.ToSubResourceId();
-
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 			if (!await JobService.AuthorizeAsync(Job, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, JobId);
 			}
-			if (!Job.TryGetStep(BatchId.ToSubResourceId(), StepId.ToSubResourceId(), out _))
+			if (!Job.TryGetBatch(BatchId, out IJobStepBatch? Batch))
 			{
-				return NotFound();
+				return NotFound(JobId, BatchId);
+			}
+			if (!Batch.TryGetStep(StepId, out _))
+			{
+				return NotFound(JobId, BatchId, StepId);
 			}
 
-			List<IArtifact> Artifacts = await ArtifactCollection.GetArtifactsAsync(JobId, StepIdValue, null);
+			List<IArtifact> Artifacts = await ArtifactCollection.GetArtifactsAsync(JobId, StepId, null);
 			foreach (IArtifact Artifact in Artifacts)
 			{
 				if (Artifact.Name.Equals("trace.json", StringComparison.OrdinalIgnoreCase))
@@ -1326,11 +1517,11 @@ namespace HordeServer.Controllers
 				IJob? Job = await JobService.GetJobAsync(JobId);
 				if (Job == null)
 				{
-					return NotFound();
+					return NotFound(JobId);
 				}
 				if (!await JobService.AuthorizeAsync(Job, AclAction.CreateSubscription, User, null))
 				{
-					return Forbid();
+					return Forbid(AclAction.CreateSubscription, JobId);
 				}
 
 				ObjectId NewTriggerId;
@@ -1367,7 +1558,7 @@ namespace HordeServer.Controllers
 			IJob? Job = await JobService.GetJobAsync(JobId);
 			if (Job == null)
 			{
-				return NotFound();
+				return NotFound(JobId);
 			}
 
 			INotificationSubscription? Subscription;

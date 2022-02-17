@@ -41,6 +41,7 @@ using Status = Grpc.Core.Status;
 using EpicGames.Horde.Storage;
 using EpicGames.Horde.Compute;
 using System.Net;
+using EpicGames.Horde.Storage.Impl;
 
 namespace HordeAgent.Services
 {
@@ -161,6 +162,11 @@ namespace HordeAgent.Services
 		GrpcService GrpcService;
 
 		/// <summary>
+		/// Client interface to the storage system
+		/// </summary>
+		IStorageClient StorageClient;
+
+		/// <summary>
 		/// The working directory
 		/// </summary>
 		DirectoryReference WorkingDir;
@@ -222,13 +228,15 @@ namespace HordeAgent.Services
 		/// <param name="Logger">Log sink</param>
 		/// <param name="OptionsMonitor">The current settings</param>
 		/// <param name="GrpcService">Instance of the Grpc service</param>
+		/// <param name="StorageClient">Instance of the storage client</param>
 		/// <param name="CreateExecutor"></param>
-		public WorkerService(ILogger<WorkerService> Logger, IOptionsMonitor<AgentSettings> OptionsMonitor, GrpcService GrpcService, Func<IRpcConnection, ExecuteJobTask, BeginBatchResponse, IExecutor>? CreateExecutor = null)
+		public WorkerService(ILogger<WorkerService> Logger, IOptionsMonitor<AgentSettings> OptionsMonitor, GrpcService GrpcService, IStorageClient StorageClient, Func<IRpcConnection, ExecuteJobTask, BeginBatchResponse, IExecutor>? CreateExecutor = null)
 		{
 			this.Logger = Logger;
 			this.Settings = OptionsMonitor.CurrentValue;
 			this.ServerProfile = Settings.GetCurrentServerProfile();
 			this.GrpcService = GrpcService;
+			this.StorageClient = StorageClient;
 
 			if (Settings.WorkingDir == null)
 			{
@@ -298,18 +306,26 @@ namespace HordeAgent.Services
 				Stopwatch SessionTime = Stopwatch.StartNew();
 				try
 				{
-					await HandleSessionAsync(StoppingToken);
+					if (ActiveLeases.Count == 0)
+					{
+						await HandleSessionAsync(StoppingToken);
+					}
 				}
 				catch (Exception Ex)
 				{
-					if (StoppingToken.IsCancellationRequested && IsCancellationException(Ex))
-					{
-						break;
-					}
-					else
+					if (!StoppingToken.IsCancellationRequested || !IsCancellationException(Ex))
 					{
 						Logger.LogError(Ex, "Exception while executing session. Restarting.");
 					}
+				}
+
+				try
+				{
+					await DrainLeasesAsync();
+				}
+				catch (Exception Ex)
+				{
+					Logger.LogError(Ex, "Exception while draining leases. Agent may be in an inconsistent state.");
 				}
 
 				if (RequestShutdown)
@@ -350,6 +366,56 @@ namespace HordeAgent.Services
 			}
 			catch (AbandonedMutexException)
 			{
+			}
+		}
+
+		async Task DrainLeasesAsync()
+		{
+			for (int Idx = 0; Idx < ActiveLeases.Count; Idx++)
+			{
+				LeaseInfo ActiveLease = ActiveLeases[Idx];
+				if (ActiveLease.Task == null)
+				{
+					ActiveLeases.RemoveAt(Idx--);
+					Logger.LogInformation("Removed lease {LeaseId}", ActiveLease.Lease.Id);
+				}
+				else
+				{
+					Logger.LogInformation("Cancelling active lease {LeaseId}", ActiveLease.Lease.Id);
+					ActiveLease.CancellationTokenSource.Cancel();
+				}
+			}
+
+			while (ActiveLeases.Count > 0)
+			{
+				List<Task> Tasks = ActiveLeases.Select(x => x.Task!).ToList();
+				Tasks.Add(Task.Delay(TimeSpan.FromMinutes(1.0)));
+				await Task.WhenAny(Tasks);
+
+				for (int Idx = 0; Idx < ActiveLeases.Count; Idx++)
+				{
+					LeaseInfo ActiveLease = ActiveLeases[Idx];
+					if (ActiveLease.Task!.IsCompleted)
+					{
+						ActiveLeases.RemoveAt(Idx--);
+						try
+						{
+							await ActiveLease.Task;
+						}
+						catch (OperationCanceledException)
+						{
+						}
+						catch (Exception Ex)
+						{
+							Logger.LogError(Ex, "Lease {LeaseId} threw an exception while terminating", ActiveLease.Lease.Id);
+						}
+						Logger.LogInformation("Lease {LeaseId} has completed", ActiveLease.Lease.Id);
+					}
+					else
+					{
+						Logger.LogInformation("Still waiting for lease {LeaseId} to terminate...", ActiveLease.Lease.Id);
+					}
+				}
 			}
 		}
 
@@ -420,6 +486,10 @@ namespace HordeAgent.Services
 			// Open a connection to the server
 			await using (IRpcConnection RpcCon = RpcConnection.Create(() => GrpcService.CreateGrpcChannel(CreateSessionResponse.Token), Logger))
 			{
+				// Track how many updates we get in 10 seconds. We'll start rate limiting this if it looks like we've got a problem that's causing us to spam the server.
+				Stopwatch UpdateTimer = Stopwatch.StartNew();
+				Queue<TimeSpan> UpdateTimes = new Queue<TimeSpan>();
+
 				// Loop until we're ready to exit
 				Stopwatch UpdateCapabilitiesTimer = Stopwatch.StartNew();
 				for (; ; )
@@ -460,7 +530,6 @@ namespace HordeAgent.Services
 					{
 						UpdateSessionRequest.Status = AgentStatus.Ok;
 					}
-
 
 					// Update the capabilities every 5m
 					if (UpdateCapabilitiesTimer.Elapsed > TimeSpan.FromMinutes(5.0))
@@ -525,6 +594,21 @@ namespace HordeAgent.Services
 								break;
 							}
 						}
+					}
+
+					// Update the historical update times
+					TimeSpan UpdateTime = UpdateTimer.Elapsed;
+					while (UpdateTimes.TryPeek(out TimeSpan FirstTime) && FirstTime < UpdateTime - TimeSpan.FromMinutes(1.0))
+					{
+						UpdateTimes.Dequeue();
+					}
+					UpdateTimes.Enqueue(UpdateTime);
+
+					// If we're updating too much, introduce an artificial delay
+					if (UpdateTimes.Count > 60)
+					{
+						Logger.LogWarning("Agent is issuing large number of UpdateSession() calls. Delaying for 10 seconds.");
+						await Task.Delay(TimeSpan.FromSeconds(10.0));
 					}
 				}
 
@@ -835,7 +919,7 @@ namespace HordeAgent.Services
 					DirectoryReference LeaseDir = DirectoryReference.Combine(WorkingDir, "Compute", LeaseId);
 					DirectoryReference.CreateDirectory(LeaseDir);
 
-					ComputeTaskExecutor Executor = new ComputeTaskExecutor(Client.Channel, Logger);
+					ComputeTaskExecutor Executor = new ComputeTaskExecutor(StorageClient, Logger);
 					try
 					{
 						Result = await Executor.ExecuteAsync(LeaseId, ComputeTask, LeaseDir, CancellationToken);
@@ -881,13 +965,14 @@ namespace HordeAgent.Services
 			ConformLogger.LogInformation("Conforming, lease {LeaseId}", LeaseId);
 			TerminateProcesses(ConformLogger, CancellationToken);
 
+			bool RemoveUntrackedFiles = ConformTask.RemoveUntrackedFiles;
 			IList<AgentWorkspace> PendingWorkspaces = ConformTask.Workspaces;
 			for (; ;)
 			{
 				// Run the conform task
 				if (Settings.Executor == ExecutorType.Perforce && Settings.PerforceExecutor.RunConform)
 				{
-					await PerforceExecutor.ConformAsync(WorkingDir, PendingWorkspaces, ConformLogger, CancellationToken);
+					await PerforceExecutor.ConformAsync(WorkingDir, PendingWorkspaces, RemoveUntrackedFiles, ConformLogger, CancellationToken);
 				}
 				else
 				{
@@ -898,6 +983,7 @@ namespace HordeAgent.Services
 				UpdateAgentWorkspacesRequest Request = new UpdateAgentWorkspacesRequest();
 				Request.AgentId = AgentId;
 				Request.Workspaces.AddRange(PendingWorkspaces);
+				Request.RemoveUntrackedFiles = RemoveUntrackedFiles;
 
 				UpdateAgentWorkspacesResponse Response = await RpcConnection.InvokeAsync(x => x.UpdateAgentWorkspacesAsync(Request, null, null, CancellationToken), new RpcContext(), CancellationToken);
 				if (!Response.Retry)
@@ -908,6 +994,7 @@ namespace HordeAgent.Services
 
 				ConformLogger.LogInformation("Pending workspaces have changed - running conform again...");
 				PendingWorkspaces = Response.PendingWorkspaces;
+				RemoveUntrackedFiles = Response.RemoveUntrackedFiles;
 			}
 
 			return LeaseResult.Success;
@@ -942,12 +1029,19 @@ namespace HordeAgent.Services
 			{
 				if (CancellationToken.IsCancellationRequested && IsCancellationException(Ex))
 				{
+					Logger.LogError("Step was aborted");
 					throw;
 				}
 				else
 				{
-					Logger.LogError(Ex, $"Exception while executing batch: {Ex}");
+					Logger.LogError(Ex, "Exception while executing batch: {Ex}", Ex);
 				}
+			}
+
+			// If this lease was cancelled, don't bother updating the job state.
+			if (CancellationToken.IsCancellationRequested)
+			{
+				return LeaseResult.Cancelled;
 			}
 
 			// Mark the batch as complete
@@ -987,90 +1081,130 @@ namespace HordeAgent.Services
 				await Executor.InitializeAsync(BatchLogger, CancellationToken);
 			}
 
-			// Execute the steps
-			for (; ; )
+			try
 			{
-				// Get the next step to execute
-				BeginStepResponse Step = await RpcClient.InvokeAsync(x => x.BeginStepAsync(new BeginStepRequest(ExecuteTask.JobId, ExecuteTask.BatchId, LeaseId), null, null, CancellationToken), new RpcContext(), CancellationToken);
-				if (Step.State == BeginStepResponse.Types.Result.Waiting)
+				// Execute the steps
+				for (; ; )
 				{
-					BatchLogger.LogInformation("Waiting for dependency to be ready");
-					await Task.Delay(TimeSpan.FromSeconds(20.0), CancellationToken);
-					continue;
-				}
-				else if (Step.State == BeginStepResponse.Types.Result.Complete)
-				{
-					break;
-				}
-				else if (Step.State != BeginStepResponse.Types.Result.Ready)
-				{
-					BatchLogger.LogError("Unexpected step state: {StepState}", Step.State);
-					break;
-				}
-
-				// Print the new state
-				Stopwatch StepTimer = Stopwatch.StartNew();
-				BatchLogger.LogInformation("Starting job {JobId}, batch {BatchId}, step {StepId}", ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId);
-
-				// Create a trace span
-				using IScope Scope = GlobalTracer.Instance.BuildSpan("Execute").WithResourceName(Step.Name).StartActive();
-				Scope.Span.SetTag("stepId", Step.StepId);
-				Scope.Span.SetTag("logId", Step.LogId);
-//				using IDisposable TraceProperty = LogContext.PushProperty("dd.trace_id", CorrelationIdentifier.TraceId.ToString());
-//				using IDisposable SpanProperty = LogContext.PushProperty("dd.span_id", CorrelationIdentifier.SpanId.ToString());
-
-				// Update the context to include information about this step
-				JobStepOutcome StepOutcome;
-				JobStepState StepState;
-				using (BatchLogger.BeginIndentScope("  "))
-				{
-					// Start writing to the log file
-					await using (JsonRpcLogger StepLogger = new JsonRpcLogger(RpcClient, Step.LogId, ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, Step.Warnings, Logger))
+					// Get the next step to execute
+					BeginStepResponse Step = await RpcClient.InvokeAsync(x => x.BeginStepAsync(new BeginStepRequest(ExecuteTask.JobId, ExecuteTask.BatchId, LeaseId), null, null, CancellationToken), new RpcContext(), CancellationToken);
+					if (Step.State == BeginStepResponse.Types.Result.Waiting)
 					{
-						// Execute the task
-						ILogger ForwardingLogger = new DefaultLoggerIndentHandler(StepLogger);
-						if (Settings.WriteStepOutputToLogger)
-						{
-							ForwardingLogger = new ForwardingLogger(Logger, ForwardingLogger);
-						}
+						BatchLogger.LogInformation("Waiting for dependency to be ready");
+						await Task.Delay(TimeSpan.FromSeconds(20.0), CancellationToken);
+						continue;
+					}
+					else if (Step.State == BeginStepResponse.Types.Result.Complete)
+					{
+						break;
+					}
+					else if (Step.State != BeginStepResponse.Types.Result.Ready)
+					{
+						BatchLogger.LogError("Unexpected step state: {StepState}", Step.State);
+						break;
+					}
 
-						using CancellationTokenSource StepPollCancelSource = new CancellationTokenSource();
-						using CancellationTokenSource StepAbortSource = new CancellationTokenSource();
-						TaskCompletionSource<bool> StepFinishedSource = new TaskCompletionSource<bool>();
-						Task StepPollTask = Task.Run(() => PollForStepAbort(RpcClient, ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, StepPollCancelSource.Token, StepAbortSource, StepFinishedSource.Task));
-						
+					// Get current disk space available. This will allow us to more easily spot steps that eat up a lot of disk space.
+					string? DriveName;
+					if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+					{
+						DriveName = Path.GetPathRoot(WorkingDir.FullName);
+					}
+					else
+					{
+						DriveName = WorkingDir.FullName;
+					}
+
+					float AvailableFreeSpace = 0;
+					if (DriveName != null)
+					{
 						try
 						{
-							(StepOutcome, StepState) = await ExecuteStepAsync(Executor, Step, ForwardingLogger, CancellationToken, StepAbortSource.Token);
+							DriveInfo Info = new DriveInfo(DriveName);
+							AvailableFreeSpace = (1.0f * Info.AvailableFreeSpace) / 1024 / 1024 / 1024;
 						}
-						finally
+						catch (Exception Ex)
 						{
-							// Will get called even when cancellation token for the lease/batch fires
-							StepFinishedSource.SetResult(true); // Tell background poll task to stop
-							await StepPollTask;
-						}
-						
-						// Kill any processes spawned by the step
-						TerminateProcesses(StepLogger, CancellationToken);
-
-						// Wait for the logger to finish
-						await StepLogger.StopAsync();
-						
-						// Reflect the warnings/errors in the step outcome
-						if (StepOutcome > StepLogger.Outcome)
-						{
-							StepOutcome = StepLogger.Outcome;
+							BatchLogger.LogWarning(Ex, "Unable to query disk info for path '{DriveName}'", DriveName);
 						}
 					}
 
-					// Update the server with the outcome from the step
-					BatchLogger.LogInformation("Marking step as complete (Outcome={Outcome}, State={StepState})", StepOutcome, StepState);
-					await RpcClient.InvokeAsync(x => x.UpdateStepAsync(new UpdateStepRequest(ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, StepState, StepOutcome), null, null, CancellationToken), new RpcContext(), CancellationToken);
-				}
+					// Print the new state
+					Stopwatch StepTimer = Stopwatch.StartNew();
 
-				// Print the finishing state
-				StepTimer.Stop();
-				BatchLogger.LogInformation("Completed in {Time}", StepTimer.Elapsed);
+					BatchLogger.LogInformation("Starting job {JobId}, batch {BatchId}, step {StepId} (Drive Space Left: {DriveSpaceRemaining} GB)", ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, AvailableFreeSpace.ToString("F1"));
+
+					// Create a trace span
+					using IScope Scope = GlobalTracer.Instance.BuildSpan("Execute").WithResourceName(Step.Name).StartActive();
+					Scope.Span.SetTag("stepId", Step.StepId);
+					Scope.Span.SetTag("logId", Step.LogId);
+					//				using IDisposable TraceProperty = LogContext.PushProperty("dd.trace_id", CorrelationIdentifier.TraceId.ToString());
+					//				using IDisposable SpanProperty = LogContext.PushProperty("dd.span_id", CorrelationIdentifier.SpanId.ToString());
+
+					// Update the context to include information about this step
+					JobStepOutcome StepOutcome;
+					JobStepState StepState;
+					using (BatchLogger.BeginIndentScope("  "))
+					{
+						// Start writing to the log file
+						await using (JsonRpcLogger StepLogger = new JsonRpcLogger(RpcClient, Step.LogId, ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, Step.Warnings, Logger))
+						{
+							// Execute the task
+							ILogger ForwardingLogger = new DefaultLoggerIndentHandler(StepLogger);
+							if (Settings.WriteStepOutputToLogger)
+							{
+								ForwardingLogger = new ForwardingLogger(Logger, ForwardingLogger);
+							}
+
+							using CancellationTokenSource StepPollCancelSource = new CancellationTokenSource();
+							using CancellationTokenSource StepAbortSource = new CancellationTokenSource();
+							TaskCompletionSource<bool> StepFinishedSource = new TaskCompletionSource<bool>();
+							Task StepPollTask = Task.Run(() => PollForStepAbort(RpcClient, ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, StepPollCancelSource.Token, StepAbortSource, StepFinishedSource.Task));
+
+							try
+							{
+								(StepOutcome, StepState) = await ExecuteStepAsync(Executor, Step, ForwardingLogger, CancellationToken, StepAbortSource.Token);
+							}
+							finally
+							{
+								// Will get called even when cancellation token for the lease/batch fires
+								StepFinishedSource.SetResult(true); // Tell background poll task to stop
+								await StepPollTask;
+							}
+
+							// Kill any processes spawned by the step
+							TerminateProcesses(StepLogger, CancellationToken);
+
+							// Wait for the logger to finish
+							await StepLogger.StopAsync();
+
+							// Reflect the warnings/errors in the step outcome
+							if (StepOutcome > StepLogger.Outcome)
+							{
+								StepOutcome = StepLogger.Outcome;
+							}
+						}
+
+						// Update the server with the outcome from the step
+						BatchLogger.LogInformation("Marking step as complete (Outcome={Outcome}, State={StepState})", StepOutcome, StepState);
+						await RpcClient.InvokeAsync(x => x.UpdateStepAsync(new UpdateStepRequest(ExecuteTask.JobId, ExecuteTask.BatchId, Step.StepId, StepState, StepOutcome), null, null, CancellationToken), new RpcContext(), CancellationToken);
+					}
+
+					// Print the finishing state
+					StepTimer.Stop();
+					BatchLogger.LogInformation("Completed in {Time}", StepTimer.Elapsed);
+				}
+			}
+			catch (Exception Ex)
+			{
+				if (CancellationToken.IsCancellationRequested && IsCancellationException(Ex))
+				{
+					Logger.LogError("Step was aborted");
+				}
+				else
+				{
+					Logger.LogError(Ex, "Exception while executing batch: {Ex}", Ex);
+				}
 			}
 
 			// Clean the environment
@@ -1078,7 +1212,7 @@ namespace HordeAgent.Services
 			using (BatchLogger.BeginIndentScope("  "))
 			{
 				using IScope Scope = GlobalTracer.Instance.BuildSpan("Finalize").StartActive();
-				await Executor.FinalizeAsync(BatchLogger, CancellationToken);
+				await Executor.FinalizeAsync(BatchLogger, CancellationToken.None);
 			}
 		}
 
@@ -1113,7 +1247,7 @@ namespace HordeAgent.Services
 					return (JobStepOutcome.Failure, JobStepState.Aborted);
 				}
 				
-				StepLogger.LogError(Ex, $"Exception while executing step: {Ex}");
+				StepLogger.LogError(Ex, "Exception while executing step: {Ex}", Ex);
 				return (JobStepOutcome.Failure, JobStepState.Completed);
 			}
 		}
@@ -1473,12 +1607,9 @@ namespace HordeAgent.Services
 							WmiProperties Properties = new WmiProperties(Row);
 							if (Properties.TryGetValue("Name", out string? Name) && Properties.TryGetValue("DriverVersion", out string? DriverVersion))
 							{
-								DeviceCapabilities Device = new DeviceCapabilities();
-								Device.Handle = $"GPU-{++Index}";
-								Device.Properties.Add($"Name={Name}");
-								Device.Properties.Add($"Type=GPU");
-								Device.Properties.Add($"DriverVersion={DriverVersion}");
-								OtherDevices.Add(Device);
+								string Prefix = $"GPU-{++Index}";
+								PrimaryDevice.Properties.Add($"{Prefix}-Name={Name}");
+								PrimaryDevice.Properties.Add($"{Prefix}-DriverVersion={DriverVersion}");								
 							}
 						}
 					}

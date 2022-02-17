@@ -9,6 +9,7 @@ using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -75,8 +76,8 @@ namespace Horde.Storage.Implementation
         {
             await Initialize();
 
-            using Scope scope = Tracer.Instance.StartActive("dynamo.get");
-            Span span = scope.Span;
+            using IScope scope = Tracer.Instance.StartActive("dynamo.get");
+            ISpan span = scope.Span;
             span.ResourceName = $"{ns}.{bucket}.{key}";
 
             Task<DynamoBaseRefRecord> baseRefRecordTask = Context.LoadAsync<DynamoBaseRefRecord>(DynamoBaseRefRecord.BuildCacheKey(ns, bucket, key));
@@ -111,8 +112,8 @@ namespace Horde.Storage.Implementation
         {
             await Initialize();
 
-            using Scope scope = Tracer.Instance.StartActive("dynamo.add");
-            Span span = scope.Span;
+            using IScope scope = Tracer.Instance.StartActive("dynamo.add");
+            ISpan span = scope.Span;
             span.ResourceName = $"{record.Namespace}.{record.Bucket}.{record.RefName}";
 
             Task namespaceTableTask = _namespaceStore.AddToNamespaceTable(record.Namespace, DynamoNamespaceStore.NamespaceUsage.Cache);
@@ -205,8 +206,8 @@ namespace Horde.Storage.Implementation
         {
             await Initialize();
 
-            using Scope scope = Tracer.Instance.StartActive("dynamo.update_last_access");
-            Span span = scope.Span;
+            using IScope scope = Tracer.Instance.StartActive("dynamo.update_last_access");
+            ISpan span = scope.Span;
             span.ResourceName = $"{record.Namespace}.{record.Bucket}.{record.RefName}";
 
             Table table = Table.LoadTable(Client, MainTableName);
@@ -251,6 +252,8 @@ namespace Horde.Storage.Implementation
 
                     DynamoBaseRefRecord? baseRecord = await context.LoadAsync<DynamoBaseRefRecord>(parentKey);
                     if (baseRecord == null || baseRecord.Namespace == null || baseRecord.Bucket == null || baseRecord.Name == null)
+                        continue;
+                    if (baseRecord.Namespace != ns.ToString())
                         continue;
                     yield return new OldRecord(new NamespaceId(baseRecord.Namespace), new BucketId(baseRecord.Bucket), new KeyId(baseRecord.Name));
                 }

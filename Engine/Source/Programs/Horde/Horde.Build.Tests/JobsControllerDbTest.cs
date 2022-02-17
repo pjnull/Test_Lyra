@@ -45,19 +45,33 @@ namespace HordeServerTests
 	        SubResourceId BatchId = Job.Batches[0].Id;
 	        SubResourceId StepId = Job.Batches[0].Steps[0].Id;
 
-	        object Obj = (await JobsController.GetStepAsync(Job.Id, BatchId.ToString(), StepId.ToString())).Value!;
+	        object Obj = (await JobsController.GetStepAsync(Job.Id, BatchId, StepId)).Value!;
 	        GetStepResponse StepRes = (Obj as GetStepResponse)!;
 	        Assert.IsFalse(StepRes.AbortRequested);
 	        
 	        UpdateStepRequest UpdateReq = new UpdateStepRequest();
 	        UpdateReq.AbortRequested = true;
-	        Obj = (await JobsController.UpdateStepAsync(Job.Id, BatchId.ToString(), StepId.ToString(), UpdateReq)).Value!;
+	        Obj = (await JobsController.UpdateStepAsync(Job.Id, BatchId, StepId, UpdateReq)).Value!;
 	        UpdateStepResponse UpdateRes = (Obj as UpdateStepResponse)!;
 	        
-	        Obj = (await JobsController.GetStepAsync(Job.Id, BatchId.ToString(), StepId.ToString())).Value!;
+	        Obj = (await JobsController.GetStepAsync(Job.Id, BatchId, StepId)).Value!;
 	        StepRes = (Obj as GetStepResponse)!;
 	        Assert.IsTrue(StepRes.AbortRequested);
 //	        Assert.AreEqual("Anonymous", StepRes.AbortByUser);
+        }
+        
+        [TestMethod]
+        public async Task FindJobTimingsTest()
+        {
+	        Fixture Fixture = await CreateFixtureAsync();
+	        IJob Job = Fixture.Job1;
+	        string[] Templates = { Job.TemplateId.ToString() };
+	        object Obj = (await JobsController.FindJobTimingsAsync(Fixture.Stream!.Id.ToString(), Templates)).Value!;
+	        FindJobTimingsResponse Res = (Obj as FindJobTimingsResponse)!;
+	        Assert.AreEqual(1, Res.Timings.Count);
+	        GetJobTimingResponse TimingResponse = Res.Timings[Job.Id.ToString()];
+	        Assert.AreEqual(0, TimingResponse.JobResponse!.Labels!.Count);
+	        Assert.AreEqual(Job.Name, TimingResponse.Job!.Name);
         }
     }
 }

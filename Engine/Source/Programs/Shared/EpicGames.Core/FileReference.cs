@@ -15,7 +15,7 @@ namespace EpicGames.Core
 	/// Representation of an absolute file path. Allows fast hashing and comparisons.
 	/// </summary>
 	[Serializable]
-	public class FileReference : FileSystemReference, IEquatable<FileReference>
+	public class FileReference : FileSystemReference, IEquatable<FileReference>, IComparable<FileReference>
 	{
 		/// <summary>
 		/// Dummy enum to allow invoking the constructor which takes a sanitized full path
@@ -238,6 +238,9 @@ namespace EpicGames.Core
 		{
 			return Comparer.GetHashCode(FullName);
 		}
+
+		/// <inheritdoc/>
+		public int CompareTo(FileReference? Other) => Comparer.Compare(FullName, Other?.FullName);
 
 		/// <summary>
 		/// Helper function to create a remote file reference. Unlike normal FileReference objects, these aren't converted to a full path in the local filesystem, but are
@@ -768,6 +771,16 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="Location">Location of the file</param>
 		/// <param name="Contents">Contents to append to the file</param>
+		public static Task AppendAllLinesAsync(FileReference Location, IEnumerable<string> Contents)
+		{
+			return File.AppendAllLinesAsync(Location.FullName, Contents);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
 		/// <param name="Encoding">The encoding to use when parsing the file</param>
 		public static void AppendAllLines(FileReference Location, IEnumerable<string> Contents, Encoding Encoding)
 		{
@@ -779,9 +792,30 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="Location">Location of the file</param>
 		/// <param name="Contents">Contents to append to the file</param>
+		/// <param name="Encoding">The encoding to use when parsing the file</param>
+		public static Task AppendAllLinesAsync(FileReference Location, IEnumerable<string> Contents, Encoding Encoding)
+		{
+			return File.AppendAllLinesAsync(Location.FullName, Contents, Encoding);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
 		public static void AppendAllLines(FileReference Location, string[] Contents)
 		{
 			File.AppendAllLines(Location.FullName, Contents);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
+		public static Task AppendAllLinesAsync(FileReference Location, string[] Contents)
+		{
+			return File.AppendAllLinesAsync(Location.FullName, Contents);
 		}
 
 		/// <summary>
@@ -800,9 +834,30 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="Location">Location of the file</param>
 		/// <param name="Contents">Contents to append to the file</param>
+		/// <param name="Encoding">The encoding to use when parsing the file</param>
+		public static Task AppendAllLinesAsync(FileReference Location, string[] Contents, Encoding Encoding)
+		{
+			return File.AppendAllLinesAsync(Location.FullName, Contents, Encoding);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
 		public static void AppendAllText(FileReference Location, string Contents)
 		{
 			File.AppendAllText(Location.FullName, Contents);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
+		public static Task AppendAllTextAsync(FileReference Location, string Contents)
+		{
+			return File.AppendAllTextAsync(Location.FullName, Contents);
 		}
 
 		/// <summary>
@@ -814,6 +869,17 @@ namespace EpicGames.Core
 		public static void AppendAllText(FileReference Location, string Contents, Encoding Encoding)
 		{
 			File.AppendAllText(Location.FullName, Contents, Encoding);
+		}
+
+		/// <summary>
+		/// Appends the contents to a file
+		/// </summary>
+		/// <param name="Location">Location of the file</param>
+		/// <param name="Contents">Contents to append to the file</param>
+		/// <param name="Encoding">The encoding to use when parsing the file</param>
+		public static Task AppendAllTextAsync(FileReference Location, string Contents, Encoding Encoding)
+		{
+			return File.AppendAllTextAsync(Location.FullName, Contents, Encoding);
 		}
 
 		#endregion

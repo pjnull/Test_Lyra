@@ -23,6 +23,9 @@ using OpenTracing;
 using OpenTracing.Util;
 using Datadog.Trace.Configuration;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
+using EpicGames.Horde.Storage.Impl;
+using EpicGames.Horde.Compute;
 
 namespace HordeAgent.Modes.Service
 {
@@ -32,11 +35,6 @@ namespace HordeAgent.Modes.Service
 	[Command("Service", "Run", "Runs the service in listen mode")]
 	class RunCommand : Command
 	{
-		/// <summary>
-		/// The logger instance
-		/// </summary>
-		ILogger Logger = null!;
-
 		/// <summary>
 		/// Override for the server to use
 		/// </summary>
@@ -52,12 +50,9 @@ namespace HordeAgent.Modes.Service
 		/// <summary>
 		/// Runs the service indefinitely
 		/// </summary>
-		/// <param name="Logger">Logger to use</param>
 		/// <returns>Exit code</returns>
 		public override async Task<int> ExecuteAsync(ILogger Logger)
 		{
-			this.Logger = Logger;
-
 			IHostBuilder HostBuilder = Host.CreateDefaultBuilder();
 
 			// Attempt to setup this process as a Windows service. A race condition inside Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService
@@ -125,6 +120,8 @@ namespace HordeAgent.Modes.Service
 					{
 						return Builder.WaitAndRetryAsync(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) });
 					});
+
+					Services.AddHordeStorage(Settings => ConfigSection.GetCurrentServerProfile().GetSection(nameof(ServerProfile.Storage)).Bind(Settings));
 
 					Services.AddSingleton<GrpcService>();
 					Services.AddHostedService<WorkerService>();

@@ -11,6 +11,10 @@ using System.Threading.Tasks;
 using IdentityModel.Client;
 using EpicGames.Core;
 using EpicGames.Jupiter;
+using EpicGames.Perforce;
+using Microsoft.Extensions.Logging;
+
+#nullable disable
 
 namespace UnrealGameSync
 {
@@ -26,7 +30,7 @@ namespace UnrealGameSync
 		private readonly Uri JupiterUrl;
 
 		private readonly Timer UpdateTimer;
-		private readonly BoundedLogWriter LogWriter;
+		private readonly ILogger Logger;
 
 		public IReadOnlyList<IArchiveInfo> AvailableArchives
 		{
@@ -39,7 +43,7 @@ namespace UnrealGameSync
 			}
 		}
 
-		private JupiterMonitor(OIDCTokenManager InTokenManager, string InLogPath, string InNamespace, string InUrl,
+		private JupiterMonitor(OIDCTokenManager InTokenManager, ILogger InLogger, string InNamespace, string InUrl,
 			string InProviderIdentifier, string InExpectedBranch)
 		{
 			TokenManager = InTokenManager;
@@ -48,18 +52,17 @@ namespace UnrealGameSync
 			ExpectedBranch = InExpectedBranch;
 			JupiterUrl = new Uri(InUrl);
 
-			LogWriter = new BoundedLogWriter(InLogPath);
+			Logger = InLogger;
 			UpdateTimer = new Timer(DoUpdate, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
 		}
 		public void Dispose()
 		{
 			UpdateTimer?.Dispose();
-			LogWriter?.Dispose();
 		}
 
 		private async void DoUpdate(object State)
 		{
-			await LogWriter.WriteLineAsync($"Starting poll of JupiterMonitor for namespace {JupiterNamespace}");
+			Logger.LogInformation("Starting poll of JupiterMonitor for namespace {JupiterNamespace}", JupiterNamespace);
 			try
 			{
 				IReadOnlyList<IArchiveInfo> NewArchives = await GetAvailableArchives();
@@ -71,11 +74,11 @@ namespace UnrealGameSync
 			}
 			catch (Exception Exception)
 			{
-				await LogWriter.WriteLineAsync($"Exception occured during poll! {Exception}");
+				Logger.LogError(Exception, "Exception occured during poll!");
 			}
 		}
 
-		public static JupiterMonitor CreateFromConfigFile(OIDCTokenManager TokenManager, string LogPath, ConfigFile ConfigFile, string SelectedProjectIdentifier)
+		public static JupiterMonitor CreateFromConfigFile(OIDCTokenManager TokenManager, ILogger<JupiterMonitor> Logger, ConfigFile ConfigFile, string SelectedProjectIdentifier)
 		{
 			ConfigSection JupiterConfigSection = ConfigFile.FindSection("Jupiter");
 			if (JupiterConfigSection == null)
@@ -107,7 +110,7 @@ namespace UnrealGameSync
 			// project specific overrides
 			JupiterUrl = ProjectConfigSection.GetValue("JupiterUrl") ?? JupiterUrl;
 
-			return new JupiterMonitor(TokenManager, LogPath, JupiterNamespace, JupiterUrl, OIDCProviderIdentifier, ExpectedBranch);
+			return new JupiterMonitor(TokenManager, Logger, JupiterNamespace, JupiterUrl, OIDCProviderIdentifier, ExpectedBranch);
 		}
 
 		private async Task<IReadOnlyList<IArchiveInfo>> GetAvailableArchives()
@@ -212,7 +215,7 @@ namespace UnrealGameSync
 				get { return null; } 
 			}
 
-			public string Target => throw new NotImplementedException();
+			public string Target => throw new NotSupportedException();
 
 			public bool Exists()
 			{
@@ -224,7 +227,7 @@ namespace UnrealGameSync
 				return ChangeToKey.TryGetValue(ChangeNumber, out ArchiveKey);
 			}
 
-			public bool DownloadArchive(string ArchiveKey, string LocalRootPath, string ManifestFileName, TextWriter Log, ProgressValue Progress)
+			public Task<bool> DownloadArchive(IPerforceConnection _, string ArchiveKey, DirectoryReference LocalRootPath, FileReference ManifestFileName, ILogger Logger, ProgressValue Progress, CancellationToken CancellationToken)
 			{
 				try
 				{
@@ -232,17 +235,14 @@ namespace UnrealGameSync
 					{
 						(float ProgressFraction, FileReference FileReference) = ProgressUpdate;
 						Progress.Set(ProgressFraction);
-						lock (Log)
-						{
-							Log.WriteLine("Writing {0}", FileReference.FullName);
-						}
+						Logger.LogInformation("Writing {FileName}", FileReference.FullName);
 					});
 
 					// place the manifest for the Jupiter download next to the UGS manifest
-					FileReference UGSManifestFileReference = new FileReference(ManifestFileName);
+					FileReference UGSManifestFileReference = ManifestFileName;
 					FileReference JupiterManifestFileReference = FileReference.Combine(UGSManifestFileReference.Directory, "Jupiter-Manifest.json");
 
-					DirectoryReference RootDirectory = new DirectoryReference(LocalRootPath);
+					DirectoryReference RootDirectory = LocalRootPath;
 					JupiterFileTree FileTree = new JupiterFileTree(RootDirectory, InDeferReadingFiles: true);
 					Task<List<FileReference>> DownloadTask = FileTree.DownloadFromJupiter(JupiterManifestFileReference, JupiterUrl, JupiterNamespace, ArchiveKey, ProgressCallback);
 					DownloadTask.Wait();
@@ -255,20 +255,19 @@ namespace UnrealGameSync
 					}
 
 					// Write it out to a temporary file, then move it into place
-					string TempManifestFileName = ManifestFileName + ".tmp";
-					using (FileStream OutputStream = File.Open(TempManifestFileName, FileMode.Create, FileAccess.Write))
+					FileReference TempManifestFileName = ManifestFileName + ".tmp";
+					using (FileStream OutputStream = FileReference.Open(TempManifestFileName, FileMode.Create, FileAccess.Write))
 					{
 						ArchiveManifest.Write(OutputStream);
 					}
-					File.Move(TempManifestFileName, ManifestFileName);
+					FileReference.Move(TempManifestFileName, ManifestFileName);
 
-					return true;
+					return Task.FromResult(true);
 				}
 				catch (Exception Exception)
 				{
-					Log.WriteLine(
-						$"Exception occured when downloading build from Jupiter with key {ArchiveKey}. Exception {Exception}");
-					return false;
+					Logger.LogError(Exception, "Exception occured when downloading build from Jupiter with key {Key}.", ArchiveKey);
+					return Task.FromResult(false);
 				}
 			}
 

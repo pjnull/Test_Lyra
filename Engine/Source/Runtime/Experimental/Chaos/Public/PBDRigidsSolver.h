@@ -175,13 +175,6 @@ namespace Chaos
 		int32& GetCurrentFrame() { return CurrentFrame; }
 
 		/**/
-		FReal& GetSolverTime() { return MTime; }
-		const FReal GetSolverTime() const { return MTime; }
-
-		/**/
-		FReal GetLastDt() const { return MLastDt; }
-
-		/**/
 		void SetIterations(const int32 InNumIterations) { GetEvolution()->SetNumIterations(InNumIterations); }
 		void SetPushOutIterations(const int32 InNumIterations) {  GetEvolution()->SetNumPushOutIterations(InNumIterations); }
 		void SetCollisionPairIterations(const int32 InNumIterations) { GetEvolution()->GetCollisionConstraints().SetPairIterations(InNumIterations); }
@@ -287,6 +280,10 @@ namespace Chaos
 		const FPerSolverFieldSystem& GetPerSolverField() const { return *PerSolverField; }
 
 		void UpdateExternalAccelerationStructure_External(ISpatialAccelerationCollection<FAccelerationStructureHandle,FReal,3>*& ExternalStructure);
+		const ISpatialAccelerationCollection<FAccelerationStructureHandle, FReal, 3>* GetInternalAccelerationStructure_Internal() const
+		{
+			return MEvolution->GetSpatialAcceleration();
+		}
 
 		/** Apply a solver configuration to this solver, set externally by the owner of a solver (see UPhysicsSettings for world solver settings) */
 		void ApplyConfig(const FChaosSolverConfiguration& InConfig);
@@ -321,7 +318,8 @@ namespace Chaos
 		void BufferPhysicsResults();
 	
 		/**/
-		virtual void AdvanceSolverBy(const FReal DeltaTime, const FSubStepInfo& SubStepInfo = FSubStepInfo()) override;
+		virtual void PrepareAdvanceBy(const FReal DeltaTime) override;
+		virtual void AdvanceSolverBy(const FSubStepInfo& SubStepInfo) override;
 		virtual void PushPhysicsState(const FReal ExternalDt, const int32 NumSteps, const int32 NumExternalSteps) override;
 		virtual void SetExternalTimestampConsumed_Internal(const int32 Timestamp) override;
 
@@ -331,8 +329,6 @@ namespace Chaos
 		// Solver Data
 		//
 		int32 CurrentFrame;
-		FReal MTime;
-		FReal MLastDt;
 		bool bHasFloor;
 		bool bIsFloorAnalytic;
 		FReal FloorHeight;

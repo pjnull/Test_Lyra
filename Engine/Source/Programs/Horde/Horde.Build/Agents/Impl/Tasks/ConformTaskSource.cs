@@ -33,6 +33,9 @@ namespace HordeServer.Tasks.Impl
 		/// <inheritdoc/>
 		public override string Type => "Conform";
 
+		/// <inheritdoc/>
+		public override TaskSourceFlags Flags => TaskSourceFlags.AllowWhenDisabled;
+
 		DatabaseService DatabaseService;
 		IAgentCollection AgentCollection;
 		PoolService PoolService;
@@ -40,18 +43,12 @@ namespace HordeServer.Tasks.Impl
 		PerforceLoadBalancer PerforceLoadBalancer;
 		ILogFileService LogService;
 		ILogger Logger;
-		ElectedTick TickConformList;
+		ITicker TickConformList;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="DatabaseService"></param>
-		/// <param name="AgentCollection"></param>
-		/// <param name="PoolService"></param>
-		/// <param name="LogService"></param>
-		/// <param name="PerforceLoadBalancer"></param>
-		/// <param name="Logger"></param>
-		public ConformTaskSource(DatabaseService DatabaseService, IAgentCollection AgentCollection, PoolService PoolService, ILogFileService LogService, PerforceLoadBalancer PerforceLoadBalancer, ILogger<ConformTaskSource> Logger)
+		public ConformTaskSource(DatabaseService DatabaseService, IAgentCollection AgentCollection, PoolService PoolService, ILogFileService LogService, PerforceLoadBalancer PerforceLoadBalancer, IClock Clock, ILogger<ConformTaskSource> Logger)
 		{
 			this.DatabaseService = DatabaseService;
 			this.AgentCollection = AgentCollection;
@@ -60,36 +57,26 @@ namespace HordeServer.Tasks.Impl
 			this.PerforceLoadBalancer = PerforceLoadBalancer;
 			this.LogService = LogService;
 			this.Logger = Logger;
-			this.TickConformList = new ElectedTick(DatabaseService, new ObjectId("60afc5cf555a9a76aff0a50c"), CleanConformListAsync, TimeSpan.FromMinutes(1.0), Logger);
+			this.TickConformList = Clock.AddSharedTicker<ConformTaskSource>(TimeSpan.FromMinutes(1.0), CleanConformListAsync, Logger);
 
 			this.OnLeaseStartedProperties.Add(nameof(ConformTask.LogId), x => new LogId(x.LogId));
 		}
 
 		/// <inheritdoc/>
-		public void Dispose()
-		{
-			TickConformList.Dispose();
-		}
+		public Task StartAsync(CancellationToken CancellationToken) => TickConformList.StartAsync();
 
 		/// <inheritdoc/>
-		public Task StartAsync(CancellationToken CancellationToken)
-		{
-			TickConformList.Start();
-			return Task.CompletedTask;
-		}
+		public Task StopAsync(CancellationToken CancellationToken) => TickConformList.StopAsync();
 
 		/// <inheritdoc/>
-		public async Task StopAsync(CancellationToken CancellationToken)
-		{
-			await TickConformList.StopAsync();
-		}
+		public void Dispose() => TickConformList.Dispose();
 
 		/// <summary>
 		/// Clean up the conform list of any outdated entries
 		/// </summary>
 		/// <param name="CancellationToken">Cancellation token</param>
 		/// <returns>Async task</returns>
-		async Task CleanConformListAsync(CancellationToken CancellationToken)
+		async ValueTask CleanConformListAsync(CancellationToken CancellationToken)
 		{
 			DateTime UtcNow = DateTime.UtcNow;
 			DateTime LastCheckTimeUtc = UtcNow - TimeSpan.FromMinutes(30.0);
@@ -185,6 +172,7 @@ namespace HordeServer.Tasks.Impl
 
 					ILogFile Log = await LogService.CreateLogFileAsync(JobId.Empty, Agent.SessionId, LogType.Json);
 					Task.LogId = Log.Id.ToString();
+					Task.RemoveUntrackedFiles = Agent.RequestFullConform;
 
 					byte[] Payload = Any.Pack(Task).ToByteArray();
 
@@ -192,7 +180,7 @@ namespace HordeServer.Tasks.Impl
 				}
 			}
 
-			if (Agent.RequestConform)
+			if (Agent.RequestConform || Agent.RequestFullConform)
 			{
 				return AgentLease.Drain;
 			}
@@ -321,7 +309,7 @@ namespace HordeServer.Tasks.Impl
 		private async Task<bool> IsConformPendingAsync(IAgent Agent, DateTime UtcNow)
 		{
 			// If a conform was manually requested, allow it to run even if the agent is disabled
-			if (Agent.RequestConform)
+			if (Agent.RequestConform || Agent.RequestFullConform)
 			{
 				return !IsConformCoolDownPeriod(Agent, UtcNow);
 			}

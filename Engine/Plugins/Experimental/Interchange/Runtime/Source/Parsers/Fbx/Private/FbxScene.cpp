@@ -15,6 +15,7 @@
 #include "InterchangeResultsContainer.h"
 #include "InterchangeSceneNode.h"
 #include "Nodes/InterchangeBaseNodeContainer.h"
+#include "Nodes/InterchangeUserDefinedAttribute.h"
 
 #define LOCTEXT_NAMESPACE "InterchangeFbxScene"
 
@@ -25,7 +26,7 @@ namespace UE
 		namespace Private
 		{
 
-			void FFbxScene::CreateMeshNodeReference(UInterchangeSceneNode* UnrealSceneNode, FbxNodeAttribute* NodeAttribute, UInterchangeBaseNodeContainer& NodeContainer)
+			void FFbxScene::CreateMeshNodeReference(UInterchangeSceneNode* UnrealSceneNode, FbxNodeAttribute* NodeAttribute, UInterchangeBaseNodeContainer& NodeContainer, const FTransform& GeometricTransform)
 			{
 				UInterchangeMeshNode* MeshNode = nullptr;
 				if (NodeAttribute->GetAttributeType() == FbxNodeAttribute::eMesh)
@@ -46,6 +47,7 @@ namespace UE
 				{
 					UnrealSceneNode->SetCustomAssetInstanceUid(MeshNode->GetUniqueID());
 					MeshNode->SetSceneInstanceUid(UnrealSceneNode->GetUniqueID());
+					UnrealSceneNode->SetCustomGeometricTransform(GeometricTransform);
 				}
 			}
 
@@ -69,13 +71,35 @@ namespace UE
 				CreateAssetNodeReference(UnrealSceneNode, NodeAttribute, NodeContainer, UInterchangeLightNode::StaticAssetTypeName());
 			}
 
-			UInterchangeSceneNode* FFbxScene::AddHierarchyRecursively(FbxNode* Node, FbxScene* SDKScene, UInterchangeBaseNodeContainer& NodeContainer)
+			bool DoesTheParentHierarchyContainJoints(FbxNode* Node)
+			{
+				if (!Node)
+				{
+					return false;
+				}
+				int32 AttributeCount = Node->GetNodeAttributeCount();
+				for (int32 AttributeIndex = 0; AttributeIndex < AttributeCount; ++AttributeIndex)
+				{
+					FbxNodeAttribute* NodeAttribute = Node->GetNodeAttributeByIndex(AttributeIndex);
+					if (NodeAttribute->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+					{
+						return true;
+					}
+				}
+				return DoesTheParentHierarchyContainJoints(Node->GetParent());
+			}
+
+			void FFbxScene::AddHierarchyRecursively(UInterchangeSceneNode* UnrealParentNode, FbxNode* Node, FbxScene* SDKScene, UInterchangeBaseNodeContainer& NodeContainer)
 			{
 				FString NodeName = FFbxHelper::GetFbxObjectName(Node);
 				FString NodeUniqueID = FFbxHelper::GetFbxNodeHierarchyName(Node);
 
 				UInterchangeSceneNode* UnrealNode = CreateTransformNode(NodeContainer, NodeName, NodeUniqueID);
 				check(UnrealNode);
+				if (UnrealParentNode)
+				{
+					UnrealNode->SetParentUid(UnrealParentNode->GetUniqueID());
+				}
 				
 				auto GetConvertedTransform = [Node](FbxAMatrix& NewFbxMatrix)
 				{
@@ -103,16 +127,22 @@ namespace UE
 					return Transform;
 				};
 
+				//Set the node default transform
 				{
-					//Set the global node transform
 					FbxAMatrix GlobalFbxMatrix = Node->EvaluateGlobalTransform();
 					FTransform GlobalTransform = GetConvertedTransform(GlobalFbxMatrix);
-					UnrealNode->SetCustomGlobalTransform(GlobalTransform);
-
-					//Set the local node transform
-					FbxAMatrix LocalFbxMatrix = Node->EvaluateLocalTransform();
-					FTransform LocalTransform = GetConvertedTransform(LocalFbxMatrix);
-					UnrealNode->SetCustomLocalTransform(LocalTransform);
+					if (FbxNode* ParentNode = Node->GetParent())
+					{
+						FbxAMatrix GlobalFbxParentMatrix = ParentNode->EvaluateGlobalTransform();
+						FbxAMatrix	LocalFbxMatrix = GlobalFbxParentMatrix.Inverse() * GlobalFbxMatrix;
+						FTransform LocalTransform = GetConvertedTransform(LocalFbxMatrix);
+						UnrealNode->SetCustomLocalTransform(&NodeContainer, LocalTransform);
+					}
+					else
+					{
+						//No parent, set the same matrix has the global
+						UnrealNode->SetCustomLocalTransform(&NodeContainer, GlobalTransform);
+					}
 				}
 
 				int32 AttributeCount = Node->GetNodeAttributeCount();
@@ -125,7 +155,6 @@ namespace UE
 						case FbxNodeAttribute::eOpticalReference:
 						case FbxNodeAttribute::eOpticalMarker:
 						case FbxNodeAttribute::eCachedEffect:
-						case FbxNodeAttribute::eNull:
 						case FbxNodeAttribute::eMarker:
 						case FbxNodeAttribute::eCameraStereo:
 						case FbxNodeAttribute::eCameraSwitcher:
@@ -139,20 +168,83 @@ namespace UE
 						case FbxNodeAttribute::eLine:
 							//Unsupported attribute
 							break;
+
 						case FbxNodeAttribute::eShape: //We do not add a dependency for shape on the scene node since shapes are a MeshNode dependency.
 							break;
+
+						case FbxNodeAttribute::eNull:
+						{
+							if (!DoesTheParentHierarchyContainJoints(Node->GetParent()))
+							{
+								//eNull node will be set has a transform and a joint specialized type
+								UnrealNode->AddSpecializedType(FSceneNodeStaticData::GetTransformSpecializeTypeString());
+							}
+						}
+						//No break since the eNull act has a skeleton if possible
 						case FbxNodeAttribute::eSkeleton:
 						{
 							//Add the joint specialized type
 							UnrealNode->AddSpecializedType(FSceneNodeStaticData::GetJointSpecializeTypeString());
+							//Get the bind pose transform for this joint
+							FbxAMatrix GlobalBindPoseJointMatrix;
+							if (FFbxMesh::GetGlobalJointBindPoseTransform(SDKScene, Node, GlobalBindPoseJointMatrix))
+							{
+								FTransform GlobalBindPoseJointTransform = GetConvertedTransform(GlobalBindPoseJointMatrix);
+								//We grab the fbx parent node to compute the local transform
+								if (FbxNode* ParentNode = Node->GetParent())
+								{
+									FbxAMatrix GlobalFbxParentMatrix = ParentNode->EvaluateGlobalTransform();
+									FFbxMesh::GetGlobalJointBindPoseTransform(SDKScene, ParentNode, GlobalFbxParentMatrix);
+									FbxAMatrix	LocalFbxMatrix = GlobalFbxParentMatrix.Inverse() * GlobalBindPoseJointMatrix;
+									FTransform LocalBindPoseJointTransform = GetConvertedTransform(LocalFbxMatrix);
+									UnrealNode->SetCustomBindPoseLocalTransform(&NodeContainer, LocalBindPoseJointTransform);
+								}
+								else
+								{
+									//No parent, set the same matrix has the global
+									UnrealNode->SetCustomBindPoseLocalTransform(&NodeContainer, GlobalBindPoseJointTransform);
+								}
+							}
+
+							//Get time Zero transform for this joint
+							{
+								//Set the global node transform
+								FbxAMatrix GlobalFbxMatrix = Node->EvaluateGlobalTransform(FBXSDK_TIME_ZERO);
+								FTransform GlobalTransform = GetConvertedTransform(GlobalFbxMatrix);
+								if (FbxNode* ParentNode = Node->GetParent())
+								{
+									FbxAMatrix GlobalFbxParentMatrix = ParentNode->EvaluateGlobalTransform(FBXSDK_TIME_ZERO);
+									FbxAMatrix	LocalFbxMatrix = GlobalFbxParentMatrix.Inverse() * GlobalFbxMatrix;
+									FTransform LocalTransform = GetConvertedTransform(LocalFbxMatrix);
+									UnrealNode->SetCustomTimeZeroLocalTransform(&NodeContainer, LocalTransform);
+								}
+								else
+								{
+									//No parent, set the same matrix has the global
+									UnrealNode->SetCustomTimeZeroLocalTransform(&NodeContainer, GlobalTransform);
+								}
+							}
+
 							break;
 						}
+
 						case FbxNodeAttribute::eMesh:
 						{
 							//For Mesh attribute we add the fbx nodes materials
 							FFbxMaterial FbxMaterial(Parser);
 							FbxMaterial.AddAllNodeMaterials(UnrealNode, Node, NodeContainer);
-							CreateMeshNodeReference(UnrealNode, NodeAttribute, NodeContainer);
+							//Get the Geometric offset transform and set it in the mesh node
+							//The geometric offset is not part of the hierarchy transform, it is not inherited
+							FbxAMatrix Geometry;
+							FbxVector4 Translation, Rotation, Scaling;
+							Translation = Node->GetGeometricTranslation(FbxNode::eSourcePivot);
+							Rotation = Node->GetGeometricRotation(FbxNode::eSourcePivot);
+							Scaling = Node->GetGeometricScaling(FbxNode::eSourcePivot);
+							Geometry.SetT(Translation);
+							Geometry.SetR(Rotation);
+							Geometry.SetS(Scaling);
+							FTransform GeometricTransform = GetConvertedTransform(Geometry);
+							CreateMeshNodeReference(UnrealNode, NodeAttribute, NodeContainer, GeometricTransform);
 							break;
 						}
 						case FbxNodeAttribute::eLODGroup:
@@ -175,17 +267,172 @@ namespace UE
 					}
 				}
 
+				//Add all custom Attributes for the node
+				auto IsSupportedExtraAttributeType = [](int32 InDataType)
+				{
+					switch (InDataType)
+					{
+					case EFbxType::eFbxBool:
+
+					case EFbxType::eFbxChar:		//!< 8 bit signed integer.
+					case EFbxType::eFbxUChar:		//!< 8 bit unsigned integer.
+					case EFbxType::eFbxShort:		//!< 16 bit signed integer.
+					case EFbxType::eFbxUShort:		//!< 16 bit unsigned integer.
+					case EFbxType::eFbxInt:			//!< 32 bit signed integer.
+					case EFbxType::eFbxUInt:		//!< 32 bit unsigned integer.
+					case EFbxType::eFbxLongLong:	//!< 64 bit signed integer.
+					case EFbxType::eFbxULongLong:	//!< 64 bit unsigned integer.
+					case EFbxType::eFbxHalfFloat:	//!< 16 bit floating point.
+					case EFbxType::eFbxFloat:		//!< Floating point value.
+					case EFbxType::eFbxDouble:	//!< Double width floating point value.
+					case EFbxType::eFbxDouble2:	//!< Vector of two double values.
+					case EFbxType::eFbxDouble3:	//!< Vector of three double values.
+					case EFbxType::eFbxDouble4:	//!< Vector of four double values.
+
+					case EFbxType::eFbxEnum:		//!< Enumeration.
+					case EFbxType::eFbxString:	//!< String.
+						return true;
+					}
+
+					return false;
+				};
+
+				FbxProperty Property = Node->GetFirstProperty();
+				while (Property.IsValid())
+				{
+					if (Property.GetFlag(FbxPropertyFlags::eUserDefined) && IsSupportedExtraAttributeType(Property.GetPropertyDataType().GetType()))
+					{
+						FString PropertyName = FFbxHelper::GetFbxPropertyName(Property);
+
+						FbxAnimCurveNode* CurveNode = Property.GetCurveNode();
+						TOptional<FString> PayloadKey;
+						if (CurveNode && CurveNode->IsAnimated())
+						{
+							//Set the optional payload key
+						}
+						switch (Property.GetPropertyDataType().GetType())
+						{
+							case EFbxType::eFbxBool:
+								{
+									bool PropertyValue = Property.Get<bool>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxChar:
+								{
+									int8 PropertyValue = Property.Get<int8>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxUChar:
+								{
+									uint8 PropertyValue = Property.Get<uint8>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxShort:
+								{
+									int16 PropertyValue = Property.Get<int16>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxUShort:
+								{
+									uint16 PropertyValue = Property.Get<uint16>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxInt:
+								{
+									int32 PropertyValue = Property.Get<int32>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxUInt:
+								{
+									uint32 PropertyValue = Property.Get<uint32>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxLongLong:
+								{
+									int64 PropertyValue = Property.Get<int64>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxULongLong:
+								{
+									uint64 PropertyValue = Property.Get<uint64>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxHalfFloat:
+								{
+									FbxHalfFloat HalfFloat = Property.Get<FbxHalfFloat>();
+									FFloat16 PropertyValue = FFloat16(HalfFloat.value());
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxFloat:
+								{
+									float PropertyValue = Property.Get<float>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxDouble:
+								{
+									double PropertyValue = Property.Get<double>();
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxDouble2:
+								{
+									FbxDouble2 Vec = Property.Get<FbxDouble2>();
+									FVector2D PropertyValue = FVector2D(Vec[0], Vec[1]);
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxDouble3:
+								{
+									FbxDouble3 Vec = Property.Get<FbxDouble3>();
+									FVector3d PropertyValue = FVector3d(Vec[0], Vec[1], Vec[2]);
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxDouble4:
+								{
+									FbxDouble4 Vec = Property.Get<FbxDouble4>();
+									FVector4d PropertyValue = FVector4d(Vec[0], Vec[1], Vec[2], Vec[3]);
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxEnum:
+								{
+									//Convert enum to uint8
+									FbxEnum EnumValue = Property.Get<FbxEnum>();
+									uint8 PropertyValue = static_cast<uint8>(EnumValue);
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+							case EFbxType::eFbxString:
+								{
+									FbxString StringValue = Property.Get<FbxString>();
+									FString PropertyValue = FFbxConvert::MakeString(StringValue.Buffer());
+									UInterchangeUserDefinedAttributesAPI::CreateUserDefinedAttribute(UnrealNode, PropertyName, PropertyValue, PayloadKey);
+								}
+								break;
+						}
+					}
+					//Inspect next node property
+					Property = Node->GetNextProperty(Property);
+				}
+
 				const int32 ChildCount = Node->GetChildCount();
 				for (int32 ChildIndex = 0; ChildIndex < ChildCount; ++ChildIndex)
 				{
 					FbxNode* ChildNode = Node->GetChild(ChildIndex);
-					UInterchangeSceneNode* UnrealChildNode = AddHierarchyRecursively(ChildNode, SDKScene, NodeContainer);
-					if (UnrealChildNode)
-					{
-						UnrealChildNode->SetParentUid(UnrealNode->GetUniqueID());
-					}
+					AddHierarchyRecursively(UnrealNode, ChildNode, SDKScene, NodeContainer);
 				}
-				return UnrealNode;
 			}
 
 			UInterchangeSceneNode* FFbxScene::CreateTransformNode(UInterchangeBaseNodeContainer& NodeContainer, const FString& NodeName, const FString& NodeUniqueID)
@@ -200,7 +447,7 @@ namespace UE
 					return nullptr;
 				}
 				// Creating a UMaterialInterface
-				TransformNode->InitializeNode(NodeUid, DisplayLabel, EInterchangeNodeContainerType::NodeContainerType_TranslatedScene);
+				TransformNode->InitializeNode(NodeUid, DisplayLabel, EInterchangeNodeContainerType::TranslatedScene);
 				NodeContainer.AddNode(TransformNode);
 				return TransformNode;
 			}
@@ -208,7 +455,7 @@ namespace UE
 			void FFbxScene::AddHierarchy(FbxScene* SDKScene, UInterchangeBaseNodeContainer& NodeContainer)
 			{
 				 FbxNode* RootNode = SDKScene->GetRootNode();
-				 AddHierarchyRecursively(RootNode, SDKScene, NodeContainer);
+				 AddHierarchyRecursively(nullptr, RootNode, SDKScene, NodeContainer);
 			}
 		} //ns Private
 	} //ns Interchange

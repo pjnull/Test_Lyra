@@ -33,7 +33,7 @@ namespace Horde.Build.Utilities
 
 			public async Task<bool> ExistsAsync(string Path)
 			{
-				List<FStatRecord> Records = await PerforceConnection.FStatAsync($"{Stream}/{Path}@{ChangeNumber}");
+				List<FStatRecord> Records = await PerforceConnection.FStatAsync($"{Stream}/{Path}@{ChangeNumber}").ToListAsync();
 				return Records.Count > 0;
 			}
 
@@ -136,7 +136,7 @@ namespace Horde.Build.Utilities
 				throw new NotImplementedException();
 			}
 
-			BgGraph? Script = await BgScriptReader.ReadAsync(Context, ScriptFile, Options, Properties, false, Schema, EpicGames.Core.Log.Logger);
+			BgGraph? Script = await BgScriptReader.ReadAsync(Context, ScriptFile, Options, Properties, Schema, EpicGames.Core.Log.Logger);
 			if (Script == null)
 			{
 				throw new NotImplementedException();

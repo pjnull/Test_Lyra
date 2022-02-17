@@ -71,6 +71,35 @@ DECLARE_CYCLE_STAT(TEXT("Update Kinematics On Deferred SkelMeshes"), STAT_Update
 #include "Editor.h"
 #endif
 
+class FAsyncPhysicsTickCallback : public Chaos::TSimCallbackObject<>
+{
+public:
+	FAsyncPhysicsTickCallback()
+		: TSimCallbackObject<>(/*InRunOnFrozenGameThread=*/ true)
+	{
+
+	}
+
+	TSet<UActorComponent*> AsyncPhysicsTickComponents;
+	TSet<AActor*> AsyncPhysicsTickActors;
+	virtual void OnPreSimulate_Internal() override
+	{
+		using namespace Chaos;
+		const FReal DeltaTime = GetDeltaTime_Internal();
+		const FReal SimTime = GetSimTime_Internal();
+		//TODO: handle case where callbacks modify AsyncPhysicsTickComponents or AsyncPhysicsTickActors
+		for (UActorComponent* Component : AsyncPhysicsTickComponents)
+		{
+			Component->AsyncPhysicsTickComponent(DeltaTime, SimTime);
+		}
+
+		for(AActor* Actor : AsyncPhysicsTickActors)
+		{
+			Actor->AsyncPhysicsTickActor(DeltaTime, SimTime);
+		}
+	}
+};
+
 DEFINE_LOG_CATEGORY_STATIC(LogFPhysScene_ChaosSolver, Log, All);
 
 void DumpHierarchyStats(const TArray<FString>& Args)
@@ -418,6 +447,11 @@ FPhysScene_Chaos::FPhysScene_Chaos(AActor* InSolverActor
 FPhysScene_Chaos::~FPhysScene_Chaos()
 {
 #if WITH_CHAOS
+
+	if (AsyncPhysicsTickCallback)
+	{
+		SceneSolver->UnregisterAndFreeSimCallbackObject_External(AsyncPhysicsTickCallback);
+	}
 
 	// Must ensure deferred components do not hold onto scene pointer.
 	ProcessDeferredCreatePhysicsState();
@@ -1321,7 +1355,7 @@ void FPhysScene_Chaos::ProcessDeferredCreatePhysicsState()
 	}
 
 	TArray<UBodySetup*> BodySetups = UniqueBodySetups.Array();
-	ParallelFor(BodySetups.Num(), [this, &BodySetups](int32 Index)
+	ParallelFor( TEXT("CreatePhysicsMeshes.PF"), BodySetups.Num(),1, [this, &BodySetups](int32 Index)
 	{
 		BodySetups[Index]->CreatePhysicsMeshes();
 	});
@@ -1813,6 +1847,41 @@ void FPhysScene_Chaos::ResimNFrames(const int32 NumFramesRequested)
 #endif
 }
 
+void FPhysScene_Chaos::EnableAsyncPhysicsTickCallback()
+{
+	if (AsyncPhysicsTickCallback == nullptr)
+	{
+		AsyncPhysicsTickCallback = SceneSolver->CreateAndRegisterSimCallbackObject_External<FAsyncPhysicsTickCallback>();
+	}
+}
+
+void FPhysScene_Chaos::RegisterAsyncPhysicsTickComponent(UActorComponent* Component)
+{
+	EnableAsyncPhysicsTickCallback();
+	AsyncPhysicsTickCallback->AsyncPhysicsTickComponents.Add(Component);
+}
+
+void FPhysScene_Chaos::UnregisterAsyncPhysicsTickComponent(UActorComponent* Component)
+{
+	if (AsyncPhysicsTickCallback)
+	{
+		AsyncPhysicsTickCallback->AsyncPhysicsTickComponents.Remove(Component);
+	}
+}
+
+void FPhysScene_Chaos::RegisterAsyncPhysicsTickActor(AActor* Actor)
+{
+	EnableAsyncPhysicsTickCallback();
+	AsyncPhysicsTickCallback->AsyncPhysicsTickActors.Add(Actor);
+}
+
+void FPhysScene_Chaos::UnregisterAsyncPhysicsTickActor(AActor* Actor)
+{
+	if (AsyncPhysicsTickCallback)
+	{
+		AsyncPhysicsTickCallback->AsyncPhysicsTickActors.Remove(Actor);
+	}
+}
 
 TSharedPtr<IPhysicsReplicationFactory> FPhysScene_Chaos::PhysicsReplicationFactory;
 

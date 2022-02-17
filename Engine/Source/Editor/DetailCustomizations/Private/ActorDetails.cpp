@@ -518,7 +518,7 @@ void FActorDetails::AddEventsCategory(IDetailLayoutBuilder& DetailBuilder)
 			FText EventText = Property->GetDisplayNameText();
 
 			EventsCategory.AddCustomRow(EventText)
-			.NameContent()
+			.WholeRowContent()
 			[
 				SNew(SHorizontalBox)
 				.ToolTipText(Property->GetToolTipText())
@@ -529,7 +529,7 @@ void FActorDetails::AddEventsCategory(IDetailLayoutBuilder& DetailBuilder)
 				.Padding(0.0f, 0.0f, 5.0f, 0.0f)
 				[
 					SNew(SImage)
-					.Image(FEditorStyle::GetBrush("GraphEditor.Event_16x"))
+					.Image(FAppStyle::Get().GetBrush("GraphEditor.Event_16x"))
 				]
 
 				+ SHorizontalBox::Slot()
@@ -539,21 +539,24 @@ void FActorDetails::AddEventsCategory(IDetailLayoutBuilder& DetailBuilder)
 					.Font(IDetailLayoutBuilder::GetDetailFont())
 					.Text(EventText)
 				]
-			]
-			// A green "Plus" button to add a binding. For dynamic delegates on the CDO, you can always
-			// make a new binding, so always display the "Plus"
-			.ValueContent()
-			.MinDesiredWidth(150.0f)
-			.MaxDesiredWidth(200.0f)
-			[
-				SNew(SButton)
-				.ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
-				.HAlign(HAlign_Center)
-				.OnClicked(this, &FActorDetails::HandleAddOrViewEventForVariable, Blueprint, Property)
-				.ForegroundColor(FSlateColor::UseForeground())
-				[			
-					SNew(SImage)
-					.Image(FEditorStyle::GetBrush("Plus"))			
+
+				+ SHorizontalBox::Slot()
+				.HAlign(HAlign_Left)
+				.VAlign(VAlign_Center)
+				.Padding(0)
+				[
+					// A "Plus" button to add a binding. For dynamic delegates on the CDO, you can always
+					// make a new binding, so always display the "Plus"
+					SNew(SButton)
+					.ButtonStyle(FAppStyle::Get(), "DetailsView.CalloutButton")
+					.ContentPadding(FMargin(3.0, 2.0))
+					.HAlign(HAlign_Center)
+					.OnClicked(this, &FActorDetails::HandleAddOrViewEventForVariable, Blueprint, Property)
+					[
+						SNew(SImage)
+						.ColorAndOpacity(FSlateColor::UseForeground())
+						.Image(FAppStyle::Get().GetBrush("Icons.Plus"))
+					]
 				]
 			];
 		}
@@ -663,10 +666,10 @@ void FActorDetails::AddActorCategory( IDetailLayoutBuilder& DetailBuilder, const
 		.NameContent()
 		[
 			SNew(SHyperlink)
-				.Style(FEditorStyle::Get(), "HoverOnlyHyperlink")
+				.Style(FAppStyle::Get(), "HoverOnlyHyperlink")
 				.OnNavigate(this, &FActorDetails::OnNarrowSelectionSetToSpecificLevel, WeakLevelPtr)
 				.Text(ActorCountDescription)
-				.TextStyle(FEditorStyle::Get(), "DetailsView.HyperlinkStyle")
+				.TextStyle(FAppStyle::Get(), "DetailsView.HyperlinkStyle")
 				.ToolTipText(Tooltip)
 		]
 		.ValueContent()

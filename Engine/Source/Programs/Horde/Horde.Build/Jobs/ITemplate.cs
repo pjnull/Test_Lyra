@@ -442,6 +442,11 @@ namespace HordeServer.Models
 		public bool AllowPreflights { get; }
 
 		/// <summary>
+		/// Whether to always issues for jobs using this template
+		/// </summary>
+		public bool UpdateIssues { get; }
+
+		/// <summary>
 		/// Agent type to use for parsing the job state
 		/// </summary>
 		public string? InitialAgentType { get; }
@@ -450,6 +455,11 @@ namespace HordeServer.Models
 		/// Path to a file within the stream to submit to generate a new changelist for jobs
 		/// </summary>
 		public string? SubmitNewChange { get; }
+
+		/// <summary>
+		/// Description for new changelists
+		/// </summary>
+		public string? SubmitDescription { get; }
 
 		/// <summary>
 		/// Optional predefined user-defined properties for this job

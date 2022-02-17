@@ -6,6 +6,7 @@
 
 struct FStrataLegacyParameters
 {
+	FStrataPixelFootprint PixelFootprint;
 	bool UseMetalness;
 	float3 DiffuseAlbedo;
 	float3 F0;
@@ -25,10 +26,13 @@ struct FStrataLegacyParameters
 	float  Thickness;
 	uint   SharedLocalBasisIndex;
 
+	int bIsTop;
+	int bIsBottom;
+
 	float Weight;
 };
 
-FStrataLegacyParameters InitStrataLegacyParameters(uint InSharedLocalBasisIndex, float InWeight)
+FStrataLegacyParameters InitStrataLegacyParameters(FStrataPixelFootprint InPixelFootprint, uint InSharedLocalBasisIndex, float InWeight)
 {
 	const float3 Zeros = float3(0, 0, 0);
 
@@ -52,37 +56,50 @@ FStrataLegacyParameters InitStrataLegacyParameters(uint InSharedLocalBasisIndex,
 	Out.FuzzColor = Zeros;
 	Out.Thickness = STRATA_LAYER_DEFAULT_THICKNESS_CM;
 	Out.SharedLocalBasisIndex = InSharedLocalBasisIndex;
+	Out.bIsTop = 1;
+	Out.bIsBottom = 1;
 	Out.Weight = InWeight;
+	Out.PixelFootprint = InPixelFootprint;
 	return Out;
 }
 
-FStrataData CreateLegacySlab(FStrataLegacyParameters In, inout uint SharedLocalBasisTypes)
+FStrataData CreateLegacySlab(
+	FStrataLegacyParameters In, inout uint SharedLocalBasisTypes,
+	inout FStrataTree StrataTree,
+	int OperatorIndex, int BSDFIndex)
 {
 	const float3 Zeros = float3(0, 0, 0);
 	const float3 Ones  = float3(1, 1, 1);
 
 	// Fixed layer structure for helping compiler to unroll and optimize shader
-	return GetStrataSlabBSDF(
-		In.UseMetalness,	// UseMetalness
-		In.BaseColor,		// BaseColor		-  Metalness workflow
-		Ones,				// EdgeColor		-  Metalness workflow
-		In.Specular,		// Specular			-  Metalness workflow
-		In.Metallic,		// Metallic			-  Metalness workflow
-		In.DiffuseAlbedo,	// DiffuseAlbedo	- !Metalness workflow
-		In.F0,				// F0				- !Metalness workflow
-		In.F90,				// F90				- !Metalness workflow
-		In.Roughness,		// Roughness
-		In.Anisotropy,		// Anisotropy
-		In.SSSProfileID,	// SSSProfileID
-		In.SSSDMFP,			// SSSDMFP
-		In.SSSDMFPScale,	// SSSDMFPScale
-		In.Emissive,		// Emissive
-		0.f,				// Haziness
-		0.f,				// ThinFilmThickness
-		In.FuzzAmount,		// FuzzAmount
-		In.FuzzColor,		// FuzzColor
-		In.Thickness,
-		In.SharedLocalBasisIndex, SharedLocalBasisTypes);
+	return PromoteParameterBlendedBSDFToOperator(
+		GetStrataSlabBSDF(
+			In.PixelFootprint,
+			In.UseMetalness,	// UseMetalness
+			In.BaseColor,		// BaseColor		-  Metalness workflow
+			Ones,				// EdgeColor		-  Metalness workflow
+			In.Specular,		// Specular			-  Metalness workflow
+			In.Metallic,		// Metallic			-  Metalness workflow
+			In.DiffuseAlbedo,	// DiffuseAlbedo	- !Metalness workflow
+			In.F0,				// F0				- !Metalness workflow
+			In.F90,				// F90				- !Metalness workflow
+			In.Roughness,		// Roughness
+			In.Anisotropy,		// Anisotropy
+			In.SSSProfileID,	// SSSProfileID
+			In.SSSDMFP,			// SSSDMFP
+			In.SSSDMFPScale,	// SSSDMFPScale
+			In.Emissive,		// Emissive
+			0.f,				// Haziness
+			0.f,				// ThinFilmThickness
+			In.FuzzAmount,		// FuzzAmount
+			In.FuzzColor,		// FuzzColor
+			In.Thickness,
+			In.SharedLocalBasisIndex, SharedLocalBasisTypes),
+		StrataTree,
+		OperatorIndex,
+		BSDFIndex,
+		In.bIsBottom,
+		In.bIsTop);
 }
 
 // Convert legacy shading models - Dynamic
@@ -91,6 +108,7 @@ FStrataData CreateLegacySlab(FStrataLegacyParameters In, inout uint SharedLocalB
 // helping the compiler to unroll Strata BSDF traversing and packing. In most cases, the bottom slab is 
 // weighted by 0 and it will be removed once the data are written-out/packed.
 FStrataData StrataConvertLegacyMaterialDynamic(
+	FStrataPixelFootprint PixelFootprint,
 	float3 BaseColor, float Specular, float Metallic,
 	float Roughness, float Anisotropy,
 	float3 SubSurfaceColor, float SubSurfaceProfileId,
@@ -102,18 +120,57 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 	uint ShadingModel,
 	uint SharedLocalBasisIndex,
 	uint ClearCoatBottomNormal_SharedLocalBasisIndex,
-	inout uint SharedLocalBasisTypes)
+	inout uint SharedLocalBasisTypes,
+	inout FStrataTree StrataTree)
 {
 	const float DefaultThickness = STRATA_LAYER_DEFAULT_THICKNESS_CM;
 	const float3 Zeros = float3(0, 0, 0);
 	const float3 Ones  = float3(1, 1, 1);
 
 	// Can only mix Unlit / DefaultLit / Sub-Surface / Preintegrated-Skin / Subsurface-Profile / ClearCoat / Foliage / Cloth / Eye/ Thin
-	// No supported : Water/Hair
+
+	// Note: If hair or single layer water are enabled with other shading model, the code generation won't be ideal, as the compiler will struggle with unrolling the BSDFs
+	#if MATERIAL_SHADINGMODEL_SINGLELAYERWATER
+	if (ShadingModel == SHADINGMODELID_SINGLELAYERWATER)
+	{
+		const float3 WaterExtinction = WaterScatteringCoefficients + WaterAbsorptionCoefficients;
+		const float3 WaterAlbedo = WaterScatteringCoefficients / WaterExtinction;
+
+		return GetStrataSingleLayerWaterBSDF(
+			BaseColor, 				// BaseColor
+			Metallic, 				// Metallic 
+			Specular, 				// Specular
+			Roughness, 				// Roughness 
+			Emissive, 				// Emissive 
+			Opacity,				// TopMaterialOpacity
+			WaterAlbedo, 			// WaterAlbedo
+			WaterExtinction, 		// WaterExtinction
+			WaterPhaseG, 			// WaterPhaseG
+			ColorScaleBehindWater,	// ColorScaleBehindWater
+			SharedLocalBasisIndex);
+
+		// No need to take into account opacity weighting for translucent material, as the coverage is assumed to be 1
+	}
+	#endif
+	#if MATERIAL_SHADINGMODEL_HAIR
+	if (ShadingModel == SHADINGMODELID_HAIR)
+	{
+		return GetStrataHairBSDF(
+			BaseColor,	   // BaseColor
+			Metallic,	   // Scatter
+			Specular,	   // Specular
+			Roughness,	   // Roughness
+			ClearCoat,	   // Backlit
+			Emissive,	   // EmissiveColor
+			SharedLocalBasisIndex);
+
+		// No need to take into account opacity weighting for translucent material, as the coverage is assumed to be 1
+	}
+	#endif
 
 	// Top/Bottom
-	FStrataLegacyParameters Top = InitStrataLegacyParameters(SharedLocalBasisIndex, 1.0f);
-	FStrataLegacyParameters Bot = InitStrataLegacyParameters(SharedLocalBasisIndex, 1.0f);
+	FStrataLegacyParameters Top = InitStrataLegacyParameters(PixelFootprint, SharedLocalBasisIndex, 1.0f);
+	FStrataLegacyParameters Bot = InitStrataLegacyParameters(PixelFootprint, SharedLocalBasisIndex, 1.0f);
 
 	float FinalWeight = 1.0f;
 
@@ -197,6 +254,8 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 		Bot.SSSDMFPScale = 0.f;
 		Bot.Emissive = Zeros;
 		Bot.SharedLocalBasisIndex = ClearCoatBottomNormal_SharedLocalBasisIndex;
+		Bot.bIsTop = 0;
+		Bot.bIsBottom = 1;
 		Bot.Weight = 1.f;
 		// === TOP layer === 
 		 																								   
@@ -222,6 +281,8 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 		Top.Emissive = Emissive;
 		Top.Thickness = Thickness;
 		Top.SharedLocalBasisIndex = SharedLocalBasisIndex;
+		Top.bIsTop = 1;
+		Top.bIsBottom = 0;
 		Top.Weight = ClearCoat;
 
 		FinalWeight = Opacity;
@@ -284,6 +345,8 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 		Top.SSSDMFPScale = Opacity;
 		Top.Emissive = Emissive;
 		Top.SharedLocalBasisIndex = SharedLocalBasisIndex;
+		Top.bIsTop = 1;
+		Top.bIsBottom = 0;
 		Top.Weight = 1.f;
 
 		// Iris
@@ -297,6 +360,8 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 		Bot.SSSDMFPScale = Opacity;
 		Bot.Emissive = Emissive;
 		Bot.SharedLocalBasisIndex = ClearCoatBottomNormal_SharedLocalBasisIndex;
+		Bot.bIsTop = 0;
+		Bot.bIsBottom = 1;
 		Bot.Weight = 1.f;
 
 		// No need to take into account opacity weighting for translucent material, as the coverage is assumed to be 1
@@ -344,7 +409,7 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 		Top.SharedLocalBasisIndex = SharedLocalBasisIndex;
 
 		Top.Weight  = 1.0f;
-		Bot.Weight  = 0.f;
+		Bot.Weight  = 0.0f;
 		FinalWeight = 1.0f;
 
 		// Reference two layers approach
@@ -385,14 +450,17 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 	}
 
 	// Fixed layer structure for helping compiler to unroll and optimize shader
-	FStrataData Top_Slab = CreateLegacySlab(Top, SharedLocalBasisTypes);
-	FStrataData Bot_Slab = CreateLegacySlab(Bot, SharedLocalBasisTypes);
-	FStrataData Out = StrataVerticalLayering(StrataWeight(Top_Slab, Top.Weight), StrataWeight(Bot_Slab, Bot.Weight));
+	// This must match what is done in PackStrataOut
+	FStrataData Top_Slab = CreateLegacySlab(Top, SharedLocalBasisTypes, StrataTree,	/*OperatorIndex*/0, /*BSDFIndex*/0);
+	FStrataData Bot_Slab = CreateLegacySlab(Bot, SharedLocalBasisTypes, StrataTree,	/*OperatorIndex*/1, /*BSDFIndex*/1);
+	FStrataData WTop_Slab= StrataWeight(Top_Slab, Top.Weight, StrataTree,			/*OperatorIndex*/2, /*MaxDistanceFromLeaves*/1);
+	FStrataData WBot_Slab= StrataWeight(Bot_Slab, Bot.Weight, StrataTree,			/*OperatorIndex*/3, /*MaxDistanceFromLeaves*/1);
+	FStrataData Out		 = StrataVerticalLayering(WTop_Slab, WBot_Slab, StrataTree,	/*OperatorIndex*/4, /*MaxDistanceFromLeaves*/2);
 
 	// Take in account the legacy opacity weighting for translucent material
 	#if !MATERIALBLENDING_MASKED && !MATERIALBLENDING_SOLID
 	{
-		Out = StrataWeight(Out, FinalWeight);
+		Out = StrataWeight(Out, FinalWeight, StrataTree,	/*OperatorIndex*/5, /*MaxDistanceFromLeaves*/3);
 	}
 	#endif
 
@@ -404,6 +472,7 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 // It reuses the dynamic version for most part, but for special node like Unlit/Hair/Water, 
 // we use the dedicated node
 FStrataData StrataConvertLegacyMaterialStatic(
+	FStrataPixelFootprint PixelFootprint,
 	float3 BaseColor, float Specular, float Metallic,
 	float Roughness, float Anisotropy,
 	float3 SubSurfaceColor, float SubSurfaceProfileId,
@@ -415,7 +484,8 @@ FStrataData StrataConvertLegacyMaterialStatic(
 	uint ShadingModel,
 	uint SharedLocalBasisIndex,
 	uint ClearCoatBottomNormal_SharedLocalBasisIndex,
-	inout uint SharedLocalBasisTypes)
+	inout uint SharedLocalBasisTypes,
+	inout FStrataTree StrataTree)
 {
 	FStrataData Out = GetInitialisedStrataData();
 
@@ -426,7 +496,7 @@ FStrataData StrataConvertLegacyMaterialStatic(
 	if (ShadingModel == SHADINGMODELID_UNLIT)
 	{
 		Out = GetStrataUnlitBSDF(Emissive, Zeros);
-		Out = StrataWeight(Out, Opacity);
+//		Out = StrataWeight(Out, Opacity);				// STRATA_TODO
 	}
 	else if (ShadingModel == SHADINGMODELID_HAIR)
 	{
@@ -464,6 +534,7 @@ FStrataData StrataConvertLegacyMaterialStatic(
 	else
 	{
 		Out = StrataConvertLegacyMaterialDynamic(
+			PixelFootprint,
 			BaseColor, Specular, Metallic,
 			Roughness, Anisotropy,
 			SubSurfaceColor, SubSurfaceProfileId,
@@ -475,7 +546,8 @@ FStrataData StrataConvertLegacyMaterialStatic(
 			ShadingModel,
 			SharedLocalBasisIndex,
 			ClearCoatBottomNormal_SharedLocalBasisIndex,
-			SharedLocalBasisTypes);
+			SharedLocalBasisTypes,
+			StrataTree);
 	}
 
 	return Out;

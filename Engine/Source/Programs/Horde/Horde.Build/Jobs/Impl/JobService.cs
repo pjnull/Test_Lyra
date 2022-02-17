@@ -7,7 +7,6 @@ using HordeCommon;
 using HordeServer.Models;
 using HordeCommon.Rpc;
 using HordeServer.Utilities;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
@@ -34,6 +33,7 @@ namespace HordeServer.Services
 	using JobId = ObjectId<IJob>;
 	using LeaseId = ObjectId<ILease>;
 	using LogId = ObjectId<ILogFile>;
+	using SessionId = ObjectId<ISession>;
 	using StreamId = StringId<IStream>;
 	using TemplateRefId = StringId<TemplateRef>;
 	using UserId = ObjectId<IUser>;
@@ -165,6 +165,13 @@ namespace HordeServer.Services
 		/// Event triggered when a job step completes
 		/// </summary>
 		public event JobStepCompleteEvent? OnJobStepComplete;
+		
+		/// <summary>
+		/// Event triggered when a job is scheduled on the underlying JobTaskSource
+		///
+		/// Exposed and duplicated here to avoid dependency on the exact JobTaskSource
+		/// </summary>
+		public event JobTaskSource.JobScheduleEvent? OnJobScheduled;
 
 		/// <summary>
 		/// Constructor
@@ -199,6 +206,11 @@ namespace HordeServer.Services
 			this.PerforceService = PerforceService;
 			this.Settings = Settings;
 			this.Logger = Logger;
+
+			this.JobTaskSource.OnJobScheduled += (Pool, NumAgentsOnline, Job, Graph, BatchId) =>
+			{
+				OnJobScheduled?.Invoke(Pool, NumAgentsOnline, Job, Graph, BatchId);
+			};
 		}
 
 #pragma warning disable CA1801
@@ -520,6 +532,7 @@ namespace HordeServer.Services
 		/// <param name="MinChange">The minimum changelist number</param>
 		/// <param name="MaxChange">The maximum changelist number</param>		
 		/// <param name="PreflightChange">The preflight change to look for</param>
+		/// <param name="PreflightOnly">Whether to only include preflights</param>
 		/// <param name="PreflightStartedByUser">User for which to include preflight jobs</param>		
 		/// <param name="StartedByUser">User for which to include jobs</param>
 		/// <param name="MinCreateTime">The minimum creation time</param>
@@ -531,8 +544,10 @@ namespace HordeServer.Services
 		/// <param name="ModifiedAfter">Filter the results by last modified time</param>
 		/// <param name="Index">Index of the first result to return</param>
 		/// <param name="Count">Number of results to return</param>
+		/// <param name="ConsistentRead">If the database read should be made to the replica server</param>
+		/// <param name="ExcludeUserJobs">Whether to exclude user jobs from the find</param>
 		/// <returns>List of jobs matching the given criteria</returns>
-		public async Task<List<IJob>> FindJobsAsync(JobId[]? JobIds = null, StreamId? StreamId = null, string? Name = null, TemplateRefId[]? Templates = null, int? MinChange = null, int? MaxChange = null, int? PreflightChange = null, UserId? PreflightStartedByUser = null, UserId? StartedByUser = null, DateTimeOffset ? MinCreateTime = null, DateTimeOffset? MaxCreateTime = null, string? Target = null, JobStepState[]? State = null, JobStepOutcome[]? Outcome = null, DateTimeOffset? ModifiedBefore = null, DateTimeOffset? ModifiedAfter = null, int? Index = null, int? Count = null)
+		public async Task<List<IJob>> FindJobsAsync(JobId[]? JobIds = null, StreamId? StreamId = null, string? Name = null, TemplateRefId[]? Templates = null, int? MinChange = null, int? MaxChange = null, int? PreflightChange = null, bool? PreflightOnly = null, UserId? PreflightStartedByUser = null, UserId? StartedByUser = null, DateTimeOffset ? MinCreateTime = null, DateTimeOffset? MaxCreateTime = null, string? Target = null, JobStepState[]? State = null, JobStepOutcome[]? Outcome = null, DateTimeOffset? ModifiedBefore = null, DateTimeOffset? ModifiedAfter = null, int? Index = null, int? Count = null, bool ConsistentRead = true, bool? ExcludeUserJobs = null)
 		{
 			using IScope Scope = GlobalTracer.Instance.BuildSpan("JobService.FindJobsAsync").StartActive();
 			Scope.Span.SetTag("JobIds", JobIds);
@@ -556,7 +571,7 @@ namespace HordeServer.Services
 			
 			if (Target == null && (State == null || State.Length == 0) && (Outcome == null || Outcome.Length == 0))
 			{
-				return await Jobs.FindAsync(JobIds, StreamId, Name, Templates, MinChange, MaxChange, PreflightChange, PreflightStartedByUser, StartedByUser, MinCreateTime, MaxCreateTime, ModifiedBefore, ModifiedAfter, Index, Count);
+				return await Jobs.FindAsync(JobIds, StreamId, Name, Templates, MinChange, MaxChange, PreflightChange, PreflightOnly, PreflightStartedByUser, StartedByUser, MinCreateTime, MaxCreateTime, ModifiedBefore, ModifiedAfter, Index, Count, ConsistentRead, null, ExcludeUserJobs);
 			}
 			else
 			{
@@ -566,7 +581,7 @@ namespace HordeServer.Services
 				int MaxCount = (Count ?? 1);
 				while (Results.Count < MaxCount)
 				{
-					List<IJob> ScanJobs = await Jobs.FindAsync(JobIds, StreamId, Name, Templates, MinChange, MaxChange, PreflightChange, PreflightStartedByUser, StartedByUser, MinCreateTime, MaxCreateTime, ModifiedBefore, ModifiedAfter, 0, 5);
+					List<IJob> ScanJobs = await Jobs.FindAsync(JobIds, StreamId, Name, Templates, MinChange, MaxChange, PreflightChange, PreflightOnly, PreflightStartedByUser, StartedByUser, MinCreateTime, MaxCreateTime, ModifiedBefore, ModifiedAfter, 0, 5, ConsistentRead, null, ExcludeUserJobs);
 					if (ScanJobs.Count == 0)
 					{
 						break;
@@ -603,6 +618,32 @@ namespace HordeServer.Services
 
 				return Results;
 			}
+		}
+		
+		/// <summary>
+		/// Searches for jobs matching a stream with given templates
+		/// </summary>
+		/// <param name="StreamId">The stream containing the job</param>
+		/// <param name="Templates">Templates to look for</param>
+		/// <param name="PreflightStartedByUser">User for which to include preflight jobs</param>
+		/// <param name="MaxCreateTime">The maximum creation time</param>
+		/// <param name="ModifiedAfter">Filter the results by last modified time</param>	
+		/// <param name="Index">Index of the first result to return</param>
+		/// <param name="Count">Number of results to return</param>
+		/// <param name="ConsistentRead">If the database read should be made to the replica server</param>
+		/// <returns>List of jobs matching the given criteria</returns>
+		public async Task<List<IJob>> FindJobsByStreamWithTemplatesAsync(StreamId StreamId, TemplateRefId[] Templates, UserId? PreflightStartedByUser = null, DateTimeOffset? MaxCreateTime = null, DateTimeOffset? ModifiedAfter = null, int? Index = null, int? Count = null, bool ConsistentRead = true)
+		{
+			using IScope Scope = GlobalTracer.Instance.BuildSpan("JobService.FindJobsByStreamWithTemplatesAsync").StartActive();
+			Scope.Span.SetTag("StreamId", StreamId);
+			Scope.Span.SetTag("Templates", Templates);
+			Scope.Span.SetTag("PreflightStartedByUser", PreflightStartedByUser);
+			Scope.Span.SetTag("MaxCreateTime", MaxCreateTime);
+			Scope.Span.SetTag("ModifiedAfter", ModifiedAfter);
+			Scope.Span.SetTag("Index", Index);
+			Scope.Span.SetTag("Count", Count);
+			
+			return await Jobs.FindLatestByStreamWithTemplatesAsync(StreamId, Templates, PreflightStartedByUser, MaxCreateTime, ModifiedAfter, Index, Count, ConsistentRead);
 		}
 
 		/// <summary>
@@ -1212,7 +1253,7 @@ namespace HordeServer.Services
 					TemplateRef? TemplateRef;
 					if (!Stream.Templates.TryGetValue(JobTrigger.TemplateRefId, out TemplateRef))
 					{
-						Logger.LogWarning("Cannot find template {TemplateRefId} in stream {StreamId}", JobTrigger.TemplateRefId, NewJob.StreamId);
+						Logger.LogWarning("Cannot find template {TemplateId} in stream {StreamId}", JobTrigger.TemplateRefId, NewJob.StreamId);
 						break;
 					}
 
@@ -1326,8 +1367,8 @@ namespace HordeServer.Services
 				{
 					if(Claim.Type == HordeClaimTypes.AgentSessionId)
 					{
-						ObjectId SessionId;
-						if (ObjectId.TryParse(Claim.Value, out SessionId) && SessionId == Batch.SessionId.Value)
+						SessionId SessionIdValue;
+						if (SessionId.TryParse(Claim.Value, out SessionIdValue) && SessionIdValue == Batch.SessionId.Value)
 						{
 							return true;
 						}

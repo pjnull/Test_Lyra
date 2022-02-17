@@ -70,6 +70,7 @@
 #include "NaniteSceneProxy.h"
 #include "RayTracing/RayTracingInstanceCulling.h"
 #include "GPUMessaging.h"
+#include "RectLightTextureManager.h"
 
 extern int32 GNaniteShowStats;
 
@@ -1549,7 +1550,7 @@ bool FDeferredShadingSceneRenderer::DispatchRayTracingWorldUpdates(FRDGBuilder& 
 
 	RDG_GPU_MASK_SCOPE(GraphBuilder, FRHIGPUMask::All());
 
-	RayTracingScene.Create(GraphBuilder, Scene->GPUScene);
+	RayTracingScene.Create(GraphBuilder, Scene->GPUScene, ReferenceView.ViewMatrices);
 
 	const uint32 BLASScratchSize = Scene->GetRayTracingDynamicGeometryCollection()->ComputeScratchBufferSize();
 	if (BLASScratchSize > 0)
@@ -2027,6 +2028,9 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 		// Force the subsurface profile texture to be updated.
 		UpdateSubsurfaceProfileTexture(GraphBuilder, ShaderPlatform);
+
+		// Force the rect light texture to be updated.
+		RectLightAtlas::UpdateRectLightAtlasTexture(GraphBuilder, FeatureLevel);
 	}
 
 	const FSceneTexturesConfig SceneTexturesConfig = FSceneTexturesConfig::Create(ViewFamily);
@@ -2405,6 +2409,7 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 				Nanite::CullRasterize(
 					GraphBuilder,
+					Scene->NaniteRasterPipelines,
 					*Scene,
 					View,
 					{ PackedView },
@@ -2723,6 +2728,13 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 		RenderHairBasePass(GraphBuilder, Scene, SceneTextures, Views, InstanceCullingManager);
 	}
 
+	// Post base pass for material classification
+	// This needs to run before virtual shadow map, in order to have ready&cleared classified SSS data
+	if (Strata::IsStrataEnabled())
+	{
+		Strata::AddStrataMaterialClassificationPass(GraphBuilder, SceneTextures, Views);
+	}
+
 	FLumenSceneFrameTemporaries LumenFrameTemporaries;
 
 	// Shadows, lumen and fog after base pass
@@ -2811,12 +2823,6 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 	// Copy lighting channels out of stencil before deferred decals which overwrite those values
 	FRDGTextureRef LightingChannelsTexture = CopyStencilToLightingChannelTexture(GraphBuilder, SceneTextures.Stencil);
-
-	// Post base pass for material classification
-	if (Strata::IsStrataEnabled())
-	{
-		Strata::AddStrataMaterialClassificationPass(GraphBuilder, SceneTextures, Views);
-	}
 
 	// Pre-lighting composition lighting stage
 	// e.g. deferred decals, SSAO

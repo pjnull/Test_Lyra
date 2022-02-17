@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Horde.Storage.Implementation;
 using Jupiter;
 using Jupiter.Implementation;
@@ -17,6 +18,7 @@ namespace Horde.Storage.Controllers
     [FormatFilter]
     [Route("api/v1/g")]
     [Authorize("Admin")]
+    [InternalApiFilter]
     public class ReplicationController : ControllerBase
     {
         private readonly ReplicationService _replicationService;
@@ -60,6 +62,9 @@ namespace Horde.Storage.Controllers
                     Namespace = replicator.Info.NamespaceToReplicate,
                     Offset = replicator.Info.State.ReplicatorOffset ?? 0,
                     Generation = replicator.Info.State.ReplicatingGeneration ?? Guid.Empty,
+
+                    LastEvent = replicator.Info.State.LastEvent ?? Guid.Empty,
+                    LastBucket = replicator.Info.State.LastBucket ?? "",
 
                     LastReplicationRun = replicator.Info.LastRun,
                     CountOfRunningReplications = replicator.Info.CountOfRunningReplications,
@@ -203,5 +208,7 @@ namespace Horde.Storage.Controllers
         public Guid? Generation { get; set; }
         public DateTime LastReplicationRun { get; set; }
         public int CountOfRunningReplications { get; set; }
+        public string? LastBucket { get; set; }
+        public Guid LastEvent { get; set; }
     }
 }

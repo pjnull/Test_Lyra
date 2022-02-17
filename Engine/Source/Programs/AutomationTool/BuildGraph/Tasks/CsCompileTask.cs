@@ -78,7 +78,7 @@ namespace AutomationTool.Tasks
 	/// Compiles C# project files, and their dependencies.
 	/// </summary>
 	[TaskElement("CsCompile", typeof(CsCompileTaskParameters))]
-	public class CsCompileTask : CustomTask
+	public class CsCompileTask : BgTaskImpl
 	{
 		/// <summary>
 		/// Parameters for the task
@@ -100,7 +100,7 @@ namespace AutomationTool.Tasks
 		/// <param name="Job">Information about the current job</param>
 		/// <param name="BuildProducts">Set of build products produced by this node.</param>
 		/// <param name="TagNameToFileSet">Mapping from tag names to the set of files they include</param>
-		public override void Execute(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
+		public override Task ExecuteAsync(JobContext Job, HashSet<FileReference> BuildProducts, Dictionary<string, HashSet<FileReference>> TagNameToFileSet)
 		{
 			// Get the project file
 			HashSet<FileReference> ProjectFiles = ResolveFilespec(Unreal.RootDirectory, Parameters.Project, TagNameToFileSet);
@@ -197,6 +197,7 @@ namespace AutomationTool.Tasks
 			// Merge them into the standard set of build products
 			BuildProducts.UnionWith(ProjectBuildProducts);
 			BuildProducts.UnionWith(ProjectReferences);
+			return Task.CompletedTask;
 		}
 
 		/// <summary>
@@ -305,5 +306,81 @@ namespace AutomationTool.Tasks
 				}
 			}
 		}
-	}	
+	}
+
+	public class CsCompileOutput
+	{
+		public static CsCompileOutput Empty { get; } = new CsCompileOutput(FileSet.Empty, FileSet.Empty);
+
+		public FileSet Binaries { get; }
+		public FileSet References { get; }
+
+		public CsCompileOutput(FileSet Binaries, FileSet References)
+		{
+			this.Binaries = Binaries;
+			this.References = References;
+		}
+
+		public FileSet Merge()
+		{
+			return Binaries + References;
+		}
+
+		public static CsCompileOutput operator +(CsCompileOutput Lhs, CsCompileOutput Rhs)
+		{
+			return new CsCompileOutput(Lhs.Binaries + Rhs.Binaries, Lhs.References + Rhs.References);
+		}
+	}
+
+	public static class CsCompileOutputExtensions
+	{
+		public static async Task<FileSet> MergeAsync(this Task<CsCompileOutput> Task)
+		{
+			return (await Task).Merge();
+		}
+	}
+
+	public static partial class StandardTasks
+	{
+		/// <summary>
+		/// Compile a C# project
+		/// </summary>
+		/// <param name="Project">The C# project files to compile.</param>
+		/// <param name="Platform">The platform to compile.</param>
+		/// <param name="Configuration">The configuration to compile.</param>
+		/// <param name="Target">The target to build.</param>
+		/// <param name="Properties">Properties for the command.</param>
+		/// <param name="Arguments">Additional options to pass to the compiler.</param>
+		/// <param name="EnumerateOnly">Only enumerate build products -- do not actually compile the projects.</param>
+		public static async Task<CsCompileOutput> CsCompileAsync(FileReference Project, string Platform = null, string Configuration = null, string Target = null, string Properties = null, string Arguments = null, bool? EnumerateOnly = null)
+		{
+			CsCompileTaskParameters Parameters = new CsCompileTaskParameters();
+			Parameters.Project = Project.FullName;
+			Parameters.Platform = Platform;
+			Parameters.Configuration = Configuration;
+			Parameters.Target = Target;
+			Parameters.Properties = Properties;
+			Parameters.Arguments = Arguments;
+			Parameters.EnumerateOnly = EnumerateOnly ?? Parameters.EnumerateOnly;
+			Parameters.Tag = "#Out";
+			Parameters.TagReferences = "#Refs";
+
+			HashSet<FileReference> BuildProducts = new HashSet<FileReference>();
+			Dictionary<string, HashSet<FileReference>> TagNameToFileSet = new Dictionary<string, HashSet<FileReference>>();
+			await new CsCompileTask(Parameters).ExecuteAsync(new JobContext(null!), BuildProducts, TagNameToFileSet);
+
+			FileSet Binaries = FileSet.Empty;
+			FileSet References = FileSet.Empty;
+			if (TagNameToFileSet.TryGetValue(Parameters.Tag, out HashSet<FileReference> BinaryFiles))
+			{
+				Binaries = FileSet.FromFiles(Unreal.RootDirectory, BinaryFiles);
+			}
+			if (TagNameToFileSet.TryGetValue(Parameters.TagReferences, out HashSet<FileReference> ReferenceFiles))
+			{
+				References = FileSet.FromFiles(Unreal.RootDirectory, ReferenceFiles);
+			}
+
+			return new CsCompileOutput(Binaries, References);
+		}
+	}
 }

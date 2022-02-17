@@ -29,6 +29,7 @@ namespace UE
 				static FRotator ConvertRotation(FbxQuaternion Quaternion);
 				static FVector ConvertPos(const FbxVector4& Vector);
 				static FVector ConvertDir(const FbxVector4& Vector);
+				static FLinearColor ConvertColor(const FbxDouble3& Color);
 
 				static FTransform AdjustCameraTransform(const FTransform& Transform);
 				static FTransform AdjustLightTransform(const FTransform& Transform);
@@ -56,7 +57,7 @@ namespace UE
 				 * Replace all special characters with '_', then remove all namespace
 				 * Special characters are . , / ` %
 				 */
-				static ANSICHAR* MakeName(const ANSICHAR* Name);
+				static FString MakeName(const ANSICHAR* Name);
 
 				/**
 				 * Convert ANSI char to a FString using ANSI_TO_TCHAR macro

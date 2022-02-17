@@ -74,6 +74,7 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "AssetRegistryModule.h"
 #include "ObjectTools.h"
+#include "Cooker/ExternalCookOnTheFlyServer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogUnrealEdEngine, Log, All);
 
@@ -220,6 +221,8 @@ void UUnrealEdEngine::Init(IEngineLoop* InEngineLoop)
 			CookServer = NewObject<UCookOnTheFlyServer>();
 			CookServer->Initialize(ECookMode::CookByTheBookFromTheEditor, BaseCookingFlags);
 		}
+
+		ExternalCookOnTheFlyServer = new FExternalCookOnTheFlyServer();
 	}
 
 	if (FParse::Param(FCommandLine::Get(), TEXT("nomcp")))
@@ -440,6 +443,12 @@ void UUnrealEdEngine::FinishDestroy()
 		FCoreUObjectDelegates::OnObjectModified.RemoveAll(CookServer);
 	}
 
+	if (ExternalCookOnTheFlyServer)
+	{
+		delete ExternalCookOnTheFlyServer;
+		ExternalCookOnTheFlyServer = nullptr;
+	}
+
 	if(PackageAutoSaver.Get())
 	{
 		// We've finished shutting down, so disable the auto-save restore
@@ -527,7 +536,8 @@ void UUnrealEdEngine::OnPackageDirtyStateUpdated( UPackage* Pkg)
 
 		if( !bIsAutoSaving && 
 			!GIsEditorLoadingPackage && // Don't ask if the package was modified as a result of a load
-			!GIsCookerLoadingPackage)   // don't ask if the package was modified as a result of a cooker load
+			!GIsCookerLoadingPackage && // don't ask if the package was modified as a result of a cooker load
+			!(Package->GetPackageFlags() & PKG_CompiledIn)) // don't ask if the package is a script package (changes are saved elsewhere via config files)
 		{
 			PackagesDirtiedThisTick.Add(Package);
 

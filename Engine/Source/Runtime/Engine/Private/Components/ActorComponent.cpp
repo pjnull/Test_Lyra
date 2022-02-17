@@ -327,6 +327,7 @@ UActorComponent::UActorComponent(const FObjectInitializer& ObjectInitializer /*=
 	bNavigationRelevant = false;
 
 	bMarkedForPreEndOfFrameSync = false;
+	bAsyncPhysicsTickEnabled = false;
 }
 
 void UActorComponent::PostInitProperties()
@@ -1190,7 +1191,24 @@ void UActorComponent::RegisterAllComponentTickFunctions(bool bRegister)
 			checkf(GTestRegisterComponentTickFunctions == this, TEXT("Failed to route component RegisterTickFunctions (%s)"), *GetFullName());
 			GTestRegisterComponentTickFunctions = NULL;
 		}
+
+#if WITH_CHAOS
+		if(bAsyncPhysicsTickEnabled)
+		{
+			if(FPhysScene_Chaos* Scene = static_cast<FPhysScene_Chaos*>(WorldPrivate->GetPhysicsScene()))
+			{
+				if(bRegister)
+				{
+					Scene->RegisterAsyncPhysicsTickComponent(this);
+				}
+				else
+				{
+					Scene->UnregisterAsyncPhysicsTickComponent(this);
+				}
+			}
+		}
 	}
+#endif
 }
 
 void UActorComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)

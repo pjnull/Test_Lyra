@@ -2029,10 +2029,9 @@ void UMaterialInstance::CacheResourceShadersForRendering(EMaterialShaderPrecompi
 			ResourcesToCache.Reset();
 			ResourcesToCache.Add(CurrentResource);
 			CacheShadersForResources(ShaderPlatform, ResourcesToCache, PrecompileMode);
+			RecacheUniformExpressions(true);
 		}
 	}
-
-	RecacheUniformExpressions(true);
 
 	InitResources();
 }
@@ -2131,6 +2130,11 @@ void UMaterialInstance::CacheShadersForResources(EShaderPlatform ShaderPlatform,
 			UE_ASSET_LOG(LogMaterial, Warning, this, TEXT("%s"), *ErrorString);
 		}
 	}
+}
+
+void UMaterialInstance::CacheShaders(EMaterialShaderPrecompileMode CompileMode)
+{
+	InitStaticPermutation(CompileMode);
 }
 
 bool UMaterialInstance::GetMaterialLayers(FMaterialLayersFunctions& OutLayers, TMicRecursionGuard RecursionGuard) const

@@ -80,9 +80,19 @@ namespace HordeAgent.Execution
 
 					int AutoSdkChangeNumber = await AutoSdkWorkspace.GetLatestChangeAsync(CancellationToken);
 
-					FileReference AutoSdkCacheFile = FileReference.Combine(AutoSdkWorkspace.MetadataDir, "Contents.dat");
-					await AutoSdkWorkspace.UpdateLocalCacheMarker(AutoSdkCacheFile, AutoSdkChangeNumber, -1);
-					await AutoSdkWorkspace.SyncAsync(AutoSdkChangeNumber, -1, AutoSdkCacheFile, Logger, CancellationToken);
+					string SyncText = $"Synced to CL {AutoSdkChangeNumber}";
+
+					FileReference SyncFile = FileReference.Combine(AutoSdkWorkspace.MetadataDir, "Synced.txt");
+					if (!FileReference.Exists(SyncFile) || FileReference.ReadAllText(SyncFile) != SyncText)
+					{
+						FileReference.Delete(SyncFile);
+
+						FileReference AutoSdkCacheFile = FileReference.Combine(AutoSdkWorkspace.MetadataDir, "Contents.dat");
+						await AutoSdkWorkspace.UpdateLocalCacheMarker(AutoSdkCacheFile, AutoSdkChangeNumber, -1);
+						await AutoSdkWorkspace.SyncAsync(AutoSdkChangeNumber, -1, AutoSdkCacheFile, Logger, CancellationToken);
+
+						FileReference.WriteAllText(SyncFile, SyncText);
+					}
 				}
 			}
 
@@ -197,13 +207,11 @@ namespace HordeAgent.Execution
 
 		protected override async Task<bool> SetupAsync(BeginStepResponse Step, ILogger Logger, CancellationToken CancellationToken)
 		{
-			await Workspace.Repository.LogFortniteStatsInfoAsync(Workspace.PerforceClient);
 			return await SetupAsync(Step, Workspace.WorkspaceDir, SharedStorageDir, EnvVars, Logger, CancellationToken);
 		}
 
 		protected override async Task<bool> ExecuteAsync(BeginStepResponse Step, ILogger Logger, CancellationToken CancellationToken)
 		{
-			await Workspace.Repository.LogFortniteStatsInfoAsync(Workspace.PerforceClient);
 			return await ExecuteAsync(Step, Workspace.WorkspaceDir, SharedStorageDir, EnvVars, Logger, CancellationToken);
 		}
 
@@ -212,7 +220,7 @@ namespace HordeAgent.Execution
 			await Workspace.CleanAsync(CancellationToken);
 		}
 
-		public static async Task ConformAsync(DirectoryReference RootDir, IList<AgentWorkspace> PendingWorkspaces, ILogger Logger, CancellationToken CancellationToken)
+		public static async Task ConformAsync(DirectoryReference RootDir, IList<AgentWorkspace> PendingWorkspaces, bool bRemoveUntrackedFiles, ILogger Logger, CancellationToken CancellationToken)
 		{
 			// Print out all the workspaces we're going to sync
 			Logger.LogInformation("Workspaces:");
@@ -230,126 +238,151 @@ namespace HordeAgent.Execution
 			}
 
 			// Find all the unique Perforce servers
-			List<PerforceConnection> PerforceConnections = new List<PerforceConnection>();
-			foreach (WorkspaceInfo Workspace in Workspaces)
+			List<IPerforceConnection> PerforceConnections = new List<IPerforceConnection>();
+			try
 			{
-				if (!PerforceConnections.Any(x => x.ServerAndPort!.Equals(Workspace.ServerAndPort, StringComparison.OrdinalIgnoreCase) && x.UserName!.Equals(Workspace.PerforceClient.UserName, StringComparison.Ordinal)))
+				foreach (WorkspaceInfo Workspace in Workspaces)
 				{
-					PerforceConnections.Add(new PerforceConnection(Workspace.PerforceClient.ServerAndPort, Workspace.PerforceClient.UserName, Workspace.PerforceClient.Logger));
-				}
-			}
-
-			// Enumerate all the workspaces
-			foreach(PerforceConnection Perforce in PerforceConnections)
-			{
-				// Get the server info
-				InfoRecord Info = await Perforce.GetInfoAsync(InfoOptions.ShortOutput, CancellationToken.None);
-
-				// Enumerate all the clients on the server
-				List<ClientsRecord> Clients = await Perforce.GetClientsAsync(ClientsOptions.None, null, -1, null, Perforce.UserName, CancellationToken);
-				foreach (ClientsRecord Client in Clients)
-				{
-					// Check the host matches
-					if (!String.Equals(Client.Host, Info.ClientHost, StringComparison.OrdinalIgnoreCase))
+					if (!PerforceConnections.Any(x => x.Settings.ServerAndPort!.Equals(Workspace.ServerAndPort, StringComparison.OrdinalIgnoreCase) && x.Settings.UserName!.Equals(Workspace.PerforceClient.Settings.UserName, StringComparison.Ordinal)))
 					{
-						continue;
+						IPerforceConnection Connection = await PerforceConnection.CreateAsync(Workspace.PerforceClient.Settings, Workspace.PerforceClient.Logger);
+						PerforceConnections.Add(Connection);
 					}
-
-					// Check the edge server id matches
-					if(!String.IsNullOrEmpty(Client.ServerID) && !String.Equals(Client.ServerID, Info.ServerID, StringComparison.OrdinalIgnoreCase))
-					{
-						continue;
-					}
-
-					// Check it's under the managed root directory
-					DirectoryReference? ClientRoot;
-					try
-					{
-						ClientRoot = new DirectoryReference(Client.Root);
-					}
-					catch
-					{
-						ClientRoot = null;
-					}
-
-					if (ClientRoot == null || !ClientRoot.IsUnderDirectory(RootDir))
-					{
-						continue;
-					}
-
-					// Check it doesn't match one of the workspaces we want to keep
-					if (Workspaces.Any(x => String.Equals(Client.Name, x.ClientName, StringComparison.OrdinalIgnoreCase)))
-					{
-						continue;
-					}
-
-					// Revert all the files in this clientspec and delete it
-					Logger.LogInformation("Deleting client {ClientName}...", Client.Name);
-					PerforceConnection PerforceClient = new PerforceConnection(Perforce) { ClientName = Client.Name };
-					await Utility.WorkspaceInfo.RevertAllChangesAsync(PerforceClient, Logger, CancellationToken);
-					await Perforce.DeleteClientAsync(DeleteClientOptions.None, Client.Name, CancellationToken);
-				}
-			}
-
-			// Delete all the directories that aren't a workspace root
-			if (DirectoryReference.Exists(RootDir))
-			{
-				// Delete all the files in the root
-				foreach (FileInfo File in RootDir.ToDirectoryInfo().EnumerateFiles())
-				{
-					FileUtils.ForceDeleteFile(File);
 				}
 
-				// Build a set of directories to protect
-				HashSet<DirectoryReference> ProtectDirs = new HashSet<DirectoryReference>();
-				ProtectDirs.Add(DirectoryReference.Combine(RootDir, "Temp"));
-				ProtectDirs.Add(DirectoryReference.Combine(RootDir, "Saved"));
-				ProtectDirs.UnionWith(Workspaces.Select(x => x.MetadataDir));
-
-				// Delete all the directories which aren't a workspace root
-				foreach (DirectoryReference Dir in DirectoryReference.EnumerateDirectories(RootDir))
+				// Enumerate all the workspaces
+				foreach (IPerforceConnection Perforce in PerforceConnections)
 				{
-					if (ProtectDirs.Contains(Dir))
+					// Get the server info
+					InfoRecord Info = await Perforce.GetInfoAsync(InfoOptions.ShortOutput, CancellationToken.None);
+
+					// Enumerate all the clients on the server
+					List<ClientsRecord> Clients = await Perforce.GetClientsAsync(ClientsOptions.None, null, -1, null, Perforce.Settings.UserName, CancellationToken);
+					foreach (ClientsRecord Client in Clients)
 					{
-						Logger.LogInformation("Keeping directory {KeepDir}", Dir);
+						// Check the host matches
+						if (!String.Equals(Client.Host, Info.ClientHost, StringComparison.OrdinalIgnoreCase))
+						{
+							continue;
+						}
+
+						// Check the edge server id matches
+						if (!String.IsNullOrEmpty(Client.ServerID) && !String.Equals(Client.ServerID, Info.ServerID, StringComparison.OrdinalIgnoreCase))
+						{
+							continue;
+						}
+
+						// Check it's under the managed root directory
+						DirectoryReference? ClientRoot;
+						try
+						{
+							ClientRoot = new DirectoryReference(Client.Root);
+						}
+						catch
+						{
+							ClientRoot = null;
+						}
+
+						if (ClientRoot == null || !ClientRoot.IsUnderDirectory(RootDir))
+						{
+							continue;
+						}
+
+						// Check it doesn't match one of the workspaces we want to keep
+						if (Workspaces.Any(x => String.Equals(Client.Name, x.ClientName, StringComparison.OrdinalIgnoreCase)))
+						{
+							continue;
+						}
+
+						// Revert all the files in this clientspec and delete it
+						Logger.LogInformation("Deleting client {ClientName}...", Client.Name);
+						using IPerforceConnection PerforceClient = await Perforce.WithClientAsync(Client.Name);
+						await Utility.WorkspaceInfo.RevertAllChangesAsync(PerforceClient, Logger, CancellationToken);
+						await Perforce.DeleteClientAsync(DeleteClientOptions.None, Client.Name, CancellationToken);
+					}
+				}
+
+				// Delete all the directories that aren't a workspace root
+				if (DirectoryReference.Exists(RootDir))
+				{
+					// Delete all the files in the root
+					foreach (FileInfo File in RootDir.ToDirectoryInfo().EnumerateFiles())
+					{
+						FileUtils.ForceDeleteFile(File);
+					}
+
+					// Build a set of directories to protect
+					HashSet<DirectoryReference> ProtectDirs = new HashSet<DirectoryReference>();
+					if (!bRemoveUntrackedFiles)
+					{
+						ProtectDirs.Add(DirectoryReference.Combine(RootDir, "Temp"));
+						ProtectDirs.Add(DirectoryReference.Combine(RootDir, "Saved"));
+					}
+					ProtectDirs.UnionWith(Workspaces.Select(x => x.MetadataDir));
+
+					// Delete all the directories which aren't a workspace root
+					foreach (DirectoryReference Dir in DirectoryReference.EnumerateDirectories(RootDir))
+					{
+						if (ProtectDirs.Contains(Dir))
+						{
+							Logger.LogInformation("Keeping directory {KeepDir}", Dir);
+						}
+						else
+						{
+							Logger.LogInformation("Deleting directory {DeleteDir}", Dir);
+							FileUtils.ForceDeleteDirectory(Dir);
+						}
+					}
+					Logger.LogInformation("");
+				}
+
+				// Revert any open files in any workspace
+				HashSet<string> RevertedClientNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+				foreach (WorkspaceInfo Workspace in Workspaces)
+				{
+					if (RevertedClientNames.Add(Workspace.ClientName))
+					{
+						using IPerforceConnection Connection = await Workspace.PerforceClient.WithClientAsync(Workspace.ClientName);
+						await Workspace.Repository.RevertAsync(Connection, CancellationToken);
+					}
+				}
+
+				// Sync all the branches.
+				List<Func<Task>> SyncFuncs = new List<Func<Task>>();
+				foreach (IGrouping<DirectoryReference, WorkspaceInfo> WorkspaceGroup in Workspaces.GroupBy(x => x.MetadataDir).OrderBy(x => x.Key.FullName))
+				{
+					List<PopulateRequest> PopulateRequests = new List<PopulateRequest>();
+					foreach (WorkspaceInfo Workspace in WorkspaceGroup)
+					{
+						IPerforceConnection PerforceClient = await Workspace.PerforceClient.WithClientAsync(Workspace.ClientName);
+						PerforceConnections.Add(PerforceClient);
+						PopulateRequests.Add(new PopulateRequest(PerforceClient, Workspace.StreamName, Workspace.View));
+					}
+
+					WorkspaceInfo? FirstWorkspace = WorkspaceGroup.First();
+					if (PopulateRequests.Count == 1 && !FirstWorkspace.bRemoveUntrackedFiles && !bRemoveUntrackedFiles)
+					{
+						await FirstWorkspace.CleanAsync(CancellationToken);
+						SyncFuncs.Add(() => FirstWorkspace.SyncAsync(-1, -1, null, Logger, CancellationToken));
 					}
 					else
 					{
-						Logger.LogInformation("Deleting directory {DeleteDir}", Dir);
-						FileUtils.ForceDeleteDirectory(Dir);
+						ManagedWorkspace Repository = FirstWorkspace.Repository;
+						Tuple<int, StreamSnapshot>[] StreamStates = await Repository.PopulateCleanAsync(PopulateRequests, false, CancellationToken);
+						SyncFuncs.Add(() => Repository.PopulateSyncAsync(PopulateRequests, StreamStates, false, CancellationToken));
 					}
 				}
-				Logger.LogInformation("");
-			}
-
-			// Revert any open files in any workspace
-			HashSet<string> RevertedClientNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			foreach (WorkspaceInfo Workspace in Workspaces)
-			{
-				if (RevertedClientNames.Add(Workspace.ClientName))
+				foreach (Func<Task> SyncFunc in SyncFuncs)
 				{
-					await Workspace.Repository.RevertAsync(new PerforceClientConnection(Workspace.PerforceClient, Workspace.ClientName), CancellationToken);
+					await SyncFunc();
 				}
 			}
-
-			// Sync all the branches.
-			List<Func<Task>> SyncFuncs = new List<Func<Task>>();
-			foreach (IGrouping<DirectoryReference, WorkspaceInfo> WorkspaceGroup in Workspaces.GroupBy(x => x.MetadataDir).OrderBy(x => x.Key.FullName))
+			finally
 			{
-				List<PopulateRequest> PopulateRequests = new List<PopulateRequest>();
-				foreach (WorkspaceInfo Workspace in WorkspaceGroup)
+				foreach (IPerforceConnection PerforceConnection in PerforceConnections)
 				{
-					PerforceClientConnection PerforceClient = new PerforceClientConnection(Workspace.PerforceClient, Workspace.ClientName);
-					PopulateRequests.Add(new PopulateRequest(PerforceClient, Workspace.StreamName, Workspace.View));
+					PerforceConnection.Dispose();
 				}
-
-				ManagedWorkspace Repository = WorkspaceGroup.First().Repository;
-				Tuple<int, StreamSnapshot>[] StreamStates = await Repository.PopulateCleanAsync(PopulateRequests, false, CancellationToken);
-				SyncFuncs.Add(() => Repository.PopulateSyncAsync(PopulateRequests, StreamStates, false, CancellationToken));
-			}
-			foreach (Func<Task> SyncFunc in SyncFuncs)
-			{
-				await SyncFunc();
 			}
 		}
 	}

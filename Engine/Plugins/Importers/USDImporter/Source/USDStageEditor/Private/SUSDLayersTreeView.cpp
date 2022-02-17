@@ -13,9 +13,11 @@
 #include "UsdWrappers/SdfLayer.h"
 #include "UsdWrappers/UsdStage.h"
 
+#include "DesktopPlatformModule.h"
 #include "EditorStyleSet.h"
 #include "Engine/World.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "IDesktopPlatform.h"
 #include "Modules/ModuleManager.h"
 #include "Styling/SlateTypes.h"
 #include "Widgets/Images/SImage.h"
@@ -25,6 +27,46 @@
 #if USE_USD_SDK
 
 #define LOCTEXT_NAMESPACE "SUSDLayersTreeView"
+
+namespace UE::USDLayersTreeViewImpl::Private
+{
+	void ExportLayerToPath( const UE::FSdfLayer& LayerToExport, const FString& TargetPath )
+	{
+		if ( !LayerToExport )
+		{
+			return;
+		}
+
+		// Clone the layer so that we don't modify the currently opened stage when we do the remapping below
+		UE::FSdfLayer OutputLayer = UE::FSdfLayer::CreateNew( *TargetPath );
+		OutputLayer.TransferContent( LayerToExport );
+
+		// Update references to assets (e.g. textures) so that they're absolute and also work from the new file
+		UsdUtils::ConvertAssetRelativePathsToAbsolute( OutputLayer, LayerToExport );
+
+		// Convert layer references to absolute paths so that it still works at its target location
+		FString LayerPath = LayerToExport.GetRealPath();
+		FPaths::NormalizeFilename( LayerPath );
+		const TSet<FString> AssetDependencies =
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+			OutputLayer.GetCompositionAssetDependencies();
+#else
+			OutputLayer.GetExternalReferences();
+#endif
+		for ( const FString& Ref : AssetDependencies )
+		{
+			FString AbsRef = FPaths::ConvertRelativePathToFull( FPaths::GetPath( LayerPath ), Ref ); // Relative to the original file
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+			OutputLayer.UpdateCompositionAssetDependency( *Ref, *AbsRef );
+#else
+			OutputLayer.UpdateExternalReference( *Ref, *AbsRef );
+#endif
+		}
+
+		bool bForce = true;
+		OutputLayer.Save( bForce );
+	}
+}
 
 class FUsdLayerNameColumn : public FUsdTreeViewColumn
 {
@@ -177,9 +219,9 @@ class FUsdLayerEditColumn : public FUsdTreeViewColumn, public TSharedFromThis< F
 public:
 	const FSlateBrush* GetCheckedImage( const FUsdLayerViewModelRef InTreeItem ) const
 	{
-		return InTreeItem->LayerModel->bIsEditTarget ?
-			&FEditorStyle::Get().GetWidgetStyle< FCheckBoxStyle >( "Checkbox" ).CheckedImage :
-			nullptr;
+		return InTreeItem->LayerModel->bIsEditTarget
+			? FUsdStageEditorStyle::Get()->GetBrush( "UsdStageEditor.CheckBoxImage" )
+			: nullptr;
 	}
 
 	virtual TSharedRef< SWidget > GenerateWidget( const TSharedPtr< IUsdTreeViewItem > InTreeItem, const TSharedPtr< ITableRow > TableRow ) override
@@ -188,8 +230,7 @@ public:
 
 		TSharedRef< SWidget > Item =
 			SNew(SImage)
-				.Image( this, &FUsdLayerEditColumn::GetCheckedImage, TreeItem )
-				.ColorAndOpacity( FSlateColor::UseForeground() );
+				.Image( this, &FUsdLayerEditColumn::GetCheckedImage, TreeItem );
 
 		float ItemSize = FUsdStageEditorStyle::Get()->GetFloat( "UsdStageEditor.ListItemHeight" );
 
@@ -297,6 +338,18 @@ TSharedPtr< SWidget > SUsdLayersTreeView::ConstructLayerContextMenu()
 			NAME_None,
 			EUserInterfaceActionType::Button
 		);
+
+		LayerOptions.AddMenuEntry(
+			LOCTEXT( "ExportLayer", "Export" ),
+			LOCTEXT( "Export_ToolTip", "Export the selected layers, having the exported layers reference the original stage's layers" ),
+			FSlateIcon(),
+			FUIAction(
+				FExecuteAction::CreateSP( this, &SUsdLayersTreeView::OnExportSelectedLayers ),
+				FCanExecuteAction()
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
 	}
 	LayerOptions.EndSection();
 
@@ -372,6 +425,76 @@ void SUsdLayersTreeView::OnEditSelectedLayer()
 		if ( SelectedItem->EditLayer() )
 		{
 			break;
+		}
+	}
+}
+
+void SUsdLayersTreeView::OnExportSelectedLayers() const
+{
+	TArray< FUsdLayerViewModelRef > MySelectedItems = GetSelectedItems();
+
+	TArray<UE::FSdfLayer> LayersToExport;
+	LayersToExport.Reserve( MySelectedItems.Num() );
+
+	for ( FUsdLayerViewModelRef SelectedItem : MySelectedItems )
+	{
+		UE::FSdfLayer SelectedLayer = SelectedItem->GetLayer();
+		if ( !SelectedLayer )
+		{
+			continue;
+		}
+
+		LayersToExport.Add( SelectedLayer );
+	}
+
+	// Single layer -> Allow picking the target layer filename
+	if ( LayersToExport.Num() == 1 )
+	{
+		TOptional< FString > UsdFilePath = UsdUtils::BrowseUsdFile( UsdUtils::EBrowseFileMode::Save, AsShared() );
+		if ( !UsdFilePath.IsSet() )
+		{
+			return;
+		}
+
+		UE::USDLayersTreeViewImpl::Private::ExportLayerToPath( LayersToExport[ 0 ], UsdFilePath.GetValue() );
+	}
+	// Multiple layers -> Pick folder and export them with the same name
+	if ( LayersToExport.Num() > 1 )
+	{
+		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+		if ( !DesktopPlatform )
+		{
+			return;
+		}
+
+		TSharedPtr< SWindow > ParentWindow = FSlateApplication::Get().FindWidgetWindow( AsShared() );
+		void* ParentWindowHandle = ( ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid() )
+			? ParentWindow->GetNativeWindow()->GetOSWindowHandle()
+			: nullptr;
+
+		FString TargetFolderPath;
+		if ( !DesktopPlatform->OpenDirectoryDialog( ParentWindowHandle, LOCTEXT( "ChooseFolder", "Choose output folder" ).ToString(), TEXT( "" ), TargetFolderPath ) )
+		{
+			return;
+		}
+		TargetFolderPath = FPaths::ConvertRelativePathToFull( TargetFolderPath );
+
+		if ( FPaths::DirectoryExists( TargetFolderPath ) )
+		{
+			for ( const UE::FSdfLayer& LayerToExport : LayersToExport )
+			{
+				FString TargetFileName = FPaths::GetCleanFilename( LayerToExport.GetRealPath() );
+				FString FullPath = FPaths::Combine( TargetFolderPath, TargetFileName );
+				FString FinalFullPath = FullPath;
+
+				uint32 Suffix = 0;
+				while ( FPaths::FileExists( FinalFullPath ) )
+				{
+					FinalFullPath = FString::Printf( TEXT( "%s_%u" ), *FullPath, Suffix++ );
+				}
+
+				UE::USDLayersTreeViewImpl::Private::ExportLayerToPath( LayerToExport, FinalFullPath );
+			}
 		}
 	}
 }

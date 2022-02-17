@@ -63,6 +63,8 @@
 #include "VT/RuntimeVirtualTextureSceneProxy.h"
 #include "HairStrandsInterface.h"
 #include "VelocityRendering.h"
+#include "RectLightSceneProxy.h"
+#include "RectLightTextureManager.h"
 
 #if RHI_RAYTRACING
 #include "RayTracingDynamicGeometryCollection.h"
@@ -1145,6 +1147,7 @@ FScene::FScene(UWorld* InWorld, bool bInRequiresHitProxies, bool bInIsEditorScen
 :	FSceneInterface(InFeatureLevel)
 ,	World(InWorld)
 ,	FXSystem(nullptr)
+,	NaniteRasterPipelines(InFeatureLevel)
 ,	bScenesPrimitivesNeedStaticMeshElementUpdate(false)
 ,	bPathTracingNeedsInvalidation(true)
 #if RHI_RAYTRACING
@@ -1896,7 +1899,8 @@ void FScene::AddLightSceneInfo_RenderThread(FLightSceneInfo* LightSceneInfo)
 	// Add the light to the light list.
 	LightSceneInfo->Id = Lights.Add(FLightSceneInfoCompact(LightSceneInfo));
 	const FLightSceneInfoCompact& LightSceneInfoCompact = Lights[LightSceneInfo->Id];
-	const bool bDirectionalLight = LightSceneInfo->Proxy->GetLightType() == LightType_Directional;
+	const ELightComponentType LightType = (ELightComponentType)LightSceneInfo->Proxy->GetLightType();
+	const bool bDirectionalLight = LightType == LightType_Directional;
 
 	if (bDirectionalLight)
 	{
@@ -1943,6 +1947,13 @@ void FScene::AddLightSceneInfo_RenderThread(FLightSceneInfo* LightSceneInfo)
 				}
 		    }
 		}
+	}
+
+	// Register rect. light source texture
+	if (LightType == LightType_Rect)
+	{
+		FRectLightSceneProxy* RectProxy = (FRectLightSceneProxy*)LightSceneInfo->Proxy;
+		RectProxy->AtlasSlotIndex = RectLightAtlas::AddRectLightTexture(RectProxy->SourceTexture);
 	}
 
 	const bool bForwardShading = IsForwardShadingEnabled(GetShaderPlatform());
@@ -2317,6 +2328,18 @@ void FScene::RemoveHairStrands(FHairStrandsInstance* Proxy)
 			FHairStrandsInstance* Other = HairStrandsSceneData.RegisteredProxies[ProxyIndex];
 			Other->RegisteredIndex = ProxyIndex;
 		}
+	}
+}
+
+void FScene::GetRectLightAtlasSlot(const FRectLightSceneProxy* Proxy, FLightRenderParameters* Out)
+{
+	if (Proxy)
+	{
+		check(IsInRenderingThread());
+		const RectLightAtlas::FAtlasSlotDesc Slot = RectLightAtlas::GetRectLightAtlasSlot(Proxy->AtlasSlotIndex);
+		Out->RectLightAtlasUVOffset = Slot.UVOffset;
+		Out->RectLightAtlasUVScale = Slot.UVScale;
+		Out->RectLightAtlasMaxLevel = Slot.MaxMipLevel;
 	}
 }
 
@@ -3183,6 +3206,12 @@ void FScene::RemoveLightSceneInfo_RenderThread(FLightSceneInfo* LightSceneInfo)
 	else
 	{
 		InvisibleLights.RemoveAt(LightSceneInfo->Id);
+	}
+
+	if (LightSceneInfo->Proxy->GetLightType() == LightType_Rect)
+	{
+		const FRectLightSceneProxy* RectProxy = (const FRectLightSceneProxy*)LightSceneInfo->Proxy;
+		RectLightAtlas::RemoveRectLightTexture(RectProxy->AtlasSlotIndex);
 	}
 
 	// Free the light scene info and proxy.
@@ -5260,6 +5289,7 @@ public:
 
 	virtual void AddHairStrands(FHairStrandsInstance* Proxy) override {}
 	virtual void RemoveHairStrands(FHairStrandsInstance* Proxy) override {}
+	virtual void GetRectLightAtlasSlot(const FRectLightSceneProxy* Proxy, FLightRenderParameters* Out) override {}
 
 	virtual void SetPhysicsField(FPhysicsFieldSceneProxy* PhysicsFieldSceneProxy) override {}
 	virtual void ResetPhysicsField() override {}

@@ -3,10 +3,8 @@
 using HordeCommon;
 using HordeServer.Api;
 using HordeServer.Models;
-using MongoDB.Bson;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace HordeServer.Notifications
@@ -16,6 +14,13 @@ namespace HordeServer.Notifications
 	/// </summary>
 	public interface INotificationSink
 	{
+		/// <summary>
+		/// Send notifications that a job has been scheduled
+		/// </summary>
+		/// <param name="Notifications">List of notifications to send</param>
+		/// <returns>Async task</returns>
+		Task NotifyJobScheduledAsync(List<JobScheduledNotification> Notifications);
+		
 		/// <summary>
 		/// Send notifications that a job has completed
 		/// </summary>
@@ -80,7 +85,7 @@ namespace HordeServer.Notifications
 		/// <param name="Description"></param>
 		/// <returns></returns>
 		Task NotifyConfigUpdateFailureAsync(string ErrorMessage, string FileName, int? Change = null, IUser? Author = null, string? Description = null);
-		
+
 		/// <summary>
 		/// Notification for device service
 		/// </summary>
@@ -89,9 +94,11 @@ namespace HordeServer.Notifications
 		/// <param name="Pool"></param>
 		/// <param name="Stream"></param>
 		/// <param name="Job"></param>
-        /// <param name="Step"></param>
-        /// <param name="Node"></param>
+		/// <param name="Step"></param>
+		/// <param name="Node"></param>
+		/// <param name="User"></param>
 		/// <returns></returns>
-        Task NotifyDeviceServiceAsync(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null);
+		Task NotifyDeviceServiceAsync(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null, IUser? User = null);
     }
 }
+

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using EpicGames.Horde.Storage;
 using Jupiter;
 using Jupiter.Implementation;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,7 +28,7 @@ namespace Horde.Storage.Implementation
             public List<IReplicator> Replicators { get; } = new List<IReplicator>();
         }
 
-        public override bool ShouldStartPolling()
+        protected override bool ShouldStartPolling()
         {
             return _settings.CurrentValue.Enabled;
         }
@@ -40,7 +41,7 @@ namespace Horde.Storage.Implementation
 
             _leaderElection.OnLeaderChanged += OnLeaderChanged;
 
-            DirectoryInfo di = new DirectoryInfo(settings.CurrentValue.StateRoot);
+            DirectoryInfo di = new DirectoryInfo(settings.CurrentValue.GetStateRoot());
             Directory.CreateDirectory(di.FullName);
 
             foreach (var replicator in settings.CurrentValue.Replicators)

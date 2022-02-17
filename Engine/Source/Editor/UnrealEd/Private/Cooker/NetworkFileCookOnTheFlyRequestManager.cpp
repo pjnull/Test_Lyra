@@ -34,6 +34,10 @@ public:
 		return NetworkFileServer.IsValid();
 	}
 
+	virtual void Tick() override
+	{
+	}
+
 	virtual void Shutdown() override
 	{
 		if (NetworkFileServer.IsValid())
@@ -41,6 +45,10 @@ public:
 			NetworkFileServer->Shutdown();
 			NetworkFileServer.Reset();
 		}
+	}
+
+	virtual void OnPackageGenerated(const FName& PackageName) override
+	{
 	}
 
 private:
@@ -59,7 +67,7 @@ private:
 		if (bIsCookable)
 		{
 			FEvent* CookCompletedEvent = FPlatformProcess::GetSynchEventFromPool();
-			FCookRequestCompletedCallback CookRequestCompleted = [this, CookCompletedEvent](const UE::Cook::ECookResult)
+			FCompletionCallback CookRequestCompleted = [this, CookCompletedEvent](UE::Cook::FPackageData*)
 			{
 				CookCompletedEvent->Trigger();
 			};

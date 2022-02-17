@@ -689,7 +689,7 @@ bool IAnalyzer::FEventData::GetString(const ANSICHAR* FieldName, FAnsiStringView
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-bool IAnalyzer::FEventData::GetString(const ANSICHAR* FieldName, FStringView& Out) const
+bool IAnalyzer::FEventData::GetString(const ANSICHAR* FieldName, FWideStringView& Out) const
 {
 	const auto* Info = (const FEventDataInfo*)this;
 	const auto& Dispatch = Info->Dispatch;
@@ -701,18 +701,18 @@ bool IAnalyzer::FEventData::GetString(const ANSICHAR* FieldName, FStringView& Ou
 	}
 
 	const auto& Field = Dispatch.Fields[Index];
-	if (Field.Class != UE::Trace::Protocol0::Field_String || Field.SizeAndType != sizeof(TCHAR))
+	if (Field.Class != UE::Trace::Protocol0::Field_String || Field.SizeAndType != sizeof(WIDECHAR))
 	{
 		return false;
 	}
 
 	if (const FAuxData* Data = Info->GetAuxData(Index))
 	{
-		Out = FStringView((const TCHAR*)(Data->Data), Data->DataSize / sizeof(TCHAR));
+		Out = FWideStringView((const WIDECHAR*)(Data->Data), Data->DataSize / sizeof(WIDECHAR));
 		return true;
 	}
 
-	Out = FStringView();
+	Out = FWideStringView();
 	return true;
 }
 
@@ -744,9 +744,9 @@ bool IAnalyzer::FEventData::GetString(const ANSICHAR* FieldName, FString& Out) c
 			return true;
 		}
 
-		if (Field.SizeAndType == sizeof(TCHAR))
+		if (Field.SizeAndType == sizeof(WIDECHAR))
 		{
-			Out = FStringView((const TCHAR*)(Data->Data), Data->DataSize / sizeof(TCHAR));
+			Out = FWideStringView((const WIDECHAR*)(Data->Data), Data->DataSize / sizeof(WIDECHAR));
 			return true;
 		}
 	}
@@ -926,6 +926,7 @@ class FAnalyzerHub
 public:
 	void				End();
 	void				SetAnalyzers(TArray<IAnalyzer*>&& InAnalyzers);
+	uint32				GetActiveAnalyzerNum() const;
 	void				OnNewType(const FTypeRegistry::FTypeInfo* TypeInfo);
 	void				OnEvent(const FTypeRegistry::FTypeInfo& TypeInfo, IAnalyzer::EStyle Style, const IAnalyzer::FOnEventContext& Context);
 	void				OnThreadInfo(const FThreads::FInfo& ThreadInfo);
@@ -979,6 +980,17 @@ void FAnalyzerHub::SetAnalyzers(TArray<IAnalyzer*>&& InAnalyzers)
 {
 	Analyzers = MoveTemp(InAnalyzers);
 	BuildRoutes();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+uint32 FAnalyzerHub::GetActiveAnalyzerNum() const
+{
+	uint32 Count = 0;
+	for (IAnalyzer* Analyzer : Analyzers)
+	{
+		Count += (Analyzer != nullptr);
+	}
+	return Count;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1458,6 +1470,7 @@ public:
 	typedef FAnalysisState::FSerial FSerial;
 
 						FAnalysisBridge(TArray<IAnalyzer*>&& Analyzers);
+	bool				IsStillAnalyzing() const;
 	void				Reset();
 	uint32				GetUserUidBias() const;
 	FSerial&			GetSerial();
@@ -1484,6 +1497,13 @@ FAnalysisBridge::FAnalysisBridge(TArray<IAnalyzer*>&& Analyzers)
 	TArray<IAnalyzer*> TempAnalyzers(MoveTemp(Analyzers));
 	TempAnalyzers.Add(&TraceAnalyzer);
 	AnalyzerHub.SetAnalyzers(MoveTemp(TempAnalyzers));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+bool FAnalysisBridge::IsStillAnalyzing() const
+{
+	// "> 1" because TraceAnalyzer is always present but shouldn't be considered
+	return AnalyzerHub.GetActiveAnalyzerNum() > 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1915,7 +1935,7 @@ FProtocol2Stage::EStatus FProtocol2Stage::OnData(
 		uint32				ThreadId;
 		FStreamReader*		Reader;
 
-		bool operator < (const FRotaItem& Rhs)
+		bool operator < (const FRotaItem& Rhs) const
 		{
 			int32 Delta = Rhs.Serial - Serial;
 			int32 Wrapped = uint32(Delta + 0x007f'fffe) >= uint32(0x00ff'fffd);
@@ -1932,9 +1952,10 @@ FProtocol2Stage::EStatus FProtocol2Stage::OnData(
 	}
 
 	auto& Serial = Context.Bridge.GetSerial();
-	uint32 ActiveCount = uint32(Rota.Num());
 	while (true)
 	{
+		uint32 ActiveCount = uint32(Rota.Num());
+
 		for (uint32 i = 0; i < ActiveCount;)
 		{
 			FRotaItem& RotaItem = Rota[i];
@@ -2539,8 +2560,8 @@ private:
 	int32					DispatchEvents(FAnalysisBridge& Bridge, const FEventDesc* EventDesc, uint32 Count);
 	int32					DispatchEvents(FAnalysisBridge& Bridge, TArray<FEventDescStream>& EventDescHeap);
 	void					DetectSerialGaps(TArray<FEventDescStream>& EventDescHeap);
-	template <typename CALLBACK>
-	void					ForEachSerialGap(const TArray<FEventDescStream>& EventDescHeap, CALLBACK&& Callback);
+	template <typename Callback>
+	void					ForEachSerialGap(const TArray<FEventDescStream>& EventDescHeap, Callback&& InCallback);
 	FTypeRegistry			TypeRegistry;
 	FTidPacketTransport&	Transport;
 	EventDescArray			EventDescs;
@@ -2604,7 +2625,7 @@ FProtocol5Stage::EStatus FProtocol5Stage::OnData(
 		return EStatus::NotEnoughData;
 	}
 
-	return (Reader.GetRemaining() != 0) ? EStatus::Continue : EStatus::EndOfStream;
+	return Reader.CanMeetDemand() ? EStatus::Continue : EStatus::EndOfStream;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3164,10 +3185,10 @@ int32 FProtocol5Stage::ParseEvent(FStreamReader& Reader, FEventDesc& EventDesc)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-template <typename CALLBACK>
+template <typename Callback>
 void FProtocol5Stage::ForEachSerialGap(
 	const TArray<FEventDescStream>& EventDescHeap,
-	CALLBACK&& Callback)
+	Callback&& InCallback)
 {
 	TArray<FEventDescStream> HeapCopy(EventDescHeap);
 	int Serial = HeapCopy.HeapTop().EventDescs[0].Serial;
@@ -3176,7 +3197,7 @@ void FProtocol5Stage::ForEachSerialGap(
 	// already been consumed.
 	if (NextSerial != Serial)
 	{
-		if (!Callback(NextSerial, Serial))
+		if (!InCallback(NextSerial, Serial))
 		{
 			return;
 		}
@@ -3193,7 +3214,7 @@ void FProtocol5Stage::ForEachSerialGap(
 		// the previous stream we have found a gap. Celebration ensues.
 		if (Serial != EventDesc->Serial)
 		{
-			if (!Callback(Serial, EventDesc->Serial))
+			if (!InCallback(Serial, EventDesc->Serial))
 			{
 				return;
 			}
@@ -3597,7 +3618,9 @@ void FAnalysisEngine::FImpl::End()
 ////////////////////////////////////////////////////////////////////////////////
 bool FAnalysisEngine::FImpl::OnData(FStreamReader& Reader)
 {
-	return (Machine.OnData(Reader) != FAnalysisMachine::EStatus::Error);
+	bool bRet = (Machine.OnData(Reader) != FAnalysisMachine::EStatus::Error);
+	bRet &= Bridge.IsStillAnalyzing();
+	return bRet;
 }
 
 

@@ -24,6 +24,10 @@ namespace HordeServer.Collections
 		/// </summary>
 		public DevicePlatformId PlatformId { get; set; }
 
+		/// <summary>
+		/// The platform client requested, which can differ from the devices platformid due to mapping
+		/// </summary>
+		public string RequestedPlatform { get; set; }
 
 		/// <summary>
 		/// Models to include for this request
@@ -38,11 +42,12 @@ namespace HordeServer.Collections
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public DeviceRequestData(DevicePlatformId PlatformId, List<string>? IncludeModels = null, List<string>? ExcludeModels = null)
+		public DeviceRequestData(DevicePlatformId PlatformId, string RequestedPlatform, List<string>? IncludeModels = null, List<string>? ExcludeModels = null)
 		{
 			this.PlatformId = PlatformId;
 			this.IncludeModels = IncludeModels ?? new List<string>();
 			this.ExcludeModels = ExcludeModels ?? new List<string>();
+			this.RequestedPlatform = RequestedPlatform;
 		}
 	}
 
@@ -211,6 +216,16 @@ namespace HordeServer.Collections
 		/// Deletes expired reservations
 		/// </summary>
 		public Task<bool> ExpireReservationsAsync();
+
+		/// <summary>
+		/// Deletes user device checkouts
+		/// </summary>
+		public Task<List<(UserId, IDevice)>?> ExpireCheckedOutAsync();
+
+		/// <summary>
+		/// Gets a list of users to notify whose device checkout is about to expire
+		/// </summary>
+		public Task<List<(UserId, IDevice)>?> ExpireNotificatonsAsync();
 
 	}
 

@@ -10,6 +10,7 @@
 #include "ICurveTableEditor.h"
 #include "Widgets/Views/STableViewBase.h"
 #include "Widgets/Views/STableRow.h"
+#include "Widgets/Views/SHeaderRow.h"
 #include "Tree/ICurveEditorTreeItem.h"
 #include "CurveTableEditorHandle.h"
 #include "CurveTableEditorUtils.h"
@@ -72,6 +73,9 @@ public:
 	/** Get the curve table being edited */
 	UCurveTable* GetCurveTable() const;
 
+	/** Get the curve editor used for the Curve View*/
+	TSharedPtr<FCurveEditor> GetCurveEditor() const { return CurveEditor; }
+
 	void HandlePostChange();
 
 	/**	Spawns the tab with the curve table inside */
@@ -80,6 +84,27 @@ public:
 	/** Get the mode that we are displaying data in */
 	ECurveTableViewMode GetViewMode() const { return ViewMode; }
 
+	/** Rename a specific curve */
+	void HandleCurveRename(FCurveEditorTreeItemID& TreeID, FName& OldCurveName, FName& NewCurveName);
+
+	/** Pop open context Menu */
+	TSharedPtr<SWidget> OnOpenCurveMenu();
+
+	/** Callback for R-Click Menu Delete Curves */
+	void OnDeleteCurves();
+
+	/** Callback for R-Click Menu Rename Selected Curve */
+	void OnRenameCurve();
+
+	/** Callback for R-Click Menu Delete Key Column */
+	void OnDeleteKeyColumn(float KeyTime);
+
+	/** Ensure that whatever time we are reetiming to is not redundant */
+	bool VerifyValidRetime(const FText& InText, FText& OutErrorMessage, float OriginalTime);
+
+	/** Process the retime from the header column text entry */
+	void HandleRetimeCommitted(const FText& InText, ETextCommit::Type CommitInfo, float OriginalKeyTime);
+
 protected:
 
 	/** Handles setting up slate for the curve table editor */
@@ -87,6 +112,9 @@ protected:
 
 	/** Add extra menu items */
 	void ExtendMenu();
+
+	/** Add extra menu items */
+	void ExtendToolbar();
 
 	/** Bind commands to delegates */
 	void BindCommands();
@@ -119,7 +147,7 @@ protected:
 	FReply OnAddCurveClicked();
 
 	/** Callback For SimpleCurves, add a new Key/Column */
-	FReply OnAddNewKeyColumn();
+	void OnAddNewKeyColumn();
 
 	/* Adds new key for all (Simple) curves in the table at given time */
 	void AddNewKeyColumn(float NewKeyTime);
@@ -130,8 +158,13 @@ protected:
 	/** Get whether the curve view checkbox should be toggled on */
 	bool IsCurveViewChecked() const;
 
+	/** Invoke UI for Renaming a Curve */
+	void OnRequestCurveRename(FCurveEditorTreeItemID TreeItemId);
+
 	virtual bool ShouldCreateDefaultStandaloneMenu() const { return true; }
-	virtual bool ShouldCreateDefaultToolbar() const { return false; }
+	virtual bool ShouldCreateDefaultToolbar() const { return true ; }
+
+	SHeaderRow::FColumn::FArguments GenerateHeaderColumnForKey(FCurveTableEditorColumnHeaderDataPtr ColumnData);
 
 	/** Array of the columns that are available for editing */
 	TArray<FCurveTableEditorColumnHeaderDataPtr> AvailableColumns;
@@ -144,6 +177,9 @@ protected:
 
 	/** Menu extender */
 	TSharedPtr<FExtender> MenuExtender;
+
+	/** Menu extender */
+	TSharedPtr<FExtender> ToolbarExtender;
 
 	/**	The tab id for the curve table tab */
 	static const FName CurveTableTabId;

@@ -17,6 +17,7 @@ using System.Diagnostics.CodeAnalysis;
 using HordeServer.Notifications;
 using System.Linq;
 using HordeServer.Api;
+using Microsoft.Extensions.Hosting;
 
 namespace HordeServer.Services
 {
@@ -88,7 +89,7 @@ namespace HordeServer.Services
 	/// <summary>
 	/// Device management service
 	/// </summary>
-	public class DeviceService : TickedBackgroundService
+	public sealed class DeviceService : IHostedService, IDisposable
 	{
 		/// <summary>
 		/// The ACL service instance
@@ -99,7 +100,6 @@ namespace HordeServer.Services
 		/// Instance of the notification service
 		/// </summary>
 		INotificationService NotificationService;
-
 
 		/// <summary>
 		/// Singleton instance of the job service
@@ -117,6 +117,11 @@ namespace HordeServer.Services
 		ProjectService ProjectService;
 
 		/// <summary>
+		/// The user collection instance
+		/// </summary>
+		IUserCollection UserCollection { get; set; }
+
+		/// <summary>
 		/// Log output writer
 		/// </summary>
 		ILogger<DeviceService> Logger;
@@ -126,6 +131,8 @@ namespace HordeServer.Services
 		/// </summary>
 		IDeviceCollection Devices;
 
+		ITicker Ticker;
+
 		/// <summary>
 		/// Platform map V1 singleton
 		/// </summary>
@@ -134,30 +141,58 @@ namespace HordeServer.Services
 		/// <summary>
 		/// Device service constructor
 		/// </summary>
-		public DeviceService(IDeviceCollection Devices, ISingletonDocument<DevicePlatformMapV1> PlatformMapSingleton, JobService JobService, ProjectService ProjectService, StreamService StreamService, AclService AclService, INotificationService NotificationService, ILogger<DeviceService> Logger)
-			: base(TimeSpan.FromMinutes(1.0), Logger)
+		public DeviceService(IDeviceCollection Devices, ISingletonDocument<DevicePlatformMapV1> PlatformMapSingleton, IUserCollection UserCollection, JobService JobService, ProjectService ProjectService, StreamService StreamService, AclService AclService, INotificationService NotificationService, IClock Clock, ILogger<DeviceService> Logger)
 		{
+			this.UserCollection = UserCollection;
 			this.Devices = Devices;
             this.JobService = JobService;
 			this.ProjectService = ProjectService;
             this.StreamService = StreamService;
             this.AclService = AclService;
             this.NotificationService = NotificationService;
+			this.Ticker = Clock.AddSharedTicker<DeviceService>(TimeSpan.FromMinutes(1.0), TickAsync, Logger);
             this.Logger = Logger;
 			
 			this.PlatformMapSingleton = PlatformMapSingleton;
 
 		}
 
+		/// <inheritdoc/>
+		public Task StartAsync(CancellationToken cancellationToken) => Ticker.StartAsync();
+
+		/// <inheritdoc/>
+		public Task StopAsync(CancellationToken cancellationToken) => Ticker.StopAsync();
+
+		/// <inheritdoc/>
+		public void Dispose() => Ticker.Dispose();
+
 		/// <summary>
 		/// Ticks service
 		/// </summary>
-		protected override async Task TickAsync(CancellationToken StoppingToken)
+		async ValueTask TickAsync(CancellationToken StoppingToken)
 		{
 
 			if (!StoppingToken.IsCancellationRequested)
 			{
 				await Devices.ExpireReservationsAsync();
+
+				List<(UserId, IDevice)>? ExpireNotifications = await Devices.ExpireNotificatonsAsync();
+				if (ExpireNotifications != null && ExpireNotifications.Count > 0)
+				{
+					foreach ((UserId, IDevice) ExpiredDevice in ExpireNotifications)
+					{
+						await NotifyDeviceServiceAsync($"Device {ExpiredDevice.Item2.PlatformId.ToString().ToUpperInvariant()} / {ExpiredDevice.Item2.Name} checkout will expire in 24 hours.  Please visit https://horde.devtools.epicgames.com/devices to renew the checkout if needed.", null, null, null, ExpiredDevice.Item1);
+					}
+				}
+
+				List<(UserId, IDevice)>? ExpireCheckouts = await Devices.ExpireCheckedOutAsync();
+				if (ExpireCheckouts != null && ExpireCheckouts.Count > 0)
+				{
+					foreach ((UserId, IDevice) ExpiredDevice in ExpireCheckouts)
+					{
+						await NotifyDeviceServiceAsync($"Device {ExpiredDevice.Item2.PlatformId.ToString().ToUpperInvariant()} / {ExpiredDevice.Item2.Name} checkout has expired.  The device has been returned to the shared pool and should no longer be accessed.  Please visit https://horde.devtools.epicgames.com/devices to checkout devices as needed.", null, null, null, ExpiredDevice.Item1);
+					}
+				}
 			}
 
 		}
@@ -347,7 +382,8 @@ namespace HordeServer.Services
 		/// <param name="DeviceId"></param>
 		/// <param name="JobId"></param>
 		/// <param name="StepId"></param>
-		public async Task NotifyDeviceServiceAsync(string Message, DeviceId? DeviceId = null, string? JobId = null, string? StepId = null)
+		/// <param name="UserId"></param>
+		public async Task NotifyDeviceServiceAsync(string Message, DeviceId? DeviceId = null, string? JobId = null, string? StepId = null, UserId? UserId = null)
 		{
 			try 
 			{
@@ -357,6 +393,17 @@ namespace HordeServer.Services
 				IJobStep? Step = null;
 				INode? Node = null;
 				IStream? Stream = null;
+				IUser? User = null;
+
+				if (UserId.HasValue)
+				{
+					User = await UserCollection.GetUserAsync(UserId.Value);
+					if (User == null)
+					{
+						Logger.LogError("Unable to send device notification, can't find User {UserId}", UserId.Value);
+						return;
+					}
+				}
 
 				if (DeviceId.HasValue)
 				{
@@ -388,12 +435,12 @@ namespace HordeServer.Services
 					}
 				}
 
-				NotificationService.NotifyDeviceService(Message, Device, Pool, Stream, Job, Step, Node);
+				NotificationService.NotifyDeviceService(Message, Device, Pool, Stream, Job, Step, Node, User);
 
 			}
 			catch (Exception Ex)
 			{
-                Logger.LogError($"Error on device notification {Ex.Message}");
+                Logger.LogError(Ex, "Error on device notification {Message}", Ex.Message);
             }
         }
 
@@ -443,7 +490,7 @@ namespace HordeServer.Services
 
 				if (Projects.Where(x => x.Id == ProjectId).FirstOrDefault() == null)
 				{
-					Logger.LogWarning($"Device pool authorization references missing project id {ProjectId}");
+					Logger.LogWarning("Device pool authorization references missing project id {ProjectId}", ProjectId);
 					continue;
 				}
 

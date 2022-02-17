@@ -13,6 +13,7 @@
 #include "Chaos/ChaosScene.h"
 #include "Chaos/ContactModification.h"
 #include "Chaos/Real.h"
+#include "UObject/ObjectKey.h"
 
 #ifndef CHAOS_WITH_PAUSABLE_SOLVER
 #define CHAOS_WITH_PAUSABLE_SOLVER 1
@@ -120,6 +121,12 @@ public:
 	void RegisterForCollisionEvents(UPrimitiveComponent* Component);
 
 	void UnRegisterForCollisionEvents(UPrimitiveComponent* Component);
+
+	void RegisterAsyncPhysicsTickComponent(UActorComponent* Component);
+	void UnregisterAsyncPhysicsTickComponent(UActorComponent* Component);
+
+	void RegisterAsyncPhysicsTickActor(AActor* Actor);
+	void UnregisterAsyncPhysicsTickActor(AActor* Actor);
 
 	/**
 	 * Called during creation of the physics state for gamethread objects to pass off an object to the physics thread
@@ -231,6 +238,17 @@ public:
 	void RemoveDeferredPhysicsStateCreation(UPrimitiveComponent* Component);
 	void ProcessDeferredCreatePhysicsState();
 
+
+	// Storage structure for replication data
+	// probably should just expose read/write API not the structure directly itself like this.
+	struct FPrimitiveComponentReplicationCache
+	{
+		int32 ServerFrame = 0;
+		TMap<FObjectKey, FRigidBodyState>	Map;
+	};
+
+	FPrimitiveComponentReplicationCache ReplicationCache;
+
 private:
 	UPROPERTY()
 	TArray<UPrimitiveComponent*> CollisionEventRegistrations;
@@ -281,6 +299,8 @@ private:
 #if WITH_CHAOS
 	virtual void OnSyncBodies(Chaos::FPhysicsSolverBase* Solver) override;
 #endif
+
+	void EnableAsyncPhysicsTickCallback();
 
 #if 0
 	void SetKinematicTransform(FPhysicsActorHandle& InActorReference,const Chaos::TRigidTransform<float,3>& NewTransform)
@@ -343,12 +363,16 @@ private:
 	// Maps Component to PhysicsProxy that is created
 	TMap<UPrimitiveComponent*, TArray<IPhysicsProxyBase*>> ComponentToPhysicsProxyMap;
 
+	//TSet<UActorComponent*> FixedTickComponents;
+	//TSet<AActor*> FixedTickActors;
+
 	/** The SolverActor that spawned and owns this scene */
 	TWeakObjectPtr<AActor> SolverActor;
 
 #if WITH_CHAOS
 	Chaos::FReal LastEventDispatchTime;
 #endif 
+	class FAsyncPhysicsTickCallback* AsyncPhysicsTickCallback = nullptr;
 
 #if WITH_EDITOR
 	// Counter used to check a match with the single step status.

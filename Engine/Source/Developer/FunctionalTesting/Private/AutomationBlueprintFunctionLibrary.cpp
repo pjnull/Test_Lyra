@@ -49,6 +49,8 @@
 #include "IImageWrapperModule.h"
 #include "ImageWrapperHelper.h"
 #include "Misc/FileHelper.h"
+#include "Materials/MaterialInterface.h"
+#include "AssetCompilingManager.h"
 
 #if WITH_EDITOR
 #include "SLevelViewport.h"
@@ -156,7 +158,7 @@ public:
 		, Options(InOptions)
 	{
 	}
-	
+
 	/** ISceneViewExtension interface */
 	virtual void SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView)
 	{
@@ -214,7 +216,7 @@ public:
 			// Disable screen percentage.
 			//InViewFamily.EngineShowFlags.SetScreenPercentage(false);
 		}
-		
+
 		if (Options.bDisableTonemapping)
 		{
 			//InViewFamily.EngineShowFlags.SetEyeAdaptation(false);
@@ -368,13 +370,13 @@ public:
 			{
 #if WITH_EDITOR
 				// In the editor we can only attempt to re-size standalone viewports
-				UEditorEngine* EditorEngine = Cast<UEditorEngine>(GEngine);	
+				UEditorEngine* EditorEngine = Cast<UEditorEngine>(GEngine);
 
-				const bool bIsPIEViewport = GameViewport->IsPlayInEditorViewport();	
+				const bool bIsPIEViewport = GameViewport->IsPlayInEditorViewport();
 				const bool bIsNewViewport = InWorld && EditorEngine && EditorEngine->WorldIsPIEInNewViewport(InWorld);
 
 				if (!bIsPIEViewport || bIsNewViewport)
-#endif		
+#endif
 				{
 					ViewportRestoreSize = GameViewport->GetSize();
 					FIntPoint ScreenshotViewportSize = UAutomationBlueprintFunctionLibrary::GetAutomationScreenshotSize(InOptions);
@@ -505,7 +507,7 @@ public:
 private:
 
 	TWeakObjectPtr<UWorld> World;
-	
+
 	FString	Context;
 	FString	ScreenShotName;
 	FString Notes;
@@ -634,7 +636,7 @@ public:
 	virtual void SetDone() override
 	{
 		FScreenshotRequest::OnScreenshotRequestProcessed().RemoveAll(this);
-		
+
 		UnlockViewport();
 
 		Done = true;
@@ -676,22 +678,25 @@ UAutomationBlueprintFunctionLibrary::UAutomationBlueprintFunctionLibrary(const c
 
 void UAutomationBlueprintFunctionLibrary::FinishLoadingBeforeScreenshot()
 {
-	// Finish compiling the shaders if the platform doesn't require cooked data.
-	if (!FPlatformProperties::RequiresCookedData())
-	{
-		GShaderCompilingManager->FinishAllCompilation();
-		FModuleManager::GetModuleChecked<IAutomationControllerModule>("AutomationController").GetAutomationController()->ResetAutomationTestTimeout(TEXT("shader compilation"));
-	}
-
 	FlushAsyncLoading();
 
+	UWorld* CurrentWorld{ nullptr };
 	// Make sure we finish all level streaming
 	if (UGameEngine* GameEngine = Cast<UGameEngine>(GEngine))
 	{
 		if (UWorld* GameWorld = GameEngine->GetGameWorld())
 		{
+			CurrentWorld = GameWorld;
 			GameWorld->FlushLevelStreaming(EFlushLevelStreamingType::Full);
 		}
+	}
+
+	// Finish compiling the shaders if the platform doesn't require cooked data.
+	if (!FPlatformProperties::RequiresCookedData())
+	{
+		UMaterialInterface::SubmitRemainingJobsForWorld(CurrentWorld);
+		FAssetCompilingManager::Get().FinishAllCompilation();
+		FModuleManager::GetModuleChecked<IAutomationControllerModule>("AutomationController").GetAutomationController()->ResetAutomationTestTimeout(TEXT("shader compilation"));
 	}
 
 	// Force all mip maps to load before taking the screenshot.
@@ -944,7 +949,7 @@ float HelperGetStat(FName StatName)
 		{
 			if(bCallCount)
 			{
-				return StatMessage->GetValue_CallCount(ValueType);	
+				return StatMessage->GetValue_CallCount(ValueType);
 			}
 			else
 			{
@@ -1024,7 +1029,7 @@ public:
 		, Options(InOptions)
 	{
 		UAutomationBlueprintFunctionLibrary::FinishLoadingBeforeScreenshot();
-		
+
 		WaitingFrames = 0;
 		LastLoadTime = FPlatformTime::Seconds();
 
@@ -1136,7 +1141,7 @@ public:
 		return TEXT("Waiting For Loading");
 	}
 #endif
-	
+
 private:
 	FName ExecutionFunction;
 	int32 OutputLink;
@@ -1200,7 +1205,7 @@ UAutomationEditorTask* UAutomationBlueprintFunctionLibrary::TakeHighResScreensho
 
 			Task->BindTask(MakeUnique<FScreenshotTakenState>());
 
-			// Delay taking the screenshot by a few frames			
+			// Delay taking the screenshot by a few frames
 			FTSTicker::GetCoreTicker().AddTicker(TEXT("ScreenshotDelay"), Delay, [LevelViewport, ComparisonTolerance, ComparisonNotes, Filename, ResX, ResY, bMaskEnabled, bCaptureHDR](float) {
 					FHighResScreenshotConfig& HighResScreenshotConfig = GetHighResScreenshotConfig();
 					HighResScreenshotConfig.SetResolution(ResX, ResY);
@@ -1379,6 +1384,48 @@ void UAutomationBlueprintFunctionLibrary::SetScalabilityQualityToLow(UObject* Wo
 	Scalability::FQualityLevels Quality;
 	Quality.SetFromSingleQualityLevel(0);
 	Scalability::SetQualityLevels(Quality, true);
+}
+
+void UAutomationBlueprintFunctionLibrary::SetEditorViewportViewMode(EViewModeIndex Index)
+{
+#if WITH_EDITOR
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+
+	if (TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor())
+	{
+		for (TSharedPtr<SLevelViewport> LevelViewport : LevelEditor->GetViewports())
+		{
+			if (LevelViewport.IsValid())
+			{
+				if (TSharedPtr<FEditorViewportClient> Viewport = LevelViewport->GetViewportClient())
+				{
+					Viewport->SetViewMode(Index);
+				}
+			}
+		}
+	}
+#endif
+}
+
+void UAutomationBlueprintFunctionLibrary::SetEditorViewportVisualizeBuffer( FName BufferName )
+{
+#if WITH_EDITOR
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+
+	if (TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor())
+	{
+		for (TSharedPtr<SLevelViewport> LevelViewport : LevelEditor->GetViewports())
+		{
+			if (LevelViewport.IsValid())
+			{
+				if (TSharedPtr<FEditorViewportClient> Viewport = LevelViewport->GetViewportClient())
+				{
+					Viewport->ChangeBufferVisualizationMode(BufferName);
+				}
+			}
+		}
+	}
+#endif
 }
 
 #undef LOCTEXT_NAMESPACE

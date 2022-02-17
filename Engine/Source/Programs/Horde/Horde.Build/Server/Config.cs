@@ -1,6 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using EpicGames.Core;
+using EpicGames.Horde.Common;
+using EpicGames.Horde.Compute;
+using EpicGames.Horde.Storage;
+using EpicGames.Serialization;
 using HordeServer.Api;
 using HordeServer.Utilities;
 using System;
@@ -27,11 +31,6 @@ namespace HordeServer.Models
 		public List<ProjectConfigRef> Projects { get; set; } = new List<ProjectConfigRef>();
 
 		/// <summary>
-		/// Manually added status messages
-		/// </summary>
-		public List<Notice> Notices { get; set; } = new List<Notice>();
-
-		/// <summary>
 		/// List of scheduled downtime
 		/// </summary>
 		public List<ScheduledDowntime> Downtime { get; set; } = new List<ScheduledDowntime>();
@@ -42,6 +41,16 @@ namespace HordeServer.Models
 		public List<PerforceCluster> PerforceClusters { get; set; } = new List<PerforceCluster>();
 
 		/// <summary>
+		/// List of costs of a particular agent type
+		/// </summary>
+		public List<AgentRateConfig> Rates { get; set; } = new List<AgentRateConfig>();
+
+		/// <summary>
+		/// List of compute profiles
+		/// </summary>
+		public List<ComputeClusterConfig> Compute { get; set; } = new List<ComputeClusterConfig>();
+
+		/// <summary>
 		/// Maximum number of conforms to run at once
 		/// </summary>
 		public int MaxConformCount { get; set; }
@@ -50,6 +59,37 @@ namespace HordeServer.Models
 		/// List of storage namespaces
 		/// </summary>
 		public StorageConfig? Storage { get; set; }
+
+		/// <summary>
+		/// Access control list
+		/// </summary>
+		public UpdateAclRequest? Acl { get; set; }
+	}
+
+	/// <summary>
+	/// Profile for executing compute requests
+	/// </summary>
+	public class ComputeClusterConfig
+	{
+		/// <summary>
+		/// Name of the partition
+		/// </summary>
+		public string Id { get; set; } = "default";
+
+		/// <summary>
+		/// Name of the namespace to use
+		/// </summary>
+		public string NamespaceId { get; set; } = "horde.compute";
+
+		/// <summary>
+		/// Name of the input bucket
+		/// </summary>
+		public string RequestBucketId { get; set; } = "requests";
+
+		/// <summary>
+		/// Name of the output bucket
+		/// </summary>
+		public string ResponseBucketId { get; set; } = "responses";
 
 		/// <summary>
 		/// Access control list
@@ -252,6 +292,24 @@ namespace HordeServer.Models
 		/// Identifier for the bucket
 		/// </summary>
 		public string Id { get; set; } = String.Empty;
+	}
+
+	/// <summary>
+	/// Describes the monetary cost of agents matching a particular criteris
+	/// </summary>
+	public class AgentRateConfig
+	{
+		/// <summary>
+		/// Condition string
+		/// </summary>
+		[CbField("c")]
+		public Condition? Condition { get; set; }
+
+		/// <summary>
+		/// Rate for this agent
+		/// </summary>
+		[CbField("r")]
+		public double Rate { get; set; }
 	}
 }
 

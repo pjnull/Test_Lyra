@@ -714,6 +714,20 @@ namespace UnrealBuildTool
 			}
 		}
 
+		/// <summary>
+		/// Decides whether to include the "Tests" folder at the root of the module as part of the compilation.
+		/// By default this folder is excluded from the module's compilation.
+		/// The "Tests" folder should be reserved for low level tests but there are exceptions to this rule.
+		/// </summary>
+		public bool bBuildIncludeTestsFolder
+		{
+			get { return bBuildIncludeTestsFolderOverride ?? false; }
+		}
+		/// <summary>
+		/// Set this override to true in derived target classes to include the "Tests" folder at the root of the module in the compilation.
+		/// </summary>
+		protected bool? bBuildIncludeTestsFolderOverride;
+
 
 		/// <summary>
 		/// The number of source files in this module before unity build will be activated for that module.  If set to
@@ -1041,6 +1055,17 @@ namespace UnrealBuildTool
 			}
 		}
 
+		/// <summary>
+		/// Returns module's low level tests directory "Tests".
+		/// </summary>
+		public string TestsDirectory
+		{
+			get
+			{
+				return Path.Combine(Directory.FullName, "Tests");
+			}
+		}
+
 #nullable disable
 		/// <summary>
 		/// Constructor. For backwards compatibility while the parameterless constructor is being phased out, initialization which would happen here is done by 
@@ -1198,7 +1223,7 @@ namespace UnrealBuildTool
 					PublicDefinitions.Add("WITH_APEX=0");
 					PublicDefinitions.Add("WITH_APEX_CLOTHING=0");
 					PublicDefinitions.Add("WITH_CLOTH_COLLISION_DETECTION=0");
-					PublicDefinitions.Add(string.Format("WITH_PHYSX_COOKING={0}", Target.bBuildEditor && Target.bCompilePhysX ? 1 : 0));  // without APEX, we only need cooking in editor builds
+					PublicDefinitions.Add(string.Format("WITH_PHYSX_COOKING={0}", Target.Type == TargetType.Editor && Target.bCompilePhysX ? 1 : 0));  // without APEX, we only need cooking in editor builds
 				}
 
 				if (Target.bCompileNvCloth == true)
@@ -1223,7 +1248,7 @@ namespace UnrealBuildTool
 				PublicDefinitions.Add("PHYSICS_INTERFACE_PHYSX=0");
 				PublicDefinitions.Add("WITH_APEX=0");
 				PublicDefinitions.Add("WITH_APEX_CLOTHING=0");
-				PublicDefinitions.Add(string.Format("WITH_PHYSX_COOKING={0}", Target.bBuildEditor && Target.bCompilePhysX ? 1 : 0));  // without APEX, we only need cooking in editor builds
+				PublicDefinitions.Add(string.Format("WITH_PHYSX_COOKING={0}", Target.Type == TargetType.Editor && Target.bCompilePhysX ? 1 : 0));  // without APEX, we only need cooking in editor builds
 				PublicDefinitions.Add("WITH_NVCLOTH=0");
 
 				if(Target.bUseChaos)

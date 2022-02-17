@@ -3,14 +3,47 @@
 using HordeServer.Api;
 using HordeServer.Models;
 using MongoDB.Bson;
-using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace HordeServer.Notifications
 {
+	/// <summary>
+	/// Marker interface for (serializable) notifications
+	/// </summary>
+	[SuppressMessage("Design", "CA1040:Avoid empty interfaces", Justification = "Marker interface for generic type handling")]
+	public interface INotification { }
+
+	/// <summary>
+	/// Notification for job scheduled events
+	/// </summary>
+	public class JobScheduledNotification : INotification
+	{
+		/// <summary>Job ID</summary>
+		public string JobId { get; }
+		
+		/// <summary>Job name</summary>
+		public string JobName { get; }
+		
+		/// <summary>Pool name job got scheduled in</summary>
+		public string PoolName { get; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="JobId"></param>
+		/// <param name="JobName"></param>
+		/// <param name="PoolName"></param>
+		public JobScheduledNotification(string JobId, string JobName, string PoolName)
+		{
+			this.JobId = JobId;
+			this.JobName = JobName;
+			this.PoolName = PoolName;
+		}
+	}
+	
 	/// <summary>
 	/// Interface for the notification service
 	/// </summary>
@@ -43,7 +76,7 @@ namespace HordeServer.Notifications
 		/// <param name="StepId">The step id</param>
 		/// <returns>Async task</returns>
 		void NotifyJobStepComplete(IJob Job, IGraph Graph, SubResourceId BatchId, SubResourceId StepId);
-
+		
 		/// <summary>
 		/// Notify all subscribers that a job step's outcome has changed
 		/// </summary>
@@ -70,15 +103,16 @@ namespace HordeServer.Notifications
 		void NotifyIssueUpdated(IIssue Issue);
 
 		/// <summary>
-        /// Send a device service notification
-        /// </summary>
-        /// <param name="Message">The message to send</param>
-        /// <param name="Device">The device</param>
-        /// <param name="Pool">The pool</param>
-        /// <param name="Stream"></param>
-        /// <param name="Job"></param>
-        /// <param name="Step"></param>
-        /// <param name="Node"></param>
-        void NotifyDeviceService(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null);
+		/// Send a device service notification
+		/// </summary>
+		/// <param name="Message">The message to send</param>
+		/// <param name="Device">The device</param>
+		/// <param name="Pool">The pool</param>
+		/// <param name="Stream"></param>
+		/// <param name="Job"></param>
+		/// <param name="Step"></param>
+		/// <param name="Node"></param>
+		/// <param name="User"></param>
+		void NotifyDeviceService(string Message, IDevice? Device = null, IDevicePool? Pool = null, IStream? Stream = null, IJob? Job = null, IJobStep? Step = null, INode? Node = null, IUser? User = null);
     }
 }

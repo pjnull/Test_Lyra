@@ -578,31 +578,45 @@ namespace IncludeTool
 			return false;
 		}
 
+		static readonly string[] PathsToIgnoreForOldStyleHeaders = new string[] {
+			"/Engine/Source/Runtime/Navmesh/Public/DebugUtils/",
+			"/Engine/Source/Runtime/Navmesh/Public/Detour/",
+			"/Engine/Source/Runtime/Navmesh/Public/DetourCrowd/",
+			"/Engine/Source/Runtime/Navmesh/Public/DetourTileCache/",
+			"/Engine/Source/Runtime/Navmesh/Public/Recast/",
+
+			"/Engine/Plugins/Compression/OodleNetwork/",
+			"/Engine/Plugins/Developer/TextureFormatOodle/",
+			"/Engine/Plugins/Media/BinkMedia/Source/",
+			"/Engine/Source/Runtime/OodleDataCompression/Sdks/",
+
+			"/Engine/Plugins/Animation/ControlRigSpline/Source/ControlRigSpline/ThirdParty/",
+			"/Engine/Plugins/Runtime/nDisplay/ThirdParty/",
+			"/Engine/Plugins/Runtime/ResonanceAudio/Source/ResonanceAudio/Private/ResonanceAudioLibrary/",
+			"/Engine/Source/Runtime/Experimental/Voronoi/",
+
+			"/Engine/Plugins/Animation/ControlRig/Source/ControlRig/ThirdParty/AHEasing/AHEasing/easing.h",
+			"/Engine/Plugins/Animation/RigLogic/Source/RigLogicLib/Private/dna/utils/Extd.h",
+			"/Engine/Plugins/Animation/RigLogic/Source/RigLogicLib/Private/riglogic/utils/Extd.h",
+			"/Engine/Plugins/Animation/RigLogic/Source/RigLogicLib/Public/dna/types/ArrayView.h",
+			"/Engine/Source/Runtime/Core/Public/Experimental/Containers/FAAArrayQueue.h",
+			"/Engine/Source/Runtime/Core/Public/Hash/CityHash.h",
+			"/Engine/Source/Runtime/Core/Public/MemPro/MemPro.h",
+			"/Engine/Source/Runtime/CUDA/Source/Public/CudaWrapper.h",
+			"/Engine/Plugins/Runtime/GeometryProcessing/Source/GeometryAlgorithms/Private/ThirdParty/xatlas/xatlas.h",
+
+			"/Engine/Restricted/",
+		};
+
 		/// <summary>
 		/// Whether to ignore old-style header guards
 		/// </summary>
-		/// <param name="RootDir">Root directory for the branch</param>
-		/// <param name="Location">Path to the file</param>
+		/// <param name="NormalizedPath">Path to the file</param>
 		/// <returns>True to ignore the different derivations</returns>
-		public static bool IgnoreOldStyleHeaderGuards(string NormalizedPath)
+		public static bool IgnoreOldStyleHeaderGuards(FileReference Location)
 		{
-			if(NormalizedPath.StartsWith("/engine/source/runtime/navmesh/public/detour/"))
-			{
-				return true;
-			}
-			if(NormalizedPath.StartsWith("/engine/source/runtime/navmesh/public/detourcrowd/"))
-			{
-				return true;
-			}
-			if(NormalizedPath.StartsWith("/engine/source/runtime/navmesh/public/recast/"))
-			{
-				return true;
-			}
-			if(NormalizedPath.StartsWith("/engine/source/runtime/navmesh/public/debugutils/"))
-			{
-				return true;
-			}
-			return false;
+			string LocationString = Location.ToString().Replace("\\", "/");
+			return PathsToIgnoreForOldStyleHeaders.Any(x => LocationString.Contains(x));
 		}
 
         /// <summary>

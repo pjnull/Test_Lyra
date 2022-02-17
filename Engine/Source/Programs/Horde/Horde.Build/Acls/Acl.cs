@@ -160,7 +160,7 @@ namespace HordeServer.Models
 		DeleteAgent,
 
 		/// <summary>
-		/// View an available agents
+		/// View an agent
 		/// </summary>
 		ViewAgent,
 
@@ -381,12 +381,16 @@ namespace HordeServer.Models
 		/// </summary>
 		Impersonate,
 
+		/// <summary>
+		/// View estimated costs for particular operations
+		/// </summary>
+		ViewCosts,
 
 
 
 
 		//// PERMISSIONS ////
-		
+
 		/// <summary>
 		/// Ability to view permissions on an object
 		/// </summary>
@@ -428,6 +432,27 @@ namespace HordeServer.Models
 		/// Ability to write devices
 		/// </summary>
 		DeviceWrite,
+
+
+
+
+
+
+
+		//// COMPUTE ////
+
+		/// <summary>
+		/// User can add tasks to the compute cluster
+		/// </summary>
+		AddComputeTasks,
+
+		/// <summary>
+		/// User can poll for compute results
+		/// </summary>
+		ViewComputeTasks,
+
+
+
 
 
 
@@ -765,10 +790,6 @@ namespace HordeServer.Models
 				{
 					break;
 				}
-				else if (Type == BsonType.Int32)
-				{
-					Values.Add((AclAction)Context.Reader.ReadInt32());
-				}
 				else
 				{
 					Values.Add((AclAction)Enum.Parse(typeof(AclAction), Context.Reader.ReadString()));
@@ -789,17 +810,5 @@ namespace HordeServer.Models
 			}
 			Context.Writer.WriteEndArray();
 		}
-	}
-
-	/// <summary>
-	/// Represents an access control list for an object in the database
-	/// </summary>
-	[SingletonDocument("5e39b51941b875626e600193")]
-	public class GlobalPermissions : SingletonBase
-	{
-		/// <summary>
-		/// The global ACL object
-		/// </summary>
-		public Acl Acl { get; set; } = new Acl();
 	}
 }

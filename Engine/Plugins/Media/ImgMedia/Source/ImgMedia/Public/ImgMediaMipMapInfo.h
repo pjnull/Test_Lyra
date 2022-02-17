@@ -67,7 +67,7 @@ struct FImgMediaTileSelection
 
 	FImgMediaTileSelection()
 	{
-		SetAllNotVisible();
+		SetAllVisible();
 	}
 
 	/**
@@ -219,6 +219,7 @@ public:
 	//~ FTickableGameObject interface
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { RETURN_QUICK_DECLARE_CYCLE_STAT(FImgMediaMipMapInfo, STATGROUP_Tickables); }
+	virtual bool IsTickableInEditor() const override { return true; }
 
 protected:
 	/**

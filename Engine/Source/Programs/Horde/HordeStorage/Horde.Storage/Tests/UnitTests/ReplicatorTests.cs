@@ -5,15 +5,21 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Threading.Tasks;
 using Horde.Storage.Implementation;
+using Jupiter;
+using Jupiter.Common.Implementation;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
 using Moq;
 using RestSharp;
+using EpicGames.Horde.Storage;
+using Horde.Storage.Controllers;
+using Moq.Contrib.HttpClient;
 
 namespace Horde.Storage.UnitTests
 {
@@ -22,7 +28,6 @@ namespace Horde.Storage.UnitTests
     {
         private readonly DirectoryInfo _tempPath = new DirectoryInfo(Path.GetTempPath());
         private readonly Guid _currentLogGeneration = new Guid();
-        private const string CurrentSite = "Test";
         private const string ReplicatorNameV1 = "TestReplicatorV1";
 
         private readonly NamespaceId NamespaceV1 = new NamespaceId("test-namespace-v1");
@@ -44,13 +49,13 @@ namespace Horde.Storage.UnitTests
         {
             ReplicatorSettings replicatorSettings = new ReplicatorSettings
             {
-                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1
+                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1, ConnectionString = "http://localhost"
             };
 
             byte[] contents = Encoding.ASCII.GetBytes("test string");
             BlobIdentifier blobToReplication = BlobIdentifier.FromBlob(contents);
 
-            Mock<IBlobStore> blobStoreMock = new Mock<IBlobStore>();
+            Mock<IBlobService> blobStoreMock = new Mock<IBlobService>();
             IServiceCredentials serviceCredentials = Mock.Of<IServiceCredentials>();
             Mock<ITransactionLogWriter> transactionLogWriter = new Mock<ITransactionLogWriter>();
             Mock<IRestClient> remoteClientMock = new Mock<IRestClient> { DefaultValue = DefaultValue.Empty };
@@ -88,10 +93,16 @@ namespace Horde.Storage.UnitTests
                 .Setup(x => x.ExecuteGetAsync(It.IsAny<IRestRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(mockedIoResponse.Object);
 
-            ReplicationSettings replicationSettings = new ReplicationSettings {CurrentSite = CurrentSite, StateRoot = _tempPath.FullName};
+            ReplicationSettings replicationSettings = new ReplicationSettings {StateRoot = _tempPath.FullName};
             IOptionsMonitor<ReplicationSettings> replicationSettingsMonitor = Mock.Of<IOptionsMonitor<ReplicationSettings>>(_ => _.CurrentValue == replicationSettings);
+            IOptionsMonitor<JupiterSettings> jupiterSettingsMonitor = Mock.Of<IOptionsMonitor<JupiterSettings>>(_ => _.CurrentValue == new JupiterSettings());
 
-            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object);
+            Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
+            handler.SetupRequest($"http://localhost/api/v1/s/{NamespaceV1}/{blobToReplication}").ReturnsResponse(contents, "application/octet-stream");
+
+            IHttpClientFactory httpClientFactory = handler.CreateClientFactory();
+
+            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, jupiterSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object, serviceCredentials, httpClientFactory);
 
             Assert.IsNull(replicator.State.ReplicatorOffset,"Expected state to have been reset during test initialize");
 
@@ -108,8 +119,7 @@ namespace Horde.Storage.UnitTests
             transactionLogWriter.Verify(writer => writer.Add(ns, It.Is<AddTransactionEvent>(e => e.Blobs[0].Equals(blobToReplication))), Times.Once);
 
             // as this was a add operation we should have transferred the blob from the remote blob store to the local
-            remoteClientMock.Verify(client => client.ExecuteGetAsync(It.IsAny<IRestRequest>(), It.IsAny<CancellationToken>()), Times.Once);
-            blobStoreMock.Verify(blobStore => blobStore.PutObject(ns, It.IsAny<byte[]>(), blobToReplication), Times.Once);
+            blobStoreMock.Verify(blobStore => blobStore.PutObject(ns, It.IsAny<IBufferedPayload>(), blobToReplication), Times.Once);
 
             Assert.AreEqual(_currentLogGeneration, replicator.State.ReplicatingGeneration);
 
@@ -122,11 +132,11 @@ namespace Horde.Storage.UnitTests
         {
             ReplicatorSettings replicatorSettings = new ReplicatorSettings
             {
-                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1
+                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1, ConnectionString = "http://localhost"
             };
 
             Mock<IRestClient> remoteClientMock = new Mock<IRestClient> { DefaultValue = DefaultValue.Empty };
-
+            IServiceCredentials serviceCredentials = Mock.Of<IServiceCredentials>();
             CallistoReader.CallistoGetResponse[] responses = new[]
             {
                 new CallistoReader.CallistoGetResponse(
@@ -142,12 +152,16 @@ namespace Horde.Storage.UnitTests
                 .ReturnsAsync(mockedCallistoResponse[0].Object)
                 .ReturnsAsync(mockedCallistoResponse[0].Object);
 
-            Mock<IBlobStore> blobStoreMock = new Mock<IBlobStore>();
+            Mock<IBlobService> blobStoreMock = new Mock<IBlobService>();
             Mock<ITransactionLogWriter> transactionLogWriter = new Mock<ITransactionLogWriter>();
-            ReplicationSettings replicationSettings = new ReplicationSettings {CurrentSite = CurrentSite, StateRoot = _tempPath.FullName};
+            ReplicationSettings replicationSettings = new ReplicationSettings {StateRoot = _tempPath.FullName};
             IOptionsMonitor<ReplicationSettings> replicationSettingsMonitor = Mock.Of<IOptionsMonitor<ReplicationSettings>>(_ => _.CurrentValue == replicationSettings);
+            IOptionsMonitor<JupiterSettings> jupiterSettingsMonitor = Mock.Of<IOptionsMonitor<JupiterSettings>>(_ => _.CurrentValue == new JupiterSettings());
 
-            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object);
+            Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
+            IHttpClientFactory httpClientFactory = handler.CreateClientFactory();
+
+            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, jupiterSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object, serviceCredentials, httpClientFactory);
 
             Assert.IsNull(replicator.State.ReplicatorOffset,"Expected state to have been reset during test initialize");
 
@@ -171,13 +185,13 @@ namespace Horde.Storage.UnitTests
         {
             ReplicatorSettings replicatorSettings = new ReplicatorSettings
             {
-                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1
+                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1, ConnectionString = "http://localhost"
             };
 
             byte[] contents = Encoding.ASCII.GetBytes("test string");
             BlobIdentifier blobToReplication = BlobIdentifier.FromBlob(contents);
 
-            Mock<IBlobStore> blobStoreMock = new Mock<IBlobStore>();
+            Mock<IBlobService> blobStoreMock = new Mock<IBlobService>();
             IServiceCredentials serviceCredentials = Mock.Of<IServiceCredentials>();
             Mock<ITransactionLogWriter> transactionLogWriter = new Mock<ITransactionLogWriter>();
             Mock<IRestClient> remoteClientMock = new Mock<IRestClient> { DefaultValue = DefaultValue.Empty };
@@ -218,10 +232,15 @@ namespace Horde.Storage.UnitTests
                 .ReturnsAsync(mockedIoResponse.Object)
                 .ReturnsAsync(mockedIoResponse2.Object);
 
-            ReplicationSettings replicationSettings = new ReplicationSettings {CurrentSite = CurrentSite, StateRoot = _tempPath.FullName};
+            ReplicationSettings replicationSettings = new ReplicationSettings {StateRoot = _tempPath.FullName};
             IOptionsMonitor<ReplicationSettings> replicationSettingsMonitor = Mock.Of<IOptionsMonitor<ReplicationSettings>>(_ => _.CurrentValue == replicationSettings);
+            IOptionsMonitor<JupiterSettings> jupiterSettingsMonitor = Mock.Of<IOptionsMonitor<JupiterSettings>>(_ => _.CurrentValue == new JupiterSettings());
 
-            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object);
+            Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
+            handler.SetupRequest($"http://localhost/api/v1/s/{NamespaceV1}/{blobToReplication}").ReturnsResponse(contents, "application/octet-stream");
+            IHttpClientFactory httpClientFactory = handler.CreateClientFactory();
+
+            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, jupiterSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object, serviceCredentials, httpClientFactory);
 
             Assert.IsNull(replicator.State.ReplicatorOffset,"Expected state to have been reset during test initialize");
 
@@ -238,8 +257,7 @@ namespace Horde.Storage.UnitTests
             transactionLogWriter.Verify(writer => writer.Add(ns, It.Is<AddTransactionEvent>(e => e.Blobs[0].Equals(blobToReplication))), Times.Once);
 
             // as this was a add operation we should have transferred the blob from the remote blob store to the local
-            remoteClientMock.Verify(client => client.ExecuteGetAsync(It.IsAny<IRestRequest>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-            blobStoreMock.Verify(blobStore => blobStore.PutObject(ns, It.IsAny<byte[]>(), blobToReplication), Times.Once);
+            blobStoreMock.Verify(blobStore => blobStore.PutObject(ns, It.IsAny<IBufferedPayload>(), blobToReplication), Times.Once);
 
             Assert.AreEqual(_currentLogGeneration, replicator.State.ReplicatingGeneration);
 
@@ -252,12 +270,12 @@ namespace Horde.Storage.UnitTests
         {
             ReplicatorSettings replicatorSettings = new ReplicatorSettings
             {
-                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1
+                NamespaceToReplicate = NamespaceV1, ReplicatorName = ReplicatorNameV1, Version = ReplicatorVersion.V1, ConnectionString = "http://localhost"
             };
 
             NamespaceId ns = replicatorSettings.NamespaceToReplicate;
 
-            Mock<IBlobStore> blobStoreMock = new Mock<IBlobStore>();
+            Mock<IBlobService> blobStoreMock = new Mock<IBlobService>();
             IServiceCredentials serviceCredentials = Mock.Of<IServiceCredentials>();
             Mock<ITransactionLogWriter> transactionLogWriter = new Mock<ITransactionLogWriter>();
             Mock<IRestClient> remoteClientMock = new Mock<IRestClient> { DefaultValue = DefaultValue.Empty };
@@ -289,10 +307,13 @@ namespace Horde.Storage.UnitTests
                 .ReturnsAsync(mockedCallistoResponse[0].Object)
                 .ReturnsAsync(mockedCallistoResponse[1].Object);
 
-            ReplicationSettings replicationSettings = new ReplicationSettings {CurrentSite = CurrentSite, StateRoot = _tempPath.FullName};
+            ReplicationSettings replicationSettings = new ReplicationSettings {StateRoot = _tempPath.FullName};
             IOptionsMonitor<ReplicationSettings> replicationSettingsMonitor = Mock.Of<IOptionsMonitor<ReplicationSettings>>(_ => _.CurrentValue == replicationSettings);
+            IOptionsMonitor<JupiterSettings> jupiterSettingsMonitor = Mock.Of<IOptionsMonitor<JupiterSettings>>(_ => _.CurrentValue == new JupiterSettings());
 
-            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object);
+            Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
+            IHttpClientFactory httpClientFactory = handler.CreateClientFactory();
+            using IReplicator replicator = new ReplicatorV1(replicatorSettings, replicationSettingsMonitor, jupiterSettingsMonitor, blobStoreMock.Object, transactionLogWriter.Object, remoteClientMock.Object, serviceCredentials, httpClientFactory);
 
             Assert.IsNull(replicator.State.ReplicatorOffset, "Expected state to have been reset during test initialize");
 

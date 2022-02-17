@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
 using System.Collections;
@@ -11,13 +11,24 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+#nullable enable
+
 namespace UnrealGameSync
 {
 	public partial class VariablesWindow : Form
 	{
+		static HashSet<string> LegacyVariables = new HashSet<string>()
+		{
+			"UE4EditorConfig",
+			"UE4EditorDebugArg",
+			"UE4EditorExe",
+			"UE4EditorCmdExe",
+			"UseIncrementalBuilds",
+		};
+
 		public delegate void InsertVariableDelegate(string Name);
 
-		public event InsertVariableDelegate OnInsertVariable;
+		public event InsertVariableDelegate? OnInsertVariable;
 
 		public VariablesWindow(IReadOnlyDictionary<string, string> Variables)
 		{
@@ -31,16 +42,19 @@ namespace UnrealGameSync
 
 			foreach(KeyValuePair<string, string> Pair in Variables)
 			{
-				ListViewItem Item = new ListViewItem(String.Format("$({0})", Pair.Key));
-				Item.SubItems.Add(Pair.Value);
-				Item.Group = CurrentProjectGroup;
-				MacrosList.Items.Add(Item);
+				if (!LegacyVariables.Contains(Pair.Key))
+				{
+					ListViewItem Item = new ListViewItem(String.Format("$({0})", Pair.Key));
+					Item.SubItems.Add(Pair.Value);
+					Item.Group = CurrentProjectGroup;
+					MacrosList.Items.Add(Item);
+				}
 			}
 
-			foreach(DictionaryEntry Entry in Environment.GetEnvironmentVariables())
+			foreach(DictionaryEntry Entry in Environment.GetEnvironmentVariables().OfType<DictionaryEntry>())
 			{
-				string Key = Entry.Key.ToString();
-				if(!Variables.ContainsKey(Key))
+				string? Key = Entry.Key?.ToString();
+				if(Key != null && Entry.Value != null && !Variables.ContainsKey(Key))
 				{
 					ListViewItem Item = new ListViewItem(String.Format("$({0})", Key));
 					Item.SubItems.Add(Entry.Value.ToString());

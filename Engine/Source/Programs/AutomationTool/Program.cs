@@ -4,7 +4,9 @@
 // This software will not be supported.
 // Use at your own risk.
 using System;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Reflection;
 using EpicGames.Core;
@@ -14,7 +16,6 @@ using System.Text;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework.Profiler;
 using UnrealBuildBase;
-using System.Linq;
 
 namespace AutomationToolDriver
 {
@@ -313,7 +314,7 @@ namespace AutomationToolDriver
 		static StartupTraceListener StartupListener = new StartupTraceListener();
 
 		// Do not add [STAThread] here. It will cause deadlocks in platform automation code.
-		public static int Main(string[] Arguments)
+		public static async Task<int> Main(string[] Arguments)
 		{
 			// Initialize the log system, buffering the output until we can create the log file
 			Log.AddTraceListener(StartupListener);
@@ -391,7 +392,7 @@ namespace AutomationToolDriver
 				bool bWaitForUATMutex = AutomationToolCommandLine.IsSetGlobal("-WaitForUATMutex");
 
 				// Don't allow simultaneous execution of AT (in the same branch)
-				ReturnCode = ProcessSingleton.RunSingleInstance(MainProc, bWaitForUATMutex);
+				ReturnCode = await ProcessSingleton.RunSingleInstanceAsync(MainProc, bWaitForUATMutex);
 			}
 			catch (Exception Ex)
             {
@@ -409,7 +410,7 @@ namespace AutomationToolDriver
             return (int)ReturnCode;
         }
 
-		static ExitCode MainProc()
+		static async Task<ExitCode> MainProc()
 		{
 			string ScriptsForProject = (string)AutomationToolCommandLine.GetValueUnchecked("-ScriptsForProject");
 			List<string> AdditionalScriptDirs = (List<string>) AutomationToolCommandLine.GetValueUnchecked("-ScriptDir");
@@ -440,8 +441,8 @@ namespace AutomationToolDriver
 			// Call into AutomationTool.Automation.Process()
 
 			Type AutomationTools_Automation = AutomationUtilsAssembly.GetType("AutomationTool.Automation");
-			MethodInfo Automation_Process = AutomationTools_Automation.GetMethod("Process");
-			return (ExitCode) Automation_Process.Invoke(null,
+			MethodInfo Automation_Process = AutomationTools_Automation.GetMethod("ProcessAsync");
+			return await (Task<ExitCode>) Automation_Process.Invoke(null,
 				new object[] {AutomationToolCommandLine, StartupListener, ScriptModuleAssemblyPaths});
 		}
 	}

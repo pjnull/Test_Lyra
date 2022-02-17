@@ -14,7 +14,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using HordeServer.Storage;
-using HordeServer.Storage.Primitives;
 using HordeServer.Services;
 using EpicGames.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
@@ -29,13 +28,15 @@ using EpicGames.Redis;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.IO;
+using HordeCommon;
+using EpicGames.Horde.Storage;
+using System.Text;
 
 namespace HordeServer.Commits.Impl
 {
 	using P4 = Perforce.P4;
-	using NamespaceId = StringId<INamespace>;
-	using BucketId = StringId<IBucket>;
 	using StreamId = StringId<IStream>;
+	using IRef = EpicGames.Horde.Storage.IRef;
 
 	/// <summary>
 	/// Service which mirrors changes from Perforce
@@ -67,51 +68,42 @@ namespace HordeServer.Commits.Impl
 
 		// Collections
 		ICommitCollection CommitCollection;
-		IBlobCollection BlobCollection;
-		IObjectCollection ObjectCollection;
-		IRefCollection RefCollection;
+		IStorageClient StorageClient;
 		IStreamCollection StreamCollection;
 		IPerforceService PerforceService;
 		IUserCollection UserCollection;
-		ISingletonDocument<Globals> GlobalsDocument;
 		ILogger<CommitService> Logger;
-		ElectedTick UpdateCommitsTicker;
+		ITicker UpdateCommitsTicker;
 
 		const int MaxBackgroundTasks = 2;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public CommitService(IDatabase Redis, ICommitCollection CommitCollection, IBlobCollection BlobCollection, IObjectCollection ObjectCollection, IRefCollection RefCollection, IStreamCollection StreamCollection, IPerforceService PerforceService, IUserCollection UserCollection, DatabaseService DatabaseService, ILogger<CommitService> Logger)
+		public CommitService(IDatabase Redis, ICommitCollection CommitCollection, IStorageClient StorageClient, IStreamCollection StreamCollection, IPerforceService PerforceService, IUserCollection UserCollection, IClock Clock, ILogger<CommitService> Logger)
 		{
 			this.Redis = Redis;
 			this.RedisDirtyStreams = new RedisSet<StreamId>(Redis, RedisBaseKey.Append("streams"));
 			this.RedisReservations = new RedisSortedSet<StreamId>(Redis, RedisBaseKey.Append("reservations"));
 
 			this.CommitCollection = CommitCollection;
-			this.BlobCollection = BlobCollection;
-			this.ObjectCollection = ObjectCollection;
-			this.RefCollection = RefCollection;
+			this.StorageClient = StorageClient;
 			this.StreamCollection = StreamCollection;
 			this.PerforceService = PerforceService;
 			this.UserCollection = UserCollection;
-			this.GlobalsDocument = new SingletonDocument<Globals>(DatabaseService);
 			this.Logger = Logger;
-			this.UpdateCommitsTicker = new ElectedTick(DatabaseService, new ObjectId("60f866c49e7268f71803b6ef"), UpdateCommitsAsync, TimeSpan.FromSeconds(30.0), Logger);
+			this.UpdateCommitsTicker = Clock.AddSharedTicker<CommitService>(TimeSpan.FromSeconds(30.0), UpdateCommitsAsync, Logger);
 		}
 
 		/// <inheritdoc/>
-		public void Dispose()
-		{
-			UpdateCommitsTicker.Dispose();
-		}
+		public void Dispose() => UpdateCommitsTicker.Dispose();
 
 		/// <inheritdoc/>
 		public async Task StartAsync(CancellationToken CancellationToken)
 		{
 			if (EnableUpdates)
 			{
-				UpdateCommitsTicker.Start();
+				await UpdateCommitsTicker.StartAsync();
 				await StartTreeUpdatesAsync();
 			}
 		}
@@ -133,7 +125,7 @@ namespace HordeServer.Commits.Impl
 		/// </summary>
 		/// <param name="CancellationToken"></param>
 		/// <returns></returns>
-		async Task UpdateCommitsAsync(CancellationToken CancellationToken)
+		async ValueTask UpdateCommitsAsync(CancellationToken CancellationToken)
 		{
 			List<IStream> Streams = await StreamCollection.FindAllAsync();
 			foreach (IGrouping<string, IStream> Group in Streams.GroupBy(x => x.ClusterName, StringComparer.OrdinalIgnoreCase))
@@ -157,8 +149,44 @@ namespace HordeServer.Commits.Impl
 		/// <returns></returns>
 		async Task UpdateCommitsForClusterAsync(string ClusterName, IEnumerable<IStream> Streams)
 		{
+			// Find the minimum changelist number to query
+			Dictionary<IStream, int> StreamToFirstChange = new Dictionary<IStream, int>();
+			foreach (IStream Stream in Streams)
+			{
+				RedisList<int> Changes = RedisStreamChanges(Stream.Id);
+
+				int FirstChange = await Changes.GetByIndexAsync(-1);
+				if (FirstChange != 0)
+				{
+					FirstChange++;
+				}
+
+				StreamToFirstChange[Stream] = FirstChange;
+			}
+
+			// Update the database with all the commits
+			await foreach (NewCommit NewCommit in FindCommitsForClusterAsync(ClusterName, StreamToFirstChange))
+			{
+				ICommit Commit = await CommitCollection.AddOrReplaceAsync(NewCommit);
+
+				RedisList<int> StreamCommitsKey = RedisStreamChanges(Commit.StreamId);
+				await StreamCommitsKey.RightPushAsync(Commit.Change);
+
+				await RedisDirtyStreams.AddAsync(Commit.StreamId);
+				await Redis.PublishAsync(RedisUpdateChannel, Commit.StreamId);
+			}
+		}
+
+		/// <summary>
+		/// Enumerate new commits to the given streams, using a stream view to deduplicate changes which affect multiple branches.
+		/// </summary>
+		/// <param name="ClusterName"></param>
+		/// <param name="StreamToFirstChange"></param>
+		/// <returns>List of new commits</returns>
+		public async IAsyncEnumerable<NewCommit> FindCommitsForClusterAsync(string ClusterName, Dictionary<IStream, int> StreamToFirstChange)
+		{
 			// Create a connection to the server
-			IPerforceConnection? Connection = await PerforceService.GetServiceUserConnection(ClusterName);
+			using IPerforceConnection? Connection = await PerforceService.GetServiceUserConnection(ClusterName);
 			if (Connection == null)
 			{
 				throw new PerforceException($"Unable to create cluster connection for {ClusterName}");
@@ -169,7 +197,7 @@ namespace HordeServer.Commits.Impl
 
 			// Get the view for each stream
 			List<StreamInfo> StreamInfoList = new List<StreamInfo>();
-			foreach (IStream Stream in Streams)
+			foreach (IStream Stream in StreamToFirstChange.Keys)
 			{
 				ViewMap View = await GetStreamViewAsync(Connection, Stream.Name);
 				StreamInfoList.Add(new StreamInfo(Stream, View));
@@ -206,18 +234,11 @@ namespace HordeServer.Commits.Impl
 			int MinChange = int.MaxValue;
 			foreach (StreamInfo StreamInfo in StreamInfoList)
 			{
-				RedisList<int> Changes = RedisStreamChanges(StreamInfo.Stream.Id);
-
-				int FirstChange = await Changes.GetByIndexAsync(-1);
+				int FirstChange = StreamToFirstChange[StreamInfo.Stream];
 				if (FirstChange == 0)
 				{
 					FirstChange = await GetFirstCommitToReplicateAsync(Connection, StreamInfo.View, ServerInfo.Utf8PathComparer);
 				}
-				else
-				{
-					FirstChange++;
-				}
-
 				if (FirstChange != 0)
 				{
 					MinChange = Math.Min(MinChange, FirstChange);
@@ -244,13 +265,12 @@ namespace HordeServer.Commits.Impl
 					Utf8String BasePath = GetBasePath(DescribeRecord, StreamInfo.View, ServerInfo.Utf8PathComparer);
 					if (!BasePath.IsEmpty)
 					{
-						await AddCommitAsync(Stream, DescribeRecord, BasePath.ToString());
+						IUser Author = await UserCollection.FindOrAddUserByLoginAsync(DescribeRecord.User);
+						IUser Owner = (await ParseRobomergeOwnerAsync(DescribeRecord.Description)) ?? Author;
 
-						RedisList<int> StreamCommitsKey = RedisStreamChanges(Stream.Id);
-						await StreamCommitsKey.RightPushAsync(DescribeRecord.Number);
+						int OriginalChange = ParseRobomergeSource(DescribeRecord.Description) ?? DescribeRecord.Number;
 
-						await RedisDirtyStreams.AddAsync(Stream.Id);
-						await Redis.PublishAsync(RedisUpdateChannel, Stream.Id);
+						yield return new NewCommit(Stream.Id, DescribeRecord.Number, OriginalChange, Author.Id, Owner.Id, DescribeRecord.Description, BasePath.ToString(), DescribeRecord.Time);
 					}
 				}
 			}
@@ -319,24 +339,6 @@ namespace HordeServer.Commits.Impl
 				Index++;
 			}
 			return A.Substring(0, Index);
-		}
-
-		/// <summary>
-		/// Adds metadata for a particular commit
-		/// </summary>
-		/// <param name="Stream"></param>
-		/// <param name="Changelist"></param>
-		/// <param name="BasePath"></param>
-		/// <returns></returns>
-		async Task<ICommit> AddCommitAsync(IStream Stream, DescribeRecord Changelist, string BasePath)
-		{
-			IUser Author = await UserCollection.FindOrAddUserByLoginAsync(Changelist.User);
-			IUser Owner = (await ParseRobomergeOwnerAsync(Changelist.Description)) ?? Author;
-
-			int OriginalChange = ParseRobomergeSource(Changelist.Description) ?? Changelist.Number;
-
-			NewCommit NewCommit = new NewCommit(Stream.Id, Changelist.Number, OriginalChange, Author.Id, Owner.Id, Changelist.Description, BasePath, Changelist.Time);
-			return await CommitCollection.AddOrReplaceAsync(NewCommit);
 		}
 
 		/// <inheritdoc/>
@@ -565,7 +567,7 @@ namespace HordeServer.Commits.Impl
 				return;
 			}
 
-			NativePerforceConnection? Perforce = await PerforceService.GetServiceUserConnection(Stream.ClusterName);
+			using IPerforceConnection? Perforce = await PerforceService.GetServiceUserConnection(Stream.ClusterName);
 			if (Perforce == null)
 			{
 				return;
@@ -579,7 +581,7 @@ namespace HordeServer.Commits.Impl
 			ICommit? PrevCommit = null;
 			StreamTreeRef? PrevRoot = null;
 #endif
-			ObjectSet ObjectSet = new ObjectSet(BlobCollection, NamespaceId, 256 * 1024, DateTime.UtcNow);
+			ObjectSet ObjectSet = new ObjectSet(StorageClient, NamespaceId, 256 * 1024, DateTime.UtcNow);
 			for (; ; )
 			{
 				// Get the first two changelists to update
@@ -654,7 +656,7 @@ namespace HordeServer.Commits.Impl
 				return null;
 			}
 
-			IRef? Ref = await RefCollection.GetAsync(NamespaceId, BucketId, Commit.TreeRef);
+			IRef? Ref = await StorageClient.GetRefAsync(NamespaceId, BucketId, Commit.GetRefId());
 			if (Ref == null)
 			{
 				return null;
@@ -679,12 +681,8 @@ namespace HordeServer.Commits.Impl
 
 			CommitTree Tree = await FlushAsync(ObjectSet, Root);
 			string RefName = $"tree_{Commit.StreamId}_{Commit.Change}";
-
-			List<IoHash> MissingHashes = await RefCollection.SetAsync(NamespaceId, BucketId, RefName, Tree.Serialize(Stream.Name));
-			if (MissingHashes.Count > 0)
-			{
-				throw new Exception($"Missing hashes when attempting to add ref: {String.Join(", ", MissingHashes.Select(x => x.ToString()))}");
-			}
+			RefId RefId = new RefId(IoHash.Compute(Encoding.UTF8.GetBytes(RefName)));
+			await StorageClient.SetRefAsync(NamespaceId, BucketId, RefId, Tree.Serialize(Stream.Name));
 
 			NewCommit NewCommit = new NewCommit(Commit);
 			NewCommit.TreeRef = RefName;
@@ -693,9 +691,9 @@ namespace HordeServer.Commits.Impl
 			return Tree.Root;
 		}
 
-#endregion
+		#endregion
 
-#region Tree Snapshots
+		#region Tree Snapshots
 
 		/// <summary>
 		/// Creates a snapshot of a stream at a particular changelist
@@ -760,22 +758,22 @@ namespace HordeServer.Commits.Impl
 		public class Utf8FStatRecord
 		{
 			[PerforceTag("depotFile", Optional = true)]
-			public Utf8String DepotFile;
+			public Utf8String DepotFile { get; set; }
 
 			[PerforceTag("headType", Optional = true)]
-			public Utf8String HeadType;
+			public Utf8String HeadType { get; set; }
 
 			[PerforceTag("headRev", Optional = true)]
-			public int HeadRevision;
+			public int HeadRevision { get; set; }
 
 			[PerforceTag("digest", Optional = true)]
-			public Utf8String Digest;
+			public Utf8String Digest { get; set; }
 
 			[PerforceTag("fileSize", Optional = true)]
-			public long FileSize;
+			public long FileSize { get; set; }
 
 			[PerforceTag("type", Optional = true)]
-			public Utf8String Type;
+			public Utf8String Type { get; set; }
 		}
 
 		/// <summary>
@@ -891,7 +889,7 @@ namespace HordeServer.Commits.Impl
 		/// <returns></returns>
 		static async Task<StreamTreeRef> UpdateTreeAsync(StreamTreeRef RootRef, IPerforceConnection Perforce, ViewMap View, int Change, ObjectSet ObjectSet, Utf8StringComparer PathComparer)
 		{
-			List<FStatRecord> Records = await Perforce.FStatAsync(-1, Change, null, null, -1, FStatOptions.IncludeFileSizes, FileSpecList.Any);
+			List<FStatRecord> Records = await Perforce.FStatAsync(-1, Change, null, null, -1, FStatOptions.IncludeFileSizes, FileSpecList.Any).ToListAsync();
 			return await UpdateTreeAsync(RootRef, Records, View, ObjectSet, PathComparer);
 		}
 
@@ -1085,7 +1083,7 @@ namespace HordeServer.Commits.Impl
 
 			foreach ((Utf8String Name, StreamFile File) in Tree.NameToFile)
 			{
-				Logger.LogInformation($"{Prefix}/{Name} = {File.Path}#{File.Revision}");
+				Logger.LogInformation("{Prefix}/{Name} = {Path}#{Revision}", Prefix, Name, File.Path, File.Revision);
 			}
 			foreach ((Utf8String Name, StreamTreeRef ChildTreeRef) in Tree.NameToTree)
 			{
@@ -1103,7 +1101,7 @@ namespace HordeServer.Commits.Impl
 		/// <param name="Commit"></param>
 		async Task<CommitTree> ReadCommitTreeAsync(ICommit Commit)
 		{
-			IRef? Ref = await RefCollection.GetAsync(NamespaceId, BucketId, Commit.TreeRef!);
+			IRef? Ref = await StorageClient.GetRefAsync(NamespaceId, BucketId, Commit.GetRefId());
 			return CbSerializer.Deserialize<CommitTree>(Ref!.Value.AsField());
 		}
 

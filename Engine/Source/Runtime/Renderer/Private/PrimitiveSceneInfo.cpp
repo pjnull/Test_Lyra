@@ -28,23 +28,6 @@
 extern int32 GGPUSceneInstanceClearList;
 extern int32 GGPUSceneInstanceBVH;
 
-#if RHI_RAYTRACING
-static int32 GCachedRayTracingInstancesCacheLocalTransform = 0;
-static FAutoConsoleVariableRef CVarCachedRayTracingInstancesUseInstanceData(
-	TEXT("r.CachedRayTracingInstances.CacheLocalTransform"),
-	GCachedRayTracingInstancesCacheLocalTransform,
-	TEXT("Cache Local Transform instead of using InstanceData (increases memory usage)."),
-	ECVF_ReadOnly);
-
-static int32 GCachedRayTracingInstancesLazyUpdate = 1;
-static FAutoConsoleVariableRef CVarCachedRayTracingInstancesLazyUpdate(
-	TEXT("r.CachedRayTracingInstances.LazyUpdate"),
-	GCachedRayTracingInstancesLazyUpdate,
-	TEXT("Lazy update cached ray tracing instances world transforms. \n")
-	TEXT("Reduces memory usage by only caching world transforms of primitives when necessary."),
-	ECVF_ReadOnly);
-#endif
-
 static int32 GMeshDrawCommandsCacheMultithreaded = 1;
 static FAutoConsoleVariableRef CVarDrawCommandsCacheMultithreaded(
 	TEXT("r.MeshDrawCommands.CacheMultithreaded"),
@@ -257,7 +240,6 @@ FPrimitiveSceneInfo::~FPrimitiveSceneInfo()
 	}
 
 #if RHI_RAYTRACING
-	DEC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, CachedRayTracingInstanceLocalTransforms.Num() * sizeof(FMatrix));
 	DEC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, CachedRayTracingInstanceWorldTransforms.Num() * sizeof(FMatrix));
 #endif
 }
@@ -575,7 +557,7 @@ void FPrimitiveSceneInfo::CacheNaniteDrawCommands(FRHICommandListImmediate& RHIC
 			{
 				SCOPED_NAMED_EVENT(RegisterDeferredCommands, FColor::Emerald);
 
-				for(FNaniteDrawListContextDeferred& Context : DrawListContexts)
+				for (FNaniteDrawListContextDeferred& Context : DrawListContexts)
 				{
 					Context.RegisterDeferredCommands(*Scene);
 				}
@@ -588,7 +570,7 @@ void FPrimitiveSceneInfo::CacheNaniteDrawCommands(FRHICommandListImmediate& RHIC
 			{
 				BuildNaniteDrawCommands(RHICmdList, Scene, PrimitiveSceneInfo, DrawListContext);
 			}
-		}		
+		}
 	}
 }
 
@@ -597,42 +579,68 @@ void BuildNaniteDrawCommands(FRHICommandListImmediate& RHICmdList, FScene* Scene
 	FPrimitiveSceneProxy* Proxy = PrimitiveSceneInfo->Proxy;
 	if (Proxy->IsNaniteMesh())
 	{
-		FNaniteDrawListContext::FPrimitiveSceneInfoScope PrimInfoScope(DrawListContext, *PrimitiveSceneInfo);
-	
-		auto PassBody = [PrimitiveSceneInfo, Proxy, &DrawListContext](ENaniteMeshPass::Type MeshPass, FMeshPassProcessor* const NaniteMeshProcessor)
+		// Shading material mapping
 		{
-			FNaniteDrawListContext::FMeshPassScope MeshPassScope(DrawListContext, MeshPass);
-
-			int32 StaticMeshesCount = PrimitiveSceneInfo->StaticMeshes.Num();
-			for (int32 MeshIndex = 0; MeshIndex < StaticMeshesCount; ++MeshIndex)
+			FNaniteDrawListContext::FPrimitiveSceneInfoScope PrimInfoScope(DrawListContext, *PrimitiveSceneInfo);
+	
+			auto PassBody = [PrimitiveSceneInfo, Proxy, &DrawListContext](ENaniteMeshPass::Type MeshPass, FMeshPassProcessor* const NaniteMeshProcessor)
 			{
-				FStaticMeshBatchRelevance& MeshRelevance = PrimitiveSceneInfo->StaticMeshRelevances[MeshIndex];
-				FStaticMeshBatch& Mesh = PrimitiveSceneInfo->StaticMeshes[MeshIndex];
+				FNaniteDrawListContext::FMeshPassScope MeshPassScope(DrawListContext, MeshPass);
 
-				if (MeshRelevance.bSupportsNaniteRendering && Mesh.bUseForMaterial)
+				int32 StaticMeshesCount = PrimitiveSceneInfo->StaticMeshes.Num();
+				for (int32 MeshIndex = 0; MeshIndex < StaticMeshesCount; ++MeshIndex)
 				{
-					uint64 BatchElementMask = ~0ull;
-					NaniteMeshProcessor->AddMeshBatch(Mesh, BatchElementMask, Proxy);
+					FStaticMeshBatchRelevance& MeshRelevance = PrimitiveSceneInfo->StaticMeshRelevances[MeshIndex];
+					FStaticMeshBatch& Mesh = PrimitiveSceneInfo->StaticMeshes[MeshIndex];
+
+					if (MeshRelevance.bSupportsNaniteRendering && Mesh.bUseForMaterial)
+					{
+						uint64 BatchElementMask = ~0ull;
+						NaniteMeshProcessor->AddMeshBatch(Mesh, BatchElementMask, Proxy);
+					}
+				}
+			};
+
+			// ENaniteMeshPass::BasePass
+			{
+				FMeshPassProcessor* NaniteMeshProcessor = CreateNaniteMeshProcessor(Scene, nullptr, &DrawListContext);
+				PassBody(ENaniteMeshPass::BasePass, NaniteMeshProcessor);
+				NaniteMeshProcessor->~FMeshPassProcessor();
+			}
+
+			// ENaniteMeshPass::LumenCardCapture
+			if (Lumen::HasPrimitiveNaniteMeshBatches(Proxy) && DoesPlatformSupportLumenGI(GetFeatureLevelShaderPlatform(Scene->GetFeatureLevel())))
+			{
+				FMeshPassProcessor* NaniteMeshProcessor = CreateLumenCardNaniteMeshProcessor(Scene, nullptr, &DrawListContext);
+				PassBody(ENaniteMeshPass::LumenCardCapture, NaniteMeshProcessor);
+				NaniteMeshProcessor->~FMeshPassProcessor();
+			}
+
+			static_assert(ENaniteMeshPass::Num == 2, "Change BuildNaniteDrawCommands() to account for more Nanite mesh passes");
+		}
+
+		// Raster material mapping
+		{
+			Nanite::FSceneProxyBase* NaniteProxy = static_cast<Nanite::FSceneProxyBase*>(Proxy);
+			TArray<Nanite::FSceneProxyBase::FMaterialSection>& NaniteMaterialSections = NaniteProxy->GetMaterialSections();
+
+			for (int32 MaterialSectionIndex = 0; MaterialSectionIndex < NaniteMaterialSections.Num(); ++MaterialSectionIndex)
+			{
+				Nanite::FSceneProxyBase::FMaterialSection& MaterialSection = NaniteMaterialSections[MaterialSectionIndex];
+
+				const bool bValidMaterial = MaterialSection.RasterMaterial.IsValid() && !MaterialSection.RasterMaterial.IsStale();
+				const UMaterialInterface* RasterMaterial = bValidMaterial ? MaterialSection.RasterMaterial.Get() : UMaterial::GetDefaultMaterial(MD_Surface);
+				check(RasterMaterial);
+
+				FNaniteRasterPipeline* RasterPipeline = Scene->NaniteRasterPipelines.Register(RasterMaterial);
+				check(RasterPipeline);
+
+				for (int32 NaniteMeshPassIndex = 0; NaniteMeshPassIndex < ENaniteMeshPass::Num; ++NaniteMeshPassIndex)
+				{
+					PrimitiveSceneInfo->NaniteMaterialSlots[NaniteMeshPassIndex][MaterialSectionIndex].RasterId = uint16(RasterPipeline->GetBinIndex());
 				}
 			}
-		};
-
-		// ENaniteMeshPass::BasePass
-		{
-			FMeshPassProcessor* NaniteMeshProcessor = CreateNaniteMeshProcessor(Scene, nullptr, &DrawListContext);
-			PassBody(ENaniteMeshPass::BasePass, NaniteMeshProcessor);
-			NaniteMeshProcessor->~FMeshPassProcessor();
 		}
-
-		// ENaniteMeshPass::LumenCardCapture
-		if (Lumen::HasPrimitiveNaniteMeshBatches(Proxy) && DoesPlatformSupportLumenGI(GetFeatureLevelShaderPlatform(Scene->GetFeatureLevel())))
-		{
-			FMeshPassProcessor* NaniteMeshProcessor = CreateLumenCardNaniteMeshProcessor(Scene, nullptr, &DrawListContext);
-			PassBody(ENaniteMeshPass::LumenCardCapture, NaniteMeshProcessor);
-			NaniteMeshProcessor->~FMeshPassProcessor();
-		}
-
-		static_assert(ENaniteMeshPass::Num == 2, "Change BuildNaniteDrawCommands() to account for more Nanite mesh passes");
 	}
 }
 
@@ -646,6 +654,19 @@ void FPrimitiveSceneInfo::RemoveCachedNaniteDrawCommands()
 	}
 
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_RemoveCachedNaniteDrawCommands);
+
+	// Release raster materials
+	{
+		Nanite::FSceneProxyBase* NaniteProxy = static_cast<Nanite::FSceneProxyBase*>(Proxy);
+		TArray<Nanite::FSceneProxyBase::FMaterialSection>& NaniteMaterialSections = NaniteProxy->GetMaterialSections();
+		for (Nanite::FSceneProxyBase::FMaterialSection& MaterialSection : NaniteMaterialSections)
+		{
+			const bool bValidMaterial = MaterialSection.RasterMaterial.IsValid() && !MaterialSection.RasterMaterial.IsStale();
+			const UMaterialInterface* RasterMaterial = bValidMaterial ? MaterialSection.RasterMaterial.Get() : UMaterial::GetDefaultMaterial(MD_Surface);
+			check(RasterMaterial);
+			Scene->NaniteRasterPipelines.Unregister(RasterMaterial);
+		}
+	}
 
 	for (int32 NaniteMeshPassIndex = 0; NaniteMeshPassIndex < ENaniteMeshPass::Num; ++NaniteMeshPassIndex)
 	{
@@ -685,7 +706,7 @@ void FScene::RefreshRayTracingInstances()
 
 void FPrimitiveSceneInfo::UpdateCachedRayTracingInstances(FScene* Scene, const TArrayView<FPrimitiveSceneInfo*>& SceneInfos)
 {
-	if (IsRayTracingEnabled() && !(Scene->World->WorldType == EWorldType::EditorPreview || Scene->World->WorldType == EWorldType::GamePreview))
+	if (IsRayTracingEnabled())
 	{
 		checkf(GRHISupportsMultithreadedShaderCreation, TEXT("Raytracing code needs the ability to create shaders from task threads."));
 
@@ -843,7 +864,7 @@ void CacheRayTracingPrimitive(
 
 void FPrimitiveSceneInfo::CacheRayTracingPrimitives(FScene* Scene, const TArrayView<FPrimitiveSceneInfo*>& SceneInfos)
 {
-	if (IsRayTracingEnabled() && !(Scene->World->WorldType == EWorldType::EditorPreview || Scene->World->WorldType == EWorldType::GamePreview))
+	if (IsRayTracingEnabled())
 	{
 		CSV_SCOPED_TIMING_STAT_EXCLUSIVE(FPrimitiveSceneInfo_CacheRayTracingPrimitives)
 		SCOPED_NAMED_EVENT(FPrimitiveSceneInfo_CacheRayTracingPrimitives, FColor::Emerald);
@@ -908,7 +929,7 @@ void FPrimitiveSceneInfo::CacheRayTracingPrimitives(FScene* Scene, const TArrayV
 
 void FPrimitiveSceneInfo::UpdateCachedRayTracingInstanceWorldTransforms()
 {
-	if (bUpdateCachedRayTracingInstanceWorldTransforms && GCachedRayTracingInstancesLazyUpdate)
+	if (bUpdateCachedRayTracingInstanceWorldTransforms)
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_UpdateCachedRayTracingInstanceWorldTransforms);
 
@@ -931,7 +952,7 @@ void FPrimitiveSceneInfo::UpdateCachedRayTracingInstanceWorldTransforms()
 
 		for (int32 Index = 0; Index < CachedRayTracingInstanceWorldTransforms.Num(); Index++)
 		{
-			FMatrix LocalTransform = GCachedRayTracingInstancesCacheLocalTransform ? CachedRayTracingInstanceLocalTransforms[Index] : InstanceSceneData[Index].LocalToPrimitive.ToMatrix();
+			FMatrix LocalTransform = InstanceSceneData[Index].LocalToPrimitive.ToMatrix();
 
 			CachedRayTracingInstanceWorldTransforms[Index] = LocalTransform * LocalToWorld;
 		}
@@ -945,23 +966,8 @@ void FPrimitiveSceneInfo::UpdateCachedRayTracingInstance(FPrimitiveSceneInfo* Sc
 {
 	if (EnumHasAnyFlags(Flags, ERayTracingPrimitiveFlags::CacheInstances))
 	{
-		if (GCachedRayTracingInstancesCacheLocalTransform)
-		{
-			// Cache a copy of local transforms so that they can be updated in the future
-			// TODO: this is actually not needed for static meshes with non-movable mobility (except in editor)
-			DEC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, SceneInfo->CachedRayTracingInstanceLocalTransforms.Num() * sizeof(FMatrix));
-			SceneInfo->CachedRayTracingInstanceLocalTransforms = CachedRayTracingInstance.InstanceTransforms;
-			INC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, SceneInfo->CachedRayTracingInstanceLocalTransforms.Num() * sizeof(FMatrix));
-		}
 		// TODO: allocate from FRayTracingScene & do better low-level caching
 		SceneInfo->CachedRayTracingInstance.NumTransforms = CachedRayTracingInstance.NumTransforms;
-		if (!GCachedRayTracingInstancesLazyUpdate)
-		{
-			DEC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, SceneInfo->CachedRayTracingInstanceWorldTransforms.Num() * sizeof(FMatrix));
-			SceneInfo->CachedRayTracingInstanceWorldTransforms.Empty();
-			SceneInfo->CachedRayTracingInstanceWorldTransforms.AddUninitialized(CachedRayTracingInstance.NumTransforms);
-			INC_MEMORY_STAT_BY(STAT_CachedRayTracingInstancesMemory, SceneInfo->CachedRayTracingInstanceWorldTransforms.Num() * sizeof(FMatrix));
-		}
 
 		// Apply local offset to far-field object
 		FMatrix LocalToWorld = SceneInfo->Proxy->GetLocalToWorld();
@@ -974,12 +980,6 @@ void FPrimitiveSceneInfo::UpdateCachedRayTracingInstance(FPrimitiveSceneInfo* Sc
 		SceneInfo->CachedRayTracingInstanceWorldBounds.AddUninitialized(CachedRayTracingInstance.NumTransforms);
 
 		SceneInfo->UpdateCachedRayTracingInstanceTransforms(LocalToWorld);
-
-		if (!GCachedRayTracingInstancesLazyUpdate)
-		{
-			SceneInfo->CachedRayTracingInstance.Transforms = MakeArrayView(SceneInfo->CachedRayTracingInstanceWorldTransforms);
-			check(SceneInfo->CachedRayTracingInstance.NumTransforms >= uint32(SceneInfo->CachedRayTracingInstance.Transforms.Num()));
-		}
 
 		SceneInfo->CachedRayTracingInstance.GeometryRHI = CachedRayTracingInstance.Geometry->RayTracingGeometryRHI;
 
@@ -1034,13 +1034,9 @@ void FPrimitiveSceneInfo::UpdateCachedRayTracingInstanceTransforms(const FMatrix
 	{
 		const FRenderBounds& LocalBoundingBox = Proxy->GetInstanceLocalBounds(Index);
 
-		FMatrix LocalTransform = GCachedRayTracingInstancesCacheLocalTransform ? CachedRayTracingInstanceLocalTransforms[Index] : InstanceSceneData[Index].LocalToPrimitive.ToMatrix();
+		FMatrix LocalTransform = InstanceSceneData[Index].LocalToPrimitive.ToMatrix();
 
 		CachedRayTracingInstanceWorldBounds[Index] = LocalBoundingBox.TransformBy(LocalTransform * NewPrimitiveLocalToWorld).ToBoxSphereBounds();
-		if(!GCachedRayTracingInstancesLazyUpdate)
-		{
-			CachedRayTracingInstanceWorldTransforms[Index] = LocalTransform * NewPrimitiveLocalToWorld;
-		}
 		SmallestRayTracingInstanceWorldBoundsIndex = CachedRayTracingInstanceWorldBounds[Index].SphereRadius < CachedRayTracingInstanceWorldBounds[SmallestRayTracingInstanceWorldBoundsIndex].SphereRadius ? Index : SmallestRayTracingInstanceWorldBoundsIndex;
 	}
 

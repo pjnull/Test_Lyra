@@ -67,7 +67,7 @@ namespace HordeServerTests.Stubs.Services
 			this.UserCollection = UserCollection;
 		}
 
-		public Task<NativePerforceConnection?> GetServiceUserConnection(string? ClusterName)
+		public Task<IPerforceConnection?> GetServiceUserConnection(string? ClusterName)
 		{
 			throw new NotImplementedException();
 		}
@@ -115,6 +115,11 @@ namespace HordeServerTests.Stubs.Services
 			return Task.FromResult(Results);
 		}
 
+		public Task<CheckShelfResult> CheckShelfAsync(string ClusterName, string StreamName, int ChangeNumber, string? ImpersonateUser)
+		{
+			throw new NotImplementedException();
+		}
+
 		public Task<PerforceUserInfo?> GetUserInfoAsync(string ClusterName, string UserName)
 		{
 			return Task.FromResult<PerforceUserInfo?>(new PerforceUserInfo { Login = UserName, FullName = UserName, Email = $"{UserName}@epicgames.com" });
@@ -155,9 +160,9 @@ namespace HordeServerTests.Stubs.Services
 			return Task.FromResult(CodeChange);
 		}
 
-		public Task<int> CreateNewChangeAsync(string ClusterName, string StreamName, string Path)
+		public Task<int> CreateNewChangeAsync(string ClusterName, string StreamName, string Path, string Description)
 		{
-			ChangeDetails NewChange = new ChangeDetails(Changes[StreamName].First().Key + 1, TestUser, null!, "", new List<ChangeFile> { PerforceExtensions.CreateChangeFile(Path) }, DateTime.Now);
+			ChangeDetails NewChange = new ChangeDetails(Changes[StreamName].First().Key + 1, TestUser, null!, Description, new List<ChangeFile> { PerforceExtensions.CreateChangeFile(Path) }, DateTime.Now);
 			Changes[StreamName].Add(NewChange.Number, NewChange);
 			return Task.FromResult(NewChange.Number);
 		}

@@ -228,10 +228,31 @@ namespace UE
 #endif // #if USE_USD_SDK
 
 	template<typename PtrType>
+	void FSdfLayerBase<PtrType>::TransferContent( const FSdfLayer& SourceLayer )
+	{
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			Ptr->TransferContent( pxr::SdfLayerRefPtr{ SourceLayer } );
+		}
+#endif // #if USE_USD_SDK
+	}
+
+	template<typename PtrType>
 	FSdfLayer FSdfLayerBase<PtrType>::FindOrOpen( const TCHAR* Identifier )
 	{
 #if USE_USD_SDK
 		return FSdfLayer( pxr::SdfLayer::FindOrOpen( TCHAR_TO_ANSI( Identifier ) ) );
+#else
+		return FSdfLayer();
+#endif // #if USE_USD_SDK
+	}
+
+	template<typename PtrType>
+	FSdfLayer FSdfLayerBase<PtrType>::CreateNew( const TCHAR* Identifier )
+	{
+#if USE_USD_SDK
+		return FSdfLayer( pxr::SdfLayer::CreateNew( TCHAR_TO_ANSI( Identifier ) ) );
 #else
 		return FSdfLayer();
 #endif // #if USE_USD_SDK
@@ -249,6 +270,80 @@ namespace UE
 
 		return false;
 	}
+
+	template<typename PtrType>
+	TSet<FString> FSdfLayerBase<PtrType>::GetExternalReferences() const
+	{
+		TSet<FString> Result;
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			FScopedUsdAllocs UsdAllocs;
+			std::set<std::string> ExternalReferences = Ptr->GetExternalReferences();
+
+			Result.Reserve( ExternalReferences.size() );
+
+			for ( const std::string& Reference : ExternalReferences )
+			{
+				Result.Add( ANSI_TO_TCHAR( Reference.c_str() ) );
+			}
+		}
+#endif // #if USE_USD_SDK
+		return Result;
+	}
+
+	template<typename PtrType>
+	bool FSdfLayerBase<PtrType>::UpdateExternalReference( const TCHAR* OldReferencePath, const TCHAR* NewReferencePath )
+	{
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			FScopedUsdAllocs UsdAllocs;
+			return Ptr->UpdateExternalReference( TCHAR_TO_ANSI( OldReferencePath ), TCHAR_TO_ANSI( NewReferencePath ) );
+		}
+#endif // #if USE_USD_SDK
+
+		return false;
+	}
+
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+	template<typename PtrType>
+	TSet<FString> FSdfLayerBase<PtrType>::GetCompositionAssetDependencies() const
+	{
+		TSet<FString> Results;
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			FScopedUsdAllocs UsdAllocs;
+			const std::set<std::string> AssetDependencies = Ptr->GetCompositionAssetDependencies();
+
+			Results.Reserve( AssetDependencies.size() );
+			for ( const std::string& AssetDependency : AssetDependencies )
+			{
+				Results.Add( ANSI_TO_TCHAR( AssetDependency.c_str() ) );
+			}
+		}
+#endif // #if USE_USD_SDK
+		return Results;
+	}
+
+	template<typename PtrType>
+	bool FSdfLayerBase<PtrType>::UpdateCompositionAssetDependency(
+			const TCHAR* OldAssetPath,
+			const TCHAR* NewAssetPath)
+	{
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			FScopedUsdAllocs UsdAllocs;
+			return Ptr->UpdateCompositionAssetDependency(
+				TCHAR_TO_ANSI( OldAssetPath ),
+				(NewAssetPath != nullptr) ? TCHAR_TO_ANSI( NewAssetPath ) : std::string() );
+		}
+#endif // #if USE_USD_SDK
+		return false;
+	}
+#endif // #if defined(PXR_VERSION) && PXR_VERSION >= 2111
 
 	template<typename PtrType>
 	FString FSdfLayerBase<PtrType>::GetRealPath() const
@@ -286,6 +381,20 @@ namespace UE
 		{
 			FScopedUsdAllocs UsdAllocs;
 			return FString( ANSI_TO_TCHAR( Ptr->GetDisplayName().c_str() ) );
+		}
+#endif // #if USE_USD_SDK
+
+		return FString();
+	}
+
+	template<typename PtrType>
+	FString FSdfLayerBase<PtrType>::ComputeAbsolutePath( const FString& AssetPath ) const
+	{
+#if USE_USD_SDK
+		if ( const PtrType& Ptr = Impl->GetInner() )
+		{
+			FScopedUsdAllocs UsdAllocs;
+			return FString( ANSI_TO_TCHAR( Ptr->ComputeAbsolutePath( TCHAR_TO_ANSI( *AssetPath ) ).c_str() ) );
 		}
 #endif // #if USE_USD_SDK
 

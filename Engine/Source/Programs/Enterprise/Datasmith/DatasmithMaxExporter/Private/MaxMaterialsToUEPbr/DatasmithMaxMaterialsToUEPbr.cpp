@@ -11,6 +11,8 @@
 #include "MaxMaterialsToUEPbr/DatasmithMaxCoronaMaterialsToUEPbr.h"
 #include "MaxMaterialsToUEPbr/DatasmithMaxScanlineMaterialsToUEPbr.h"
 #include "MaxMaterialsToUEPbr/DatasmithMaxVrayMaterialsToUEPbr.h"
+#include "MaxMaterialsToUEPbr/DatasmithMaxPhysicalMaterialToUEPbr.h"
+#include "MaxMaterialsToUEPbr/DatasmithMaxMentalMaterialToUEPbr.h"
 
 
 FDatasmithMaxMaterialsToUEPbr* FDatasmithMaxMaterialsToUEPbrManager::GetMaterialConverter( Mtl* Material )
@@ -43,6 +45,12 @@ FDatasmithMaxMaterialsToUEPbr* FDatasmithMaxMaterialsToUEPbrManager::GetMaterial
 		static FDatasmithMaxVRayBlendMaterialToUEPbr VrayBlendConverter = FDatasmithMaxVRayBlendMaterialToUEPbr();
 		MaterialConverter = &VrayBlendConverter;
 	}
+	else if ( MaterialClassID == VRAYLIGHTMATCLASS )
+	{
+		static FDatasmithMaxVRayLightMaterialToUEPbr CoronaConverter = FDatasmithMaxVRayLightMaterialToUEPbr();
+		MaterialConverter = &CoronaConverter;
+	}
+	
 	else if ( MaterialClassID == STANDARDMATCLASS )
 	{
 		static FDatasmithMaxScanlineMaterialsToUEPbr ScanlineConverter = FDatasmithMaxScanlineMaterialsToUEPbr();
@@ -63,15 +71,31 @@ FDatasmithMaxMaterialsToUEPbr* FDatasmithMaxMaterialsToUEPbrManager::GetMaterial
 		static FDatasmithMaxCoronaBlendMaterialToUEPbr CoronaConverter = FDatasmithMaxCoronaBlendMaterialToUEPbr();
 		MaterialConverter = &CoronaConverter;
 	}
+	else if ( MaterialClassID == CORONALIGHTMATCLASS )
+	{
+		static FDatasmithMaxCoronaLightMaterialToUEPbr CoronaConverter = FDatasmithMaxCoronaLightMaterialToUEPbr();
+		MaterialConverter = &CoronaConverter;
+	}
+	else if (MaterialClassID == PHYSICALMATCLASS)
+	{
+		static FDatasmithMaxPhysicalMaterialToUEPbr PhysicalConverter = FDatasmithMaxPhysicalMaterialToUEPbr();
+		MaterialConverter = &PhysicalConverter;
+	}
+	else if (MaterialClassID == ARCHDESIGNMATCLASS)
+	{
+		static FDatasmithMaxMentalMaterialToUEPbr PhysicalConverter = FDatasmithMaxMentalMaterialToUEPbr();
+		MaterialConverter = &PhysicalConverter;
+	}
+	else if (MaterialClassID == XREFMATCLASS)
+	{
+		MaterialConverter = GetMaterialConverter(FDatasmithMaxMatHelper::GetRenderedXRefMaterial(Material));
+	}
 
 	if ( MaterialConverter && MaterialConverter->IsSupported( Material ) )
 	{
 		return MaterialConverter;
 	}
-	else
-	{
-		return nullptr;
-	}
+	return nullptr;
 }
 
 FDatasmithMaxMaterialsToUEPbr::FDatasmithMaxMaterialsToUEPbr()

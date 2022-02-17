@@ -26,7 +26,7 @@ namespace HordeServer.Controllers
 	[ApiController]
 	[Authorize]
 	[Route("[controller]")]
-	public class StreamsController : ControllerBase
+	public class StreamsController : HordeControllerBase
 	{
 		private readonly AclService AclService;
 		private readonly ProjectService ProjectService;
@@ -89,23 +89,20 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/streams/{StreamId}")]
 		[ProducesResponseType(typeof(GetStreamResponse), 200)]
-		public async Task<ActionResult<object>> GetStreamAsync(string StreamId, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<object>> GetStreamAsync(StreamId StreamId, [FromQuery] PropertyFilter? Filter = null)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 
 			ProjectPermissionsCache PermissionsCache = new ProjectPermissionsCache();
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.ViewStream, User, PermissionsCache))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewStream, StreamId);
 			}
 
-			bool bIncludeAcl = await StreamService.AuthorizeAsync(Stream, AclAction.ViewPermissions, User, PermissionsCache);
 			return PropertyFilter.Apply(await CreateGetStreamResponse(Stream, PermissionsCache), Filter);
 		}
 
@@ -148,24 +145,22 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/streams/{StreamId}/changes")]
 		[ProducesResponseType(typeof(List<GetChangeSummaryResponse>), 200)]
-		public async Task<ActionResult<List<object>>> GetChangesAsync(string StreamId, [FromQuery] int? Min = null, [FromQuery] int? Max = null, [FromQuery] int Results = 50, PropertyFilter? Filter = null)
+		public async Task<ActionResult<List<object>>> GetChangesAsync(StreamId StreamId, [FromQuery] int? Min = null, [FromQuery] int? Max = null, [FromQuery] int Results = 50, PropertyFilter? Filter = null)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.ViewChanges, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewChanges, StreamId);
 			}
 
 			string? PerforceUser = User.GetPerforceUser();
 			if(PerforceUser == null)
 			{
-				return Forbid();
+				return BadRequest("Current user does not have an associated Perforce user");
 			}
 
 			List<ChangeSummary> Commits = await PerforceService.GetChangesAsync(Stream.ClusterName, Stream.Name, Min, Max, Results, PerforceUser);
@@ -182,36 +177,34 @@ namespace HordeServer.Controllers
 		/// Gets a list of changes for a stream
 		/// </summary>
 		/// <param name="StreamId">The stream id</param>
-		/// <param name="Number">The changelist number</param>
+		/// <param name="ChangeNumber">The changelist number</param>
 		/// <param name="Filter">The filter to apply to the results</param>
 		/// <returns>Http result code</returns>
 		[HttpGet]
-		[Route("/api/v1/streams/{StreamId}/changes/{Number}")]
+		[Route("/api/v1/streams/{StreamId}/changes/{ChangeNumber}")]
 		[ProducesResponseType(typeof(GetChangeDetailsResponse), 200)]
-		public async Task<ActionResult<object>> GetChangeDetailsAsync(string StreamId, int Number, PropertyFilter? Filter = null)
+		public async Task<ActionResult<object>> GetChangeDetailsAsync(StreamId StreamId, int ChangeNumber, PropertyFilter? Filter = null)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.ViewChanges, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewChanges, StreamId);
 			}
 
 			string? PerforceUser = User.GetPerforceUser();
 			if(PerforceUser == null)
 			{
-				return Forbid();
+				return BadRequest("Current user does not have an associated Perforce user");
 			}
 
-			ChangeDetails? ChangeDetails = await PerforceService.GetChangeDetailsAsync(Stream.ClusterName, Stream.Name, Number, PerforceUser);
+			ChangeDetails? ChangeDetails = await PerforceService.GetChangeDetailsAsync(Stream.ClusterName, Stream.Name, ChangeNumber, PerforceUser);
 			if(ChangeDetails == null)
 			{
-				return NotFound();
+				return NotFound("CL {Change} not found in stream {StreamId}", ChangeNumber, StreamId);
 			}
 
 			return PropertyFilter.Apply(new GetChangeDetailsResponse(ChangeDetails), Filter);
@@ -230,23 +223,21 @@ namespace HordeServer.Controllers
 		[HttpGet]
 		[Route("/api/v1/streams/{StreamId}/history")]
 		[ProducesResponseType(typeof(List<GetJobStepRefResponse>), 200)]
-		public async Task<ActionResult<List<object>>> GetStepHistoryAsync(string StreamId, [FromQuery] string TemplateId, [FromQuery] string Step, [FromQuery] int? Change = null, [FromQuery] int Count = 10, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<List<object>>> GetStepHistoryAsync(StreamId StreamId, [FromQuery] string TemplateId, [FromQuery] string Step, [FromQuery] int? Change = null, [FromQuery] int Count = 10, [FromQuery] PropertyFilter? Filter = null)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.ViewJob, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewJob, StreamId);
 			}
 
 			TemplateRefId TemplateIdValue = new TemplateRefId(TemplateId);
 
-			List<IJobStepRef> Steps = await JobStepRefCollection.GetStepsForNodeAsync(StreamIdValue, TemplateIdValue, Step, Change, true, Count);
+			List<IJobStepRef> Steps = await JobStepRefCollection.GetStepsForNodeAsync(StreamId, TemplateIdValue, Step, Change, true, Count);
 			return Steps.ConvertAll(x => PropertyFilter.Apply(new GetJobStepRefResponse(x), Filter));
 		}
 
@@ -257,136 +248,48 @@ namespace HordeServer.Controllers
 		/// <returns>Http result code</returns>
 		[HttpDelete]
 		[Route("/api/v1/streams/{StreamId}")]
-		public async Task<ActionResult> DeleteStreamAsync(string StreamId)
+		public async Task<ActionResult> DeleteStreamAsync(StreamId StreamId)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, AclAction.DeleteStream, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.DeleteStream, StreamId);
 			}
 
-			await StreamService.DeleteStreamAsync(StreamIdValue);
+			await StreamService.DeleteStreamAsync(StreamId);
 			return new OkResult();
-		}
-
-		/// <summary>
-		/// Validates that the user is allowed to specify the given template refs
-		/// </summary>
-		/// <param name="Requests">List of template refs</param>
-		/// <param name="OutResult">On failure, receives information about the missing claim</param>
-		/// <returns>True if the refs are valid, false otherwise</returns>
-		bool TryAuthorizeTemplateClaims(List<CreateTemplateRefRequest>? Requests, [NotNullWhen(false)] out ActionResult? OutResult)
-		{
-			if (Requests != null)
-			{
-				foreach (CreateTemplateRefRequest Request in Requests)
-				{
-					if (Request.Schedule != null && Request.Schedule.Claims != null)
-					{
-						foreach (CreateAclClaimRequest Claim in Request.Schedule.Claims)
-						{
-							if (!User.HasClaim(Claim.Type, Claim.Value))
-							{
-								OutResult = BadRequest("User does not have the {Claim.Type}: {Claim.Value} claim");
-								return false;
-							}
-						}
-					}
-				}
-			}
-
-			OutResult = null;
-			return true;
-		}
-
-		/// <summary>
-		/// Creates a list of template refs from a set of request objects
-		/// </summary>
-		/// <param name="Requests">Request objects</param>
-		/// <param name="Stream">The current stream state</param>
-		/// <param name="TemplateCollection">The template service</param>
-		/// <returns>List of new template references</returns>
-		static async Task<Dictionary<TemplateRefId, TemplateRef>> CreateTemplateRefs(List<CreateTemplateRefRequest> Requests, IStream? Stream, ITemplateCollection TemplateCollection)
-		{
-			Dictionary<TemplateRefId, TemplateRef> NewTemplateRefs = new Dictionary<TemplateRefId, TemplateRef>();
-			foreach (CreateTemplateRefRequest Request in Requests)
-			{
-				// Create the template
-				ITemplate NewTemplate = await TemplateCollection.AddAsync(Request.Name, Request.Priority, Request.AllowPreflights, Request.InitialAgentType, Request.SubmitNewChange, Request.Arguments, Request.Parameters.ConvertAll(x => x.ToModel()));
-
-				// Get an identifier for the new template ref
-				TemplateRefId NewTemplateRefId;
-				if (Request.Id != null)
-				{
-					NewTemplateRefId = new TemplateRefId(Request.Id);
-				}
-				else
-				{
-					NewTemplateRefId = TemplateRefId.Sanitize(Request.Name);
-				}
-
-				// Add it to the list
-				TemplateRef NewTemplateRef = new TemplateRef(NewTemplate, Request.ShowUgsBadges, Request.ShowUgsAlerts, Request.NotificationChannel, Request.NotificationChannelFilter, Request.TriageChannel, Request.Schedule?.ToModel(), Request.ChainedJobs?.ConvertAll(x => new ChainedJobTemplate(x)), Acl.Merge(null, Request.Acl));
-				if (Stream != null && Stream.Templates.TryGetValue(NewTemplateRefId, out TemplateRef? OldTemplateRef))
-				{
-					if (OldTemplateRef.Schedule != null && NewTemplateRef.Schedule != null)
-					{
-						NewTemplateRef.Schedule.CopyState(OldTemplateRef.Schedule);
-					}
-				}
-				NewTemplateRefs.Add(NewTemplateRefId, NewTemplateRef);
-			}
-			foreach (TemplateRef TemplateRef in NewTemplateRefs.Values)
-			{
-				if (TemplateRef.ChainedJobs != null)
-				{
-					foreach (ChainedJobTemplate ChainedJob in TemplateRef.ChainedJobs)
-					{
-						if (!NewTemplateRefs.ContainsKey(ChainedJob.TemplateRefId))
-						{
-							throw new InvalidDataException($"Invalid template ref id '{ChainedJob.TemplateRefId}");
-						}
-					}
-				}
-			}
-			return NewTemplateRefs;
 		}
 
 		/// <summary>
 		/// Gets all the templates for a stream
 		/// </summary>
 		/// <param name="StreamId">Unique id of the stream to query</param>
-		/// <param name="TemplateRefId">Unique id of the template to query</param>
+		/// <param name="TemplateId">Unique id of the template to query</param>
 		/// <param name="Filter">Filter for properties to return</param>
 		/// <returns>Information about all the templates</returns>
 		[HttpGet]
-		[Route("/api/v1/streams/{StreamId}/templates/{TemplateRefId}")]
+		[Route("/api/v1/streams/{StreamId}/templates/{TemplateId}")]
 		[ProducesResponseType(typeof(List<GetTemplateResponse>), 200)]
-		public async Task<ActionResult<object>> GetTemplateAsync(string StreamId, string TemplateRefId, [FromQuery] PropertyFilter? Filter = null)
+		public async Task<ActionResult<object>> GetTemplateAsync(StreamId StreamId, TemplateRefId TemplateId, [FromQuery] PropertyFilter? Filter = null)
 		{
-			StreamId StreamIdValue = new StreamId(StreamId);
-			TemplateRefId TemplateRefIdValue = new TemplateRefId(TemplateRefId);
-
-			IStream? Stream = await StreamService.GetStreamAsync(StreamIdValue);
+			IStream? Stream = await StreamService.GetStreamAsync(StreamId);
 			if (Stream == null)
 			{
-				return NotFound();
+				return NotFound(StreamId);
 			}
 
 			TemplateRef? TemplateRef;
-			if (!Stream.Templates.TryGetValue(TemplateRefIdValue, out TemplateRef))
+			if (!Stream.Templates.TryGetValue(TemplateId, out TemplateRef))
 			{
-				return NotFound();
+				return NotFound(StreamId, TemplateId);
 			}
 			if (!await StreamService.AuthorizeAsync(Stream, TemplateRef, AclAction.ViewTemplate, User, null))
 			{
-				return Forbid();
+				return Forbid(AclAction.ViewTemplate, StreamId);
 			}
 
 			ITemplate? Template = await TemplateCollection.GetAsync(TemplateRef.Hash);

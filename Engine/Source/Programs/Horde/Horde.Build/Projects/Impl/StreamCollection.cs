@@ -172,7 +172,7 @@ namespace HordeServer.Collections.Impl
 			foreach (CreateTemplateRefRequest Request in Requests)
 			{
 				// Create the template
-				ITemplate NewTemplate = await TemplateCollection.AddAsync(Request.Name, Request.Priority, Request.AllowPreflights, Request.InitialAgentType, Request.SubmitNewChange, Request.Arguments, Request.Parameters.ConvertAll(x => x.ToModel()));
+				ITemplate NewTemplate = await TemplateCollection.AddAsync(Request.Name, Request.Priority, Request.AllowPreflights, Request.UpdateIssues, Request.InitialAgentType, Request.SubmitNewChange, Request.SubmitDescription, Request.Arguments, Request.Parameters.ConvertAll(x => x.ToModel()));
 
 				// Get an identifier for the new template ref
 				TemplateRefId NewTemplateRefId;
@@ -189,8 +189,7 @@ namespace HordeServer.Collections.Impl
 				Schedule? Schedule = null;
 				if (Request.Schedule != null)
 				{
-					Schedule = Request.Schedule.ToModel();
-					Schedule.LastTriggerTime = Clock.UtcNow;
+					Schedule = Request.Schedule.ToModel(Clock.UtcNow);
 				}
 
 				// Add it to the list
@@ -330,28 +329,28 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<IStream?> TryUpdateScheduleTriggerAsync(IStream StreamInterface, TemplateRefId TemplateRefId, DateTimeOffset? LastTriggerTime, int? LastTriggerChange, List<JobId> NewActiveJobs)
+		public async Task<IStream?> TryUpdateScheduleTriggerAsync(IStream StreamInterface, TemplateRefId TemplateId, DateTime? LastTriggerTimeUtc, int? LastTriggerChange, List<JobId> NewActiveJobs)
 		{
 			StreamDocument Stream = (StreamDocument)StreamInterface;
-			Schedule Schedule = Stream.Templates[TemplateRefId].Schedule!;
+			Schedule Schedule = Stream.Templates[TemplateId].Schedule!;
 
 			// Build the updates. MongoDB driver cannot parse TemplateRefId in expression tree; need to specify field name explicitly
 			List<UpdateDefinition<StreamDocument>> Updates = new List<UpdateDefinition<StreamDocument>>();
-			if (LastTriggerTime.HasValue && LastTriggerTime.Value != Schedule.LastTriggerTime)
+			if (LastTriggerTimeUtc.HasValue && LastTriggerTimeUtc.Value != Schedule.LastTriggerTime)
 			{
-				FieldDefinition<StreamDocument, DateTimeOffset> LastTriggerTimeField = $"{nameof(Stream.Templates)}.{TemplateRefId}.{nameof(Schedule)}.{nameof(Schedule.LastTriggerTime)}";
-				Updates.Add(Builders<StreamDocument>.Update.Set(LastTriggerTimeField, LastTriggerTime.Value));
-				Schedule.LastTriggerTime = LastTriggerTime.Value;
+				FieldDefinition<StreamDocument, DateTimeOffset> LastTriggerTimeField = $"{nameof(Stream.Templates)}.{TemplateId}.{nameof(Schedule)}.{nameof(Schedule.LastTriggerTime)}";
+				Updates.Add(Builders<StreamDocument>.Update.Set(LastTriggerTimeField, LastTriggerTimeUtc.Value));
+				Schedule.LastTriggerTimeUtc = LastTriggerTimeUtc.Value;
 			}
 			if (LastTriggerChange.HasValue && LastTriggerChange.Value > Schedule.LastTriggerChange)
 			{
-				FieldDefinition<StreamDocument, int> LastTriggerChangeField = $"{nameof(Stream.Templates)}.{TemplateRefId}.{nameof(Schedule)}.{nameof(Schedule.LastTriggerChange)}";
+				FieldDefinition<StreamDocument, int> LastTriggerChangeField = $"{nameof(Stream.Templates)}.{TemplateId}.{nameof(Schedule)}.{nameof(Schedule.LastTriggerChange)}";
 				Updates.Add(Builders<StreamDocument>.Update.Set(LastTriggerChangeField, LastTriggerChange.Value));
 				Schedule.LastTriggerChange = LastTriggerChange.Value;
 			}
 			if (NewActiveJobs != null)
 			{
-				FieldDefinition<StreamDocument, List<JobId>> Field = $"{nameof(Stream.Templates)}.{TemplateRefId}.{nameof(Schedule)}.{nameof(Schedule.ActiveJobs)}";
+				FieldDefinition<StreamDocument, List<JobId>> Field = $"{nameof(Stream.Templates)}.{TemplateId}.{nameof(Schedule)}.{nameof(Schedule.ActiveJobs)}";
 				Updates.Add(Builders<StreamDocument>.Update.Set(Field, NewActiveJobs));
 				Schedule.ActiveJobs = NewActiveJobs;
 			}

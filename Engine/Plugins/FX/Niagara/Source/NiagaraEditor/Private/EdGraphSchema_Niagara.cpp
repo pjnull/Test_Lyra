@@ -632,7 +632,7 @@ TArray<TSharedPtr<FNiagaraAction_NewNode>> UEdGraphSchema_Niagara::GetGraphActio
 							{
 								bAddMake = true;
 								break;
-						}
+							}
 						}
 					}
 					else

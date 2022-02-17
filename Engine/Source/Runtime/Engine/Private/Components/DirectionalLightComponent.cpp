@@ -388,7 +388,9 @@ public:
 		LightParameters.SourceRadius = FMath::Sin( 0.5f * FMath::DegreesToRadians( LightSourceAngle ) );
 		LightParameters.SoftSourceRadius = FMath::Sin( 0.5f * FMath::DegreesToRadians( LightSourceSoftAngle ) );
 		LightParameters.SourceLength = 0.0f;
-		LightParameters.SourceTexture = GWhiteTexture->TextureRHI;
+		LightParameters.RectLightAtlasUVOffset = FVector2f::ZeroVector;
+		LightParameters.RectLightAtlasUVScale = FVector2f::ZeroVector;
+		LightParameters.RectLightAtlasMaxLevel = FLightRenderParameters::GetRectLightAtlasInvalidMIPLevel();
 	}
 
 	virtual float GetLightSourceAngle() const override
@@ -976,6 +978,7 @@ UDirectionalLightComponent::UDirectionalLightComponent(const FObjectInitializer&
 	WholeSceneDynamicShadowRadius_DEPRECATED = 20000.0f;
 	DynamicShadowDistanceStationaryLight = 0.f;
 
+	ForwardShadingPriority = 0;
 	// For 5.0 double dynamic shadow distance by default & enable DF shadows.
 	// Note, we reset this to old defaults in Serialize for lights created with older versions of the engine.
 	DynamicShadowDistanceMovableLight = 40000.0f;

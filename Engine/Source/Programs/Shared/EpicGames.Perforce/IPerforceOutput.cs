@@ -52,6 +52,7 @@ namespace EpicGames.Perforce
 			public static Utf8String Stat = "stat";
 			public static Utf8String Info = "info";
 			public static Utf8String Error = "error";
+			public static Utf8String Io = "io";
 		}
 
 		/// <summary>
@@ -78,11 +79,11 @@ namespace EpicGames.Perforce
 					{
 						if (Data[Idx] == '\t')
 						{
-							Result.Append("\t");
+							Result.Append('\t');
 						}
 						else if (Data[Idx] == '\\')
 						{
-							Result.Append("\\");
+							Result.Append('\\');
 						}
 						else if (Data[Idx] >= 0x20 && Data[Idx] <= 0x7f)
 						{
@@ -228,9 +229,8 @@ namespace EpicGames.Perforce
 			List<PerforceResponse> Responses = new List<PerforceResponse>();
 
 			// Read all the records into a list
-			long ParsedLen = 0;
-			long MaxParsedLen = 0;
-			while (await Perforce.ReadAsync(CancellationToken))
+			long MaxParsedLen;
+			for(; ;)
 			{
 				// Check for the whole message not being a marshalled python object, and produce a better response in that scenario
 				ReadOnlyMemory<byte> Data = Perforce.Data;
@@ -239,6 +239,9 @@ namespace EpicGames.Perforce
 					throw new PerforceException("Unexpected response from server (expected '{'):{0}", FormatDataAsString(Data.Span));
 				}
 
+				// Reset the max parsed length. This will be measured against the current buffer position.
+				MaxParsedLen = 0;
+
 				// Parse the responses from the current buffer
 				int BufferPos = 0;
 				for (; ; )
@@ -246,7 +249,7 @@ namespace EpicGames.Perforce
 					int NewBufferPos = BufferPos;
 					if (!TryReadResponse(Data, ref NewBufferPos, StatRecordInfo, out PerforceResponse? Response))
 					{
-						MaxParsedLen = ParsedLen + NewBufferPos;
+						MaxParsedLen = NewBufferPos;
 						break;
 					}
 					if (Response.Error == null || Response.Error.Generic != PerforceGenericCode.Empty)
@@ -258,17 +261,22 @@ namespace EpicGames.Perforce
 
 				// Discard all the data that we've processed
 				Perforce.Discard(BufferPos);
-				ParsedLen += BufferPos;
+				MaxParsedLen -= BufferPos;
+
+				// Try to read more data into the buffer
+				if (!await Perforce.ReadAsync(CancellationToken))
+				{
+					break;
+				}
 			}
 
 			// If the stream is complete but we couldn't parse a response from the server, treat it as an error
 			if (Perforce.Data.Length > 0)
 			{
-				long DumpOffset = Math.Max(MaxParsedLen - 32, ParsedLen);
-				int SliceOffset = (int)(DumpOffset - ParsedLen);
+				int SliceOffset = (int)Math.Max(MaxParsedLen - 32, 0);
 				string StrDump = FormatDataAsString(Perforce.Data.Span.Slice(SliceOffset));
 				string HexDump = FormatDataAsHexDump(Perforce.Data.Span.Slice(SliceOffset, Math.Min(1024, Perforce.Data.Length - SliceOffset)));
-				throw new PerforceException("Unparsable data at offset {0}+{1}/{2}.\nString data from offset {3}:{4}\nHex data from offset {3}:{5}", ParsedLen, MaxParsedLen - ParsedLen, ParsedLen + Perforce.Data.Length, DumpOffset, StrDump, HexDump);
+				throw new PerforceException("Unparsable data at offset {0}.\nString data from offset {1}:{2}\nHex data from offset {1}:{3}", MaxParsedLen, SliceOffset, StrDump, HexDump);
 			}
 
 			return Responses;
@@ -284,9 +292,6 @@ namespace EpicGames.Perforce
 		public static async Task ReadRecordsAsync(this IPerforceOutput Perforce, Action<PerforceRecord> HandleRecord, CancellationToken CancellationToken)
 		{
 			PerforceRecord Record = new PerforceRecord();
-			Record.Rows = new List<KeyValuePair<Utf8String, PerforceValue>>();
-
-			// Read all the records into a list
 			while (await Perforce.ReadAsync(CancellationToken))
 			{
 				// Start a read to add more data
@@ -297,7 +302,7 @@ namespace EpicGames.Perforce
 				for (; ; )
 				{
 					int InitialBufferPos = BufferPos;
-					if (!ReadRecord(Data, ref BufferPos, Record.Rows))
+					if (!ParseRecord(Data, ref BufferPos, Record.Rows))
 					{
 						BufferPos = InitialBufferPos;
 						break;
@@ -321,7 +326,8 @@ namespace EpicGames.Perforce
 		/// <param name="BufferPos">Current read position within the buffer</param>
 		/// <param name="Rows">List of rows to read into</param>
 		/// <returns>True if a record could be read; false if more data is required</returns>
-		static bool ReadRecord(ReadOnlyMemory<byte> Buffer, ref int BufferPos, List<KeyValuePair<Utf8String, PerforceValue>> Rows)
+		[SuppressMessage("Design", "CA1045:Do not pass types by reference", Justification = "<Pending>")]
+		public static bool ParseRecord(ReadOnlyMemory<byte> Buffer, ref int BufferPos, List<KeyValuePair<Utf8String, PerforceValue>> Rows)
 		{
 			Rows.Clear();
 			ReadOnlySpan<byte> BufferSpan = Buffer.Span;
@@ -462,6 +468,14 @@ namespace EpicGames.Perforce
 					return false;
 				}
 			}
+			else if (Code == ReadOnlyUtf8StringConstants.Io)
+			{
+				if (!TryReadTypedRecord(Buffer, ref BufferPos, Utf8String.Empty, PerforceReflection.IoRecordInfo, out Record))
+				{
+					Response = null;
+					return false;
+				}
+			}
 			else
 			{
 				throw new PerforceException("Unknown return code for record: {0}", Code);
@@ -567,10 +581,10 @@ namespace EpicGames.Perforce
 					if (TagInfo != null)
 					{
 						// Get the list field
-						System.Collections.IList? List = (System.Collections.IList?)TagInfo.Field.GetValue(NewRecord);
+						System.Collections.IList? List = (System.Collections.IList?)TagInfo.Property.GetValue(NewRecord);
 						if (List == null)
 						{
-							throw new PerforceException($"Empty list for {TagInfo.Field.Name}");
+							throw new PerforceException($"Empty list for {TagInfo.Property.Name}");
 						}
 
 						// Check the suffix matches the index of the next element
@@ -586,16 +600,16 @@ namespace EpicGames.Perforce
 							return false;
 						}
 					}
-					else if (RecordInfo.SubElementField != null)
+					else if (RecordInfo.SubElementProperty != null)
 					{
 						// Move back to the start of this tag
 						BufferPos = StartBufferPos;
 
 						// Get the list field
-						System.Collections.IList? List = (System.Collections.IList?)RecordInfo.SubElementField.GetValue(NewRecord);
+						System.Collections.IList? List = (System.Collections.IList?)RecordInfo.SubElementProperty.GetValue(NewRecord);
 						if (List == null)
 						{
-							throw new PerforceException($"Invalid field for {RecordInfo.SubElementField.Name}");
+							throw new PerforceException($"Invalid field for {RecordInfo.SubElementProperty.Name}");
 						}
 
 						// Check the suffix matches the index of the next element

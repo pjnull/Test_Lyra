@@ -10,6 +10,7 @@ import UIKit
 import MetalKit
 import ARKit
 import Easing
+import GameController
 
 class VideoViewController : BaseViewController {
 
@@ -41,6 +42,32 @@ class VideoViewController : BaseViewController {
     
     var stats = Array<(Date,Int)>()
     var statsTimer : Timer?
+    
+    var gameControllerSnapshot : GCController?
+    weak var gameController : GCController? {
+        didSet {
+            if let gc = gameController {
+                //gc.extendedGamepad?.leftThumbstick.valueChangedHandler = self.directionalPadValueChanged
+                //gc.extendedGamepad?.rightThumbstick.valueChangedHandler = self.directionalPadValueChanged
+                gc.extendedGamepad?.dpad.up.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.dpad.down.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.dpad.left.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.dpad.right.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonA.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonB.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonX.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonY.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.leftShoulder.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.rightShoulder.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.leftTrigger.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.rightTrigger.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.leftThumbstickButton?.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.rightThumbstickButton?.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonOptions?.pressedChangedHandler = self.buttonValueChanged
+                gc.extendedGamepad?.buttonMenu.pressedChangedHandler = self.buttonValueChanged
+            }
+        }
+    }
     
     private var currentTouches = Array<UITouch?>()
     
@@ -593,6 +620,108 @@ class VideoViewController : BaseViewController {
 
         // save the actual animating value of the header view's Y position
         self.headerViewY = self.headerView.layer.presentation()?.frame.minY ?? 0
+    }
+    
+    func sendThumbstickUpdate(key : String, controller : Int, oldValue : Float?, newValue : Float) {
+
+        guard let osc = oscConnection else { return }
+
+        if (newValue != 0.0) || ((oldValue ?? 0.0) != newValue) {
+            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: key, controller: controller, value: newValue)) ])
+        }
+    }
+    
+    func sendControllerUpdate() {
+        
+        guard let _ = oscConnection else { return }
+        guard let gc = gameController else { return }
+        
+        let snapshot = gc.capture()
+        guard let gp = snapshot.extendedGamepad else { return }
+
+        let controllerIndex = gc.playerIndex.rawValue
+        
+        sendThumbstickUpdate(key: "Gamepad_LeftX", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.xAxis.value, newValue :gp.leftThumbstick.xAxis.value)
+        sendThumbstickUpdate(key: "Gamepad_LeftY", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.yAxis.value, newValue :gp.leftThumbstick.yAxis.value)
+        sendThumbstickUpdate(key: "Gamepad_RightX", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.xAxis.value, newValue :gp.rightThumbstick.xAxis.value)
+        sendThumbstickUpdate(key: "Gamepad_RightY", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.yAxis.value, newValue :gp.rightThumbstick.yAxis.value)
+        
+        self.gameControllerSnapshot = snapshot
+    }
+
+    func directionalPadValueChanged(directionalPad : GCControllerDirectionPad, xValue : Float, yValue : Float) {
+        guard let osc = oscConnection else { return }
+        guard let gc = gameController else { return }
+        guard let gp = gc.extendedGamepad else { return }
+
+        let controllerIndex = gc.playerIndex.rawValue
+        
+        switch directionalPad {
+        case gp.leftThumbstick:
+            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_LeftX", controller: controllerIndex, value: xValue)) ])
+            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_LeftY", controller: controllerIndex, value: yValue)) ])
+        case gp.rightThumbstick:
+            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_RightX", controller: controllerIndex, value: xValue)) ])
+            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_RightY", controller: controllerIndex, value: yValue)) ])
+        default:
+            Log.warning("directionalPadValueChanged() encounted unsupported '\(directionalPad.localizedName ?? "UNK")'")
+            break
+        }
+    }
+    
+    func buttonValueChanged(button : GCControllerButtonInput, value : Float, pressed : Bool) {
+
+        guard let osc = oscConnection else { return }
+        guard let gc = gameController else { return }
+        guard let gp = gc.extendedGamepad else { return }
+
+        let address = button.isPressed ? OSCAddressPattern.controllerButtonPressed : OSCAddressPattern.controllerButtonReleased
+        let controllerIndex = gc.playerIndex.rawValue
+        let isRepeat = false
+
+        switch button {
+        case gp.leftThumbstickButton:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftThumbstick", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.rightThumbstickButton:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightThumbstick", controller: controllerIndex, isRepeat: isRepeat)) ])
+
+        case gp.buttonA:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Bottom", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.buttonB:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.buttonX:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.buttonY:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Top", controller: controllerIndex, isRepeat: isRepeat)) ])
+
+        case gp.leftShoulder:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftShoulder", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.rightShoulder:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightShoulder", controller: controllerIndex, isRepeat: isRepeat)) ])
+
+        case gp.leftTrigger:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftTrigger", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.rightTrigger:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightTrigger", controller: controllerIndex, isRepeat: isRepeat)) ])
+
+        case gp.dpad.up:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Up", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.dpad.down:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Down", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.dpad.left:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.dpad.right:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
+            
+        case gp.buttonOptions:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_Special_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+        case gp.buttonMenu:
+            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_Special_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
+
+        default:
+            Log.warning("buttonValueChanged() encounted unsupported '\(button.localizedName ?? "UNK")'")
+        }
+
     }
 }
 

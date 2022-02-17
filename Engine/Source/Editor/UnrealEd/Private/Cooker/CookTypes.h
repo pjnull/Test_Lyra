@@ -5,8 +5,10 @@
 #include "Containers/Map.h"
 #include "Containers/Set.h"
 #include "Containers/UnrealString.h"
+#include "Cooker/CookProfiling.h"
 #include "CookOnTheSide/CookOnTheFlyServer.h" // ECookTickFlags
 #include "DerivedDataRequestOwner.h"
+#include "HAL/LowLevelMemTracker.h"
 #include "HAL/Platform.h"
 #include "Logging/TokenizedMessage.h"
 #include "Serialization/PackageWriter.h"
@@ -17,7 +19,7 @@
 class ITargetPlatform;
 namespace UE::DerivedData { class FBuildDefinition; }
 
-#define COOK_CHECKSLOW_PACKAGEDATA 1
+#define COOK_CHECKSLOW_PACKAGEDATA 0
 #define DEBUG_COOKONTHEFLY 0
 
 /** A BaseKeyFuncs for Maps and Sets with a quicker hash function for pointers than TDefaultMapKeyFuncs */
@@ -211,6 +213,18 @@ namespace UE::Cook
 	};
 }
 
+inline void RouteBeginCacheForCookedPlatformData(UObject* Obj, const ITargetPlatform* TargetPlatform)
+{
+	UE_SCOPED_TEXT_COOKTIMER(*WriteToString<128>(Obj->GetClass()->GetFName(), TEXT("_BeginCacheForCookedPlatformData")));
+	Obj->BeginCacheForCookedPlatformData(TargetPlatform);
+}
+
+inline bool RouteIsCachedCookedPlatformDataLoaded(UObject* Obj, const ITargetPlatform* TargetPlatform)
+{
+	UE_SCOPED_TEXT_COOKTIMER(*WriteToString<128>(Obj->GetClass()->GetFName(), TEXT("_IsCachedCookedPlatformDataLoaded")));
+	return Obj->IsCachedCookedPlatformDataLoaded(TargetPlatform);
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Cook by the book options
 
@@ -260,5 +274,7 @@ public:
 };
 
 void LogCookerMessage(const FString& MessageText, EMessageSeverity::Type Severity);
+LLM_DECLARE_TAG(Cooker);
+
 constexpr uint32 ExpectedMaxNumPlatforms = 32;
 #define REMAPPED_PLUGINS TEXT("RemappedPlugins")

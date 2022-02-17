@@ -25,6 +25,7 @@ using Moq.Contrib.HttpClient;
 using Newtonsoft.Json;
 using Serilog;
 using Logger = Serilog.Core.Logger;
+using EpicGames.Horde.Storage;
 
 namespace Horde.Storage.FunctionalTests.Replication
 {
@@ -34,7 +35,7 @@ namespace Horde.Storage.FunctionalTests.Replication
     {
         private static TestServer? _server;
         private static HttpClient? _httpClient;
-        protected IBlobStore _blobStore = null!;
+        protected IBlobService _blobStore = null!;
         protected IReferencesStore _referencesStore = null!;
         private IReplicationLog _replicationLog = null!;
 
@@ -65,7 +66,7 @@ namespace Horde.Storage.FunctionalTests.Replication
             _httpClient = server.CreateClient();
             _server = server;
 
-            _blobStore = _server.Services.GetService<IBlobStore>()!;
+            _blobStore = _server.Services.GetService<IBlobService>()!;
             _referencesStore = _server.Services.GetService<IReferencesStore>()!;
             _replicationLog = _server.Services.GetService<IReplicationLog>()!;
 
@@ -76,8 +77,8 @@ namespace Horde.Storage.FunctionalTests.Replication
         {
             return new[]
             {
-                new KeyValuePair<string, string>("Horde.Storage:ReferencesDbImplementation", HordeStorageSettings.ReferencesDbImplementations.Scylla.ToString()),
-                new KeyValuePair<string, string>("Horde.Storage:ReplicationLogWriterImplementation", HordeStorageSettings.ReplicationLogWriterImplementations.Scylla.ToString()),
+                new KeyValuePair<string, string>("Horde_Storage:ReferencesDbImplementation", HordeStorageSettings.ReferencesDbImplementations.Scylla.ToString()),
+                new KeyValuePair<string, string>("Horde_Storage:ReplicationLogWriterImplementation", HordeStorageSettings.ReplicationLogWriterImplementations.Scylla.ToString()),
             };
         }
 
@@ -123,7 +124,7 @@ namespace Horde.Storage.FunctionalTests.Replication
                 byte[] blobContents = Encoding.UTF8.GetBytes($"random content {i}");
                 BlobIdentifier blob = BlobIdentifier.FromBlob(blobContents);
                 blobs.Add(blob, blobContents);
-                replicationEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, new KeyId($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
+                replicationEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, IoHashKey.FromName($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
             }
             string lastBucket = "refs-000";
             Guid lastEvent = Guid.NewGuid();
@@ -180,7 +181,7 @@ namespace Horde.Storage.FunctionalTests.Replication
                 byte[] blobContents = Encoding.UTF8.GetBytes($"random content {i}");
                 BlobIdentifier blob = BlobIdentifier.FromBlob(blobContents);
                 blobs.Add(blob, blobContents);
-                replicationEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, new KeyId($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
+                replicationEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, IoHashKey.FromName($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
             }
 
             // Build snapshot
@@ -200,13 +201,13 @@ namespace Horde.Storage.FunctionalTests.Replication
             BlobIdentifier snapshotBlob = BlobIdentifier.FromBlob(snapshotContent);
 
             Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
-            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob)}));
+            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob, DateTime.Now)}));
             handler.SetupRequest($"http://localhost/api/v1/replication-log/snapshots/{TestNamespace}").ReturnsResponse(s, "application/json");
 
             // after processing a snapshot it will attempt to incrementally replicate from there, which should be empty
             handler.SetupRequest($"http://localhost/api/v1/replication-log/incremental/{TestNamespace}?lastBucket={replicationEvents.Last().TimeBucket}&lastEvent={replicationEvents.Last().EventId}").ReturnsResponse(JsonConvert.SerializeObject(new ReplicationLogEvents(new List<ReplicationLogEvent>())), "application/json");
 
-            handler.SetupRequest($"http://localhost/api/v1/blobs/{TestNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
+            handler.SetupRequest($"http://localhost/api/v1/blobs/{SnapshotNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
 
             foreach (BlobIdentifier blob in blobs.Keys)
             {
@@ -257,7 +258,7 @@ namespace Horde.Storage.FunctionalTests.Replication
                 byte[] blobContents = Encoding.UTF8.GetBytes($"random content in snapshot {i}");
                 BlobIdentifier blob = BlobIdentifier.FromBlob(blobContents);
                 blobs.Add(blob, blobContents);
-                snapshotEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, new KeyId($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
+                snapshotEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket,IoHashKey.FromName($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
             }
 
             for (int i = 0; i < countOfTestEvents; i++)
@@ -265,7 +266,7 @@ namespace Horde.Storage.FunctionalTests.Replication
                 byte[] blobContents = Encoding.UTF8.GetBytes($"random content {i}");
                 BlobIdentifier blob = BlobIdentifier.FromBlob(blobContents);
                 blobs.Add(blob, blobContents);
-                incrementalEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, new KeyId($"incremental-event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
+                incrementalEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, IoHashKey.FromName($"incremental-event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
             }
             
             // Build snapshot
@@ -285,7 +286,7 @@ namespace Horde.Storage.FunctionalTests.Replication
             BlobIdentifier snapshotBlob = BlobIdentifier.FromBlob(snapshotContent);
 
             Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
-            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob)}));
+            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob, DateTime.Now)}));
             handler.SetupRequest($"http://localhost/api/v1/replication-log/snapshots/{TestNamespace}").ReturnsResponse(s, "application/json");
 
             // when the snapshot has been processed we have a set of incremental events as well
@@ -294,7 +295,7 @@ namespace Horde.Storage.FunctionalTests.Replication
             // after processing the incremental events there is nothing more to find
             handler.SetupRequest($"http://localhost/api/v1/replication-log/incremental/{TestNamespace}?lastBucket={incrementalEvents.Last().TimeBucket}&lastEvent={incrementalEvents.Last().EventId}").ReturnsResponse(JsonConvert.SerializeObject(new ReplicationLogEvents(new List<ReplicationLogEvent>())), "application/json");
 
-            handler.SetupRequest($"http://localhost/api/v1/blobs/{TestNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
+            handler.SetupRequest($"http://localhost/api/v1/blobs/{SnapshotNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
 
             foreach (BlobIdentifier blob in blobs.Keys)
             {
@@ -345,7 +346,7 @@ namespace Horde.Storage.FunctionalTests.Replication
                 byte[] blobContents = Encoding.UTF8.GetBytes($"random content in snapshot {i}");
                 BlobIdentifier blob = BlobIdentifier.FromBlob(blobContents);
                 blobs.Add(blob, blobContents);
-                snapshotEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, new KeyId($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
+                snapshotEvents.Add(new ReplicationLogEvent(TestNamespace, TestBucket, IoHashKey.FromName($"event-{i}"), blob, Guid.NewGuid(), "refs-000", DateTime.Now, ReplicationLogEvent.OpType.Added));
             }
 
             // Build snapshot
@@ -368,7 +369,7 @@ namespace Horde.Storage.FunctionalTests.Replication
             Guid missingId = Guid.NewGuid();
 
             Mock<HttpMessageHandler> handler = new Mock<HttpMessageHandler>();
-            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob)}));
+            string s = JsonConvert.SerializeObject(new ReplicationLogSnapshots(new List<SnapshotInfo>{new SnapshotInfo(TestNamespace, SnapshotNamespace, snapshotBlob, DateTime.Now)}));
             handler.SetupRequest($"http://localhost/api/v1/replication-log/snapshots/{TestNamespace}").ReturnsResponse(s, "application/json");
 
             // mock a error being generated due to the lastBucket/event being to old
@@ -383,7 +384,7 @@ namespace Horde.Storage.FunctionalTests.Replication
             // after processing the snapshot we do not replicate anything more
             handler.SetupRequest($"http://localhost/api/v1/replication-log/incremental/{TestNamespace}?lastBucket={snapshotEvents.Last().TimeBucket}&lastEvent={snapshotEvents.Last().EventId}").ReturnsResponse(JsonConvert.SerializeObject(new ReplicationLogEvents(new List<ReplicationLogEvent>())), "application/json");
 
-            handler.SetupRequest($"http://localhost/api/v1/blobs/{TestNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
+            handler.SetupRequest($"http://localhost/api/v1/blobs/{SnapshotNamespace}/{snapshotBlob}").ReturnsResponse(snapshotContent, "application/octet-stream").Verifiable();
 
             foreach (BlobIdentifier blob in blobs.Keys)
             {

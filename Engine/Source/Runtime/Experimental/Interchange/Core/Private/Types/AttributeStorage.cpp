@@ -18,8 +18,6 @@ namespace UE
 			{
 				case EAttributeTypes::None: { AttributeTypeString = TEXT("None"); } break;
 				case EAttributeTypes::Bool: { AttributeTypeString = TEXT("Bool"); } break;
-				case EAttributeTypes::Box: { AttributeTypeString = TEXT("Box"); } break;
-				case EAttributeTypes::BoxSphereBounds: { AttributeTypeString = TEXT("BoxSphereBounds"); } break;
 				case EAttributeTypes::ByteArray: { AttributeTypeString = TEXT("ByteArray"); } break;
 				case EAttributeTypes::ByteArray64: { AttributeTypeString = TEXT("ByteArray64"); } break;
 				case EAttributeTypes::Color: { AttributeTypeString = TEXT("Color"); } break;
@@ -34,37 +32,48 @@ namespace UE
 				case EAttributeTypes::Int64: { AttributeTypeString = TEXT("Int64"); } break;
 				case EAttributeTypes::IntRect: { AttributeTypeString = TEXT("IntRect"); } break;
 				case EAttributeTypes::LinearColor: { AttributeTypeString = TEXT("LinearColor"); } break;
-				case EAttributeTypes::Matrix: { AttributeTypeString = TEXT("Matrix"); } break;
 				case EAttributeTypes::Name: { AttributeTypeString = TEXT("Name"); } break;
-				case EAttributeTypes::Plane: { AttributeTypeString = TEXT("Plane"); } break;
-				case EAttributeTypes::Quat: { AttributeTypeString = TEXT("Quat"); } break;
 				case EAttributeTypes::RandomStream: { AttributeTypeString = TEXT("RandomStream"); } break;
-				case EAttributeTypes::Rotator: { AttributeTypeString = TEXT("Rotator"); } break;
 				case EAttributeTypes::String: { AttributeTypeString = TEXT("String"); } break;
 				case EAttributeTypes::Timespan: { AttributeTypeString = TEXT("Timespan"); } break;
-				case EAttributeTypes::Transform: { AttributeTypeString = TEXT("Transform"); } break;
 				case EAttributeTypes::TwoVectors: { AttributeTypeString = TEXT("TwoVectors"); } break;
 				case EAttributeTypes::UInt8: { AttributeTypeString = TEXT("UInt8"); } break;
 				case EAttributeTypes::UInt16: { AttributeTypeString = TEXT("UInt16"); } break;
 				case EAttributeTypes::UInt32: { AttributeTypeString = TEXT("UInt32"); } break;
 				case EAttributeTypes::UInt64: { AttributeTypeString = TEXT("UInt64"); } break;
-				case EAttributeTypes::Vector: { AttributeTypeString = TEXT("Vector"); } break;
 				case EAttributeTypes::Vector2d: { AttributeTypeString = TEXT("Vector2d"); } break;
-				case EAttributeTypes::Vector4: { AttributeTypeString = TEXT("Vector4"); } break;
 				case EAttributeTypes::IntPoint: { AttributeTypeString = TEXT("IntPoint"); } break;
 				case EAttributeTypes::IntVector: { AttributeTypeString = TEXT("IntVector"); } break;
-				case EAttributeTypes::NetworkGUID: { AttributeTypeString = TEXT("NetworkGUID"); } break;
 				case EAttributeTypes::Vector2DHalf: { AttributeTypeString = TEXT("Vector2DHalf"); } break;
 				case EAttributeTypes::Float16: { AttributeTypeString = TEXT("Float16"); } break;
-				case EAttributeTypes::CapsuleShape: { AttributeTypeString = TEXT("CapsuleShape"); } break;
-				case EAttributeTypes::DualQuat: { AttributeTypeString = TEXT("DualQuat"); } break;
 				case EAttributeTypes::OrientedBox: { AttributeTypeString = TEXT("OrientedBox"); } break;
-				case EAttributeTypes::Ray: { AttributeTypeString = TEXT("Ray"); } break;
-				case EAttributeTypes::Sphere: { AttributeTypeString = TEXT("Sphere"); } break;
 				case EAttributeTypes::FrameNumber: { AttributeTypeString = TEXT("FrameNumber"); } break;
 				case EAttributeTypes::FrameRate: { AttributeTypeString = TEXT("FrameRate"); } break;
 				case EAttributeTypes::FrameTime: { AttributeTypeString = TEXT("FrameTime"); } break;
 				case EAttributeTypes::SoftObjectPath: { AttributeTypeString = TEXT("SoftObjectPath"); } break;
+				case EAttributeTypes::Matrix44f: { AttributeTypeString = TEXT("Matrix44f"); } break;
+				case EAttributeTypes::Matrix44d: { AttributeTypeString = TEXT("Matrix44d"); } break;
+				case EAttributeTypes::Plane4f: { AttributeTypeString = TEXT("Plane4f"); } break;
+				case EAttributeTypes::Plane4d: { AttributeTypeString = TEXT("Plane4d"); } break;
+				case EAttributeTypes::Quat4f: { AttributeTypeString = TEXT("Quat4f"); } break;
+				case EAttributeTypes::Quat4d: { AttributeTypeString = TEXT("Quat4d"); } break;
+				case EAttributeTypes::Rotator3f: { AttributeTypeString = TEXT("Rotator3f"); } break;
+				case EAttributeTypes::Rotator3d: { AttributeTypeString = TEXT("Rotator3d"); } break;
+				case EAttributeTypes::Transform3f: { AttributeTypeString = TEXT("Transform3f"); } break;
+				case EAttributeTypes::Transform3d: { AttributeTypeString = TEXT("Transform3d"); } break;
+				case EAttributeTypes::Vector3f: { AttributeTypeString = TEXT("Vector3f"); } break;
+				case EAttributeTypes::Vector3d: { AttributeTypeString = TEXT("Vector3d"); } break;
+				case EAttributeTypes::Vector2f: { AttributeTypeString = TEXT("Vector2f"); } break;
+				case EAttributeTypes::Vector4f: { AttributeTypeString = TEXT("Vector4f"); } break;
+				case EAttributeTypes::Vector4d: { AttributeTypeString = TEXT("Vector4d"); } break;
+				case EAttributeTypes::Box2f: { AttributeTypeString = TEXT("Box2f"); } break;
+				case EAttributeTypes::Box2D: { AttributeTypeString = TEXT("Box2D"); } break;
+				case EAttributeTypes::Box3f: { AttributeTypeString = TEXT("Box3f"); } break;
+				case EAttributeTypes::Box3d: { AttributeTypeString = TEXT("Box3d"); } break;
+				case EAttributeTypes::BoxSphereBounds3f: { AttributeTypeString = TEXT("BoxSphereBounds3f"); } break;
+				case EAttributeTypes::BoxSphereBounds3d: { AttributeTypeString = TEXT("BoxSphereBounds3d"); } break;
+				case EAttributeTypes::Sphere3f: { AttributeTypeString = TEXT("Sphere3f"); } break;
+				case EAttributeTypes::Sphere3d: { AttributeTypeString = TEXT("Sphere3d"); } break;
 				default:
 				{
 					//Ensure if we ask an unknown type
@@ -413,7 +422,7 @@ namespace UE
 				return EAttributeStorageResult::Operation_Error_CannotFoundKey;
 			}
 
-			if (AttributeAllocationInfo->Size == 0)
+			if (AttributeAllocationInfo->Size <= sizeof(TCHAR)) // Account for the null-terminator
 			{
 				OutValue = TEXT("");
 				return EAttributeStorageResult::Operation_Success;

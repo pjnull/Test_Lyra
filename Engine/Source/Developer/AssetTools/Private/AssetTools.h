@@ -30,6 +30,7 @@ struct FAssetImportParams
 		, bForceOverrideExisting(false)
 		, bAutomated(false)
 		, bAllowAsyncImport(false)
+		, bSceneImport(false)
 	{}
 
 	/** Factory to use for importing files */
@@ -46,6 +47,8 @@ struct FAssetImportParams
 	bool bAutomated : 1;
 	/** Temporary setting to enable the async import. (We will figure a better solution in a later release) */
 	bool bAllowAsyncImport : 1;
+	/** Whether or not this is a scene import */
+	bool bSceneImport : 1;
 };
 
 
@@ -87,7 +90,7 @@ public:
 	virtual void RenameReferencingSoftObjectPaths(const TArray<UPackage *> PackagesToCheck, const TMap<FSoftObjectPath, FSoftObjectPath>& AssetRedirectorMap) override;
 	virtual TArray<UObject*> ImportAssetsWithDialog(const FString& DestinationPath) override;
 	virtual void ImportAssetsWithDialogAsync(const FString& DestinationPath) override;
-	virtual TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& DestinationPath, UFactory* ChosenFactory, bool bSyncToBrowser = true, TArray<TPair<FString, FString>>* FilesAndDestinations = nullptr, bool bAllowAsyncImport = false) const override;
+	virtual TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& DestinationPath, UFactory* ChosenFactory, bool bSyncToBrowser = true, TArray<TPair<FString, FString>>* FilesAndDestinations = nullptr, bool bAllowAsyncImport = false, bool bSceneImport = false) const override;
 	virtual TArray<UObject*> ImportAssetsAutomated(const UAutomatedAssetImportData* ImportData) override;
 	virtual void ImportAssetTasks(const TArray<UAssetImportTask*>& ImportTasks) override;
 	virtual void ExportAssets(const TArray<FString>& AssetsToExport, const FString& ExportPath) override;
@@ -178,16 +181,16 @@ private:
 
 	UObject* PerformDuplicateAsset(const FString& AssetName, const FString& PackagePath, UObject* OriginalObject, bool bWithDialog);
 
-	/** Internal method that performs actions when asset class blacklist filter changes */
+	/** Internal method that performs actions when asset class deny list filter changes */
 	void AssetClassPermissionListChanged();
 
 	/**
-	 * Add sub content blacklist filter for a new mount point
+	 * Add sub content deny list filter for a new mount point
 	 * @param InMount The mount point
 	 */
-	void AddSubContentBlacklist(const FString& InMount);
+	void AddSubContentDenyList(const FString& InMount);
 
-	/** Called when a new mount is added to add the proper sub content blacklist to it. */
+	/** Called when a new mount is added to add the proper sub content deny list to it. */
 	void OnContentPathMounted(const FString& InAssetPath, const FString& FileSystemPath);
 
 	/** Implementation for the import with dialog functions */
@@ -216,7 +219,7 @@ private:
 	TSharedRef<FPathPermissionList> WritableFolderPermissionList;
 
 	/** List of sub content paths denied for every mount. */
-	TArray<FString> SubContentBlacklistPaths;
+	TArray<FString> SubContentDenyListPaths;
 };
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

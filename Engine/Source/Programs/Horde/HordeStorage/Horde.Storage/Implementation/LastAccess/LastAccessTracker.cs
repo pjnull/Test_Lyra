@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Datadog.Trace;
+using EpicGames.Horde.Storage;
+using Jupiter.Implementation;
 using Serilog;
 
 namespace Horde.Storage.Implementation
@@ -17,6 +20,29 @@ namespace Horde.Storage.Implementation
             return $"{record.Namespace}.{record.Bucket}.{record.RefName}";
         }
     }
+
+    public class LastAccessRecord
+    {
+        public LastAccessRecord(NamespaceId ns, BucketId bucket, IoHashKey key)
+        {
+            Namespace = ns;
+            Bucket = bucket;
+            Key = key;
+        }
+
+        public NamespaceId Namespace { get; set; }
+        public BucketId Bucket { get; set; }
+        public IoHashKey Key { get; set; }
+    }
+
+    public class LastAccessTrackerReference : LastAccessTracker<LastAccessRecord>
+    {
+        protected override string BuildCacheKey(LastAccessRecord record)
+        {
+            return $"{record.Namespace}.{record.Bucket}.{record.Key}";
+        }
+    }
+
     public abstract class LastAccessTracker<T> : ILastAccessTracker<T>, ILastAccessCache<T>
     {
         private readonly ILogger _logger = Log.ForContext<LastAccessTracker<T>>();
@@ -33,6 +59,7 @@ namespace Horde.Storage.Implementation
         {
             return Task.Run(() =>
             {
+                using IScope _ = Tracer.Instance.StartActive("lastAccessTracker.track");
                 try
                 {
                     _rwLock.AcquireReaderLock(-1);

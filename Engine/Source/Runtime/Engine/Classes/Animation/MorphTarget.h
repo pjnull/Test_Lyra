@@ -110,15 +110,15 @@ public:
 	{}
 	
 	/** Load morph target data */
-	ENGINE_API virtual void LoadFromMemoryArchive(FMemoryArchive& Ar);
+	ENGINE_API virtual void LoadFromMemoryArchive(FMemoryArchive & Ar);
 	
 	/** Apply serialized data to skeletal mesh in game thread */
-	ENGINE_API virtual void ApplyEditorData(USkeletalMesh* SkeletalMesh) const;
+	ENGINE_API virtual void ApplyEditorData(USkeletalMesh * SkeletalMesh, bool bIsSerializeSaving) const;
 	
 protected:
 	bool bApplyMorphTargetsData = false;
 	TMap<FName, TArray<FMorphTargetLODModel>> MorphLODModelsPerTargetName;
-};
+	};
 #endif
 
 UCLASS(hidecategories=Object, MinimalAPI)
@@ -175,6 +175,7 @@ public:
 	//~ UObject interface
 
 	ENGINE_API virtual void Serialize(FArchive& Ar) override;
+	ENGINE_API virtual void DeclareCustomVersions(FArchive& Ar) override;
 	ENGINE_API virtual void PostLoad() override;
 
 	/** UObject does not support serialization via FMemoryArchive, so manually handle separately */

@@ -303,6 +303,8 @@ FUObjectAnnotationSparseBool GMaterialFunctionsThatNeedCommentFix;
 FUObjectAnnotationSparseBool GMaterialFunctionsThatNeedSamplerFixup;
 #endif // #if WITH_EDITOR
 
+bool Engine_IsStrataEnabled();
+
 /** Returns whether the given expression class is allowed. */
 bool IsAllowedExpressionType(const UClass* const Class, const bool bMaterialFunction)
 {
@@ -643,23 +645,8 @@ int32 CompileShadingModelBlendFunction(FMaterialCompiler* Compiler, const int32 
 
 int32 CompileStrataBlendFunction(FMaterialCompiler* Compiler, const int32 A, const int32 B, const int32 Alpha)
 {
-	if (A == INDEX_NONE || B == INDEX_NONE || Alpha == INDEX_NONE)
-	{
-		return INDEX_NONE;
-	}
-	int32 OutputCodeChunk = Compiler->StrataHorizontalMixing(A, B, Alpha); // A is background (fully visible when Alpha=0) and B is foreground (fully visible when Alpha=1)
-
-#if WITH_EDITOR
-	// Also register the horizontal mixing operation with the compiler.
-	if (!Compiler->StrataCompilationInfoContainsCodeChunk(A) || !Compiler->StrataCompilationInfoContainsCodeChunk(B))
-	{
-		return Compiler->Errorf(TEXT("Could not find A or B code chunk in CompileStrataBlendFunction"));
-	}
-	FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoHorizontalMixing(Compiler, Compiler->GetStrataCompilationInfo(A), Compiler->GetStrataCompilationInfo(B));
-	Compiler->StrataCompilationInfoRegisterCodeChunk(OutputCodeChunk, StrataInfo);
-#endif
-
-	return OutputCodeChunk;
+	check(false);	// we should never blend Strata data from material layers.
+	return INDEX_NONE;
 }
 
 #if WITH_EDITOR
@@ -6363,6 +6350,15 @@ void UMaterialExpressionGetMaterialAttributes::GatherStrataMaterialInfo(FStrataM
 	}
 }
 
+FStrataOperator* UMaterialExpressionGetMaterialAttributes::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	if (MaterialAttributes.Expression)
+	{
+		return MaterialAttributes.Expression->StrataGenerateMaterialTopologyTree(Compiler, Parent, 0);
+	}
+	return nullptr;
+}
+
 void UMaterialExpressionGetMaterialAttributes::PreEditChange(FProperty* PropertyAboutToChange)
 {
 	// Backup attribute array so we can re-connect pins
@@ -6867,6 +6863,26 @@ void UMaterialExpressionBlendMaterialAttributes::GatherStrataMaterialInfo(FStrat
 	{
 		B.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, B.OutputIndex);
 	}
+}
+
+FStrataOperator* UMaterialExpressionBlendMaterialAttributes::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	// STRATA_TODO: this likely no longer work. We would need to stop parsing and always do parameter blending at this stage.
+	const bool bUseParameterBlending = false;
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_HORIZONTAL, this, Parent, bUseParameterBlending);
+
+	UMaterialExpression* ChildAExpression = A.GetTracedInput().Expression;
+	UMaterialExpression* ChildBExpression = B.GetTracedInput().Expression;
+	if (ChildAExpression)
+	{
+		StrataOperator.LeftIndex = ChildAExpression->StrataGenerateMaterialTopologyTree(Compiler, this, A.OutputIndex)->Index;
+	}
+	if (ChildBExpression)
+	{
+		StrataOperator.RightIndex = ChildBExpression->StrataGenerateMaterialTopologyTree(Compiler, this, B.OutputIndex)->Index;
+	}
+
+	return &StrataOperator;
 }
 #endif // WITH_EDITOR
 
@@ -12685,6 +12701,27 @@ void UMaterialFunction::UpdateDependentFunctionCandidates()
 void UMaterialFunction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FProperty* PropertyThatChanged = PropertyChangedEvent.Property;
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UMaterialFunction, bEnableExecWire))
+	{
+		CreateExecutionFlowExpressions();
+	}
+
+	if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UMaterialFunction, bEnableNewHLSLGenerator))
+	{
+		if (EditorMaterial)
+		{
+			EditorMaterial->bEnableNewHLSLGenerator = bEnableNewHLSLGenerator;
+		}
+	}
+
+	// many property changes can require rebuild of graph so always mark as changed
+	// not interested in PostEditChange calls though as the graph may have instigated it
+	if (PropertyThatChanged && MaterialGraph)
+	{
+		MaterialGraph->NotifyGraphChanged();
+	}
 }
 
 void UMaterialFunction::ForceRecompileForRendering(FMaterialUpdateContext& UpdateContext, UMaterial* InPreviewMaterial)
@@ -13311,7 +13348,67 @@ bool UMaterialFunction::SetStaticComponentMaskParameterValueEditorOnly(FName Par
 	Meta.ExpressionGuid = OutExpressionGuid;
 	return SetParameterValueEditorOnly(ParameterName, Meta);
 };
-#endif //WITH_EDITORONLY_DATA
+
+bool UMaterialFunction::IsUsingControlFlow() const
+{
+	if (bEnableExecWire)
+	{
+		static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.MaterialEnableControlFlow"));
+		return CVar->GetValueOnAnyThread() != 0;
+	}
+	return false;
+}
+
+bool UMaterialFunction::IsUsingNewHLSLGenerator() const
+{
+	if (bEnableNewHLSLGenerator)
+	{
+		static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.MaterialEnableNewHLSLGenerator"));
+		return CVar->GetValueOnAnyThread() != 0;
+	}
+	return false;
+}
+
+void UMaterialFunction::CreateExecutionFlowExpressions()
+{
+	const bool bUsingControlFlow = IsUsingControlFlow();
+	if (bUsingControlFlow)
+	{
+		if (!ExpressionExecBegin)
+		{
+			ExpressionExecBegin = NewObject<UMaterialExpressionExecBegin>(this);
+			ExpressionExecBegin->Function = this;
+			FunctionExpressions.Add(ExpressionExecBegin);
+		}
+
+		if (!ExpressionExecEnd)
+		{
+			ExpressionExecEnd = NewObject<UMaterialExpressionExecEnd>(this);
+			ExpressionExecEnd->Function = this;
+			FunctionExpressions.Add(ExpressionExecEnd);
+		}
+	}
+
+	if (EditorMaterial)
+	{
+		EditorMaterial->bEnableExecWire = bUsingControlFlow;
+		EditorMaterial->ExpressionExecBegin = ExpressionExecBegin;
+		EditorMaterial->ExpressionExecEnd = ExpressionExecEnd;
+		if (ExpressionExecBegin)
+		{
+			EditorMaterial->Expressions.AddUnique(ExpressionExecBegin);
+			ExpressionExecBegin->Function = nullptr;
+			ExpressionExecBegin->Material = EditorMaterial;
+		}
+		if (ExpressionExecEnd)
+		{
+			EditorMaterial->Expressions.AddUnique(ExpressionExecEnd);
+			ExpressionExecEnd->Function = nullptr;
+			ExpressionExecEnd->Material = EditorMaterial;
+		}
+	}
+}
+#endif // WITH_EDITOR
 
 ///////////////////////////////////////////////////////////////////////////////
 // UMaterialFunctionInstance
@@ -14249,6 +14346,11 @@ int32 UMaterialExpressionMaterialFunctionCall::Compile(class FMaterialCompiler* 
 		return Compiler->Errorf(TEXT("Missing Material Function"));
 	}
 
+	if (MaterialFunction->IsUsingControlFlow())
+	{
+		return Compiler->Errorf(TEXT("Material Functions with control flow are only supported with new HLSL translator"));
+	}
+
 	// Verify that all function inputs and outputs are in a valid state to be linked into this material for compiling
 	for (int32 i = 0; i < FunctionInputs.Num(); i++)
 	{
@@ -14742,6 +14844,15 @@ void UMaterialExpressionMaterialFunctionCall::GatherStrataMaterialInfo(FStrataMa
 	{
 		return FunctionOutputs[OutputIndex].ExpressionOutput->GatherStrataMaterialInfo(StrataMaterialInfo, 0);
 	}
+}
+
+FStrataOperator* UMaterialExpressionMaterialFunctionCall::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	if (OutputIndex >= 0 && OutputIndex < FunctionOutputs.Num() && FunctionOutputs[OutputIndex].ExpressionOutput)
+	{
+		return FunctionOutputs[OutputIndex].ExpressionOutput->StrataGenerateMaterialTopologyTree(Compiler, Parent, 0);
+	}
+	return nullptr;
 }
 
 uint32 UMaterialExpressionMaterialFunctionCall::GetInputType(int32 InputIndex)
@@ -15285,6 +15396,15 @@ void UMaterialExpressionFunctionOutput::GatherStrataMaterialInfo(FStrataMaterial
 	{
 		A.Expression->GatherStrataMaterialInfo(StrataMaterialInfo, A.OutputIndex);
 	}
+}
+
+FStrataOperator* UMaterialExpressionFunctionOutput::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	if (A.GetTracedInput().Expression && !A.Expression->ContainsInputLoop())
+	{
+		return A.Expression->StrataGenerateMaterialTopologyTree(Compiler, Parent, A.OutputIndex);
+	}
+	return nullptr;
 }
 
 #endif // WITH_EDITOR
@@ -18541,8 +18661,7 @@ int32  UMaterialExpressionClearCoatNormalCustomOutput::Compile(class FMaterialCo
 	}
 	else
 	{
-		static const auto CVarStrata = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
-		const bool bStrata = CVarStrata ? CVarStrata->GetValueOnAnyThread() > 0 : false;
+		const bool bStrata = Engine_IsStrataEnabled();
 		if (!bStrata)
 		{
 			return CompilerError(Compiler, TEXT("Input missing"));
@@ -20114,6 +20233,20 @@ static int32 StrataBlendNormal(class FMaterialCompiler* Compiler, int32 NormalCo
 
 #if WITH_EDITOR
 
+// Optionnaly cast CodeChunk type to non-LWC type. 
+// Input can be built of WorldPosition data, which would force the derived data to have LWC type 
+// creating issues, as Strata functions' inputs don't support LWC
+static int32 CastToNonLWCType(class FMaterialCompiler* Compiler, int32 CodeChunk)
+{
+	EMaterialValueType Type = Compiler->GetType(CodeChunk);
+	if (IsLWCType(Type))
+	{
+		Type = MakeNonLWCType(Type);
+		CodeChunk = Compiler->ValidCast(CodeChunk, Type);
+	}
+	return CodeChunk;
+}
+
 // The compilation of an expression can sometimes lead to a INDEX_NONE code chunk when editing material graphs 
 // or when the node is inside a material function, linked to an input pin of the material function and that input is not plugged in to anything.
 // But for normals or tangents, Strata absolutely need a valid code chunk to de-duplicate when stored in memory. 
@@ -20129,6 +20262,10 @@ static int32 CompileWithDefaultCodeChunk(class FMaterialCompiler* Compiler, FExp
 	{
 		*bDefaultIsUsed |= CodeChunk == INDEX_NONE;
 	}
+	else
+	{
+		CodeChunk = CastToNonLWCType(Compiler, CodeChunk);
+	}
 	return CodeChunk == INDEX_NONE ? DefaultCodeChunk : CodeChunk;
 }
 static int32 CompileWithDefaultFloat1(class FMaterialCompiler* Compiler, FExpressionInput& Input, float X, bool* bDefaultIsUsed = nullptr)
@@ -20142,6 +20279,10 @@ static int32 CompileWithDefaultFloat1(class FMaterialCompiler* Compiler, FExpres
 	{
 		*bDefaultIsUsed |= CodeChunk == INDEX_NONE;
 	}
+	else
+	{
+		CodeChunk = CastToNonLWCType(Compiler, CodeChunk);
+	}
 	return CodeChunk == INDEX_NONE ? Compiler->Constant(X) : CodeChunk;
 }
 static int32 CompileWithDefaultFloat3(class FMaterialCompiler* Compiler, FExpressionInput& Input, float X, float Y, float Z, bool* bDefaultIsUsed = nullptr)
@@ -20154,6 +20295,10 @@ static int32 CompileWithDefaultFloat3(class FMaterialCompiler* Compiler, FExpres
 	if (bDefaultIsUsed)
 	{
 		*bDefaultIsUsed |= CodeChunk == INDEX_NONE;
+	}
+	else
+	{
+		CodeChunk = CastToNonLWCType(Compiler, CodeChunk);
 	}
 	return CodeChunk == INDEX_NONE ? Compiler->Constant3(X, Y, Z) : CodeChunk;
 }
@@ -20503,17 +20648,43 @@ bool UMaterialExpressionStrataLegacyConversion::IsResultStrataMaterial(int32 Out
 
 void UMaterialExpressionStrataLegacyConversion::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {	
+	// Track connected input
+	if (BaseColor.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_BaseColor); }
+	if (Metallic.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Metallic); }
+	if (Specular.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Specular); }
+	if (Roughness.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Roughness); }
+	if (Anisotropy.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Anisotropy); }
+	if (EmissiveColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_EmissiveColor); }
+	if (Normal.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Normal); }
+	if (Tangent.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Tangent); }
+	if (SubSurfaceColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_SubsurfaceColor); }
+	if (ClearCoat.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_CustomData0); }
+	if (ClearCoatRoughness.IsConnected())	{ StrataMaterialInfo.AddPropertyConnected(MP_CustomData1); }
+	if (Opacity.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Opacity); }
+	if (ShadingModel.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_ShadingModel); }
+
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Unlit))					{ StrataMaterialInfo.AddShadingModel(SSM_Unlit); }
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_DefaultLit))			{ StrataMaterialInfo.AddShadingModel(SSM_DefaultLit); }
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SubsurfaceLit))			{ StrataMaterialInfo.AddShadingModel(SSM_SubsurfaceLit); }
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_VolumetricFogCloud))	{ StrataMaterialInfo.AddShadingModel(SSM_VolumetricFogCloud); }
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_Hair))					{ StrataMaterialInfo.AddShadingModel(SSM_Hair); }
 	if (ConvertedStrataMaterialInfo.HasShadingModel(SSM_SingleLayerWater))		{ StrataMaterialInfo.AddShadingModel(SSM_SingleLayerWater); }
+	if (SubsurfaceProfile)														{ StrataMaterialInfo.AddSubsurfaceProfile(SubsurfaceProfile); }
+	if (ConvertedStrataMaterialInfo.HasShadingModelFromExpression())			{ StrataMaterialInfo.SetShadingModelFromExpression(true); }
+}
 
-	if (SubsurfaceProfile)
-	{
-		StrataMaterialInfo.AddSubsurfaceProfile(SubsurfaceProfile);
-	}
+FStrataOperator* UMaterialExpressionStrataLegacyConversion::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_VERTICAL, this, Parent);
+
+	// The legacy node can only be added once and we know the worst shape it can take so we hard code it here, 
+	// with fake addresses for BSDF defined in shader code.
+	UMaterialExpression* ChildAExpression = reinterpret_cast<UMaterialExpression*>(0);
+	UMaterialExpression* ChildBExpression = reinterpret_cast<UMaterialExpression*>(1);
+	StrataOperator.LeftIndex = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF_LEGACY, ChildAExpression, this).Index;
+	StrataOperator.RightIndex = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF_LEGACY, ChildBExpression, this).Index;
+
+	return &StrataOperator;
 }
 
 bool UMaterialExpressionStrataLegacyConversion::HasSSS() const
@@ -20593,6 +20764,8 @@ int32 UMaterialExpressionStrataSlabBSDF::Compile(class FMaterialCompiler* Compil
 	const float DefaultSpecular = 0.5f;
 	const float DefaultF0 = DielectricSpecularToF0(DefaultSpecular);
 
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationGetOperator(this);
+
 	int32 OutputCodeChunk = Compiler->StrataSlabBSDF(
 		bUseMetalness ? Compiler->Constant(1.0f) : Compiler->Constant(0.0f),
 
@@ -20620,7 +20793,8 @@ int32 UMaterialExpressionStrataSlabBSDF::Compile(class FMaterialCompiler* Compil
 		CompileWithDefaultFloat1(Compiler, Thickness, STRATA_LAYER_DEFAULT_THICKNESS_CM),
 		NormalCodeChunk,
 		TangentCodeChunk,
-		Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis));
+		Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis),
+		!StrataOperator.bUseParameterBlending || (StrataOperator.bUseParameterBlending && StrataOperator.bRootOfParameterBlendingSubTree) ? &StrataOperator : nullptr);
 	StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis, STRATA_BSDF_TYPE_SLAB, bHasSSS, bHasDMFPPluggedIn, bHasEdgeColor, bHasThinFilm, bHasFuzz, bHasHaziness);
 
 	return OutputCodeChunk;
@@ -21001,6 +21175,25 @@ bool UMaterialExpressionStrataSlabBSDF::IsResultStrataMaterial(int32 OutputIndex
 
 void UMaterialExpressionStrataSlabBSDF::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	// Track connected inputs
+	if (bUseMetalness)
+	{
+		if (BaseColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_BaseColor); }
+		if (Metallic.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Metallic); }
+		if (Specular.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Specular); }
+	}
+	else
+	{
+		if (DiffuseAlbedo.IsConnected())	{ StrataMaterialInfo.AddPropertyConnected(MP_DiffuseColor); }
+		if (F0.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_SpecularColor); }
+	}
+	if (Roughness.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Roughness); }
+	if (Anisotropy.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Anisotropy); }
+	if (EmissiveColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_EmissiveColor); }
+	if (Normal.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Normal); }
+	if (Tangent.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_Tangent); }
+	if (SSSDMFP.IsConnected())				{ StrataMaterialInfo.AddPropertyConnected(MP_SubsurfaceColor); }
+
 	if (HasSSS())
 	{
 		// We still do not know if this is going to be a real SSS node because it is only possible for BSDF at the bottom of the stack. Nevertheless, we take the worst case into account.
@@ -21014,6 +21207,11 @@ void UMaterialExpressionStrataSlabBSDF::GatherStrataMaterialInfo(FStrataMaterial
 	{
 		StrataMaterialInfo.AddShadingModel(SSM_DefaultLit);
 	}
+}
+
+FStrataOperator* UMaterialExpressionStrataSlabBSDF::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	return &Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF, this, Parent);
 }
 
 bool UMaterialExpressionStrataSlabBSDF::HasSSS() const
@@ -21128,6 +21326,11 @@ void UMaterialExpressionStrataVolumetricFogCloudBSDF::GatherStrataMaterialInfo(F
 {
 	StrataMaterialInfo.AddShadingModel(SSM_VolumetricFogCloud);
 }
+
+FStrataOperator* UMaterialExpressionStrataVolumetricFogCloudBSDF::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	return &Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF, this, Parent);
+}
 #endif // WITH_EDITOR
 
 
@@ -21191,7 +21394,13 @@ bool UMaterialExpressionStrataUnlitBSDF::IsResultStrataMaterial(int32 OutputInde
 
 void UMaterialExpressionStrataUnlitBSDF::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (EmissiveColor.IsConnected()) { StrataMaterialInfo.AddPropertyConnected(MP_EmissiveColor); }
 	StrataMaterialInfo.AddShadingModel(SSM_Unlit);
+}
+
+FStrataOperator* UMaterialExpressionStrataUnlitBSDF::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	return &Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF, this, Parent);
 }
 #endif // WITH_EDITOR
 
@@ -21281,7 +21490,19 @@ bool UMaterialExpressionStrataHairBSDF::IsResultStrataMaterial(int32 OutputIndex
 
 void UMaterialExpressionStrataHairBSDF::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	// Track connected inputs
+	if (BaseColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_BaseColor); }
+	if (Specular.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Specular); }
+	if (Roughness.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_Roughness); }
+	if (EmissiveColor.IsConnected())	{ StrataMaterialInfo.AddPropertyConnected(MP_EmissiveColor); }
+	if (Tangent.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Tangent); }
+
 	StrataMaterialInfo.AddShadingModel(SSM_Hair);
+}
+
+FStrataOperator* UMaterialExpressionStrataHairBSDF::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	return &Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF, this, Parent);
 }
 #endif // WITH_EDITOR
 
@@ -21386,7 +21607,20 @@ bool UMaterialExpressionStrataSingleLayerWaterBSDF::IsResultStrataMaterial(int32
 
 void UMaterialExpressionStrataSingleLayerWaterBSDF::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	// Track connected inputs
+	if (BaseColor.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_BaseColor); }
+	if (Metallic.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Metallic); }
+	if (Specular.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Specular); }
+	if (Roughness.IsConnected())		{ StrataMaterialInfo.AddPropertyConnected(MP_Roughness); }
+	if (EmissiveColor.IsConnected())	{ StrataMaterialInfo.AddPropertyConnected(MP_EmissiveColor); }
+	if (Normal.IsConnected())			{ StrataMaterialInfo.AddPropertyConnected(MP_Normal); }
+
 	StrataMaterialInfo.AddShadingModel(SSM_SingleLayerWater);
+}
+
+FStrataOperator* UMaterialExpressionStrataSingleLayerWaterBSDF::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	return &Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_BSDF, this, Parent);
 }
 #endif // WITH_EDITOR
 
@@ -21430,8 +21664,10 @@ int32 UMaterialExpressionStrataHorizontalMixing::Compile(class FMaterialCompiler
 
 	const int32 HorizontalMixCodeChunk = CompileWithDefaultFloat1(Compiler, Mix, 0.5f);
 
+
 	int32 OutputCodeChunk = INDEX_NONE;
-	if (bUseParameterBlending)
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationGetOperator(this);
+	if (StrataOperator.bUseParameterBlending)
 	{
 		const int32 NormalMixCodeChunk = Compiler->StrataHorizontalMixingParameterBlendingBSDFCoverageToNormalMixCodeChunk(BackgroundCodeChunk, ForegroundCodeChunk, HorizontalMixCodeChunk);
 
@@ -21473,7 +21709,9 @@ int32 UMaterialExpressionStrataHorizontalMixing::Compile(class FMaterialCompiler
 		}
 		const FStrataRegisteredSharedLocalBasis NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, NewNormalCodeChunk, NewTangentCodeChunk);
 
-		OutputCodeChunk = Compiler->StrataHorizontalMixingParameterBlending(BackgroundCodeChunk, ForegroundCodeChunk, HorizontalMixCodeChunk, NormalMixCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis));
+		OutputCodeChunk = Compiler->StrataHorizontalMixingParameterBlending(
+			BackgroundCodeChunk, ForegroundCodeChunk, HorizontalMixCodeChunk, NormalMixCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis),
+			StrataOperator.bRootOfParameterBlendingSubTree ? &StrataOperator : nullptr);
 
 		StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis, STRATA_BSDF_TYPE_SLAB);
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoHorizontalMixingParamBlend(Compiler, BackgroundStrataData, ForegroundStrataData, NewRegisteredSharedLocalBasis);
@@ -21485,7 +21723,9 @@ int32 UMaterialExpressionStrataHorizontalMixing::Compile(class FMaterialCompiler
 		OutputCodeChunk = Compiler->StrataHorizontalMixing(
 			BackgroundCodeChunk,
 			ForegroundCodeChunk,
-			HorizontalMixCodeChunk);
+			HorizontalMixCodeChunk,
+			StrataOperator.Index,
+			StrataOperator.MaxDistanceFromLeaves);
 
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoHorizontalMixing(Compiler, BackgroundStrataData, ForegroundStrataData);
 
@@ -21533,6 +21773,24 @@ void UMaterialExpressionStrataHorizontalMixing::GatherStrataMaterialInfo(FStrata
 		Background.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Background.OutputIndex);
 	}
 }
+
+FStrataOperator* UMaterialExpressionStrataHorizontalMixing::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_HORIZONTAL, this, Parent, bUseParameterBlending);
+
+	UMaterialExpression* ChildAExpression = Background.GetTracedInput().Expression;
+	UMaterialExpression* ChildBExpression = Foreground.GetTracedInput().Expression;
+	if (ChildAExpression)
+	{
+		StrataOperator.LeftIndex = ChildAExpression->StrataGenerateMaterialTopologyTree(Compiler, this, Background.OutputIndex)->Index;
+	}
+	if (ChildBExpression)
+	{
+		StrataOperator.RightIndex = ChildBExpression->StrataGenerateMaterialTopologyTree(Compiler, this, Foreground.OutputIndex)->Index;
+	}
+
+	return &StrataOperator;
+}
 #endif // WITH_EDITOR
 
 
@@ -21576,7 +21834,8 @@ int32 UMaterialExpressionStrataVerticalLayering::Compile(class FMaterialCompiler
 	const int32 TopNormalMixCodeChunk = Compiler->StrataVerticalLayeringParameterBlendingBSDFCoverageToNormalMixCodeChunk(TopCodeChunk);
 
 	int32 OutputCodeChunk = INDEX_NONE;
-	if (bUseParameterBlending)
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationGetOperator(this);
+	if (StrataOperator.bUseParameterBlending)
 	{
 		if (TopStrataData.TotalBSDFCount != 1)
 		{
@@ -21616,7 +21875,9 @@ int32 UMaterialExpressionStrataVerticalLayering::Compile(class FMaterialCompiler
 		}
 		const FStrataRegisteredSharedLocalBasis NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, NewNormalCodeChunk, NewTangentCodeChunk);
 
-		OutputCodeChunk = Compiler->StrataVerticalLayeringParameterBlending(TopCodeChunk, BaseCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis), TopBSDF.RegisteredSharedLocalBasis.NormalCodeChunk);
+		OutputCodeChunk = Compiler->StrataVerticalLayeringParameterBlending(
+			TopCodeChunk, BaseCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis), TopBSDF.RegisteredSharedLocalBasis.NormalCodeChunk,
+			StrataOperator.bRootOfParameterBlendingSubTree ? &StrataOperator : nullptr);
 
 		StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis, STRATA_BSDF_TYPE_SLAB);
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoVerticalLayeringParamBlend(Compiler, TopStrataData, BaseStrataData, NewRegisteredSharedLocalBasis);
@@ -21625,7 +21886,7 @@ int32 UMaterialExpressionStrataVerticalLayering::Compile(class FMaterialCompiler
 	}
 	else
 	{
-		OutputCodeChunk = Compiler->StrataVerticalLayering(TopCodeChunk, BaseCodeChunk);
+		OutputCodeChunk = Compiler->StrataVerticalLayering(TopCodeChunk, BaseCodeChunk, StrataOperator.Index, StrataOperator.MaxDistanceFromLeaves);
 
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoVerticalLayering(Compiler, Compiler->GetStrataCompilationInfo(TopCodeChunk), Compiler->GetStrataCompilationInfo(BaseCodeChunk));
 
@@ -21674,6 +21935,24 @@ void UMaterialExpressionStrataVerticalLayering::GatherStrataMaterialInfo(FStrata
 		Base.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Base.OutputIndex);
 	}
 }
+
+FStrataOperator* UMaterialExpressionStrataVerticalLayering::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_VERTICAL, this, Parent, bUseParameterBlending);
+
+	UMaterialExpression* ChildAExpression = Top.GetTracedInput().Expression;
+	UMaterialExpression* ChildBExpression = Base.GetTracedInput().Expression;
+	if (ChildAExpression)
+	{
+		StrataOperator.LeftIndex = ChildAExpression->StrataGenerateMaterialTopologyTree(Compiler, this, Top.OutputIndex)->Index;
+	}
+	if (ChildBExpression)
+	{
+		StrataOperator.RightIndex = ChildBExpression->StrataGenerateMaterialTopologyTree(Compiler, this, Base.OutputIndex)->Index;
+	}
+
+	return &StrataOperator;
+}
 #endif // WITH_EDITOR
 
 
@@ -21717,7 +21996,8 @@ int32 UMaterialExpressionStrataAdd::Compile(class FMaterialCompiler* Compiler, i
 	const int32 ANormalMixCodeChunk = Compiler->StrataAddParameterBlendingBSDFCoverageToNormalMixCodeChunk(ACodeChunk, BCodeChunk);
 
 	int32 OutputCodeChunk = INDEX_NONE;
-	if (bUseParameterBlending)
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationGetOperator(this);
+	if (StrataOperator.bUseParameterBlending)
 	{
 		if (AStrataData.TotalBSDFCount != 1)
 		{
@@ -21757,7 +22037,9 @@ int32 UMaterialExpressionStrataAdd::Compile(class FMaterialCompiler* Compiler, i
 		}
 		const FStrataRegisteredSharedLocalBasis NewRegisteredSharedLocalBasis = StrataCompilationInfoCreateSharedLocalBasis(Compiler, NewNormalCodeChunk, NewTangentCodeChunk);
 
-		OutputCodeChunk = Compiler->StrataAddParameterBlending(ACodeChunk, BCodeChunk, ANormalMixCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis));
+		OutputCodeChunk = Compiler->StrataAddParameterBlending(
+			ACodeChunk, BCodeChunk, ANormalMixCodeChunk, Compiler->GetStrataSharedLocalBasisIndexMacro(NewRegisteredSharedLocalBasis),
+			StrataOperator.bRootOfParameterBlendingSubTree ? &StrataOperator : nullptr);
 
 		StrataCompilationInfoCreateSingleBSDFMaterial(Compiler, OutputCodeChunk, NewRegisteredSharedLocalBasis, STRATA_BSDF_TYPE_SLAB);
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoAddParamBlend(Compiler, AStrataData, BStrataData, NewRegisteredSharedLocalBasis);
@@ -21766,7 +22048,7 @@ int32 UMaterialExpressionStrataAdd::Compile(class FMaterialCompiler* Compiler, i
 	}
 	else
 	{
-		OutputCodeChunk = Compiler->StrataAdd(ACodeChunk, BCodeChunk);
+		OutputCodeChunk = Compiler->StrataAdd(ACodeChunk, BCodeChunk, StrataOperator.Index, StrataOperator.MaxDistanceFromLeaves);
 
 		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoAdd(Compiler, Compiler->GetStrataCompilationInfo(ACodeChunk), Compiler->GetStrataCompilationInfo(BCodeChunk));
 
@@ -21814,6 +22096,24 @@ void UMaterialExpressionStrataAdd::GatherStrataMaterialInfo(FStrataMaterialInfo&
 		B.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, B.OutputIndex);
 	}
 }
+
+FStrataOperator* UMaterialExpressionStrataAdd::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_ADD, this, Parent, bUseParameterBlending);
+
+	UMaterialExpression* ChildAExpression = A.GetTracedInput().Expression;
+	UMaterialExpression* ChildBExpression = B.GetTracedInput().Expression;
+	if (ChildAExpression)
+	{
+		StrataOperator.LeftIndex = ChildAExpression->StrataGenerateMaterialTopologyTree(Compiler, this, A.OutputIndex)->Index;
+	}
+	if (ChildBExpression)
+	{
+		StrataOperator.RightIndex = ChildBExpression->StrataGenerateMaterialTopologyTree(Compiler, this, B.OutputIndex)->Index;
+	}
+
+	return &StrataOperator;
+}
 #endif // WITH_EDITOR
 
 
@@ -21843,14 +22143,29 @@ int32 UMaterialExpressionStrataWeight::Compile(class FMaterialCompiler* Compiler
 	int32 ACodeChunk = A.Compile(Compiler);
 	int32 WeightCodeChunk = Weight.GetTracedInput().Expression ? Weight.Compile(Compiler) : Compiler->Constant(1.0f);
 
-	int32 OutputCodeChunk = Compiler->StrataWeight(ACodeChunk, WeightCodeChunk);
-
-	if (!Compiler->StrataCompilationInfoContainsCodeChunk(ACodeChunk))
+	int32 OutputCodeChunk = INDEX_NONE;
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationGetOperator(this);
+	if (StrataOperator.bUseParameterBlending)
 	{
-		return Compiler->Errorf(TEXT("Could not find ACodeChunk to multiply"));
+		OutputCodeChunk = Compiler->StrataWeightParameterBlending(
+			ACodeChunk, WeightCodeChunk, 
+			StrataOperator.bRootOfParameterBlendingSubTree ? &StrataOperator : nullptr);
+
+		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoWeightParamBlend(Compiler, Compiler->GetStrataCompilationInfo(ACodeChunk));
+
+		Compiler->StrataCompilationInfoRegisterCodeChunk(OutputCodeChunk, StrataInfo);
 	}
-	FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoWeight(Compiler, Compiler->GetStrataCompilationInfo(ACodeChunk));
-	Compiler->StrataCompilationInfoRegisterCodeChunk(OutputCodeChunk, StrataInfo);
+	else
+	{
+		OutputCodeChunk = Compiler->StrataWeight(ACodeChunk, WeightCodeChunk, StrataOperator.Index, StrataOperator.MaxDistanceFromLeaves);
+
+		if (!Compiler->StrataCompilationInfoContainsCodeChunk(ACodeChunk))
+		{
+			return Compiler->Errorf(TEXT("Could not find ACodeChunk to multiply"));
+		}
+		FStrataMaterialCompilationInfo StrataInfo = StrataCompilationInfoWeight(Compiler, Compiler->GetStrataCompilationInfo(ACodeChunk));
+		Compiler->StrataCompilationInfoRegisterCodeChunk(OutputCodeChunk, StrataInfo);
+	}
 
 	return OutputCodeChunk;
 }
@@ -21885,6 +22200,19 @@ void UMaterialExpressionStrataWeight::GatherStrataMaterialInfo(FStrataMaterialIn
 	{
 		A.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, A.OutputIndex);
 	}
+}
+
+FStrataOperator* UMaterialExpressionStrataWeight::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
+{
+	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_WEIGHT, this, Parent);
+
+	UMaterialExpression* ChildAExpression = A.GetTracedInput().Expression;
+	if (ChildAExpression)
+	{
+		StrataOperator.LeftIndex = ChildAExpression->StrataGenerateMaterialTopologyTree(Compiler, this, A.OutputIndex)->Index;
+	}
+
+	return &StrataOperator;
 }
 #endif // WITH_EDITOR
 
@@ -22210,13 +22538,13 @@ UMaterialExpressionLess::UMaterialExpressionLess(const FObjectInitializer& Objec
 #if WITH_EDITOR
 FText UMaterialExpressionBinaryOp::GetKeywords() const
 {
-	const UE::HLSLTree::FBinaryOpDescription Description = UE::HLSLTree::GetBinaryOpDesription(GetBinaryOp());
+	const UE::HLSLTree::FOperationDescription Description = UE::HLSLTree::GetOperationDescription(GetBinaryOp());
 	return FText::FromString(Description.Operator);
 }
 
 void UMaterialExpressionBinaryOp::GetCaption(TArray<FString>& OutCaptions) const
 {
-	const UE::HLSLTree::FBinaryOpDescription Description = UE::HLSLTree::GetBinaryOpDesription(GetBinaryOp());
+	const UE::HLSLTree::FOperationDescription Description = UE::HLSLTree::GetOperationDescription(GetBinaryOp());
 	FString ret = Description.Name;
 	FExpressionInput ATraced = A.GetTracedInput();
 	FExpressionInput BTraced = B.GetTracedInput();
@@ -22265,7 +22593,12 @@ void UMaterialExpressionGetLocal::GetCaption(TArray<FString>& OutCaptions) const
 
 uint32 UMaterialExpressionGetLocal::GetOutputType(int32 InputIndex)
 {
-	return MCT_Float1;
+	return MCT_Unknown;
+}
+
+bool UMaterialExpressionGetLocal::IsResultMaterialAttributes(int32 OutputIndex)
+{
+	return false;
 }
 #endif
 
@@ -22288,11 +22621,7 @@ UMaterialExpressionSetLocal::UMaterialExpressionSetLocal(const FObjectInitialize
 #if WITH_EDITOR
 uint32 UMaterialExpressionSetLocal::GetInputType(int32 InputIndex)
 {
-	switch (InputIndex)
-	{
-	case 0: return MCT_Float1;
-	default: checkNoEntry(); return 0u;
-	}
+	return MCT_Unknown;
 }
 
 int32 UMaterialExpressionSetLocal::Compile(class FMaterialCompiler* Compiler, int32 OutputIndex)

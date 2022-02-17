@@ -20,6 +20,8 @@ using HordeServer.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 
 namespace HordeServer.Controllers
@@ -51,33 +53,14 @@ namespace HordeServer.Controllers
 	[Route("[controller]")]
 	public class LogsController : ControllerBase
 	{
-		/// <summary>
-		/// Instance of the LogFile service
-		/// </summary>
 		private readonly ILogFileService LogFileService;
-
-		/// <summary>
-		/// Instance of the issue collection
-		/// </summary>
 		private readonly IIssueCollection IssueCollection;
-
-		/// <summary>
-		/// Instance of the ACL service
-		/// </summary>
 		private readonly AclService AclService;
-
-		/// <summary>
-		/// Instance of the Job service
-		/// </summary>
 		private readonly JobService JobService;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="LogFileService">The Logfile service</param>
-		/// <param name="IssueCollection">The issue collection</param>
-		/// <param name="AclService">The ACL service</param>
-		/// <param name="JobService">The Job service</param>
 		public LogsController(ILogFileService LogFileService, IIssueCollection IssueCollection, AclService AclService, JobService JobService)
 		{
 			this.LogFileService = LogFileService;
@@ -221,7 +204,7 @@ namespace HordeServer.Controllers
 							}
 							else if (Result[Offset] == (byte)'\n')
 							{
-								Stream.Write(Result, StartOffset, Offset - StartOffset);
+								await Stream.WriteAsync(Result.AsMemory(StartOffset, Offset - StartOffset));
 								Offset++;
 								break;
 							}

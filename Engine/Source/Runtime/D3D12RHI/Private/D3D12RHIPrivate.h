@@ -200,6 +200,21 @@ static bool D3D12RHI_ShouldForceCompatibility()
 	return bForceCompatibility;
 }
 
+static bool D3D12RHI_IsRenderDocPresent(ID3D12Device* Device)
+{
+	IID RenderDocID;
+	if (SUCCEEDED(IIDFromString(L"{A7AA6116-9C8D-4BBA-9083-B4D816B71B78}", &RenderDocID)))
+	{
+		TRefCountPtr<IUnknown> RenderDoc;
+		if (SUCCEEDED(Device->QueryInterface(RenderDocID, (void**)RenderDoc.GetInitReference())))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 struct FD3D12UpdateTexture3DData
 {
 	FD3D12ResourceLocation* UploadHeapResourceLocation;
@@ -223,6 +238,24 @@ struct FD3D12RayTracingPipelineInfo
 	uint32 StackSize = 0;
 	uint32 ScratchSize = 0;
 };
+
+struct FD3D12WorkaroundFlags
+{
+	/** 
+	* Certain drivers crash when GetShaderIdentifier() is called on a ray tracing pipeline collection.
+	* If we detect such driver, we have to fall back to the path that queries identifiers on full linked RTPSO.
+	* This is less efficient and can also trigger another known issue with D3D12 Agility version <= 4.
+	*/
+	bool bAllowGetShaderIdentifierOnCollectionSubObject = true;
+
+	/**
+	* Some machine configurations have known issues when transient resource aliasing is used.
+	* If we detect such configuration, we can fall back to non-aliasing code path which is much less efficient.
+	*/
+	bool bAllowTransientResourceAllocator = true;
+};
+
+extern FD3D12WorkaroundFlags GD3D12WorkaroundFlags;
 
 /** Forward declare the context for the AMD AGS utility library. */
 struct AGSContext;
@@ -367,10 +400,6 @@ public:
 	virtual bool RHIGetRenderQueryResult(FRHIRenderQuery* RenderQuery, uint64& OutResult, bool bWait, uint32 GPUIndex = INDEX_NONE) final override;
 	virtual uint32 RHIGetViewportNextPresentGPUIndex(FRHIViewport* Viewport) final override;
 	virtual FTexture2DRHIRef RHIGetViewportBackBuffer(FRHIViewport* Viewport) final override;
-	UE_DEPRECATED(4.25, "RHIAliasTextureResources now takes references to FTextureRHIRef objects as parameters")
-	virtual void RHIAliasTextureResources(FRHITexture* DestTexture, FRHITexture* SrcTexture) final override;
-	UE_DEPRECATED(4.25, "RHICreateAliasedTexture now takes a reference to an FTextureRHIRef object")
-	virtual FTextureRHIRef RHICreateAliasedTexture(FRHITexture* SourceTexture) final override;
 	virtual void RHIAliasTextureResources(FTextureRHIRef& DestTexture, FTextureRHIRef& SrcTexture) final override;
 	virtual FTextureRHIRef RHICreateAliasedTexture(FTextureRHIRef& SourceTexture) final override;
 	virtual void RHIAdvanceFrameFence() final override;
@@ -491,8 +520,6 @@ public:
 		return RHICreateRenderQuery(QueryType);
 	}
 
-	virtual void RHICopySubTextureRegion(FRHITexture2D* SourceTexture, FRHITexture2D* DestinationTexture, FBox2D SourceBox, FBox2D DestinationBox) final override;
-
 	void RHICalibrateTimers() override;
 
 #if D3D12_RHI_RAYTRACING
@@ -501,7 +528,6 @@ public:
 	virtual FRayTracingAccelerationStructureSize RHICalcRayTracingGeometrySize(const FRayTracingGeometryInitializer& Initializer) final override;
 
 	virtual FRayTracingGeometryRHIRef RHICreateRayTracingGeometry(const FRayTracingGeometryInitializer& Initializer) final override;
-	virtual FRayTracingSceneRHIRef RHICreateRayTracingScene(const FRayTracingSceneInitializer& Initializer) final override;
 	virtual FRayTracingSceneRHIRef RHICreateRayTracingScene(FRayTracingSceneInitializer2 Initializer) final override;
 	virtual FRayTracingShaderRHIRef RHICreateRayTracingShader(TArrayView<const uint8> Code, const FSHAHash& Hash, EShaderFrequency ShaderFrequency) final override;
 	virtual FRayTracingPipelineStateRHIRef RHICreateRayTracingPipelineState(const FRayTracingPipelineStateInitializer& Initializer) final override;

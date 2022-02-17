@@ -13,6 +13,8 @@ using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.RegularExpressions;
+using EpicGames.Core;
+using Microsoft.Extensions.Logging;
 
 namespace UnrealGameSync
 {
@@ -116,16 +118,16 @@ namespace UnrealGameSync
 		int ScrollColumnsPerPage;
 
 		bool bIsSelecting;
-		TextSelection Selection;
+		TextSelection? Selection;
 
 		Size FontSize;
 
-		Timer SelectionScrollTimer;
+		Timer? SelectionScrollTimer;
 		int AutoScrollRate = 0;
 
-		Timer UpdateTimer;
+		Timer? UpdateTimer;
 		ConcurrentQueue<string> QueuedLines = new ConcurrentQueue<string>();
-		FileStream LogFileStream;
+		FileStream? LogFileStream;
 
 		public LogControl()
 		{
@@ -178,13 +180,13 @@ namespace UnrealGameSync
 			CloseFile();
 		}
 
-		public bool OpenFile(string NewLogFileName)
+		public bool OpenFile(FileReference NewLogFileName)
 		{
 			CloseFile();
 			Clear();
 			try
 			{
-				LogFileStream = File.Open(NewLogFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+				LogFileStream = FileReference.Open(NewLogFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
 			}
 			catch(Exception)
 			{
@@ -256,7 +258,7 @@ namespace UnrealGameSync
 				List<string> NewLines = new List<string>();
 				for(;;)
 				{
-					string NextLine;
+					string? NextLine;
 					if(!QueuedLines.TryDequeue(out NextLine))
 					{
 						break;
@@ -382,16 +384,16 @@ namespace UnrealGameSync
 						SelectedText.Append(Lines[LineIdx], MinIdx, MaxIdx - MinIdx);
 					}
 				}
-				Clipboard.SetText(SelectedText.ToString().Replace("\n", "\r\n"));
+				Clipboard.SetText(Regex.Replace(SelectedText.ToString(), "(?<!\r)\n", "\r\n"));
 			}
 		}
 
-		protected void ContextMenu_CopySelection(object sender, EventArgs e)
+		protected void ContextMenu_CopySelection(object? sender, EventArgs e)
 		{
 			CopySelection();
 		}
 
-		protected void ContextMenu_SelectAll(object sender, EventArgs e)
+		protected void ContextMenu_SelectAll(object? sender, EventArgs e)
 		{
 			SelectAll();
 		}
@@ -504,7 +506,7 @@ namespace UnrealGameSync
 				TextLocation Location = PointToTextLocation(e.Location);
 				Selection = new TextSelection(Location, Location);
 
-				SelectionScrollTimer.Start();
+				SelectionScrollTimer!.Start();
 				AutoScrollRate = 0;
 
 				Capture = true;
@@ -523,7 +525,7 @@ namespace UnrealGameSync
 		{
 			base.OnMouseMove(e);
 
-			if(bIsSelecting)
+			if(bIsSelecting && Selection != null)
 			{
 				TextLocation NewSelectionEnd = PointToTextLocation(e.Location);
 				if(NewSelectionEnd.LineIdx != Selection.End.LineIdx || NewSelectionEnd.ColumnIdx != Selection.End.ColumnIdx)
@@ -621,7 +623,7 @@ namespace UnrealGameSync
 				{
 					Selection = null;
 				}
-				SelectionScrollTimer.Stop();
+				SelectionScrollTimer!.Stop();
 				bIsSelecting = false;
 			}
 		}
@@ -795,7 +797,7 @@ namespace UnrealGameSync
 			ScrollLine = VerticalScroll.nPos;
 		}
 
-		protected void SelectionScrollTimer_TimerElapsed(object Sender, EventArgs Args)
+		protected void SelectionScrollTimer_TimerElapsed(object? Sender, EventArgs Args)
 		{
 			if(AutoScrollRate != 0 && Selection != null)
 			{
@@ -905,8 +907,13 @@ namespace UnrealGameSync
 		}
 	}
 
-	public class LogControlTextWriter : LineBasedTextWriter
+	public class LogControlTextWriter : ILogger
 	{
+		class NullDisposable : IDisposable
+		{
+			public void Dispose() { }
+		}
+
 		LogControl LogControl;
 
 		public LogControlTextWriter(LogControl InLogControl)
@@ -914,9 +921,22 @@ namespace UnrealGameSync
 			LogControl = InLogControl;
 		}
 
-		protected override void FlushLine(string Line)
+		public void Log<TState>(LogLevel LogLevel, EventId EventId, TState State, Exception Exception, Func<TState, Exception, string> Formatter)
 		{
-			LogControl.AppendLine(Line);
+			string Message = Formatter(State, Exception);
+			LogControl.AppendLine(Message);
+
+			if (Exception != null)
+			{
+				foreach (string Line in Exception.ToString().Trim().Split('\n'))
+				{
+					LogControl.AppendLine(Line);
+				}
+			}
 		}
+
+		public bool IsEnabled(LogLevel logLevel) => true;
+
+		public IDisposable BeginScope<TState>(TState state) => new NullDisposable();
 	}
 }

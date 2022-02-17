@@ -937,6 +937,7 @@ static void PropagateDataFromDefaultConfig(UDisplayClusterConfigurationData* InD
 	}
 }
 
+#if WITH_EDITOR
 void ADisplayClusterRootActor::RerunConstructionScripts()
 {
 	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("ADisplayClusterRootActor::RerunConstructionScripts"), STAT_RerunConstructionScripts, STATGROUP_NDisplay);
@@ -955,11 +956,10 @@ void ADisplayClusterRootActor::RerunConstructionScripts()
 				PropagateDataFromDefaultConfig(DefaultData, CurrentData);
 			}
 		}
-#if WITH_EDITOR
 		RerunConstructionScripts_Editor();
-#endif
 	}
 }
+#endif
 
 UDisplayClusterCameraComponent* ADisplayClusterRootActor::GetDefaultCamera() const
 {

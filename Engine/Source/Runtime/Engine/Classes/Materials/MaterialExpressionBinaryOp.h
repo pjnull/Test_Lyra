@@ -29,13 +29,13 @@ class UMaterialExpressionBinaryOp : public UMaterialExpression
 	UPROPERTY(EditAnywhere, Category = MaterialExpressionAdd, meta = (OverridingInputProperty = "B"))
 	float ConstB;
 
-	virtual UE::HLSLTree::EBinaryOp GetBinaryOp() const PURE_VIRTUAL(UMaterialExpressionBinaryOp::GetBinaryOp, return UE::HLSLTree::EBinaryOp::None;);
+	virtual UE::HLSLTree::EOperation GetBinaryOp() const PURE_VIRTUAL(UMaterialExpressionBinaryOp::GetBinaryOp, return UE::HLSLTree::EOperation::None;);
 
 	//~ Begin UMaterialExpression Interface
 #if WITH_EDITOR
 	virtual FText GetKeywords() const override;
 	virtual void GetCaption(TArray<FString>& OutCaptions) const override;
-	virtual EMaterialGenerateHLSLStatus GenerateHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FExpression*& OutExpression) override;
+	virtual bool GenerateHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FExpression*& OutExpression) override;
 	virtual int32 Compile(class FMaterialCompiler* Compiler, int32 OutputIndex) override;
 #endif // WITH_EDITOR
 	//~ End UMaterialExpression Interface
@@ -46,5 +46,5 @@ UCLASS(MinimalAPI, meta = (MaterialNewHLSLGenerator))
 class UMaterialExpressionLess : public UMaterialExpressionBinaryOp
 {
 	GENERATED_UCLASS_BODY()
-	virtual UE::HLSLTree::EBinaryOp GetBinaryOp() const override { return UE::HLSLTree::EBinaryOp::Less; }
+	virtual UE::HLSLTree::EOperation GetBinaryOp() const override { return UE::HLSLTree::EOperation::Less; }
 };

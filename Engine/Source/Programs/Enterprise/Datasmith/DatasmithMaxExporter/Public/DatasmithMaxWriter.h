@@ -80,7 +80,6 @@ public:
 	// CLASS RELATED FUNCTIONS
 	static EDSBitmapType GetTextureClass(Texmap* mTexMap);
 	static EDSMaterialType GetMaterialClass(Mtl* Material);
-	static BMM_Color_fl TemperatureToColor(float Kelvin);
 	/**
 	 * Gets a XRefMaterial and returns the rendered material which is either the SubMaterial or SourceMaterial depending on if the source material is overridden.
 	 * @param XRefMaterial	The XRefMaterial we want the rendered material of.
@@ -90,7 +89,7 @@ public:
 
 	static bool HasNonBakeableSubmap(Texmap* InTexmap);
 
-	static FLinearColor MaxColorToFLinearColor(BMM_Color_fl Color, float Multiplier = 1.0f);
+	static FLinearColor MaxColorToFLinearColor(BMM_Color_fl Color, float Multiplier = 1.0f); // todo: rename, although result type is FLinearColor this function does pow(rgb, 1/gamma), i.e. converting to gamma-space
 	static FLinearColor MaxLinearColorToFLinearColor(BMM_Color_fl Color, float Multiplier = 1.0f);
 	static float GetBitmapGamma(BitmapTex* InBitmapTex);
 	static float GetBitmapGamma(BitmapInfo* InBitmapInfo);

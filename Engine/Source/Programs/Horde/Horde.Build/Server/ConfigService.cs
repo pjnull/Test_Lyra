@@ -24,22 +24,22 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Reflection;
 
-using PoolId = HordeServer.Utilities.StringId<HordeServer.Models.IPool>;
 using System.Globalization;
 using HordeServer.Storage;
 using System.Text.Json.Serialization;
+using HordeCommon;
+using Microsoft.Extensions.Hosting;
 
 namespace HordeServer.Services
 {
+	using PoolId = StringId<IPool>;
 	using ProjectId = StringId<IProject>;
 	using StreamId = StringId<IStream>;
-	using NamespaceId = StringId<INamespace>;
-	using BucketId = StringId<IBucket>;
 
 	/// <summary>
 	/// Polls Perforce for stream config changes
 	/// </summary>
-	public class ConfigService : ElectedBackgroundService
+	public sealed class ConfigService : IHostedService, IDisposable
 	{
 		const string FileScheme = "file";
 		const string PerforceScheme = "p4-cluster";
@@ -47,79 +47,24 @@ namespace HordeServer.Services
 		/// <summary>
 		/// Config file version number
 		/// </summary>
-		const int Version = 5;
+		const int Version = 9;
 
-		/// <summary>
-		/// Database service
-		/// </summary>
 		DatabaseService DatabaseService;
-
-		/// <summary>
-		/// Project service
-		/// </summary>
 		ProjectService ProjectService;
-
-		/// <summary>
-		/// Stream service
-		/// </summary>
 		StreamService StreamService;
-
-		/// <summary>
-		/// Instance of the perforce service
-		/// </summary>
 		IPerforceService PerforceService;
-
-		/// <summary>
-		/// Load balancer instance
-		/// </summary>
-		private PerforceLoadBalancer PerforceLoadBalancer;
-
-		/// <summary>
-		/// Instance of the notification service
-		/// </summary>
+		PerforceLoadBalancer PerforceLoadBalancer;
 		INotificationService NotificationService;
-
-		/// <summary>
-		/// The namespace collection
-		/// </summary>
-		INamespaceCollection NamespaceCollection;
-
-		/// <summary>
-		/// The bucket collection
-		/// </summary>
-		IBucketCollection BucketCollection;
-
-		/// <summary>
-		/// Singleton instance of the pool service
-		/// </summary>
-		private readonly PoolService PoolService;
-
-		/// <summary>
-		/// The server settings
-		/// </summary>
+		AgentService AgentService;
+		PoolService PoolService;
 		IOptionsMonitor<ServerSettings> Settings;
-
-		/// <summary>
-		/// Logging device
-		/// </summary>
+		ITicker Ticker;
 		ILogger Logger;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="DatabaseService"></param>
-		/// <param name="PerforceService"></param>
-		/// <param name="PerforceLoadBalancer"></param>
-		/// <param name="ProjectService"></param>
-		/// <param name="StreamService"></param>
-		/// <param name="NotificationService"></param>
-		/// <param name="NamespaceCollection"></param>
-		/// <param name="BucketCollection"></param>
-		/// <param name="PoolService"></param>
-		/// <param name="Settings"></param>
-		/// <param name="Logger"></param>
-		public ConfigService(DatabaseService DatabaseService, IPerforceService PerforceService, ProjectService ProjectService, StreamService StreamService, INotificationService NotificationService, INamespaceCollection NamespaceCollection, IBucketCollection BucketCollection, PoolService PoolService, PerforceLoadBalancer PerforceLoadBalancer, IOptionsMonitor<ServerSettings> Settings, ILogger<ConfigService> Logger)
-			: base(DatabaseService, new ObjectId("5ff60549e7632b15e64ac2f7"), Logger)
+		public ConfigService(DatabaseService DatabaseService, IPerforceService PerforceService, ProjectService ProjectService, StreamService StreamService, INotificationService NotificationService, PoolService PoolService, AgentService AgentService, PerforceLoadBalancer PerforceLoadBalancer, IClock Clock, IOptionsMonitor<ServerSettings> Settings, ILogger<ConfigService> Logger)
 		{
 			this.DatabaseService = DatabaseService;
 			this.PerforceService = PerforceService;
@@ -127,15 +72,32 @@ namespace HordeServer.Services
 			this.ProjectService = ProjectService;
 			this.StreamService = StreamService;
 			this.NotificationService = NotificationService;
-			this.NamespaceCollection = NamespaceCollection;
-			this.BucketCollection = BucketCollection;
 			this.PoolService = PoolService;
+			this.AgentService = AgentService;
 			this.Settings = Settings;
+			if (DatabaseService.ReadOnlyMode)
+			{
+				this.Ticker = new NullTicker();
+			}
+			else
+			{
+				this.Ticker = Clock.AddSharedTicker<ConfigService>(TimeSpan.FromMinutes(1.0), TickLeaderAsync, Logger);
+			}
 			this.Logger = Logger;
 
 			// This will trigger if the local Horde.json user configuration is changed
 			this.Settings.OnChange(OnUserConfigUpdated);
 		}
+
+		/// <inheritdoc/>
+		public Task StartAsync(CancellationToken cancellationToken) => Ticker.StartAsync();
+
+		/// <inheritdoc/>
+		public Task StopAsync(CancellationToken cancellationToken) => Ticker.StopAsync();
+
+		/// <inheritdoc/>
+		public void Dispose() => Ticker.Dispose();
+
 
 		GlobalConfig? CachedGlobalConfig;
 		string? CachedGlobalConfigRevision;
@@ -179,18 +141,20 @@ namespace HordeServer.Services
 				}
 
 				Globals.ConfigRevision = Revision;
-				Globals.Notices = CachedGlobalConfig.Notices;
 				Globals.PerforceClusters = CachedGlobalConfig.PerforceClusters;
 				Globals.ScheduledDowntime = CachedGlobalConfig.Downtime;
 				Globals.MaxConformCount = CachedGlobalConfig.MaxConformCount;
-
-				await UpdateStorageConfigAsync(GlobalConfig.Storage);
+				Globals.ComputeClusters = CachedGlobalConfig.Compute;
+				Globals.RootAcl = Acl.Merge(null, CachedGlobalConfig.Acl);
 
 				if (await DatabaseService.TryUpdateSingletonAsync(Globals))
 				{
 					break;
 				}
 			}
+
+			// Update the agent rate table
+			await AgentService.UpdateRateTableAsync(GlobalConfig.Rates);
 
 			// Projects to remove
 			List<IProject> Projects = await ProjectService.GetProjectsAsync();
@@ -337,44 +301,6 @@ namespace HordeServer.Services
 			}
 		}
 
-		async Task UpdateStorageConfigAsync(StorageConfig? Config)
-		{
-			List<INamespace> Namespaces = await NamespaceCollection.FindAsync();
-			List<NamespaceId> RemoveNamespaceIds = Namespaces.ConvertAll(x => x.Id);
-
-			if (Config != null)
-			{
-				foreach (NamespaceConfig NamespaceConfig in Config.Namespaces)
-				{
-					NamespaceId NamespaceId = new NamespaceId(NamespaceConfig.Id);
-					RemoveNamespaceIds.Remove(NamespaceId);
-					await NamespaceCollection.AddOrUpdateAsync(NamespaceId, NamespaceConfig);
-
-					List<IBucket> Buckets = await BucketCollection.FindAsync(NamespaceId);
-					List<BucketId> RemoveBucketIds = Buckets.ConvertAll(x => x.BucketId);
-
-					foreach(BucketConfig BucketConfig in NamespaceConfig.Buckets)
-					{
-						BucketId BucketId = new BucketId(BucketConfig.Id);
-						await BucketCollection.AddOrUpdateAsync(NamespaceId, BucketId, BucketConfig);
-						RemoveBucketIds.Remove(BucketId);
-					}
-
-					foreach (BucketId RemoveBucketId in RemoveBucketIds)
-					{
-						Logger.LogInformation("Removing bucket {BucketId}", RemoveBucketId);
-						await BucketCollection.RemoveAsync(NamespaceId, RemoveBucketId);
-					}
-				}
-			}
-
-			foreach (NamespaceId RemoveNamespaceId in RemoveNamespaceIds)
-			{
-				Logger.LogInformation("Removing namespace {NamespaceId}", RemoveNamespaceId);
-				await NamespaceCollection.RemoveAsync(RemoveNamespaceId);
-			}
-		}
-
 		static FileExtensionContentTypeProvider ContentTypeProvider = new FileExtensionContentTypeProvider();
 
 		static string GetMimeTypeFromPath(Uri Path)
@@ -501,7 +427,7 @@ namespace HordeServer.Services
 		}
 
 		/// <inheritdoc/>
-		protected override async Task<DateTime> TickLeaderAsync(CancellationToken StoppingToken)
+		async ValueTask TickLeaderAsync(CancellationToken StoppingToken)
 		{
 
 			Uri? ConfigUri = null;
@@ -521,8 +447,6 @@ namespace HordeServer.Services
 			{
 				await UpdateConfigAsync(ConfigUri);
 			}
-		
-			return DateTime.UtcNow + TimeSpan.FromMinutes(1.0);
 		}
 
 		//
@@ -560,12 +484,12 @@ namespace HordeServer.Services
 				// write out the projects
 				foreach (KeyValuePair<string, string> Project in Request.ProjectsJson)
 				{
-					FileReference.WriteAllText(FileReference.Combine(GlobalConfigDirectory, Project.Key), Project.Value);
+					await FileReference.WriteAllTextAsync(FileReference.Combine(GlobalConfigDirectory, Project.Key), Project.Value);
 
 					if (Request.ProjectLogo != null)
 					{
 						Byte[] bytes = Convert.FromBase64String(Request.ProjectLogo);
-						FileReference.WriteAllBytes(FileReference.Combine(GlobalConfigDirectory, Project.Key.Replace(".json", ".png", StringComparison.OrdinalIgnoreCase)), bytes);
+						await FileReference.WriteAllBytesAsync(FileReference.Combine(GlobalConfigDirectory, Project.Key.Replace(".json", ".png", StringComparison.OrdinalIgnoreCase)), bytes);
 					}
 				}
 
@@ -579,7 +503,7 @@ namespace HordeServer.Services
 				// write out the streams
 				foreach (KeyValuePair<string, string> Stream in Request.StreamsJson)
 				{
-					FileReference.WriteAllText(FileReference.Combine(GlobalConfigDirectory, Stream.Key), Stream.Value);
+					await FileReference.WriteAllTextAsync(FileReference.Combine(GlobalConfigDirectory, Stream.Key), Stream.Value);
 				}
 			}
 
@@ -588,7 +512,7 @@ namespace HordeServer.Services
 			{
 				ConfigDirty = true;
 
-				FileReference.WriteAllText(GlobalConfigFile, Request.GlobalsJson);
+				await FileReference.WriteAllTextAsync(GlobalConfigFile, Request.GlobalsJson);
 			}
 
 			if (ConfigDirty == true)
@@ -677,14 +601,14 @@ namespace HordeServer.Services
 					if (Property == null)
 					{
 						Response.Errors.Add($"Horde configuration property {Pair.Key} does not exist when reading server settings");
-						Logger.LogError(Response.Errors.Last());
+						Logger.LogError("Horde configuration property {Key} does not exist when reading server settings", Pair.Key);
 						continue;
 					}
 
 					if (Property.SetMethod == null)
 					{
 						Response.Errors.Add($"Horde configuration property {Pair.Key} does not have a set method");
-						Logger.LogError(Response.Errors.Last());
+						Logger.LogError("Horde configuration property {Key} does not have a set method", Pair.Key);
 						continue;
 					}
 
@@ -768,7 +692,7 @@ namespace HordeServer.Services
 					if (Property == null)
 					{
 						Response.Errors.Add($"Horde configuration property {Name} does not exist when writing server settings");
-						Logger.LogError(Response.Errors.Last());
+						Logger.LogError("Horde configuration property {Name} does not exist when writing server settings", Name);
 
 						continue;
 					}
@@ -776,7 +700,7 @@ namespace HordeServer.Services
 					if (Property.GetMethod == null)
 					{
 						Response.Errors.Add($"Horde configuration property {Name} does not have a get method");
-						Logger.LogError(Response.Errors.Last());
+						Logger.LogError("Horde configuration property {Name} does not have a get method", Name);
 						continue;
 					}
 
@@ -785,7 +709,7 @@ namespace HordeServer.Services
 					if (Result == null)
 					{
 						Response.Errors.Add($"Horde configuration property {Name} was null while writing and should have already been filtered out");
-						Logger.LogError(Response.Errors.Last());
+						Logger.LogError("Horde configuration property {Name} was null while writing and should have already been filtered out", Name);
 						continue;
 					}
 

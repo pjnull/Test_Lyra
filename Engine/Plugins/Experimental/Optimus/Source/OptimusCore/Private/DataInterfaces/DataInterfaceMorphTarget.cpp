@@ -3,7 +3,7 @@
 #include "DataInterfaces/DataInterfaceMorphTarget.h"
 
 #include "Components/SkeletalMeshComponent.h"
-#include "ComputeFramework/ComputeKernelPermutationSet.h"
+#include "ComputeFramework/ComputeKernelPermutationVector.h"
 #include "ComputeFramework/ShaderParamTypeDefinition.h"
 #include "OptimusDataDomain.h"
 #include "Rendering/SkeletalMeshLODRenderData.h"
@@ -80,6 +80,11 @@ void UMorphTargetDataInterface::GetShaderParameters(TCHAR const* UID, FShaderPar
 	OutBuilder.AddNestedStruct<FMorphTargetDataInterfaceParameters>(UID);
 }
 
+void UMorphTargetDataInterface::GetPermutations(FComputeKernelPermutationVector& OutPermutationVector) const
+{
+	OutPermutationVector.AddPermutation(TEXT("ENABLE_DEFORMER_MORPHTARGET"), 2);
+}
+
 void UMorphTargetDataInterface::GetHLSL(FString& OutHLSL) const
 {
 	OutHLSL += TEXT("#include \"/Plugin/Optimus/Private/DataInterfaceMorphTarget.ush\"\n");
@@ -142,35 +147,52 @@ FIntVector FMorphTargetDataProviderProxy::GetDispatchDim(int32 InvocationIndex, 
 	return FIntVector(NumGroups, 1, 1);
 }
 
-void FMorphTargetDataProviderProxy::GetPermutations(int32 InvocationIndex, FComputeKernelPermutationSet& OutPermutationSet) const
+struct FMorphTargetDataInterfacePermutationIds
 {
-	// todo[CF]: Set permutations required such as ENABLE_DEFORMER_MORPHTARGET
-}
+	uint32 EnableDeformerMorphTarget = 0;
 
-void FMorphTargetDataProviderProxy::GetBindings(int32 InvocationIndex, TCHAR const* UID, FBindings& OutBindings) const
+	FMorphTargetDataInterfacePermutationIds(FComputeKernelPermutationVector const& PermutationVector)
+	{
+		{
+			static FString Name(TEXT("ENABLE_DEFORMER_MORPHTARGET"));
+			static uint32 Hash = GetTypeHash(Name);
+			EnableDeformerMorphTarget = PermutationVector.GetPermutationBits(Name, Hash, 1);
+		}
+	}
+};
+
+void FMorphTargetDataProviderProxy::GatherDispatchData(FDispatchSetup const& InDispatchSetup, FCollectedDispatchData& InOutDispatchData)
 {
-	const int32 SectionIdx = InvocationIndex;
-
-	FMorphTargetDataInterfaceParameters Parameters;
-	FMemory::Memset(&Parameters, 0, sizeof(Parameters));
+	if (!ensure(InDispatchSetup.ParameterStructSizeForValidation == sizeof(FMorphTargetDataInterfaceParameters)))
+	{
+		return;
+	}
 
 	FSkeletalMeshRenderData const& SkeletalMeshRenderData = SkeletalMeshObject->GetSkeletalMeshRenderData();
 	FSkeletalMeshLODRenderData const* LodRenderData = SkeletalMeshRenderData.GetPendingFirstLOD(0);
-	FSkelMeshRenderSection const& RenderSection = LodRenderData->RenderSections[SectionIdx];
+	if (!ensure(LodRenderData->RenderSections.Num() == InDispatchSetup.NumInvocations))
+	{
+		return;
+	}
 
-	const int32 LodIndex = SkeletalMeshRenderData.GetPendingFirstLODIdx(0);
-	const bool bPreviousFrame = false;
-	FRHIShaderResourceView* MorphBufferSRV = FSkeletalMeshDeformerHelpers::GetMorphTargetBufferForReading(SkeletalMeshObject, LodIndex, SectionIdx, FrameNumber, bPreviousFrame);
-	const bool bValidMorph = MorphBufferSRV != nullptr;
+	FMorphTargetDataInterfacePermutationIds PermutationIds(InDispatchSetup.PermutationVector);
 
 	FRHIShaderResourceView* NullSRVBinding = GWhiteVertexBufferWithSRV->ShaderResourceViewRHI.GetReference();
 
-	Parameters.NumVertices = RenderSection.NumVertices;
-	Parameters.InputStreamStart = RenderSection.BaseVertexIndex;
-	Parameters.MorphBuffer = MorphBufferSRV != nullptr ? MorphBufferSRV : NullSRVBinding;
+	for (int32 InvocationIndex = 0; InvocationIndex < InDispatchSetup.NumInvocations; ++InvocationIndex)
+	{
+		FSkelMeshRenderSection const& RenderSection = LodRenderData->RenderSections[InvocationIndex];
 
-	TArray<uint8> ParamData;
-	ParamData.SetNum(sizeof(Parameters));
-	FMemory::Memcpy(ParamData.GetData(), &Parameters, sizeof(Parameters));
-	OutBindings.Structs.Add(TTuple<FString, TArray<uint8> >(UID, MoveTemp(ParamData)));
+		const int32 LodIndex = SkeletalMeshRenderData.GetPendingFirstLODIdx(0);
+		const bool bPreviousFrame = false;
+		FRHIShaderResourceView* MorphBufferSRV = FSkeletalMeshDeformerHelpers::GetMorphTargetBufferForReading(SkeletalMeshObject, LodIndex, InvocationIndex, FrameNumber, bPreviousFrame);
+		const bool bValidMorph = MorphBufferSRV != nullptr;
+
+		FMorphTargetDataInterfaceParameters* Parameters = (FMorphTargetDataInterfaceParameters*)(InOutDispatchData.ParameterBuffer + InDispatchSetup.ParameterBufferOffset + InDispatchSetup.ParameterBufferStride * InvocationIndex);
+		Parameters->NumVertices = RenderSection.NumVertices;
+		Parameters->InputStreamStart = RenderSection.BaseVertexIndex;
+		Parameters->MorphBuffer = MorphBufferSRV != nullptr ? MorphBufferSRV : NullSRVBinding;
+
+		InOutDispatchData.PermutationId[InvocationIndex] |= (bValidMorph ? PermutationIds.EnableDeformerMorphTarget : 0);
+	}
 }

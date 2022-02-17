@@ -75,11 +75,17 @@ export enum JobStepBatchState {
 	// Waiting for dependencies of at least one jobstep to complete
 	Waiting = "Waiting",
 
+	// Getting ready to execute
+	Starting = "Starting",
+
 	// Ready to execute
 	Ready = "Ready",
 
 	// Currently running
 	Running = "Running",
+
+	// Getting ready to execute
+	Stopping = "Stopping",
 
 	// All steps have finished executing
 	Complete = "Complete"
@@ -116,7 +122,11 @@ export enum JobStepBatchError {
 	LostConnection = "LostConnection",
 
 	/** Lease terminated prematurely */
-	Incomplete = "Incomplete"
+	Incomplete = "Incomplete",
+
+	/** An error ocurred while executing the lease. Cannot be retried. */
+	ExecutionError = "ExecutionError"
+
 
 }
 
@@ -251,7 +261,21 @@ export type LogLineData = {
 	lines?: LogLine[];
 };
 
+export type JobStreamQuery = {
+	filter?: string;
+	template?: string[];
+	preflightStartedByUserId?: string,
+	includePreflight?: boolean,
+	maxCreateTime?: string;
+	modifiedAfter?: string;
+	index?: number;
+	count?: number;
+	consistentRead?: boolean;
+
+};
+
 export type JobQuery = {
+	id?: string[],
 	filter?: string;
 	streamId?: string;
 	name?: string;
@@ -261,15 +285,24 @@ export type JobQuery = {
 	minChange?: number;
 	maxChange?: number;
 	preflightChange?: number;
-	includePreflight?: boolean,
-	preflightStartedByUserId?: string,
-	startedByUserId?: string,
+	preflightOnly?: boolean;
+	includePreflight?: boolean;
+	preflightStartedByUserId?: string;
+	startedByUserId?: string;
 	minCreateTime?: string;
 	maxCreateTime?: string;
 	modifiedAfter?: string;
 	index?: number;
 	count?: number;
 };
+
+export type JobTimingsQuery = {
+	streamId?: string;
+	template?: string[];
+	filter?: string;
+	count?: number;
+};
+
 
 export type IssueQuery = {
 	jobId?: string;
@@ -286,6 +319,18 @@ export type IssueQuery = {
 	resolved?: boolean;
 	promoted?: boolean;
 }
+
+export type IssueQueryV2 = {
+	id?: string[]; 
+	streamId?: string;
+	minChange?: number;
+	maxChange?: number;
+	resolved?: boolean;
+	index?: number;
+	count?: number;
+	filter?: string;
+}
+
 
 export type UsersQuery = {
 	ids?: string[];
@@ -362,7 +407,12 @@ export type UpdateAgentRequest = {
 	/**Boolean to request a conform */
 	requestConform?: boolean;
 
+	/** Request that a full conform be performed, removing all intermediate files */
+	requestFullConform?: boolean;
+
 	requestRestart?: boolean;
+
+	requestShutdown?: boolean;
 
 	/**Per-agent override for the desired client version */
 	forceVersion?: string;
@@ -618,6 +668,12 @@ export type GetAgentResponse = {
 	/** Next conform attempt time */
 	nextConformTime?: Date | string;
 
+	/** The reason for the last shutdown */
+	lastShutdownReason: string;
+
+	/** Whether a shutdown is pending */
+	pendingShutdown: boolean;
+
 	/** agent workspaces */
 	workspaces: GetAgentWorkspaceResponse[];
 
@@ -806,14 +862,11 @@ export type CreateJobRequest = {
 	/** Whether to automatically submit the preflighted change on completion */
 	autoSubmit?: boolean;
 
+	/** Whether to update issues based on the outcome of this job */
+	updateIssues?: boolean;
+
 	/** Nodes for the new job */
 	groups?: CreateGroupRequest[];
-
-	/** Aggregates for the new job */
-	aggregates?: CreateAggregateRequest[];
-
-	/** Labels for the new job*/
-	labels?: CreateLabelRequest[];
 
 	/** Arguments for the job */
 	arguments?: string[];
@@ -896,14 +949,8 @@ export type GetJobResponse = {
 	/** Hash of the graph for this job */
 	graphHash?: string;
 
-	/** @deprecated The user that started this job */
-	startedByUser?: string;
-
 	/** The user that started this job */
 	startedByUserInfo?: GetThinUserInfoResponse;
-
-	/** @deprecated The user that aborted this job */
-	abortedByUser?: string;
 
 	/** The user that started this job */
 	abortedByUserInfo?: GetThinUserInfoResponse;
@@ -946,6 +993,9 @@ export type GetJobResponse = {
 
 	/**The last update time for this job*/
 	updateTime: Date | string;
+
+	/** Whether to update issues based on the outcome of this job */
+	updateIssues?: boolean;
 
 	/**  Custom permissions for this object */
 	acl?: GetAclResponse;
@@ -995,14 +1045,8 @@ export type GetStepResponse = {
 	/** If the step has been requested to abort	*/
 	abortRequested?: boolean;
 
-	/** @deprecated Name of the user that requested the abort of this step */
-	abortByUser?: string;
-
 	/* The user that requested the abort of this step */
 	abortedByUserInfo?: GetThinUserInfoResponse;
-
-	/** @deprecated Name of the user that requested this step be run again */
-	retryByUser?: string;
 
 	/* The user that retried this step */
 	retriedByUserInfo?: GetThinUserInfoResponse;
@@ -1093,6 +1137,9 @@ export type GetBatchResponse = {
 
 	/**The agent assigned to execute this group */
 	agentId?: string;
+
+	/** The USD rate of an agent hour */
+	agentRate?: number;
 
 	/**The agent session holding this lease */
 	sessionId?: string;
@@ -1736,6 +1783,12 @@ export type GetStreamResponse = {
 	/**Name of the stream */
 	name: string;
 
+	/**The config file path on the server*/
+	configPath?:string;
+
+	/**Revision of the config file */
+	configRevision?:string;
+
 	/**List of tabs to display for this stream*/
 	tabs: GetStreamTabResponse[];
 
@@ -1790,6 +1843,9 @@ export type CreateTemplateRequest = {
 	/**Whether to allow preflights of this template */
 	allowPreflights: boolean;
 
+	/**Whether always update issues regardless of how job was created */
+	updateIssues: boolean;
+
 	/**Array of nodes for this job */
 	groups: CreateGroupRequest[];
 
@@ -1838,6 +1894,9 @@ export enum ParameterType {
 /**Base class for template parameters */
 export type ParameterData = {
 	type: ParameterType;
+
+	// client side key, with group encoding
+	parameterKey?: string;
 }
 
 /**Used to group a number of other parameters */
@@ -1953,6 +2012,9 @@ export type GetTemplateResponse = {
 	/**Whether to allow preflights of this template */
 	allowPreflights: boolean;
 
+	/**Whether to always update issues on jobs that use this template */
+	updateIssues: boolean;
+
 	/**List of node groups for this job */
 	groups: CreateGroupRequest[];
 
@@ -1974,9 +2036,6 @@ export type GetChangeSummaryResponse = {
 
 	/**  The source changelist number */
 	number: number;
-
-	/**  @deprecated Name of the user that authored this change */
-	author: string;
 
 	/**  The description text */
 	description: string;
@@ -2276,11 +2335,17 @@ export type GetGraphResponse = {
 /**The timing info for  */
 export type GetJobTimingResponse = {
 
+	job: JobData;
+	jobResponse: JobData;
 	/**Timing info for each step */
 	steps: { [key: string]: GetStepTimingInfoResponse };
 
 	/**Timing information for each label */
 	labels: GetLabelTimingInfoResponse[];
+}
+/** batch timing info */
+export type FindJobTimingsResponse = {
+	timings: { [jobId: string]: GetJobTimingResponse };
 }
 
 /**Information about the timing info for a label */
@@ -2615,17 +2680,9 @@ export type GetIssueResponse = {
 	/**Whether the issue is promoted */
 	promoted: boolean;
 
-	/** @deprecated Owner of the issue */
-	owner?: string;
-
-	/** @deprecated Owner id of the issue */
-	ownerId?: string;
 
 	/** Owner of the issue */
 	ownerInfo: GetThinUserInfoResponse;
-
-	/** @deprecated User that nominated the current owner */
-	nominatedBy?: string;
 
 	/** Use that nominated the current owner */
 	nominatedByInfo: GetThinUserInfoResponse;
@@ -2638,12 +2695,6 @@ export type GetIssueResponse = {
 
 	/**Time at which the issue was resolved */
 	resolvedAt?: Date | string;
-
-	/** @deprecated Name of the user that resolved the issue */
-	resolvedBy?: string;
-
-	/** @deprecated User id of the person that resolved the issue */
-	resolvedById?: string;
 
 	/** Use info for the person that resolved the issue */
 	resolvedByInfo: GetThinUserInfoResponse;
@@ -2659,12 +2710,8 @@ export type GetIssueResponse = {
 
 	affectedStreams: GetIssueAffectedStreamResponse[];
 
-	/** @deprecated User id's of the Most likely suspects for causing this issue */
-	primarySuspectIds: string[];
-
 	/** Use info for the person that resolved the issue */
 	primarySuspectsInfo: GetThinUserInfoResponse[];
-
 
 	/** Whether to show alerts for this issue */
 	showDesktopAlerts: boolean;
@@ -2725,6 +2772,8 @@ export type GetUtilizationTelemetryPool = {
 	adminTime: number;
 
 	otherTime: number;
+
+	hibernatingTime?: number | undefined;
 
 	streams: GetUtilizationTelemetryStream[];
 }
@@ -2799,9 +2848,6 @@ export type GetUserResponse = {
 	/** Claims for the user */
 	claims?: UserClaim[];
 
-	/** Whether to enable slack notifications for this user */
-	enableIssueNotifications?: boolean;
-
 	/** Whether to enable experimental features for this user */
 	enableExperimentalFeatures?: boolean;
 
@@ -2841,9 +2887,6 @@ export type UpdateUserRequest = {
 
 	/** Job ids to remove from the pinned list */
 	removePinnedJobIds?: string[];
-
-	/** Whether to enable slack notifications for this user */
-	enableIssueNotifications?: boolean;
 
 	/** Whether to enable experimental features for this user */
 	enableExperimentalFeatures?: boolean;
@@ -3407,7 +3450,7 @@ export type NamespaceConfig = {
 	buckets: BucketConfig[];
 
 	/// Access control for this namespace
-	//UpdateAclRequest? Acl { get; set; }
+	//UpdateAclRequest? Acl;
 }
 
 /// Configuration for a bucket
@@ -3438,7 +3481,7 @@ export type GlobalConfig = {
 	storage?: StorageConfig;
 
 	/// Access control list
-	// public UpdateAclRequest ? Acl { get; set; }
+	// public UpdateAclRequest ? Acl;
 }
 
 
@@ -3489,7 +3532,7 @@ export type ProjectConfig = {
 	streams: StreamConfigRef[];
 
 	/// Acl entries
-	// public UpdateAclRequest? Acl { get; set; }
+	// public UpdateAclRequest? Acl;
 }
 
 
@@ -3639,17 +3682,17 @@ export type StreamConfig = {
 	/// <summary>
 	/// Custom permissions for this object
 	/// </summary>
-	// public UpdateAclRequest ? Acl { get; set; }
+	// public UpdateAclRequest ? Acl;
 
 	/// <summary>
 	/// Pause stream builds until specified date
 	/// </summary>
-	/// public DateTime ? PausedUntil { get; set; }
+	/// public DateTime ? PausedUntil;
 
 	/// <summary>
 	/// Reason for pausing builds of the stream
 	/// </summary>
-	// public string ? PauseComment { get; set; }
+	// public string ? PauseComment;
 }
 
 /// Parameters to update server settings
@@ -3687,3 +3730,100 @@ export type GetServerInfoResponse = {
 	singleInstance: boolean;
 }
 
+/// Information about a span within an issue
+export type FindIssueSpanResponse = {
+
+	/// Unique id of this span
+	id: string;
+
+	/// The template containing this step
+	templateId: string;
+
+	/// Name of the step
+	name: string;
+
+	/// The previous build 
+	lastSuccess?: GetIssueStepResponse;
+
+	/// The following successful build
+	nextSuccess?: GetIssueStepResponse;
+
+}
+
+/// Stores information about a build health issue
+export type FindIssueResponse = {
+	/// The unique object id
+	id: number;
+
+	/// Time at which the issue was created
+	createdAt: Date | string;
+
+	/// Time at which the issue was retrieved
+	RetrievedAt: Date | string;
+
+	/// The associated project for the issue
+	project?: string;
+
+	/// The summary text for this issue
+	summary: string;
+
+	/// Detailed description text
+	description?: string;
+
+	/// Severity of this issue
+	severity: IssueSeverity;
+
+	/// Current severity in the queried stream
+	streamSeverity?: IssueSeverity;
+
+	/// Whether the issue is promoted
+	promoted: boolean;
+
+	/// Owner of the issue
+	owner?: GetThinUserInfoResponse;
+
+	/// Owner of the issue
+	mominatedBy?: GetThinUserInfoResponse;
+
+	/// Time that the issue was acknowledged
+	acknowledgedAt?: Date | string;
+
+	/// Changelist that fixed this issue
+	fixChange?: number;
+
+	/// Time at which the issue was resolved
+	resolvedAt?: Date | string;
+
+	/// User that resolved the issue
+	resolvedBy?: GetThinUserInfoResponse;
+
+	/// Time at which the issue was verified
+	verifiedAt?: Date | string;
+
+	/// Time that the issue was last seen
+	lastSeenAt: Date | string;
+
+	/// Spans for this issue
+	spans: FindIssueSpanResponse[];
+}
+
+export type GetAgentSoftwareChannelResponse = {
+	name?: string;
+	modifiedBy?: string;
+	modifiedTime: string;
+	version?: string;
+}
+
+/// Jira issue information
+export type GetJiraIssueResponse = {
+
+	key: string;
+	jiraLink: string;
+	statusName?: string;
+	priorityName?: string;
+	resolutionName?: string;
+	assigneeName?: string;
+	assigneeDisplayName?: string;
+	assigneeEmailAddress?: string;
+
+}

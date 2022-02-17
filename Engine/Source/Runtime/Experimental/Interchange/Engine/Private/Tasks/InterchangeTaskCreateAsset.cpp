@@ -19,6 +19,7 @@
 #include "UObject/ObjectMacros.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 #include "Nodes/InterchangeBaseNode.h"
+#include "Nodes/InterchangeFactoryBaseNode.h"
 
 namespace UE
 {
@@ -39,7 +40,16 @@ namespace UE
 				FString SanitazedPackageBasePath = PackageBasePath;
 				SanitizeObjectPath(SanitazedPackageBasePath);
 
-				OutPackageName = FPaths::Combine(*SanitazedPackageBasePath, *OutAssetName);
+				FString SubPath;
+				if (const UInterchangeFactoryBaseNode* FactoryBaseNode = Cast<UInterchangeFactoryBaseNode>(Node))
+				{
+					if(FactoryBaseNode->GetCustomSubPath(SubPath))
+					{
+						SanitizeObjectPath(SubPath);
+					}
+				}
+
+				OutPackageName = FPaths::Combine(*SanitazedPackageBasePath, *SubPath, *OutAssetName);
 			}
 
 			UObject* GetExistingObjectFromAssetImportData(TSharedPtr<UE::Interchange::FImportAsyncHelper, ESPMode::ThreadSafe> AsyncHelper, UInterchangeBaseNode* Node)
@@ -321,10 +331,6 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 			CreateAssetParams.NodeContainer = AsyncHelper->BaseNodeContainers[SourceIndex].Get();
 		}
 		CreateAssetParams.ReimportObject = AsyncHelper->TaskData.ReimportObject;
-
-		CreateAssetParams.ReimportStrategyFlags = EReimportStrategyFlags::ApplyNoProperties;
-		//CreateAssetParams.ReimportStrategyFlags = EReimportStrategyFlags::ApplyPipelineProperties;
-		//CreateAssetParams.ReimportStrategyFlags = EReimportStrategyFlags::ApplyEditorChangedProperties;
 
 		NodeAsset = Factory->CreateAsset(CreateAssetParams);
 	}

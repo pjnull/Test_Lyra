@@ -852,6 +852,7 @@ bool IsProceduralSave(bool bIsCooking, const FPackagePath& TargetPackagePath, ui
 
 void CallPreSave(UObject* Object, FObjectSaveContextData& ObjectSaveContext)
 {
+	SCOPED_SAVETIMER_TEXT(*WriteToString<256>(Object->GetClass()->GetFName(), TEXTVIEW("_PreSave")));
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS;
 	Object->PreSave(ObjectSaveContext.TargetPlatform);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS;
@@ -874,6 +875,7 @@ void CallPreSave(UObject* Object, FObjectSaveContextData& ObjectSaveContext)
 
 void CallPreSaveRoot(UObject* Object, FObjectSaveContextData& ObjectSaveContext)
 {
+	SCOPED_SAVETIMER_TEXT(*WriteToString<256>(Object->GetClass()->GetFName(), TEXTVIEW("_PreSave")));
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS;
 	bool bLegacyNeedsCleanup = Object->PreSaveRoot(*ObjectSaveContext.TargetFilename);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS;
@@ -885,6 +887,7 @@ void CallPreSaveRoot(UObject* Object, FObjectSaveContextData& ObjectSaveContext)
 
 void CallPostSaveRoot(UObject* Object, FObjectSaveContextData& ObjectSaveContext, bool bNeedsCleanup)
 {
+	SCOPED_SAVETIMER_TEXT(*WriteToString<256>(Object->GetClass()->GetFName(), TEXTVIEW("_PreSave")));
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS;
 	Object->PostSaveRoot(bNeedsCleanup);
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS;
@@ -1377,12 +1380,15 @@ void FEDLCookChecker::Reset()
 	bIsActive = false;
 }
 
+LLM_DEFINE_TAG(EDLCookChecker);
+
 void FEDLCookChecker::AddImport(UObject* Import, UPackage* ImportingPackage)
 {
 	if (bIsActive)
 	{
 		if (!Import->GetOutermost()->HasAnyPackageFlags(PKG_CompiledIn))
 		{
+			LLM_SCOPE_BYTAG(EDLCookChecker);
 			FEDLNodeID NodeId = FindOrAddNode(FEDLNodeHash(Import, EObjectEvent::Serialize));
 			FEDLNodeData& NodeData = Nodes[NodeId];
 			FName ImportingPackageName = ImportingPackage->GetFName();
@@ -1399,6 +1405,7 @@ void FEDLCookChecker::AddExport(UObject* Export)
 {
 	if (bIsActive)
 	{
+		LLM_SCOPE_BYTAG(EDLCookChecker);
 		FEDLNodeID SerializeID = FindOrAddNode(FEDLNodeHash(Export, EObjectEvent::Serialize));
 		Nodes[SerializeID].bIsExport = true;
 		FEDLNodeID CreateID = FindOrAddNode(FEDLNodeHash(Export, EObjectEvent::Create));
@@ -1411,6 +1418,7 @@ void FEDLCookChecker::AddArc(UObject* DepObject, bool bDepIsSerialize, UObject* 
 {
 	if (bIsActive)
 	{
+		LLM_SCOPE_BYTAG(EDLCookChecker);
 		FEDLNodeID ExportID = FindOrAddNode(FEDLNodeHash(Export, bExportIsSerialize ? EObjectEvent::Serialize : EObjectEvent::Create));
 		FEDLNodeID DepID = FindOrAddNode(FEDLNodeHash(DepObject, bDepIsSerialize ? EObjectEvent::Serialize : EObjectEvent::Create));
 		AddDependency(ExportID, DepID);
@@ -1421,6 +1429,7 @@ void FEDLCookChecker::AddPackageWithUnknownExports(FName LongPackageName)
 {
 	if (bIsActive)
 	{
+		LLM_SCOPE_BYTAG(EDLCookChecker);
 		PackagesWithUnknownExports.Add(LongPackageName);
 	}
 }
@@ -1433,6 +1442,7 @@ void FEDLCookChecker::AddDependency(FEDLNodeID SourceID, FEDLNodeID TargetID)
 
 void FEDLCookChecker::StartSavingEDLCookInfoForVerification()
 {
+	LLM_SCOPE_BYTAG(EDLCookChecker);
 	FScopeLock CookCheckerInstanceLock(&CookCheckerInstanceCritical);
 	for (FEDLCookChecker* Checker : CookCheckerInstances)
 	{

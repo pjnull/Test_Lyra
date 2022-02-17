@@ -500,21 +500,69 @@ class FStrataMaterialStencilTaggingPassPS : public FGlobalShader
 IMPLEMENT_GLOBAL_SHADER(FStrataTilePassVS, "/Engine/Private/Strata/StrataTiling.usf", "StrataTilePassVS", SF_Vertex);
 IMPLEMENT_GLOBAL_SHADER(FStrataMaterialStencilTaggingPassPS, "/Engine/Private/Strata/StrataTiling.usf", "StencilTaggingMainPS", SF_Pixel);
 
-void FillUpTiledPassData(
-	EStrataTileMaterialType Type, 
-	const FViewInfo& View, 
-	FStrataTilePassVS::FParameters& ParametersVS,
+static FStrataTileParameter InternalSetTileParameters(FRDGBuilder* GraphBuilder, const FViewInfo& View, const EStrataTileMaterialType TileType)
+{
+	FStrataTileParameter Out;
+	if (View.StrataSceneData && TileType != EStrataTileMaterialType::ECount)
+	{
+		Out.TileListBuffer = View.StrataSceneData->ClassificationTileListBufferSRV[TileType];
+		Out.TileIndirectBuffer = View.StrataSceneData->ClassificationTileIndirectBuffer[TileType];
+	}
+	else if (GraphBuilder)
+	{
+		FRDGBufferRef BufferDummy = GSystemTextures.GetDefaultBuffer(*GraphBuilder, 4, 0u);
+		FRDGBufferSRVRef BufferDummySRV = GraphBuilder->CreateSRV(BufferDummy, PF_R32_UINT);
+		Out.TileListBuffer = BufferDummySRV;
+		Out.TileIndirectBuffer = BufferDummy;
+	}
+	return Out;
+}
+
+FStrataTilePassVS::FParameters SetTileParameters(
+	const FViewInfo& View,
+	const EStrataTileMaterialType TileType,
 	EPrimitiveType& PrimitiveType)
 {
-	ParametersVS.OutputViewSizeAndInvSize = View.CachedViewUniformShaderParameters->ViewSizeAndInvSize;
-	ParametersVS.OutputBufferSizeAndInvSize = View.CachedViewUniformShaderParameters->BufferSizeAndInvSize;
-	ParametersVS.ViewScreenToTranslatedWorld = View.CachedViewUniformShaderParameters->ScreenToTranslatedWorld;
-
-	ParametersVS.TileListBuffer = View.StrataSceneData->ClassificationTileListBufferSRV[Type];
-	ParametersVS.TileIndirectBuffer = View.StrataSceneData->ClassificationTileIndirectBuffer[Type];
-
+	FStrataTileParameter Temp = InternalSetTileParameters(nullptr, View, TileType);
 	PrimitiveType = GRHISupportsRectTopology ? PT_RectList : PT_TriangleList;
+
+	FStrataTilePassVS::FParameters Out;
+	Out.OutputViewSizeAndInvSize = View.CachedViewUniformShaderParameters->ViewSizeAndInvSize;
+	Out.OutputBufferSizeAndInvSize = View.CachedViewUniformShaderParameters->BufferSizeAndInvSize;
+	Out.ViewScreenToTranslatedWorld = View.CachedViewUniformShaderParameters->ScreenToTranslatedWorld;
+	Out.TileListBuffer = Temp.TileListBuffer;
+	Out.TileIndirectBuffer = Temp.TileIndirectBuffer;
+	return Out;
 }
+
+FStrataTilePassVS::FParameters SetTileParameters(
+	FRDGBuilder& GraphBuilder, 
+	const FViewInfo& View, 
+	const EStrataTileMaterialType TileType,
+	EPrimitiveType& PrimitiveType)
+{
+	FStrataTileParameter Temp = InternalSetTileParameters(&GraphBuilder, View, TileType);
+	PrimitiveType = GRHISupportsRectTopology ? PT_RectList : PT_TriangleList;
+
+	FStrataTilePassVS::FParameters Out;
+	Out.OutputViewSizeAndInvSize = View.CachedViewUniformShaderParameters->ViewSizeAndInvSize;
+	Out.OutputBufferSizeAndInvSize = View.CachedViewUniformShaderParameters->BufferSizeAndInvSize;
+	Out.ViewScreenToTranslatedWorld = View.CachedViewUniformShaderParameters->ScreenToTranslatedWorld;
+	Out.TileListBuffer = Temp.TileListBuffer;
+	Out.TileIndirectBuffer = Temp.TileIndirectBuffer;
+	return Out;
+}
+
+FStrataTileParameter SetTileParameters(FRDGBuilder& GraphBuilder, const FViewInfo& View, const EStrataTileMaterialType TileType)
+{
+	return InternalSetTileParameters(&GraphBuilder, View, TileType);
+}
+
+// Add additionnaly bits for filling/clearing stencil to ensure that the 'Strata' bits are not corrupted by the stencil shadows 
+// when generating shadow mask. Withouth these 'trailing' bits, the incr./decr. operation would change/corrupt the 'Strata' bits
+constexpr uint32 StencilBit_Fast_1	  = 0x07u | StencilBit_Fast;
+constexpr uint32 StencilBit_Single_1  = 0x07u | StencilBit_Single;
+constexpr uint32 StencilBit_Complex_1 = 0x07u | StencilBit_Complex; 
 
 static void AddStrataInternalClassificationTilePass(
 	FRDGBuilder& GraphBuilder,
@@ -529,7 +577,7 @@ static void AddStrataInternalClassificationTilePass(
 	FVector4f OutputResolutionAndInv = FVector4f(OutputResolution.X, OutputResolution.Y, 1.0f / float(OutputResolution.X), 1.0f / float(OutputResolution.Y));
 
 	FStrataMaterialStencilTaggingPassPS::FParameters* ParametersPS = GraphBuilder.AllocParameters<FStrataMaterialStencilTaggingPassPS::FParameters>();
-	FillUpTiledPassData(TileMaterialType, View, ParametersPS->VS, StrataTilePrimitiveType);
+	ParametersPS->VS = Strata::SetTileParameters(GraphBuilder, View, TileMaterialType, StrataTilePrimitiveType);
 
 	FStrataTilePassVS::FPermutationDomain VSPermutationVector;
 	VSPermutationVector.Set< FStrataTilePassVS::FEnableDebug >(bDebug);
@@ -580,28 +628,43 @@ static void AddStrataInternalClassificationTilePass(
 			}
 			else
 			{
-				check(TileMaterialType == EStrataTileMaterialType::ESimple || TileMaterialType == EStrataTileMaterialType::ESingle);
+				check(TileMaterialType != EStrataTileMaterialType::ECount);
 
 				// No blending and no pixel shader required. Stencil will be writen to.
 				GraphicsPSOInit.BoundShaderState.PixelShaderRHI = nullptr;
 				GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
-				if (TileMaterialType == EStrataTileMaterialType::ESimple)
+				switch (TileMaterialType)
+				{
+				case EStrataTileMaterialType::ESimple:
 				{
 					GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<
 						false, CF_Always,
 						true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
 						false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-						0xFF, StencilBit_Fast>::GetRHI();
-					StencilRef = StencilBit_Fast;
+						0xFF, StencilBit_Fast_1>::GetRHI();
+					StencilRef = StencilBit_Fast_1;
 				}
-				else // EStrataTileMaterialType::ESingle
+				break;
+				case EStrataTileMaterialType::ESingle:
 				{
 					GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<
 						false, CF_Always,
 						true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
 						false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-						0xFF, StencilBit_Single>::GetRHI();
-					StencilRef = StencilBit_Single;
+						0xFF, StencilBit_Single_1>::GetRHI();
+					StencilRef = StencilBit_Single_1;
+				}
+				break;
+				case EStrataTileMaterialType::EComplex:
+				{
+					GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<
+						false, CF_Always,
+						true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
+						false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
+						0xFF, StencilBit_Complex_1>::GetRHI();
+					StencilRef = StencilBit_Complex_1;
+				}
+				break;
 				}
 			}
 			GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GFilterVertexDeclaration.VertexDeclarationRHI;
@@ -622,15 +685,6 @@ static void AddStrataInternalClassificationTilePass(
 
 void AddStrataStencilPass(
 	FRDGBuilder& GraphBuilder,
-	const FViewInfo& View,
-	const FMinimalSceneTextures& SceneTextures)
-{
-	AddStrataInternalClassificationTilePass(GraphBuilder, View, &SceneTextures.Depth.Target, nullptr, EStrataTileMaterialType::ESimple);
-	AddStrataInternalClassificationTilePass(GraphBuilder, View, &SceneTextures.Depth.Target, nullptr, EStrataTileMaterialType::ESingle);
-}
-
-void AddStrataStencilPass(
-	FRDGBuilder& GraphBuilder,
 	const TArray<FViewInfo>& Views,
 	const FMinimalSceneTextures& SceneTextures)
 {
@@ -639,6 +693,7 @@ void AddStrataStencilPass(
 		const FViewInfo& View = Views[i];
 		AddStrataInternalClassificationTilePass(GraphBuilder, View, &SceneTextures.Depth.Target, nullptr, EStrataTileMaterialType::ESimple);
 		AddStrataInternalClassificationTilePass(GraphBuilder, View, &SceneTextures.Depth.Target, nullptr, EStrataTileMaterialType::ESingle);
+		AddStrataInternalClassificationTilePass(GraphBuilder, View, &SceneTextures.Depth.Target, nullptr, EStrataTileMaterialType::EComplex);
 	}
 }
 

@@ -41,7 +41,7 @@ public class Engine : ModuleRules
 			}
 		);
 
-		if (Target.Configuration != UnrealTargetConfiguration.Shipping || Target.Type == TargetType.Editor)
+		if (Target.Configuration != UnrealTargetConfiguration.Shipping || Target.bCompileAgainstEditor)
 		{
 			PrivateIncludePathModuleNames.AddRange(
 				new string[] {
@@ -130,7 +130,8 @@ public class Engine : ModuleRules
 				"CrunchCompression",
 				"IntelISPC",
 				"TraceLog",
-				"ColorManagement"
+				"ColorManagement",
+				"XmlParser"
 			}
 		);
 
@@ -151,7 +152,7 @@ public class Engine : ModuleRules
 		}
 
 		// to prevent "causes WARNING: Non-editor build cannot depend on non-redistributable modules."
-		if (Target.Type == TargetType.Editor)
+		if (Target.bCompileAgainstEditor)
 		{
 			// for now we depend on these
 			PrivateDependencyModuleNames.AddRange(
@@ -169,7 +170,7 @@ public class Engine : ModuleRules
 			}
 		);
 
-		if (Target.Type == TargetType.Editor)
+		if (Target.bCompileAgainstEditor)
 		{
 			// these modules require variadic templates
 			PrivateDependencyModuleNames.AddRange(
@@ -188,7 +189,7 @@ public class Engine : ModuleRules
 		CircularlyReferencedDependentModules.Add("CinematicCamera");
 		CircularlyReferencedDependentModules.Add("AudioMixer");
 
-		if (Target.Type == TargetType.Editor)
+		if (Target.bCompileAgainstEditor)
 		{
 			PrivateDependencyModuleNames.Add("EditorStyle");
 			PrivateIncludePathModuleNames.Add("Foliage");
@@ -235,7 +236,7 @@ public class Engine : ModuleRules
 			PrivateDependencyModuleNames.Add("PerfCounters");
 		}
 
-		if (Target.Type == TargetType.Editor)
+		if (Target.bCompileAgainstEditor)
 		{
 			PrivateIncludePathModuleNames.Add("MaterialUtilities");
 			PrivateDependencyModuleNames.Add("MaterialUtilities");

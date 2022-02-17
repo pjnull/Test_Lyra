@@ -28,6 +28,7 @@ class FIndirectLightingCacheUniformParameters;
 template<typename ElementType,typename OctreeSemantics> class TOctree2;
 
 class FNaniteCommandInfo;
+struct FNaniteMaterialSlot;
 struct FRayTracingInstance;
 
 namespace Nanite
@@ -326,7 +327,8 @@ public:
 	TArray<class FStaticMeshBatch> StaticMeshes;
 
 	TArray<FNaniteCommandInfo> NaniteCommandInfos[ENaniteMeshPass::Num];
-	TArray<uint32> NaniteMaterialSlots[ENaniteMeshPass::Num];
+	TArray<FNaniteMaterialSlot> NaniteMaterialSlots[ENaniteMeshPass::Num];
+
 #if WITH_EDITOR
 	TArray<uint32> NaniteHitProxyIds;
 #endif
@@ -410,7 +412,6 @@ public:
 	TArray<uint64> CachedRayTracingMeshCommandsHashPerLOD;
 	// TODO: this should be placed in FRayTracingScene and we have a pointer/handle here. It's here for now for PoC
 	FRayTracingGeometryInstance CachedRayTracingInstance;
-	TArray<FMatrix> CachedRayTracingInstanceLocalTransforms;
 	TArray<FMatrix> CachedRayTracingInstanceWorldTransforms;
 	TArray<FBoxSphereBounds> CachedRayTracingInstanceWorldBounds;
 	int32 SmallestRayTracingInstanceWorldBoundsIndex;

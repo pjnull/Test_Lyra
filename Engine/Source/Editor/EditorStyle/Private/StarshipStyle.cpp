@@ -462,6 +462,7 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set("Icons.Validate", new IMAGE_BRUSH_SVG("Starship/Common/validate", Icon16x16));
 		Set("Icons.Pinned", new IMAGE_BRUSH_SVG("Starship/Common/Pinned", Icon16x16));
 		Set("Icons.Unpinned", new IMAGE_BRUSH_SVG("Starship/Common/Unpinned", Icon16x16));
+		Set("Icons.Tools", new IMAGE_BRUSH_SVG("Starship/Common/EditorModes", Icon16x16));
 
 
 		Set("Icons.Toolbar.Play", new IMAGE_BRUSH_SVG("Starship/Common/play", Icon20x20));
@@ -469,6 +470,7 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set("Icons.Toolbar.Stop", new IMAGE_BRUSH_SVG("Starship/MainToolbar/stop", Icon20x20));
 		Set("Icons.Toolbar.Settings", new CORE_IMAGE_BRUSH_SVG( "Starship/Common/Settings", Icon20x20));
 		Set("Icons.Toolbar.Details", new IMAGE_BRUSH_SVG("Starship/Common/Details", Icon16x16));
+		Set("Icons.Toolbar.Import", new CORE_IMAGE_BRUSH_SVG( "Starship/Common/import", Icon20x20) );
 	}
 
 	Set("UnrealDefaultThumbnail", new IMAGE_BRUSH("Starship/Common/Unreal_DefaultThumbnail", FVector2D(256, 256)));
@@ -820,6 +822,8 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 			.SetActiveHoveredBrush(FSlateNoResource())
 			.SetInactiveHoveredBrush(FSlateNoResource())
 			);
+	
+		Set("ListView.PinnedItemShadow", new IMAGE_BRUSH("Starship/ListView/PinnedItemShadow", FVector2D(16.f, 8.f)));
 	}
 	
 	// Spinboxes
@@ -2641,18 +2645,22 @@ void FStarshipEditorStyle::FStyle::SetupTutorialStyles()
 	const FTextBlockStyle DocumentationText = FTextBlockStyle(NormalText)
 		.SetColorAndOpacity( FLinearColor::Black )
 		.SetFont(DEFAULT_FONT( "Regular", 11 ));
+	Set("Documentation.Text", FTextBlockStyle(DocumentationText));
 
 	const FTextBlockStyle DocumentationHyperlinkText = FTextBlockStyle(DocumentationText)
 		.SetColorAndOpacity( HyperlinkColor );
+	Set("Documentation.Hyperlink.Text", FTextBlockStyle(DocumentationHyperlinkText));
 
 	const FTextBlockStyle DocumentationHeaderText = FTextBlockStyle(NormalText)
 		.SetColorAndOpacity( FLinearColor::Black )
 		.SetFont(DEFAULT_FONT("Black", 32));
+	Set("Documentation.Header.Text", FTextBlockStyle(DocumentationHeaderText));
 
 	const FButtonStyle DocumentationHyperlinkButton = FButtonStyle()
 			.SetNormal(BORDER_BRUSH( "Old/HyperlinkDotted", FMargin(0,0,0,3/16.0f), HyperlinkColor ) )
 			.SetPressed(FSlateNoResource())
 			.SetHovered(BORDER_BRUSH( "Old/HyperlinkUnderline", FMargin(0,0,0,3/16.0f), HyperlinkColor ) );
+	Set("Documentation.Hyperlink.Button", FButtonStyle(DocumentationHyperlinkButton));
 
 	// Documentation
 	{
@@ -2677,316 +2685,6 @@ void FStarshipEditorStyle::FStyle::SetupTutorialStyles()
 			.SetFontSize(24));
 
 		Set( "Documentation.Separator", new BOX_BRUSH( "Common/Separator", 1/4.0f, FLinearColor(1,1,1,0.5f) ) );
-	}
-
-	{
-		Set("Documentation.ToolTip.Background", new BOX_BRUSH("Tutorials/TutorialContentBackground", FMargin(4 / 16.0f)));
-	}
-
-	// Tutorials
-	{
-		const FLinearColor TutorialButtonColor = FLinearColor(0.15f, 0.15f, 0.15f, 1.0f);
-		const FLinearColor TutorialSelectionColor = FLinearColor(0.19f, 0.33f, 0.72f);
-		const FLinearColor TutorialNavigationButtonColor = FLinearColor(0.0f, 0.59f, 0.14f, 1.0f);
-		const FLinearColor TutorialNavigationButtonHoverColor = FLinearColor(0.2f, 0.79f, 0.34f, 1.0f);
-		const FLinearColor TutorialNavigationBackButtonColor = TutorialNavigationButtonColor;
-		const FLinearColor TutorialNavigationBackButtonHoverColor = TutorialNavigationButtonHoverColor;
-
-		const FTextBlockStyle TutorialText = FTextBlockStyle(DocumentationText)
-			.SetColorAndOpacity(FLinearColor::Black)
-			.SetHighlightColor(TutorialSelectionColor);
-
-		const FTextBlockStyle TutorialHeaderText = FTextBlockStyle(DocumentationHeaderText)
-			.SetColorAndOpacity(FLinearColor::Black)
-			.SetHighlightColor(TutorialSelectionColor);
-
-		Set("Tutorials.Border", new BOX_BRUSH( "Tutorials/OverlayFrame", FMargin(18.0f/64.0f), FLinearColor(1.0f, 1.0f, 1.0f, 1.0f) ) );
-		Set("Tutorials.Shadow", new BOX_BRUSH("Tutorials/TutorialShadow", FVector2D(256.0f, 256.0f), FMargin(114.0f / 256.0f)));
-
-		const FTextBlockStyle TutorialBrowserText = FTextBlockStyle(TutorialText)
-			.SetColorAndOpacity(FSlateColor::UseForeground())
-			.SetHighlightColor(TutorialSelectionColor);
-
-		Set( "Tutorials.Browser.Text", TutorialBrowserText );
-
-		Set( "Tutorials.Browser.WelcomeHeader", FTextBlockStyle(TutorialBrowserText)
-			.SetFontSize(20));
-
-		Set( "Tutorials.Browser.SummaryHeader", FTextBlockStyle(TutorialBrowserText)
-			.SetFontSize(16));
-
-		Set( "Tutorials.Browser.SummaryText", FTextBlockStyle(TutorialBrowserText)
-			.SetFontSize(10));
-
-		Set( "Tutorials.Browser.HighlightTextColor", TutorialSelectionColor );
-
-		Set( "Tutorials.Browser.Button", FButtonStyle()
-			.SetNormal( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0.05f,0.05f,0.05f,1) ) )
-			.SetHovered( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0.07f,0.07f,0.07f,1) ) )
-			.SetPressed( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0.08f,0.08f,0.08f,1) ) )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set( "Tutorials.Browser.BackButton", FButtonStyle()
-			.SetNormal( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(1.0f,1.0f,1.0f,0.0f) ) )
-			.SetHovered( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(1.0f,1.0f,1.0f,0.05f) ) )
-			.SetPressed( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(1.0f,1.0f,1.0f,0.05f) ) )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set( "Tutorials.Content.Button", FButtonStyle()
-			.SetNormal( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0,0,0,0) ) )
-			.SetHovered( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(1,1,1,1) ) )
-			.SetPressed( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(1,1,1,1) ) )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set( "Tutorials.Content.NavigationButtonWrapper", FButtonStyle()
-			.SetNormal( FSlateNoResource() )
-			.SetHovered( FSlateNoResource() )
-			.SetPressed( FSlateNoResource() )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set( "Tutorials.Content.NavigationButton", FButtonStyle()
-			.SetNormal( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), TutorialNavigationButtonColor ) )
-			.SetHovered( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), TutorialNavigationButtonHoverColor ) )
-			.SetPressed( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), TutorialNavigationButtonHoverColor ) )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set("Tutorials.Content.NavigationBackButton", FButtonStyle()
-			.SetNormal(BOX_BRUSH("Common/ButtonHoverHint", FMargin(4 / 16.0f), TutorialNavigationBackButtonColor))
-			.SetHovered(BOX_BRUSH("Common/ButtonHoverHint", FMargin(4 / 16.0f), TutorialNavigationBackButtonHoverColor))
-			.SetPressed(BOX_BRUSH("Common/ButtonHoverHint", FMargin(4 / 16.0f), TutorialNavigationBackButtonHoverColor))
-			.SetNormalPadding(FMargin(0, 0, 0, 1))
-			.SetPressedPadding(FMargin(0, 1, 0, 0)));
-
-		Set( "Tutorials.Content.NavigationText", FTextBlockStyle(TutorialText));
-
-		Set( "Tutorials.Content.Color", FLinearColor(1.0f,1.0f,1.0f,0.9f) );
-		Set( "Tutorials.Content.Color.Hovered", FLinearColor(1.0f,1.0f,1.0f,1.0f) );
-
-		Set( "Tutorials.Browser.CategoryArrow", new IMAGE_BRUSH( "Tutorials/BrowserCategoryArrow", FVector2D(24.0f, 24.0f), FSlateColor::UseForeground() ) );
-		Set( "Tutorials.Browser.DefaultTutorialIcon", new IMAGE_BRUSH( "Tutorials/DefaultTutorialIcon_40x", FVector2D(40.0f, 40.0f), FLinearColor::White ) );
-		Set( "Tutorials.Browser.DefaultCategoryIcon", new IMAGE_BRUSH( "Tutorials/DefaultCategoryIcon_40x", FVector2D(40.0f, 40.0f), FLinearColor::White ) );
-
-		Set( "Tutorials.Browser.BackButton.Image", new IMAGE_BRUSH( "Tutorials/BrowserBack", FVector2D(32.0f, 32.0f), FLinearColor(1.0f, 1.0f, 1.0f, 1.0f) ) );
-		Set( "Tutorials.Browser.PlayButton.Image", new IMAGE_BRUSH( "Tutorials/BrowserPlay", FVector2D(32.0f, 32.0f), FLinearColor(1.0f, 1.0f, 1.0f, 1.0f) ) );
-		Set( "Tutorials.Browser.RestartButton", new IMAGE_BRUSH( "Tutorials/BrowserRestart", FVector2D(16.0f, 16.0f), FLinearColor(1.0f, 1.0f, 1.0f, 1.0f) ) );
-
-		Set( "Tutorials.Browser.Completed", new IMAGE_BRUSH( "Tutorials/TutorialCompleted", Icon32x32 ) );
-
-		Set( "Tutorials.Browser.Breadcrumb", new IMAGE_BRUSH( "Tutorials/Breadcrumb", Icon8x8, FLinearColor::White ) );
-		Set( "Tutorials.Browser.PathText", FTextBlockStyle(TutorialBrowserText)
-			.SetFontSize(9));
-
-		Set( "Tutorials.Navigation.Button", FButtonStyle()
-			.SetNormal( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0,0,0,0) ) )
-			.SetHovered( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0,0,0,0) ) )
-			.SetPressed( BOX_BRUSH( "Common/ButtonHoverHint", FMargin(4/16.0f), FLinearColor(0,0,0,0) ) )
-			.SetNormalPadding( FMargin(0,0,0,1))
-			.SetPressedPadding( FMargin(0,1,0,0)));
-
-		Set( "Tutorials.Navigation.NextButton", new IMAGE_BRUSH( "Tutorials/NavigationNext", Icon32x32 ) );
-		Set( "Tutorials.Navigation.HomeButton", new IMAGE_BRUSH( "Tutorials/NavigationHome", Icon32x32 ) );
-		Set( "Tutorials.Navigation.BackButton", new IMAGE_BRUSH( "Tutorials/NavigationBack", Icon32x32 ) );
-
-		Set( "Tutorials.WidgetContent", FTextBlockStyle(TutorialText)
-			.SetFontSize(10));
-
-		Set( "Tutorials.ButtonColor", TutorialButtonColor );
-		Set( "Tutorials.ButtonHighlightColor", TutorialSelectionColor );
-		Set( "Tutorials.ButtonDisabledColor", SelectionColor_Inactive );
-		Set( "Tutorials.ContentAreaBackground", new BOX_BRUSH( "Tutorials/TutorialContentBackground", FMargin(4/16.0f) ) );
-		Set( "Tutorials.HomeContentAreaBackground", new BOX_BRUSH( "Tutorials/TutorialHomeContentBackground", FMargin(4/16.0f) ) );
-		Set( "Tutorials.ContentAreaFrame", new BOX_BRUSH( "Tutorials/ContentAreaFrame", FMargin(26.0f/64.0f) ) );
-		Set( "Tutorials.CurrentExcerpt", new IMAGE_BRUSH( "Tutorials/CurrentExcerpt", FVector2D(24.0f, 24.0f), TutorialSelectionColor ) );
-		Set( "Tutorials.Home", new IMAGE_BRUSH( "Tutorials/HomeButton", FVector2D(32.0f, 32.0f) ) );
-		Set( "Tutorials.Back", new IMAGE_BRUSH("Tutorials/BackButton", FVector2D(24.0f, 24.0f) ) );
-		Set( "Tutorials.Next", new IMAGE_BRUSH("Tutorials/NextButton", FVector2D(24.0f, 24.0f) ) );
-
-		Set("Tutorials.PageHeader", FTextBlockStyle(TutorialHeaderText)
-			.SetFontSize(22));
-
-		Set("Tutorials.CurrentExcerpt", FTextBlockStyle(TutorialHeaderText)
-			.SetFontSize(16));
- 
-		Set("Tutorials.NavigationButtons", FTextBlockStyle(TutorialHeaderText)
-			.SetFontSize(16));
-
-		// UDN documentation styles
-		Set("Tutorials.Content", FTextBlockStyle(TutorialText)
-			.SetColorAndOpacity(FSlateColor::UseForeground()));
-		Set("Tutorials.Hyperlink.Text",  FTextBlockStyle(DocumentationHyperlinkText));
-		Set("Tutorials.NumberedContent", FTextBlockStyle(TutorialText));
-		Set("Tutorials.BoldContent",     FTextBlockStyle(TutorialText)
-			.SetTypefaceFontName(TEXT("Bold")));
-
-		Set("Tutorials.Header1", FTextBlockStyle(TutorialHeaderText)
-			.SetFontSize(32));
-
-		Set("Tutorials.Header2", FTextBlockStyle(TutorialHeaderText)
-			.SetFontSize(24));
-
-		Set( "Tutorials.Hyperlink.Button", FButtonStyle(DocumentationHyperlinkButton)
-			.SetNormal(BORDER_BRUSH( "Old/HyperlinkDotted", FMargin(0,0,0,3/16.0f), FLinearColor::Black))
-			.SetHovered(BORDER_BRUSH( "Old/HyperlinkUnderline", FMargin(0,0,0,3/16.0f), FLinearColor::Black)));
-
-		Set( "Tutorials.Separator", new BOX_BRUSH( "Common/Separator", 1/4.0f, FLinearColor::Black));
-
-		Set( "Tutorials.ProgressBar", FProgressBarStyle()
-			.SetBackgroundImage( BOX_BRUSH( "Common/ProgressBar_Background", FMargin(5.f/12.f) ) )
-			.SetFillImage( BOX_BRUSH( "Common/ProgressBar_NeutralFill", FMargin(5.f/12.f) ) )
-			.SetMarqueeImage( IMAGE_BRUSH( "Common/ProgressBar_Marquee", FVector2D(20,12), FLinearColor::White, ESlateBrushTileType::Horizontal ) )
-			);
-
-		// Default text styles
-		{
-			const FTextBlockStyle RichTextNormal = FTextBlockStyle()
-				.SetFont(DEFAULT_FONT("Regular", 11))
-				.SetColorAndOpacity(FSlateColor::UseForeground())
-				.SetShadowOffset(FVector2D::ZeroVector)
-				.SetShadowColorAndOpacity(FLinearColor::Black)
-				.SetHighlightColor(FLinearColor(0.02f, 0.3f, 0.0f))
-				.SetHighlightShape(BOX_BRUSH("Common/TextBlockHighlightShape", FMargin(3.f /8.f)));
-			Set( "Tutorials.Content.Text", RichTextNormal );
-
-			Set( "Tutorials.Content.TextBold", FTextBlockStyle(RichTextNormal)
-				.SetFont(DEFAULT_FONT("Bold", 11)));
-
-			Set( "Tutorials.Content.HeaderText1", FTextBlockStyle(RichTextNormal)
-				.SetFontSize(20));
-
-			Set( "Tutorials.Content.HeaderText2", FTextBlockStyle(RichTextNormal)
-				.SetFontSize(16));
-
-			{
-				const FButtonStyle RichTextHyperlinkButton = FButtonStyle()
-					.SetNormal(BORDER_BRUSH("Old/HyperlinkDotted", FMargin(0,0,0,3/16.0f), FLinearColor::Blue ) )
-					.SetPressed(FSlateNoResource() )
-					.SetHovered(BORDER_BRUSH("Old/HyperlinkUnderline", FMargin(0,0,0,3/16.0f), FLinearColor::Blue ) );
-
-				const FTextBlockStyle RichTextHyperlinkText = FTextBlockStyle(RichTextNormal)
-					.SetColorAndOpacity(FLinearColor::Blue);
-
-				Set( "Tutorials.Content.HyperlinkText", RichTextHyperlinkText );
-
-				// legacy style
-				Set( "TutorialEditableText.Editor.HyperlinkText", RichTextHyperlinkText );
-
-				const FHyperlinkStyle RichTextHyperlink = FHyperlinkStyle()
-					.SetUnderlineStyle(RichTextHyperlinkButton)
-					.SetTextStyle(RichTextHyperlinkText)
-					.SetPadding(FMargin(0.0f));
-				Set( "Tutorials.Content.Hyperlink", RichTextHyperlink );
-
-				Set( "Tutorials.Content.ExternalLink", new IMAGE_BRUSH("Tutorials/ExternalLink", Icon16x16, FLinearColor::Blue));
-
-				// legacy style
-				Set( "TutorialEditableText.Editor.Hyperlink", RichTextHyperlink );
-			}
-		}
-
-		// Toolbar
-		{
-			const FLinearColor NormalColor(FColor(0xffeff3f3));
-			const FLinearColor SelectedColor(FColor(0xffdbe4d5));
-			const FLinearColor HoverColor(FColor(0xffdbe4e4));
-			const FLinearColor DisabledColor(FColor(0xaaaaaa));
-			const FLinearColor TextColor(FColor(0xff2c3e50));
-
-			Set("TutorialEditableText.RoundedBackground", new BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, FLinearColor(FColor(0xffeff3f3))));
-
-			Set("TutorialEditableText.Toolbar.HyperlinkImage", new IMAGE_BRUSH("Tutorials/hyperlink", Icon16x16, TextColor));
-			Set("TutorialEditableText.Toolbar.ImageImage", new IMAGE_BRUSH("Tutorials/Image", Icon16x16, TextColor));
-
-			Set("TutorialEditableText.Toolbar.TextColor", TextColor);
-
-			Set("TutorialEditableText.Toolbar.Text", FTextBlockStyle(NormalText)
-				.SetFont(DEFAULT_FONT("Regular", 10))
-				.SetColorAndOpacity(TextColor)
-				);
-
-			Set("TutorialEditableText.Toolbar.BoldText", FTextBlockStyle(NormalText)
-				.SetFont(DEFAULT_FONT("Bold", 10))
-				.SetColorAndOpacity(TextColor)
-				);
-
-			Set("TutorialEditableText.Toolbar.ItalicText", FTextBlockStyle(NormalText)
-				.SetFont(DEFAULT_FONT("Italic", 10))
-				.SetColorAndOpacity(TextColor)
-				);
-
-			Set("TutorialEditableText.Toolbar.Checkbox", FCheckBoxStyle()
-				.SetCheckBoxType(ESlateCheckBoxType::CheckBox)
-				.SetUncheckedImage(IMAGE_BRUSH("Common/CheckBox", Icon16x16, FLinearColor::White))
-				.SetUncheckedHoveredImage(IMAGE_BRUSH("Common/CheckBox", Icon16x16, HoverColor))
-				.SetUncheckedPressedImage(IMAGE_BRUSH("Common/CheckBox_Hovered", Icon16x16, HoverColor))
-				.SetCheckedImage(IMAGE_BRUSH("Common/CheckBox_Checked_Hovered", Icon16x16, FLinearColor::White))
-				.SetCheckedHoveredImage(IMAGE_BRUSH("Common/CheckBox_Checked_Hovered", Icon16x16, HoverColor))
-				.SetCheckedPressedImage(IMAGE_BRUSH("Common/CheckBox_Checked", Icon16x16, HoverColor))
-				.SetUndeterminedImage(IMAGE_BRUSH("Common/CheckBox_Undetermined", Icon16x16, FLinearColor::White))
-				.SetUndeterminedHoveredImage(IMAGE_BRUSH("Common/CheckBox_Undetermined_Hovered", Icon16x16, HoverColor))
-				.SetUndeterminedPressedImage(IMAGE_BRUSH("Common/CheckBox_Undetermined_Hovered", Icon16x16, FLinearColor::White))
-				);
-
-			Set("TutorialEditableText.Toolbar.ToggleButtonCheckbox", FCheckBoxStyle()
-				.SetCheckBoxType(ESlateCheckBoxType::ToggleButton)
-				.SetUncheckedImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), NormalColor))
-				.SetUncheckedHoveredImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), HoverColor))
-				.SetUncheckedPressedImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), HoverColor))
-				.SetCheckedImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), SelectedColor))
-				.SetCheckedHoveredImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), HoverColor))
-				.SetCheckedPressedImage(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), HoverColor))
-				);
-
-			const FButtonStyle TutorialButton = FButtonStyle()
-				.SetNormal(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), NormalColor))
-				.SetHovered(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), HoverColor))
-				.SetPressed(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), SelectedColor))
-				.SetNormalPadding(FMargin(2, 2, 2, 2))
-				.SetPressedPadding(FMargin(2, 3, 2, 1));
-			Set("TutorialEditableText.Toolbar.Button", TutorialButton);
-
-			const FComboButtonStyle ComboButton = FComboButtonStyle()
-				.SetButtonStyle(Button)
-				.SetDownArrowImage(IMAGE_BRUSH("Common/ComboArrow", Icon8x8))
-				.SetMenuBorderBrush(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), NormalColor))
-				.SetMenuBorderPadding(FMargin(0.0f));
-			Set("TutorialEditableText.Toolbar.ComboButton", ComboButton);
-
-			{
-				const FButtonStyle ComboBoxButton = FButtonStyle()
-					.SetNormal(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), FLinearColor::White))
-					.SetHovered(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), FLinearColor::White))
-					.SetPressed(BOX_BRUSH("Tutorials/FlatColorSquare", FVector2D(1.0f, 1.0f), FMargin(1), FLinearColor::White))
-					.SetNormalPadding(FMargin(2, 2, 2, 2))
-					.SetPressedPadding(FMargin(2, 3, 2, 1));
-
-				const FComboButtonStyle ComboBoxComboButton = FComboButtonStyle(ComboButton)
-					.SetButtonStyle(ComboBoxButton)
-					.SetMenuBorderPadding(FMargin(1.0));
-
-				Set("TutorialEditableText.Toolbar.ComboBox", FComboBoxStyle()
-					.SetComboButtonStyle(ComboBoxComboButton)
-					);
-			}
-		}
-
-		// In-editor tutorial launch button
-		{
-			Set("TutorialLaunch.Button", FButtonStyle()
-				.SetNormalPadding(0)
-				.SetPressedPadding(0)
-				.SetNormal(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::Foreground))
-				.SetHovered(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::ForegroundHover))
-				.SetPressed(IMAGE_BRUSH_SVG("Starship/Common/Tutorials", Icon16x16, FStyleColors::ForegroundHover))
-				);
-
-			Set("TutorialLaunch.Circle", new IMAGE_BRUSH("Tutorials/Circle_128x", Icon128x128, FLinearColor::White));
-			Set("TutorialLaunch.Circle.Color", FLinearColor::Green);
-		}
 	}
 }
 
@@ -7230,7 +6928,7 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 	{
 		Set( "PhysicsAssetEditor.Tabs.Properties", new IMAGE_BRUSH( "/Icons/icon_tab_SelectionDetails_16x", Icon16x16 ) );
 		Set( "PhysicsAssetEditor.Tabs.Hierarchy", new IMAGE_BRUSH( "/Icons/levels_16x", Icon16x16 ) );
-		Set( "PhysicsAssetEditor.Tabs.Profiles", new IMAGE_BRUSH( "/PhysicsAssetEditor/icon_ProfilesTab_16x", Icon16x16 ) );
+		Set( "PhysicsAssetEditor.Tabs.Profiles", new IMAGE_BRUSH_SVG( "Starship/AssetEditors/ProfileFolder", Icon16x16 ) );
 		Set( "PhysicsAssetEditor.Tabs.Graph", new IMAGE_BRUSH( "/PhysicsAssetEditor/icon_GraphTab_16x", Icon16x16 ) );
 		Set( "PhysicsAssetEditor.Tabs.Tools", new IMAGE_BRUSH( "/PhysicsAssetEditor/icon_ToolsTab_16x", Icon16x16 ) );
 
@@ -7275,12 +6973,8 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set( "PhysicsAssetEditor.ConvertToSkeletal", new IMAGE_BRUSH_SVG("Starship/Persona/AnimationToSkeletal", Icon20x20));
 		Set( "PhysicsAssetEditor.DeleteConstraint", new IMAGE_BRUSH( "PhysicsAssetEditor/icon_PhAT_DeleteConstraint_40x", Icon40x40 ) );
 
-		Set("PhysicsAssetEditor.NewPhysicalAnimationProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_NewBody_40x", Icon20x20));
-		Set("PhysicsAssetEditor.DeleteCurrentPhysicalAnimationProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_DeletePrimitive_40x", Icon20x20));
 		Set("PhysicsAssetEditor.AddBodyToPhysicalAnimationProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_NewBody_40x", Icon20x20));
 		Set("PhysicsAssetEditor.RemoveBodyFromPhysicalAnimationProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_DeletePrimitive_40x", Icon20x20));
-		Set("PhysicsAssetEditor.NewConstraintProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PHatMode_Joint_40x", Icon20x20));
-		Set("PhysicsAssetEditor.DeleteCurrentConstraintProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_DeleteConstraint_40x", Icon20x20));
 		Set("PhysicsAssetEditor.AddConstraintToCurrentConstraintProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PHatMode_Joint_40x", Icon20x20));
 		Set("PhysicsAssetEditor.RemoveConstraintFromCurrentConstraintProfile", new IMAGE_BRUSH("PhysicsAssetEditor/icon_PhAT_DeleteConstraint_40x", Icon20x20));
 
@@ -7295,6 +6989,10 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("PhysicsAssetEditor.Tree.TaperedCapsule", new IMAGE_BRUSH("PhysicsAssetEditor/TaperedCapsule_16x", Icon16x16));
 		Set("PhysicsAssetEditor.Tree.Constraint", new IMAGE_BRUSH("PhysicsAssetEditor/Constraint_16x", Icon16x16));
 
+		Set("PhysicsAssetEditor.BoneAssign", new IMAGE_BRUSH_SVG("Starship/Persona/BoneAssign", Icon20x20));
+		Set("PhysicsAssetEditor.BoneUnassign", new IMAGE_BRUSH_SVG("Starship/Persona/BoneUnassign", Icon20x20));
+		Set("PhysicsAssetEditor.BoneLocate", new IMAGE_BRUSH_SVG("Starship/Persona/BoneLocate", Icon20x20));
+
 		Set("PhysicsAssetEditor.Tree.Font", DEFAULT_FONT("Regular", 10));
 
 		Set("PhysicsAssetEditor.Graph.TextStyle", FTextBlockStyle(NormalText)
@@ -7308,12 +7006,13 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 		Set("PhysicsAssetEditor.Graph.Node.ShadowSelected", new BOX_BRUSH( "PhysicsAssetEditor/PhysicsNode_shadow_selected", FMargin(18.0f/64.0f) ) );
 		Set("PhysicsAssetEditor.Graph.Node.Shadow", new BOX_BRUSH( "Graph/RegularNode_shadow", FMargin(18.0f/64.0f) ) );
 
-		FEditableTextBoxStyle EditableTextBlock = FEditableTextBoxStyle()
+		FEditableTextBoxStyle EditableTextBlock = NormalEditableTextBoxStyle
 			.SetFont(NormalText.Font)
-			.SetBackgroundImageNormal(BOX_BRUSH("Common/TextBox", FMargin(4.0f / 16.0f)))
-			.SetBackgroundImageHovered(BOX_BRUSH("Common/TextBox_Hovered", FMargin(4.0f / 16.0f)))
-			.SetBackgroundImageFocused(BOX_BRUSH("Common/TextBox_Hovered", FMargin(4.0f / 16.0f)))
-			.SetBackgroundImageReadOnly(BOX_BRUSH("Common/TextBox_ReadOnly", FMargin(4.0f / 16.0f)));
+			.SetBackgroundImageNormal(FSlateNoResource())
+			.SetBackgroundImageHovered(FSlateNoResource())
+			.SetBackgroundImageFocused(FSlateNoResource())
+			.SetBackgroundImageReadOnly(FSlateNoResource())
+			.SetForegroundColor(FSlateColor::UseStyle());
 
 		Set("PhysicsAssetEditor.Profiles.EditableTextBoxStyle", EditableTextBlock);
 

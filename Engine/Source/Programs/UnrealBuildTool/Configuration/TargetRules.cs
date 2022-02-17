@@ -189,19 +189,32 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				if (IsNameOverriden())
+				if (!string.IsNullOrEmpty(NameOverride))
+				{
+					if (NameSuffixes.Count > 0)
+					{
+						return $"{NameOverride}-{NameSuffix}";
+					}
+					return NameOverride;
+				}
+
+				if (NameSuffixes.Count > 0)
 				{
 					return $"{DefaultName}-{NameSuffix}";
 				}
 
 				return DefaultName;
 			}
+			set
+			{
+				NameOverride = value;
+			}
 		}
 
 		/// <summary>
 		/// If the Name of this target has been overriden
 		/// </summary>
-		public bool IsNameOverriden() { return NameSuffixes.Count > 0; }
+		public bool IsNameOverriden() { return !string.IsNullOrEmpty(NameOverride) || NameSuffixes.Count > 0; }
 
 		/// <summary>
 		/// Add an optional suffix to append to Name
@@ -216,12 +229,37 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				return IsNameOverriden() ? string.Join("-", NameSuffixes) : null;
+				return NameSuffixes.Count > 0 ? string.Join("-", NameSuffixes) : null;
 			}
 		}
 
 		private HashSet<string> NameSuffixes = new HashSet<string>();
+
+		/// <summary>
+		/// Override the name used for this target
+		/// </summary>
+		[CommandLine("-TargetNameOverride=")]
+		private string? NameOverride { get; set; }
+
+		/// <summary>
+		/// The default name for this target, 
+		/// </summary>
 		private readonly string DefaultName;
+
+		private TestTargetRules? TestTargetRules;
+
+		/// <summary>
+		/// Create and return test target executable on demand for this target and its dependencies' tests.
+		/// </summary>
+		public TestTargetRules CreateOrGetTestTarget()
+		{
+			if (TestTargetRules == null)
+			{
+				TargetInfo TestsTargetInfo = new TargetInfo(Name + TargetDescriptor.TEST_TARGETS_SUFFIX, Platform, Configuration, Architecture, ProjectFile, null);
+				TestTargetRules = new TestTargetRules(this, TestsTargetInfo);
+			}
+			return TestTargetRules;	
+		}
 
 		/// <summary>
 		/// File containing the general type for this target (not including platform/group)
@@ -340,6 +378,18 @@ namespace UnrealBuildTool
 		/// </summary>
 		[CommandLine("-AllModules")]
 		public bool bBuildAllModules = false;
+
+		/// <summary>
+		/// Decides whether to compile with all the "Tests" folders from all dependent modules.
+		/// </summary>
+		public bool bIncludeAllTests
+		{
+			get { return bIncludeAllTestsOverride ?? false; }
+		}
+		/// <summary>
+		/// Set this override to true in derived target classes to compile with all the "Tests" folders from all dependent modules.
+		/// </summary>
+		protected bool? bIncludeAllTestsOverride;
 
 		/// <summary>
 		/// Additional plugins that are built for this target type but not enabled.
@@ -512,11 +562,11 @@ namespace UnrealBuildTool
 		public bool bCompilePython = true;
 
 		/// <summary>
-		/// Whether to compile the editor or not. Only desktop platforms (Windows or Mac) will use this, other platforms force this to false.
+		/// Whether we are compiling editor code or not. Prefer the more explicit bCompileAgainstEditor instead.
 		/// </summary>
 		public bool bBuildEditor
 		{
-			get { return (Type == TargetType.Editor); }
+			get { return (Type == TargetType.Editor || bCompileAgainstEditor); }
 			set { Log.TraceWarning("Setting {0}.bBuildEditor is deprecated. Set {0}.Type instead.", GetType().Name); }
 		}
 
@@ -583,6 +633,20 @@ namespace UnrealBuildTool
 		public bool bForceBuildShaderFormats = false;
 
 		/// <summary>
+		/// Override for including extra shader formats
+		/// </summary>
+		public bool? bNeedsExtraShaderFormatsOverride;
+
+		/// <summary>
+		/// Whether we should include any extra shader formats. By default this is only enabled for Program and Editor targets.
+		/// </summary>
+		public bool bNeedsExtraShaderFormats
+		{
+			set { bNeedsExtraShaderFormatsOverride = value; }
+			get { return bNeedsExtraShaderFormatsOverride ?? (bForceBuildShaderFormats || bBuildDeveloperTools) && (Type == TargetType.Editor || Type == TargetType.Program); }
+		}
+
+		/// <summary>
 		/// Whether we should compile SQLite using the custom "Unreal" platform (true), or using the native platform (false).
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
@@ -615,6 +679,22 @@ namespace UnrealBuildTool
 		public bool bCompileAgainstApplicationCore = true;
 
 		/// <summary>
+		/// Manually specified value for bCompileAgainstEditor.
+		/// </summary>
+		bool? bCompileAgainstEditorOverride;
+
+		/// <summary>
+		/// Enabled for editor builds (TargetType.Editor). Can be overridden for programs (TargetType.Program) that would need to compile against editor code. Not available for other target types.
+		/// Mainly drives the value of WITH_EDITOR.
+		/// </summary>
+		[RequiresUniqueBuildEnvironment]
+		public bool bCompileAgainstEditor
+		{
+			set { bCompileAgainstEditorOverride = value; }
+			get { return bCompileAgainstEditorOverride ?? (Type == TargetType.Editor); }
+		}
+
+		/// <summary>
 		/// Whether to compile Recast navmesh generation.
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
@@ -640,7 +720,7 @@ namespace UnrealBuildTool
 		bool? bOverrideCompileSpeedTree;
 
 		/// <summary>
-		/// Whether we should compile in support for Simplygon or not.
+		/// Whether we should compile in support for SpeedTree or not.
 		/// </summary>
 		[RequiresUniqueBuildEnvironment]
 		public bool bCompileSpeedTree
@@ -696,7 +776,7 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				return bWithPushModelOverride ?? (bBuildEditor);
+				return bWithPushModelOverride ?? (Type == TargetType.Editor);
 			}
 			set
 			{
@@ -1428,7 +1508,7 @@ namespace UnrealBuildTool
 		{
 			get
 			{
-				return (LaunchModuleNamePrivate == null && Type != global::UnrealBuildTool.TargetType.Program)? "Launch" : LaunchModuleNamePrivate;
+				return (LaunchModuleNamePrivate == null && Type != global::UnrealBuildTool.TargetType.Program) ? "Launch" : LaunchModuleNamePrivate;
 			}
 			set
 			{
@@ -1545,7 +1625,7 @@ namespace UnrealBuildTool
 		public string? AdditionalLinkerArguments;
 
 		/// <summary>
-		/// Max amount of memory that each compile action may require. Used by ParallelExecutor and TaskExecutor to decide the maximum 
+		/// Max amount of memory that each compile action may require. Used by ParallelExecutor to decide the maximum 
 		/// number of parallel actions to start at one time.
 		/// </summary>
 		public double MemoryPerActionGB = 0.0;
@@ -1799,6 +1879,11 @@ namespace UnrealBuildTool
 		/// <returns>Array of platforms that the target supports</returns>
 		internal UnrealTargetPlatform[] GetSupportedPlatforms()
 		{
+			if (this is TestTargetRules TestTarget)
+			{
+				return TestTarget.TestedTarget.GetSupportedPlatforms();
+			}
+
 			// Otherwise take the SupportedPlatformsAttribute from the first type in the inheritance chain that supports it
 			for (Type? CurrentType = GetType(); CurrentType != null; CurrentType = CurrentType.BaseType)
 			{
@@ -1983,6 +2068,19 @@ namespace UnrealBuildTool
 			get { return Inner.NameSuffix; }
 		}
 
+		public TestTargetRules TestTarget { get { return Inner.CreateOrGetTestTarget(); } }
+
+		public TargetRules TestedTarget {
+			get
+			{
+				if (Inner is TestTargetRules)
+				{
+					return ((TestTargetRules)Inner).TestedTarget;
+				}
+				throw new Exception("Not a test target.");
+			}
+		}
+
 		internal FileReference File
 		{
 			get { return Inner.File!; }
@@ -2078,6 +2176,11 @@ namespace UnrealBuildTool
 			get { return Inner.bBuildAllModules; }
 		}
 
+		public bool bIncludeAllTests
+		{
+			get { return Inner.bIncludeAllTests; }
+		}
+		
 		public IEnumerable<string> AdditionalPlugins
 		{
 			get { return Inner.AdditionalPlugins; }
@@ -2241,6 +2344,11 @@ namespace UnrealBuildTool
 			get { return Inner.bForceBuildShaderFormats; }
 		}
 
+		public bool bNeedsExtraShaderFormats
+		{
+			get { return Inner.bNeedsExtraShaderFormats; }
+		}
+
 		public bool bCompileCustomSQLitePlatform
 		{
 			get { return Inner.bCompileCustomSQLitePlatform; }
@@ -2264,6 +2372,11 @@ namespace UnrealBuildTool
 		public bool bCompileAgainstApplicationCore
 		{
 			get { return Inner.bCompileAgainstApplicationCore; }
+		}
+
+		public bool bCompileAgainstEditor
+		{
+			get { return Inner.bCompileAgainstEditor; }
 		}
 
 		public bool bCompileRecast
@@ -2952,6 +3065,11 @@ namespace UnrealBuildTool
 		public string UEThirdPartyBinariesDirectory
 		{
 			get { return "../Binaries/ThirdParty/"; }
+		}
+
+		public bool IsTestTarget()
+		{
+			return Inner is TestTargetRules;
 		}
 
 		/// <summary>

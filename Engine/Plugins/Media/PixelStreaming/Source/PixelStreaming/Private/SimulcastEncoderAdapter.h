@@ -3,6 +3,9 @@
 
 #include "CoreMinimal.h"
 #include "WebRTCIncludes.h"
+#include "EncoderFactory.h"
+
+class IPixelStreamingTextureSource;
 
 namespace webrtc
 {
@@ -10,16 +13,15 @@ namespace webrtc
 	class VideoEncoderFactory;
 } // namespace webrtc
 
-namespace UE {
-	namespace PixelStreaming {
-		class ITextureSource;
-
+namespace UE
+{
+	namespace PixelStreaming
+	{
 		// This is highly modified version of webrtc::simulcast_encoder_adapter
-
 		class FSimulcastEncoderAdapter : public webrtc::VideoEncoder
 		{
 		public:
-			FSimulcastEncoderAdapter(webrtc::VideoEncoderFactory* primary_factory, const webrtc::SdpVideoFormat& format);
+			FSimulcastEncoderAdapter(FSimulcastEncoderFactory& InSimulcastFactory, const webrtc::SdpVideoFormat& format);
 			~FSimulcastEncoderAdapter() override;
 
 			// Implements VideoEncoder.
@@ -75,15 +77,16 @@ namespace UE {
 			bool IsInitialized() const;
 
 			TAtomic<bool> Initialized;
-			webrtc::VideoEncoderFactory* const PrimaryEncoderFactory;
+			FSimulcastEncoderFactory& SimulcastEncoderFactory;
 			const webrtc::SdpVideoFormat VideoFormat;
 			webrtc::VideoCodec CurrentCodec;
+			FCriticalSection StreamInfosGuard;
 			std::vector<StreamInfo> StreamInfos;
 			webrtc::EncodedImageCallback* EncodedCompleteCallback;
 
 			int LowestResolutionStreamIndex;
 			int HighestResolutionStreamIndex;
-			int EncodeStream(const webrtc::VideoFrame& InputImage, TSharedPtr<ITextureSource> LayerFrameSource, size_t StreamIdx, bool bSendKeyFrame);
+			int EncodeStream(const webrtc::VideoFrame& InputImage, TSharedPtr<IPixelStreamingTextureSource> LayerFrameSource, size_t StreamIdx, bool bSendKeyFrame);
 		};
-	}
-}
+	} // namespace PixelStreaming
+} // namespace UE

@@ -6,7 +6,6 @@ using HordeServer.Models;
 using HordeServer.Services;
 using HordeServer.Storage;
 using HordeServer.Storage.Backends;
-using HordeServer.Storage.Collections;
 using HordeServer.Utilities;
 using System;
 using System.Collections.Generic;
@@ -14,7 +13,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Horde.Build.Fleet.Autoscale;
 using TimeZoneConverter;
+using EpicGames.Horde.Storage;
 
 namespace HordeServer
 {
@@ -58,6 +59,27 @@ namespace HordeServer
 		/// Use AWS EC2 instances
 		/// </summary>
 		Aws,
+	}
+	
+	/// <summary>
+	/// Authentication method used for logging users in
+	/// </summary>
+	public enum AuthMethod
+	{
+		/// <summary>
+		/// No authentication enabled, mainly for demo and testing purposes
+		/// </summary>
+		Anonymous,
+
+		/// <summary>
+		/// OpenID Connect authentication, tailored for Okta
+		/// </summary>
+		Okta,
+		
+		/// <summary>
+		/// Generic OpenID Connect authentication, recommended for most
+		/// </summary>
+		OpenIdConnect,
 	}
 
 	/// <summary>
@@ -117,6 +139,34 @@ namespace HordeServer
 		/// </summary>
 		public int MaxConcurrentLeasesPerAgent { get; set; } = 1;
 	}
+	
+	/// <summary>
+	/// Feature flags to aid rollout of new features
+	///
+	/// Once a feature is running in its intended state and is stable, the flag should be removed.
+	/// A name and date of when the flag was created is noted next to it to help encourage this behavior.
+	/// Try having them be just a flag, a boolean.
+	/// </summary>
+	public class FeatureFlagSettings
+	{
+		/// <summary>
+		/// Registers the old v1 autoscale service as a background service
+		/// Added by carl.bystrom on Jan 26, 2022
+		/// </summary>
+		public bool AutoscaleServiceV1Enabled { get; set; } = true;
+		
+		/// <summary>
+		/// Registers the new autoscale service v2 as a background service (can run in parallel with v1 if shadow mode is on)
+		/// Added by carl.bystrom on Jan 26, 2022
+		/// </summary>
+		public bool AutoscaleServiceV2Enabled { get; set; } = false;
+		
+		/// <summary>
+		/// Shadow mode enabled on new AutoscaleServiceV2 will only log pool size changes but not act on them.
+		/// Added by carl.bystrom on Jan 26, 2022
+		/// </summary>
+		public bool AutoscaleServiceV2ShadowMode { get; set; } = true;
+	}
 
 	/// <summary>
 	/// Global settings for the application
@@ -175,10 +225,15 @@ namespace HordeServer
 		public bool DatabaseReadOnlyMode { get; set; } = false;
 
 		/// <summary>
-		/// Optional PFX certificate to use for encryting agent SSL traffic. This can be a self-signed certificate, as long as it's trusted by agents.
+		/// Optional PFX certificate to use for encrypting agent SSL traffic. This can be a self-signed certificate, as long as it's trusted by agents.
 		/// </summary>
 		public string? ServerPrivateCert { get; set; }
 
+		/// <summary>
+		/// Issuer for tokens from the auth provider
+		/// </summary>
+		public AuthMethod AuthMethod { get; set; } = AuthMethod.Anonymous;
+		
 		/// <summary>
 		/// Issuer for tokens from the auth provider
 		/// </summary>
@@ -188,11 +243,41 @@ namespace HordeServer
 		/// Client id for the OIDC authority
 		/// </summary>
 		public string? OidcClientId { get; set; }
+		
+		/// <summary>
+		/// Client secret for the OIDC authority
+		/// </summary>
+		public string? OidcClientSecret { get; set; }
 
 		/// <summary>
 		/// Optional redirect url provided to OIDC login
 		/// </summary>
-		public string? OidcSigninRedirect { get; set; }		
+		public string? OidcSigninRedirect { get; set; }
+
+		/// <summary>
+		/// OpenID Connect scopes to request when signing in
+		/// </summary>
+		public string[] OidcRequestedScopes { get; set; } = { "profile", "email", "openid" };
+		
+		/// <summary>
+		/// List of fields in /userinfo endpoint to try map to the standard name claim (see System.Security.Claims.ClaimTypes.Name)
+		/// </summary>
+		public string[] OidcClaimNameMapping { get; set; } = { "preferred_username", "email" };
+		
+		/// <summary>
+		/// List of fields in /userinfo endpoint to try map to the standard email claim (see System.Security.Claims.ClaimTypes.Email)
+		/// </summary>
+		public string[] OidcClaimEmailMapping { get; set; } = { "email" };
+		
+		/// <summary>
+		/// List of fields in /userinfo endpoint to try map to the Horde user claim (see HordeClaimTypes.User)
+		/// </summary>
+		public string[] OidcClaimHordeUserMapping { get; set; } = { "preferred_username", "email" };
+		
+		/// <summary>
+		/// List of fields in /userinfo endpoint to try map to the Horde Perforce user claim (see HordeClaimTypes.PerforceUser)
+		/// </summary>
+		public string[] OidcClaimHordePerforceUserMapping { get; set; } = { "preferred_username", "email" };
 
 		/// <summary>
 		/// Name of the issuer in bearer tokens from the server
@@ -208,11 +293,6 @@ namespace HordeServer
 		/// Length of time before JWT tokens expire, in hourse
 		/// </summary>
 		public int JwtExpiryTimeHours { get; set; } = 4;
-
-		/// <summary>
-		/// Disable authentication for debugging purposes
-		/// </summary>
-		public bool DisableAuth { get; set; }
 
 		/// <summary>
 		/// Whether to enable Cors, generally for development purposes
@@ -287,9 +367,14 @@ namespace HordeServer
 		/// S3 bucket region for logfile storage
 		/// </summary>
 		public string S3BucketRegion { get; set; } = null!;
+		
+		/// <summary>
+		/// AWS profile name. Used when S3CredentialType is set to "SharedCredentials".
+		/// </summary>
+		public string? S3AwsProfile { get; set; }
 
 		/// <summary>
-		/// Arn to assume for s3.  "Basic", "AssumeRole", "AssumeRoleWebIdentity" only
+		/// Arn to assume for s3.  "Basic", "AssumeRole", "AssumeRoleWebIdentity", "SharedCredentials" only
 		/// </summary>
 		public string? S3CredentialType { get; set; }
 
@@ -388,6 +473,11 @@ namespace HordeServer
 		/// Channel to send device notifications to
 		/// </summary>
 		public string? DeviceServiceNotificationChannel { get; set; }
+		
+		/// <summary>
+		/// Slack channel to send job related notifications to
+		/// </summary>
+		public string? JobNotificationChannel { get; set; }
 
 		/// <summary>
 		/// URI to the SmtpServer to use for sending email notifications
@@ -430,6 +520,26 @@ namespace HordeServer
 		public bool P4BridgeCanImpersonate { get; set; } = false;
 
 		/// <summary>
+		/// The Jira service account user name
+		/// </summary>
+		public string? JiraUsername { get; set; }
+
+		/// <summary>
+		/// The Jira service account API token
+		/// </summary>
+		public string? JiraApiToken { get; set; }
+
+		/// <summary>
+		/// The Uri for the Jira installation
+		/// </summary>
+		public Uri? JiraUrl { get; set; }
+
+		/// <summary>
+		/// Default agent pool sizing strategy for pools that doesn't have one explicitly configured
+		/// </summary>
+		public PoolSizeStrategy DefaultAgentPoolSizeStrategy { get; set; } = PoolSizeStrategy.LeaseUtilization;
+
+		/// <summary>
 		/// Set the minimum size of the global thread pool
 		/// This value has been found in need of tweaking to avoid timeouts with the Redis client during bursts
 		/// of traffic. Default is 16 for .NET Core CLR. The correct value is dependent on the traffic the Horde Server
@@ -451,7 +561,12 @@ namespace HordeServer
 		/// Settings for remote execution
 		/// </summary>
 		public RemoteExecSettings RemoteExecSettings { get; set; } = new RemoteExecSettings();
-		
+
+		/// <summary>
+		/// Settings for the storage service
+		/// </summary>
+		public StorageOptions? Storage { get; set; }
+
 		/// <summary>
 		/// Lazily computed timezone value
 		/// </summary>
@@ -473,5 +588,8 @@ namespace HordeServer
 		/// Whether to open a browser on startup
 		/// </summary>
 		public bool OpenBrowser { get; set; } = false;
+
+		/// <inheritdoc cref="FeatureFlags" />
+		public FeatureFlagSettings FeatureFlags { get; set; } = new ();
 	}
 }

@@ -11,7 +11,7 @@
 RWTexture3D<float> RWMipTexture;
 uint ClipmapMipResolution;
 float MipInfluenceRadius;
-Texture3D<uint> PageTableCombinedTexture;
+Texture3D<uint> PageTableTexture;
 Texture3D PageAtlasTexture;
 Texture3D PrevMipTexture;
 
@@ -55,7 +55,7 @@ float LoadPrevDistanceFieldValue(int3 MipCoord, int3 Offset)
 	ScrolledClipmapUV = frac(ScrolledClipmapUV); // apply frac twice to prevent UV == 1.0f because frac(-0.00...001f) = 1.0f
 
 	int3 PageTableTextureCoord = saturate(ScrolledClipmapUV) * GlobalDistanceFieldClipmapSizeInPages + int3(0, 0, ClipmapIndex * GlobalDistanceFieldClipmapSizeInPages);
-	uint PageIndex = PageTableCombinedTexture.Load(int4(PageTableTextureCoord, 0));
+	uint PageIndex = PageTableTexture.Load(int4(PageTableTextureCoord, 0));
 
 	float DistanceFieldValue = 1.0f;
 	if (PageIndex < GLOBAL_DISTANCE_FIELD_INVALID_PAGE_ID)

@@ -15,27 +15,26 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
 using System.Threading;
+using EpicGames.Core;
+using EpicGames.Perforce;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace UnrealGameSync
 {
 	public class UncontrolledChangelist
 	{
-		public string GUID { get; set; }
-		public string Name { get; set; }
-		public List<string> Files { get; set; }
+		public string GUID { get; set; } = String.Empty;
+		public string Name { get; set; } = String.Empty;
+		public List<string> Files { get; set; } = new List<string>();
 	}
 
 	public class UncontrolledChangelistPersistency
 	{
 		public int Version { get; set; }
-		public List<UncontrolledChangelist> Changelists { get; set; }
-	}
-
-public enum LatestChangeType
-	{
-		Any,
-		Good,
-		Starred,
+		public List<UncontrolledChangelist> Changelists { get; set; } = new List<UncontrolledChangelist>();
 	}
 
 	interface IWorkspaceControlOwner
@@ -53,7 +52,7 @@ public enum LatestChangeType
 		void UpdateAlertWindows();
 		void UpdateTintColors();
 
-		IssueMonitor CreateIssueMonitor(string ApiUrl, string UserName);
+		IssueMonitor CreateIssueMonitor(string? ApiUrl, string UserName);
 		void ReleaseIssueMonitor(IssueMonitor IssueMonitor);
 	}
 
@@ -79,22 +78,22 @@ public enum LatestChangeType
 		class BadgeInfo
 		{
 			public string Label;
-			public string Group;
-			public string UniqueId;
+			public string? Group;
+			public string? UniqueId;
 			public int Offset;
 			public int Width;
 			public int Height;
 			public Color BackgroundColor;
 			public Color HoverBackgroundColor;
-			public Action ClickHandler;
-			public string ToolTip;
+			public Action? ClickHandler;
+			public string? ToolTip;
 
 			public BadgeInfo(string Label, string Group, Color BadgeColor)
 				: this(Label, Group, null, BadgeColor, BadgeColor, null)
 			{
 			}
 
-			public BadgeInfo(string Label, string Group, string UniqueId, Color BackgroundColor, Color HoverBackgroundColor, Action ClickHandler)
+			public BadgeInfo(string Label, string? Group, string? UniqueId, Color BackgroundColor, Color HoverBackgroundColor, Action? ClickHandler)
 			{
 				this.Label = Label;
 				this.Group = Group;
@@ -121,22 +120,22 @@ public enum LatestChangeType
 		class ServiceBadgeInfo : IEquatable<ServiceBadgeInfo>
 		{
 			public string Name;
-			public string Url;
+			public string? Url;
 			public BadgeResult Result;
 
-			public ServiceBadgeInfo(string Name, string Url, BadgeResult Result)
+			public ServiceBadgeInfo(string Name, string? Url, BadgeResult Result)
 			{
 				this.Name = Name;
 				this.Url = Url;
 				this.Result = Result;
 			}
 
-			public bool Equals(ServiceBadgeInfo OtherBadge)
+			public bool Equals(ServiceBadgeInfo? OtherBadge)
 			{
 				return OtherBadge != null && Name == OtherBadge.Name && Url == OtherBadge.Url && Result == OtherBadge.Result;
 			}
 
-			public override bool Equals(object Other)
+			public override bool Equals(object? Other)
 			{
 				return Equals(Other as ServiceBadgeInfo);
 			}
@@ -149,18 +148,18 @@ public enum LatestChangeType
 
 		class ChangeLayoutInfo
 		{
-			public List<BadgeInfo> DescriptionBadges;
-			public List<BadgeInfo> TypeBadges;
-			public List<BadgeInfo> BuildBadges;
-			public Dictionary<string, List<BadgeInfo>> CustomBadges;
+			public List<BadgeInfo> DescriptionBadges = new List<BadgeInfo>();
+			public List<BadgeInfo> TypeBadges = new List<BadgeInfo>();
+			public List<BadgeInfo> BuildBadges = new List<BadgeInfo>();
+			public Dictionary<string, List<BadgeInfo>> CustomBadges = new Dictionary<string, List<BadgeInfo>>();
 		}
 
 		class BuildListItemComparer : System.Collections.IComparer
 		{
-			public int Compare(object A, object B)
+			public int Compare(object? A, object? B)
 			{
-				PerforceChangeSummary ChangeA = ((ListViewItem)A).Tag as PerforceChangeSummary;
-				PerforceChangeSummary ChangeB = ((ListViewItem)B).Tag as PerforceChangeSummary;
+				ChangesRecord? ChangeA = ((ListViewItem?)A)?.Tag as ChangesRecord;
+				ChangesRecord? ChangeB = ((ListViewItem?)B)?.Tag as ChangesRecord;
 				if (ChangeA == null)
 				{
 					return +1;
@@ -201,57 +200,32 @@ public enum LatestChangeType
 
 		const int BuildListExpandCount = 250;
 
-		const string EditorArchiveType = "Editor";
-
 		IWorkspaceControlOwner Owner;
-		string ApiUrl;
-		string DataFolder;
-		LineBasedTextWriter Log;
+		string? ApiUrl;
+		DirectoryReference DataFolder;
+		IServiceProvider ServiceProvider;
+		ILogger Logger;
+		IPerforceSettings PerforceSettings;
+		ProjectInfo ProjectInfo { get; }
 
 		UserSettings Settings;
+		UserWorkspaceState WorkspaceState;
 		UserWorkspaceSettings WorkspaceSettings;
 		UserProjectSettings ProjectSettings;
 
 		bool bUserHasOpenIssues = false;
 
-		public UserSelectedProjectSettings SelectedProject
-		{
-			get;
-			private set;
-		}
+		public UserSelectedProjectSettings SelectedProject { get; }
 
-		public string SelectedFileName
-		{
-			get;
-			private set;
-		}
-
-		string SelectedProjectIdentifier;
-
-		public string BranchDirectoryName
-		{
-			get;
-			private set;
-		}
-
-		public string StreamName
-		{
-			get;
-			private set;
-		}
-
-		public string ClientName
-		{
-			get;
-			private set;
-		}
+		public FileReference SelectedFileName => ProjectInfo.LocalFileName;
+		string SelectedProjectIdentifier => ProjectInfo.ProjectIdentifier;
+		public DirectoryReference BranchDirectoryName => ProjectInfo.LocalRootPath;
+		public string? StreamName => ProjectInfo.StreamName;
+		public string ClientName => ProjectInfo.ClientName;
 
 		SynchronizationContext MainThreadSynchronizationContext;
 		bool bIsDisposing;
 
-		bool bUnstable;
-		string EditorTargetName;
-		bool bIsEnterpriseProject;
 		JupiterMonitor JupiterMonitor;
 		PerforceMonitor PerforceMonitor;
 		Workspace Workspace;
@@ -261,7 +235,7 @@ public enum LatestChangeType
 		HashSet<int> PromotedChangeNumbers = new HashSet<int>();
 		List<int> ListIndexToChangeIndex = new List<int>();
 		List<int> SortedChangeNumbers = new List<int>();
-		Dictionary<string, Dictionary<int, string>> ArchiveToChangeNumberToArchiveKey = new Dictionary<string, Dictionary<int, string>>();
+		Dictionary<string, Dictionary<int, string?>> ArchiveToChangeNumberToArchiveKey = new Dictionary<string, Dictionary<int, string?>>();
 		Dictionary<int, ChangeLayoutInfo> ChangeNumberToLayoutInfo = new Dictionary<int, ChangeLayoutInfo>();
 		List<ContextMenuStrip> CustomStatusPanelMenus = new List<ContextMenuStrip>();
 		List<(string, Action<Point, Rectangle>)> CustomStatusPanelLinks = new List<(string, Action<Point, Rectangle>)>();
@@ -273,17 +247,15 @@ public enum LatestChangeType
 
 		bool bMouseOverExpandLink;
 
-		string HoverBadgeUniqueId = null;
+		string? HoverBadgeUniqueId = null;
 		bool bHoverSync;
-		PerforceChangeSummary ContextMenuChange;
-		Font BuildFont;
-		Font SelectedBuildFont;
-		Font BadgeFont;
+		ChangesRecord? ContextMenuChange;
+		Font? BuildFont;
+		Font? SelectedBuildFont;
+		Font? BadgeFont;
 		List<KeyValuePair<string, string>> BadgeNameAndGroupPairs = new List<KeyValuePair<string, string>>();
 		Dictionary<string, Size> BadgeLabelToSize = new Dictionary<string, Size>();
 		List<ServiceBadgeInfo> ServiceBadges = new List<ServiceBadgeInfo>();
-
-		string OriginalExecutableFileName;
 
 		NotificationWindow NotificationWindow;
 
@@ -294,23 +266,23 @@ public enum LatestChangeType
 		}
 
 		int BuildListWidth;
-		float[] ColumnWidths;
-		float[] ColumnWeights;
-		int[] MinColumnWidths;
-		int[] DesiredColumnWidths;
-		string LastColumnSettings;
-		List<ColumnHeader> CustomColumns;
+		float[] ColumnWidths = Array.Empty<float>();
+		float[] ColumnWeights = Array.Empty<float>();
+		int[] MinColumnWidths = Array.Empty<int>();
+		int[] DesiredColumnWidths = Array.Empty<int>();
+		string? LastColumnSettings;
+		List<ColumnHeader> CustomColumns = new List<ColumnHeader>();
 		int MaxBuildBadgeChars;
-		ListViewItem ExpandItem;
+		ListViewItem? ExpandItem;
 
 		bool bUpdateBuildListPosted;
 		bool bUpdateBuildMetadataPosted;
 		bool bUpdateReviewsPosted;
 
-		WorkspaceUpdateCallback UpdateCallback;
+		WorkspaceUpdateCallback? UpdateCallback;
 
-		System.Threading.Timer StartupTimer;
-		List<WorkspaceStartupCallback> StartupCallbacks;
+		System.Threading.Timer? StartupTimer;
+		List<WorkspaceStartupCallback>? StartupCallbacks;
 
 		// When an author filter is applied this will be non-empty and != AuthorFilterPlaceholderText
 		string AuthorFilterText = "";
@@ -318,30 +290,32 @@ public enum LatestChangeType
 		// Placeholder text that is in the control and cleared when the user starts editing.
 		static string AuthorFilterPlaceholderText = "<username>";
 
-		public WorkspaceControl(IWorkspaceControlOwner InOwner, string InApiUrl, string InOriginalExecutableFileName, bool bInUnstable, DetectProjectSettingsTask DetectSettings, LineBasedTextWriter InLog, UserSettings InSettings, OIDCTokenManager InOidcTokenManager)
+		public WorkspaceControl(IWorkspaceControlOwner InOwner, string? InApiUrl, OpenProjectInfo OpenProjectInfo, IServiceProvider InServiceProvider, UserSettings InSettings, OIDCTokenManager? InOidcTokenManager)
 		{
 			InitializeComponent();
 
-			MainThreadSynchronizationContext = SynchronizationContext.Current;
+			MainThreadSynchronizationContext = SynchronizationContext.Current!;
 
 			Owner = InOwner;
 			ApiUrl = InApiUrl;
-			DataFolder = DetectSettings.DataFolder;
-			OriginalExecutableFileName = InOriginalExecutableFileName;
-			bUnstable = bInUnstable;
-			Log = InLog;
+			DataFolder = OpenProjectInfo.ProjectInfo.DataFolder;
+			ServiceProvider = InServiceProvider;
+			Logger = InServiceProvider.GetRequiredService<ILogger<WorkspaceControl>>();
+			PerforceSettings = OpenProjectInfo.PerforceSettings;
+			ProjectInfo = OpenProjectInfo.ProjectInfo;
 			Settings = InSettings;
-			WorkspaceSettings = InSettings.FindOrAddWorkspace(DetectSettings.BranchClientPath);
-			ProjectSettings = InSettings.FindOrAddProject(DetectSettings.NewSelectedClientFileName);
+			this.WorkspaceSettings = OpenProjectInfo.WorkspaceSettings;
+			this.WorkspaceState = OpenProjectInfo.WorkspaceState;
+			ProjectSettings = InSettings.FindOrAddProjectSettings(OpenProjectInfo.ProjectInfo);
 
 			DesiredTaskbarState = Tuple.Create(TaskbarState.NoProgress, 0.0f);
 
-			System.Reflection.PropertyInfo DoubleBufferedProperty = typeof(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+			System.Reflection.PropertyInfo DoubleBufferedProperty = typeof(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
 			DoubleBufferedProperty.SetValue(BuildList, true, null);
 
 			// force the height of the rows
 			BuildList.SmallImageList = new ImageList() { ImageSize = new Size(1, 20) };
-			BuildList_FontChanged(null, null);
+			BuildList_FontChanged(null, null!);
 			BuildList.OnScroll += BuildList_OnScroll;
 			BuildList.ListViewItemSorter = new BuildListItemComparer();
 
@@ -357,60 +331,60 @@ public enum LatestChangeType
 
 			// Set the project logo on the status panel and notification window
 			NotificationWindow = new NotificationWindow(Properties.Resources.DefaultNotificationLogo);
-			StatusPanel.SetProjectLogo(DetectSettings.ProjectLogo, true);
-			DetectSettings.ProjectLogo = null;
-
-			// Commit all the new project info
-			PerforceConnection PerforceClient = DetectSettings.PerforceClient;
-			ClientName = PerforceClient.ClientName;
-			SelectedProject = DetectSettings.SelectedProject;
-			SelectedProjectIdentifier = DetectSettings.NewSelectedProjectIdentifier;
-			SelectedFileName = DetectSettings.NewSelectedFileName;
-			EditorTargetName = DetectSettings.NewProjectEditorTarget;
-			bIsEnterpriseProject = DetectSettings.bIsEnterpriseProject;
-			StreamName = DetectSettings.StreamName;
-
-			// Update the branch directory
-			BranchDirectoryName = DetectSettings.BranchDirectoryName;
-
-			// Check if we've the project we've got open in this workspace is the one we're actually synced to
-			int CurrentChangeNumber = -1;
-			string CurrentSyncFilterHash = null;
-			if (String.Compare(WorkspaceSettings.CurrentProjectIdentifier, SelectedProjectIdentifier, true) == 0)
+			if (ProjectInfo.LocalFileName.HasExtension(".uproject"))
 			{
-				CurrentChangeNumber = WorkspaceSettings.CurrentChangeNumber;
-				CurrentSyncFilterHash = WorkspaceSettings.CurrentSyncFilterHash;
+				FileReference LogoFileName = FileReference.Combine(ProjectInfo.LocalFileName.Directory, "Build", "UnrealGameSync.png");
+				if (FileReference.Exists(LogoFileName))
+				{
+					try
+					{
+						// Duplicate the image, otherwise we'll leave the file locked
+						using (Image Image = Image.FromFile(LogoFileName.FullName))
+						{
+							StatusPanel.SetProjectLogo(new Bitmap(Image), true);
+						}
+					}
+					catch
+					{
+					}
+				}
 			}
 
+			// Commit all the new project info
+			IPerforceSettings PerforceClientSettings = OpenProjectInfo.PerforceSettings;
+			SelectedProject = OpenProjectInfo.SelectedProject;
+
 			// Figure out which API server to use
-			string NewApiUrl;
-			if (TryGetProjectSetting(DetectSettings.LatestProjectConfigFile, "ApiUrl", out NewApiUrl))
+			string? NewApiUrl;
+			if (TryGetProjectSetting(OpenProjectInfo.LatestProjectConfigFile, "ApiUrl", out NewApiUrl))
 			{
 				ApiUrl = NewApiUrl;
 			}
 
-			string TelemetryProjectIdentifier = PerforceUtils.GetClientOrDepotDirectoryName(DetectSettings.NewSelectedProjectIdentifier);
+			ProjectInfo Project = OpenProjectInfo.ProjectInfo;
 
-			Workspace = new Workspace(PerforceClient, BranchDirectoryName, SelectedFileName, DetectSettings.BranchClientPath, DetectSettings.NewSelectedClientFileName, CurrentChangeNumber, CurrentSyncFilterHash, WorkspaceSettings.LastBuiltChangeNumber, TelemetryProjectIdentifier, DetectSettings.bIsEnterpriseProject, new LogControlTextWriter(SyncLog));
+			Workspace = new Workspace(PerforceClientSettings, Project, WorkspaceState, OpenProjectInfo.WorkspaceProjectConfigFile, OpenProjectInfo.WorkspaceProjectStreamFilter, new LogControlTextWriter(SyncLog), ServiceProvider);
 			Workspace.OnUpdateComplete += UpdateCompleteCallback;
 
-			string ProjectLogBaseName = Path.Combine(DataFolder, String.Format("{0}@{1}", PerforceClient.ClientName, DetectSettings.BranchClientPath.Replace("//" + PerforceClient.ClientName + "/", "").Trim('/').Replace("/", "$")));
+			FileReference ProjectLogBaseName = FileReference.Combine(DataFolder, "sync.log");
 
-			PerforceMonitor = new PerforceMonitor(PerforceClient, DetectSettings.BranchClientPath, DetectSettings.NewSelectedClientFileName, DetectSettings.NewSelectedProjectIdentifier, ProjectLogBaseName + ".p4.log", DetectSettings.bIsEnterpriseProject, DetectSettings.LatestProjectConfigFile, DetectSettings.CacheFolder, DetectSettings.LocalConfigFiles);
+			ILogger PerforceLogger = ServiceProvider.GetRequiredService<ILogger<PerforceMonitor>>();
+			PerforceMonitor = new PerforceMonitor(PerforceClientSettings, OpenProjectInfo.ProjectInfo, OpenProjectInfo.LatestProjectConfigFile, OpenProjectInfo.ProjectInfo.CacheFolder, OpenProjectInfo.LocalConfigFiles, ServiceProvider);
 			PerforceMonitor.OnUpdate += UpdateBuildListCallback;
 			PerforceMonitor.OnUpdateMetadata += UpdateBuildMetadataCallback;
-			PerforceMonitor.OnStreamChange += StreamChangedCallback;
-			PerforceMonitor.OnLoginExpired += LoginExpiredCallback;
+			PerforceMonitor.OnStreamChange += StreamChanged;
+			PerforceMonitor.OnLoginExpired += LoginExpired;
 
-			EventMonitor = new EventMonitor(ApiUrl, PerforceUtils.GetClientOrDepotDirectoryName(SelectedProjectIdentifier), DetectSettings.PerforceClient.UserName, ProjectLogBaseName + ".review.log");
+			ILogger EventLogger = ServiceProvider.GetRequiredService < ILogger<EventMonitor>>();
+			EventMonitor = new EventMonitor(ApiUrl, PerforceUtils.GetClientOrDepotDirectoryName(SelectedProjectIdentifier), OpenProjectInfo.PerforceSettings.UserName, ServiceProvider);
 			EventMonitor.OnUpdatesReady += UpdateReviewsCallback;
 
-			JupiterMonitor = JupiterMonitor.CreateFromConfigFile(InOidcTokenManager, ProjectLogBaseName + ".jupiter.log", DetectSettings.LatestProjectConfigFile, SelectedProjectIdentifier);
+			ILogger<JupiterMonitor> JupiterLogger = ServiceProvider.GetRequiredService<ILogger<JupiterMonitor>>();
+			JupiterMonitor = JupiterMonitor.CreateFromConfigFile(InOidcTokenManager, JupiterLogger, OpenProjectInfo.LatestProjectConfigFile, SelectedProjectIdentifier);
 
-			UpdateColumnSettings();
+			UpdateColumnSettings(true);
 
-			string LogFileName = Path.Combine(DataFolder, ProjectLogBaseName + ".sync.log");
-			SyncLog.OpenFile(LogFileName);
+			SyncLog.OpenFile(ProjectLogBaseName);
 
 			Splitter.SetLogVisibility(Settings.bShowLogWindow);
 
@@ -427,18 +401,18 @@ public enum LatestChangeType
 			StartupTimer = new System.Threading.Timer(x => MainThreadSynchronizationContext.Post((o) => { if (!IsDisposed) { StartupTimerElapsed(false); } }, null), null, TimeSpan.FromSeconds(20.0), TimeSpan.FromMilliseconds(-1.0));
 			StartupCallbacks = new List<WorkspaceStartupCallback>();
 
-			string IssuesApiUrl = GetIssuesApiUrl();
-			IssueMonitor = InOwner.CreateIssueMonitor(IssuesApiUrl, DetectSettings.PerforceClient.UserName);
+			string? IssuesApiUrl = GetIssuesApiUrl();
+			IssueMonitor = InOwner.CreateIssueMonitor(IssuesApiUrl, OpenProjectInfo.PerforceSettings.UserName);
 			IssueMonitor.OnIssuesChanged += IssueMonitor_OnIssuesChangedAsync;
 
-			if (SelectedFileName.EndsWith(".uproject", StringComparison.OrdinalIgnoreCase))
+			if (SelectedFileName.HasExtension(".uproject"))
 			{
-				string TintColorFileName = GetTintColorFileName();
+				FileReference TintColorFileName = GetTintColorFileName();
 
-				Directory.CreateDirectory(Path.GetDirectoryName(TintColorFileName));
+				DirectoryReference.CreateDirectory(TintColorFileName.Directory);
 
-				EditorConfigWatcher.Path = Path.GetDirectoryName(TintColorFileName);
-				EditorConfigWatcher.Filter = Path.GetFileName(TintColorFileName);
+				EditorConfigWatcher.Path = TintColorFileName.Directory.FullName;
+				EditorConfigWatcher.Filter = TintColorFileName.GetFileName();
 				EditorConfigWatcher.EnableRaisingEvents = true;
 
 				TintColor = GetTintColor();
@@ -454,7 +428,7 @@ public enum LatestChangeType
 
 		public List<IssueData> GetOpenIssuesForUser()
 		{
-			return IssueMonitor.GetIssues().Where(x => x.FixChange <= 0 && String.Compare(x.Owner, Workspace.Perforce.UserName, StringComparison.OrdinalIgnoreCase) == 0).ToList();
+			return IssueMonitor.GetIssues().Where(x => x.FixChange <= 0 && String.Compare(x.Owner, PerforceSettings.UserName, StringComparison.OrdinalIgnoreCase) == 0).ToList();
 		}
 
 		public void IssueMonitor_OnIssuesChanged()
@@ -478,7 +452,7 @@ public enum LatestChangeType
 			if (StartupTimer != null)
 			{
 				int LatestChangeNumber;
-				if (FindChangeToSync(Settings.SyncType, out LatestChangeNumber))
+				if (FindChangeToSync(Settings.SyncTypeID, out LatestChangeNumber))
 				{
 					StartupTimerElapsed(false);
 				}
@@ -511,32 +485,32 @@ public enum LatestChangeType
 			}
 			else
 			{
-				StartupCallbacks.Add(StartupCallback);
+				StartupCallbacks!.Add(StartupCallback);
 			}
 		}
 
-		private void UpdateColumnSettings()
+		private void UpdateColumnSettings(bool bForceUpdate)
 		{
-			string NextColumnSettings;
+			string? NextColumnSettings;
 			TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "Columns", out NextColumnSettings);
 
-			if (CustomColumns == null || NextColumnSettings != LastColumnSettings)
+			if (bForceUpdate || NextColumnSettings != LastColumnSettings)
 			{
 				LastColumnSettings = NextColumnSettings;
 
-				if (CustomColumns != null)
+				foreach (ColumnHeader CustomColumn in CustomColumns)
 				{
-					foreach (ColumnHeader CustomColumn in CustomColumns)
-					{
-						BuildList.Columns.Remove(CustomColumn);
-					}
+					BuildList.Columns.Remove(CustomColumn);
 				}
 
 				Dictionary<string, ColumnHeader> NameToColumn = new Dictionary<string, ColumnHeader>();
-				foreach (ColumnHeader Column in BuildList.Columns)
+				foreach (ColumnHeader? Column in BuildList.Columns)
 				{
-					NameToColumn[Column.Text] = Column;
-					Column.Tag = null;
+					if (Column != null)
+					{
+						NameToColumn[Column.Text] = Column;
+						Column.Tag = null;
+					}
 				}
 
 				CustomColumns = new List<ColumnHeader>();
@@ -546,10 +520,10 @@ public enum LatestChangeType
 					{
 						ConfigObject ColumnConfig = new ConfigObject(CustomColumn);
 
-						string Name = ColumnConfig.GetValue("Name", null);
+						string? Name = ColumnConfig.GetValue("Name", null);
 						if (Name != null)
 						{
-							ColumnHeader Column;
+							ColumnHeader? Column;
 							if (NameToColumn.TryGetValue(Name, out Column))
 							{
 								Column.Tag = ColumnConfig;
@@ -607,14 +581,17 @@ public enum LatestChangeType
 					ColumnWeights[DescriptionColumn.Index] = 1.25f;
 					ColumnWeights[CISColumn.Index] = 1.5f;
 
-					foreach (ColumnHeader Column in BuildList.Columns)
+					foreach (ColumnHeader? Column in BuildList.Columns)
 					{
-						ConfigObject ColumnConfig = (ConfigObject)Column.Tag;
-						if (ColumnConfig != null)
+						if (Column != null)
 						{
-							MinColumnWidths[Column.Index] = (int)(ColumnConfig.GetValue("MinWidth", MinColumnWidths[Column.Index]) * DpiScaleX);
-							DesiredColumnWidths[Column.Index] = (int)(ColumnConfig.GetValue("DesiredWidth", DesiredColumnWidths[Column.Index]) * DpiScaleX);
-							ColumnWeights[Column.Index] = ColumnConfig.GetValue("Weight", MinColumnWidths[Column.Index]);
+							ConfigObject? ColumnConfig = (ConfigObject?)Column.Tag;
+							if (ColumnConfig != null)
+							{
+								MinColumnWidths[Column.Index] = (int)(ColumnConfig.GetValue("MinWidth", MinColumnWidths[Column.Index]) * DpiScaleX);
+								DesiredColumnWidths[Column.Index] = (int)(ColumnConfig.GetValue("DesiredWidth", DesiredColumnWidths[Column.Index]) * DpiScaleX);
+								ColumnWeights[Column.Index] = ColumnConfig.GetValue("Weight", MinColumnWidths[Column.Index]);
+							}
 						}
 					}
 
@@ -623,7 +600,7 @@ public enum LatestChangeType
 					{
 						if (!String.IsNullOrEmpty(BuildList.Columns[Idx].Text))
 						{
-							string StringValue;
+							string? StringValue;
 							if (TryGetProjectSetting(ProjectConfigFile, String.Format("ColumnWidth_{0}", BuildList.Columns[Idx].Text), out StringValue))
 							{
 								int IntValue;
@@ -645,10 +622,10 @@ public enum LatestChangeType
 
 		private bool UpdateServiceBadges()
 		{
-			string[] ServiceBadgeNames;
+			string[]? ServiceBadgeNames;
 			if (!TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "ServiceBadges", out ServiceBadgeNames))
 			{
-				ServiceBadgeNames = new string[0];
+				ServiceBadgeNames = Array.Empty<string>();
 			}
 
 			List<ServiceBadgeInfo> PrevServiceBadges = ServiceBadges;
@@ -656,7 +633,7 @@ public enum LatestChangeType
 			ServiceBadges = new List<ServiceBadgeInfo>();
 			foreach (string ServiceBadgeName in ServiceBadgeNames)
 			{
-				BadgeData LatestBuild;
+				BadgeData? LatestBuild;
 				if (EventMonitor.TryGetLatestBadge(ServiceBadgeName, out LatestBuild))
 				{
 					ServiceBadges.Add(new ServiceBadgeInfo(ServiceBadgeName, LatestBuild.Url, LatestBuild.Result));
@@ -709,7 +686,10 @@ public enum LatestChangeType
 				components.Dispose();
 			}
 
-			UpdateTimer.Stop();
+			if (UpdateTimer != null)
+			{
+				UpdateTimer.Stop();
+			}
 
 			if (StartupCallbacks != null)
 			{
@@ -717,59 +697,59 @@ public enum LatestChangeType
 				{
 					StartupCallback(this, true);
 				}
-				StartupCallbacks = null;
+				StartupCallbacks = null!;
 			}
 
 			if (IssueMonitor != null)
 			{
 				IssueMonitor.OnIssuesChanged -= IssueMonitor_OnIssuesChangedAsync;
 				Owner.ReleaseIssueMonitor(IssueMonitor);
-				IssueMonitor = null;
+				IssueMonitor = null!;
 			}
 			if (StartupTimer != null)
 			{
 				StartupTimer.Dispose();
-				StartupTimer = null;
+				StartupTimer = null!;
 			}
 			if (NotificationWindow != null)
 			{
 				NotificationWindow.Dispose();
-				NotificationWindow = null;
+				NotificationWindow = null!;
 			}
 			if (PerforceMonitor != null)
 			{
 				PerforceMonitor.Dispose();
-				PerforceMonitor = null;
+				PerforceMonitor = null!;
 			}
 			if (Workspace != null)
 			{
 				Workspace.Dispose();
-				Workspace = null;
+				Workspace = null!;
 			}
 			if (EventMonitor != null)
 			{
 				EventMonitor.Dispose();
-				EventMonitor = null;
+				EventMonitor = null!;
 			}
 			if (BuildFont != null)
 			{
 				BuildFont.Dispose();
-				BuildFont = null;
+				BuildFont = null!;
 			}
 			if (SelectedBuildFont != null)
 			{
 				SelectedBuildFont.Dispose();
-				SelectedBuildFont = null;
+				SelectedBuildFont = null!;
 			}
 			if (BadgeFont != null)
 			{
 				BadgeFont.Dispose();
-				BadgeFont = null;
+				BadgeFont = null!;
 			}
 			if (JupiterMonitor != null)
 			{
 				JupiterMonitor.Dispose();
-				JupiterMonitor = null;
+				JupiterMonitor = null!;
 			}
 
 			base.Dispose(disposing);
@@ -798,7 +778,7 @@ public enum LatestChangeType
 		private void ShowErrorDialog(string Format, params object[] Args)
 		{
 			string Message = String.Format(Format, Args);
-			Log.WriteLine(Message);
+			Logger.LogError("{Message}", Message);
 			MessageBox.Show(Message);
 		}
 
@@ -823,35 +803,13 @@ public enum LatestChangeType
 			StatusPanel.ResumeDisplay();*/
 		}
 
-		private void StreamChangedCallback()
-		{
-			MainThreadSynchronizationContext.Post((o) => StreamChanged(), null);
-		}
-
 		private void LoginExpired()
 		{
 			if (!bIsDisposing)
 			{
-				Log.WriteLine("Login has expired. Requesting project to be closed.");
+				Logger.LogInformation("Login has expired. Requesting project to be closed.");
 				Owner.RequestProjectChange(this, SelectedProject, false);
 			}
-		}
-
-		private void LoginExpiredCallback()
-		{
-			MainThreadSynchronizationContext.Post((o) => LoginExpired(), null);
-		}
-
-		private void UpdateSyncConfig(int ChangeNumber, string SyncFilterHash)
-		{
-			WorkspaceSettings.CurrentProjectIdentifier = SelectedProjectIdentifier;
-			WorkspaceSettings.CurrentChangeNumber = ChangeNumber;
-			WorkspaceSettings.CurrentSyncFilterHash = SyncFilterHash;
-			if (ChangeNumber == -1 || ChangeNumber != WorkspaceSettings.CurrentChangeNumber)
-			{
-				WorkspaceSettings.AdditionalChangeNumbers.Clear();
-			}
-			Settings.Save();
 		}
 
 		private void BuildList_OnScroll()
@@ -906,7 +864,7 @@ public enum LatestChangeType
 			StartSync(ChangeNumber, false, null);
 		}
 
-		void StartSync(int ChangeNumber, bool bSyncOnly, WorkspaceUpdateCallback Callback)
+		void StartSync(int ChangeNumber, bool bSyncOnly, WorkspaceUpdateCallback? Callback)
 		{
 			WorkspaceUpdateOptions Options = WorkspaceUpdateOptions.Sync | WorkspaceUpdateOptions.SyncArchives | WorkspaceUpdateOptions.GenerateProjectFiles;
 			if (!bSyncOnly)
@@ -932,7 +890,7 @@ public enum LatestChangeType
 			StartWorkspaceUpdate(ChangeNumber, Options, null);
 		}
 
-		void StartWorkspaceUpdate(int ChangeNumber, WorkspaceUpdateOptions Options, WorkspaceUpdateCallback Callback)
+		void StartWorkspaceUpdate(int ChangeNumber, WorkspaceUpdateOptions Options, WorkspaceUpdateCallback? Callback)
 		{
 			if ((Options & (WorkspaceUpdateOptions.Sync | WorkspaceUpdateOptions.Build)) != 0 && GetProcessesRunningInWorkspace().Length > 0)
 			{
@@ -951,7 +909,7 @@ public enum LatestChangeType
 				}
 			}
 
-			string[] CombinedSyncFilter = UserSettings.GetCombinedSyncFilter(GetSyncCategories(), Settings.SyncView, Settings.SyncCategories, WorkspaceSettings.SyncView, WorkspaceSettings.SyncCategories);
+			string[] CombinedSyncFilter = UserSettings.GetCombinedSyncFilter(GetSyncCategories(), Settings.Global.Filter, WorkspaceSettings.Filter);
 
 			ConfigSection PerforceSection = PerforceMonitor.LatestProjectConfigFile.FindSection("Perforce");
 			if (PerforceSection != null)
@@ -960,7 +918,7 @@ public enum LatestChangeType
 				CombinedSyncFilter = AdditionalPaths.Union(CombinedSyncFilter).ToArray();
 			}
 
-			WorkspaceUpdateContext Context = new WorkspaceUpdateContext(ChangeNumber, Options, CombinedSyncFilter, GetDefaultBuildStepObjects(), ProjectSettings.BuildSteps, null, GetWorkspaceVariables(ChangeNumber));
+			WorkspaceUpdateContext Context = new WorkspaceUpdateContext(ChangeNumber, Options, GetEditorBuildConfig(), CombinedSyncFilter, ProjectSettings.BuildSteps, null);
 			if (Options.HasFlag(WorkspaceUpdateOptions.SyncArchives))
 			{
 				IReadOnlyList<IArchiveInfo> Archives = GetArchives();
@@ -972,19 +930,19 @@ public enum LatestChangeType
 				List<IArchiveInfo> SelectedArchives = GetSelectedArchives(Archives);
 				foreach (IArchiveInfo Archive in SelectedArchives)
 				{
-					string ArchivePath = GetArchiveKeyForChangeNumber(Archive, ChangeNumber);
+					string? ArchivePath = GetArchiveKeyForChangeNumber(Archive, ChangeNumber);
 					if (ArchivePath == null)
 					{
 						MessageBox.Show(String.Format("There are no compiled {0} binaries for this change. To sync it, you must disable syncing of precompiled editor binaries.", Archive.Name));
 						return;
 					}
 
-					if (Archive.Type == EditorArchiveType)
+					if (Archive.Type == IArchiveInfo.EditorArchiveType)
 					{
 						Context.Options &= ~(WorkspaceUpdateOptions.Build | WorkspaceUpdateOptions.GenerateProjectFiles | WorkspaceUpdateOptions.OpenSolutionAfterSync);
 					}
 
-					string[] ZippedBinariesSyncFilter;
+					string[]? ZippedBinariesSyncFilter;
 					if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "ZippedBinariesSyncFilter", out ZippedBinariesSyncFilter) && ZippedBinariesSyncFilter.Length > 0)
 					{
 						Context.SyncFilter = Enumerable.Concat(Context.SyncFilter, ZippedBinariesSyncFilter).ToArray();
@@ -996,17 +954,17 @@ public enum LatestChangeType
 			StartWorkspaceUpdate(Context, Callback);
 		}
 
-		void StartWorkspaceUpdate(WorkspaceUpdateContext Context, WorkspaceUpdateCallback Callback)
+		void StartWorkspaceUpdate(WorkspaceUpdateContext Context, WorkspaceUpdateCallback? Callback)
 		{
 			if (Settings.bAutoResolveConflicts)
 			{
 				Context.Options |= WorkspaceUpdateOptions.AutoResolveChanges;
 			}
-			if (WorkspaceSettings.bSyncAllProjects ?? Settings.bSyncAllProjects)
+			if (WorkspaceSettings.Filter.AllProjects ?? Settings.Global.Filter.AllProjects ?? false)
 			{
 				Context.Options |= WorkspaceUpdateOptions.SyncAllProjects | WorkspaceUpdateOptions.IncludeAllProjectsInSolution;
 			}
-			if (WorkspaceSettings.bIncludeAllProjectsInSolution ?? Settings.bIncludeAllProjectsInSolution)
+			if (WorkspaceSettings.Filter.AllProjectsInSln ?? Settings.Global.Filter.AllProjectsInSln ?? false)
 			{
 				Context.Options |= WorkspaceUpdateOptions.IncludeAllProjectsInSolution;
 			}
@@ -1016,14 +974,13 @@ public enum LatestChangeType
 			Context.StartTime = DateTime.UtcNow;
 			Context.PerforceSyncOptions = (PerforceSyncOptions)Settings.SyncOptions.Clone();
 
-			Log.WriteLine("Updating workspace at {0}...", Context.StartTime.ToLocalTime().ToString());
-			Log.WriteLine("  ChangeNumber={0}", Context.ChangeNumber);
-			Log.WriteLine("  Options={0}", Context.Options.ToString());
-			Log.WriteLine("  Clobbering {0} files", Context.ClobberFiles.Count);
+			Logger.LogInformation("Updating workspace at {Time}...", Context.StartTime.ToLocalTime().ToString());
+			Logger.LogInformation("  ChangeNumber={Change}", Context.ChangeNumber);
+			Logger.LogInformation("  Options={Options}", Context.Options.ToString());
+			Logger.LogInformation("  Clobbering {NumFiles} files", Context.ClobberFiles.Count);
 
 			if (Context.Options.HasFlag(WorkspaceUpdateOptions.Sync))
 			{
-				UpdateSyncConfig(-1, Workspace.CurrentSyncFilterHash);
 				EventMonitor.PostEvent(Context.ChangeNumber, EventType.Syncing);
 			}
 
@@ -1031,15 +988,13 @@ public enum LatestChangeType
 			{
 				if (!Context.Options.HasFlag(WorkspaceUpdateOptions.ContentOnly) && (Context.CustomBuildSteps == null || Context.CustomBuildSteps.Count == 0))
 				{
-					foreach (BuildConfig Config in Enum.GetValues(typeof(BuildConfig)))
+					FileReference TargetFile = ConfigUtils.GetEditorTargetFile(Workspace.Project, Workspace.ProjectConfigFile);
+					foreach (BuildConfig Config in Enum.GetValues(typeof(BuildConfig)).OfType<BuildConfig>())
 					{
-						List<string> EditorReceiptPaths = GetEditorReceiptPaths(Config);
-						foreach (string EditorReceiptPath in EditorReceiptPaths)
+						FileReference ReceiptFile = ConfigUtils.GetReceiptFile(Workspace.Project, TargetFile, Config.ToString());
+						if (FileReference.Exists(ReceiptFile))
 						{
-							if (File.Exists(EditorReceiptPath))
-							{
-								try { File.Delete(EditorReceiptPath); } catch (Exception) { }
-							}
+							try { FileReference.Delete(ReceiptFile); } catch (Exception) { }
 						}
 					}
 				}
@@ -1056,12 +1011,12 @@ public enum LatestChangeType
 		{
 			if (Workspace.IsBusy() && MessageBox.Show("Are you sure you want to cancel the current operation?", "Cancel operation", MessageBoxButtons.YesNo) == DialogResult.Yes)
 			{
-				WorkspaceSettings.LastSyncChangeNumber = Workspace.PendingChangeNumber;
-				WorkspaceSettings.LastSyncResult = WorkspaceUpdateResult.Canceled;
-				WorkspaceSettings.LastSyncResultMessage = null;
-				WorkspaceSettings.LastSyncTime = null;
-				WorkspaceSettings.LastSyncDurationSeconds = 0;
-				Settings.Save();
+				WorkspaceState.LastSyncChangeNumber = Workspace.PendingChangeNumber;
+				WorkspaceState.LastSyncResult = WorkspaceUpdateResult.Canceled;
+				WorkspaceState.LastSyncResultMessage = null;
+				WorkspaceState.LastSyncTime = null;
+				WorkspaceState.LastSyncDurationSeconds = 0;
+				WorkspaceState.Save();
 
 				Workspace.CancelUpdate();
 
@@ -1075,7 +1030,6 @@ public enum LatestChangeType
 
 				UpdateSyncActionCheckboxes();
 				Refresh();
-				UpdateSyncConfig(Workspace.CurrentChangeNumber, Workspace.CurrentSyncFilterHash);
 				UpdateStatusPanel();
 				DesiredTaskbarState = Tuple.Create(TaskbarState.NoProgress, 0.0f);
 				Owner.UpdateProgress();
@@ -1090,27 +1044,6 @@ public enum LatestChangeType
 		void UpdateComplete(WorkspaceUpdateContext Context, WorkspaceUpdateResult Result, string ResultMessage)
 		{
 			UpdateTimer.Stop();
-
-			UpdateSyncConfig(Workspace.CurrentChangeNumber, Workspace.CurrentSyncFilterHash);
-
-			if (Result == WorkspaceUpdateResult.Success && Context.Options.HasFlag(WorkspaceUpdateOptions.SyncSingleChange))
-			{
-				WorkspaceSettings.AdditionalChangeNumbers.Add(Context.ChangeNumber);
-				Settings.Save();
-			}
-
-			if (Result == WorkspaceUpdateResult.Success && WorkspaceSettings.ExpandedArchiveTypes != null)
-			{
-				WorkspaceSettings.ExpandedArchiveTypes = WorkspaceSettings.ExpandedArchiveTypes.Except(Context.ArchiveTypeToArchive.Where(x => x.Value == null).Select(x => x.Key)).ToArray();
-			}
-
-			WorkspaceSettings.LastSyncChangeNumber = Context.ChangeNumber;
-			WorkspaceSettings.LastSyncResult = Result;
-			WorkspaceSettings.LastSyncResultMessage = ResultMessage;
-			WorkspaceSettings.LastSyncTime = DateTime.UtcNow;
-			WorkspaceSettings.LastSyncDurationSeconds = (int)(WorkspaceSettings.LastSyncTime.Value - Context.StartTime).TotalSeconds;
-			WorkspaceSettings.LastBuiltChangeNumber = Workspace.LastBuiltChangeNumber;
-			Settings.Save();
 
 			if (Result == WorkspaceUpdateResult.FilesToResolve)
 			{
@@ -1135,7 +1068,7 @@ public enum LatestChangeType
 
 				HashSet<string> UncontrolledFiles = new HashSet<string>();
 				
-				if (SelectedProject.LocalPath.EndsWith(".uprojectdirs", StringComparison.InvariantCultureIgnoreCase))
+				if (SelectedProject.LocalPath != null && SelectedProject.LocalPath.EndsWith(".uprojectdirs", StringComparison.InvariantCultureIgnoreCase))
 				{
 					List<string> ProjectRoots = GetProjectRoots(SelectedProject.LocalPath);
 
@@ -1146,7 +1079,7 @@ public enum LatestChangeType
 				}
 				else
 				{
-					ParseUncontrolledChangelistsPersistencyFile(Path.GetDirectoryName(SelectedProject.LocalPath), UncontrolledFiles);
+					ParseUncontrolledChangelistsPersistencyFile(Path.GetDirectoryName(SelectedProject.LocalPath)!, UncontrolledFiles);
 				}
 
 				ClobberWindow Window = new ClobberWindow(Context.ClobberFiles, UncontrolledFiles);
@@ -1214,7 +1147,7 @@ public enum LatestChangeType
 				ArchiveToChangeNumberToArchiveKey.Clear();
 				ChangeNumberToLayoutInfo.Clear();
 
-				List<PerforceChangeSummary> Changes = PerforceMonitor.GetChanges();
+				List<ChangesRecord> Changes = PerforceMonitor.GetChanges();
 				EventMonitor.FilterChanges(Changes.Select(x => x.Number));
 
 				PromotedChangeNumbers = PerforceMonitor.GetPromotedChangeNumbers();
@@ -1236,10 +1169,10 @@ public enum LatestChangeType
 				ListIndexToChangeIndex = new List<int>();
 				SortedChangeNumbers = new List<int>();
 
-				List<PerforceChangeSummary> FilteredChanges = new List<PerforceChangeSummary>();
+				List<ChangesRecord> FilteredChanges = new List<ChangesRecord>();
 				for (int ChangeIdx = 0; ChangeIdx < Changes.Count; ChangeIdx++)
 				{
-					PerforceChangeSummary Change = Changes[ChangeIdx];
+					ChangesRecord Change = Changes[ChangeIdx];
 					if (ShouldShowChange(Change, ExcludeChanges) || PromotedChangeNumbers.Contains(Change.Number))
 					{
 						SortedChangeNumbers.Add(Change.Number);
@@ -1278,22 +1211,22 @@ public enum LatestChangeType
 			UpdateSyncActionCheckboxes();
 		}
 
-		void UpdateBuildListInternal(List<PerforceChangeSummary> Changes, bool bShowExpandItem)
+		void UpdateBuildListInternal(List<ChangesRecord> Changes, bool bShowExpandItem)
 		{
 			BuildList.BeginUpdate();
 
 			// Remove any changes that no longer exist, and update the rest
-			Dictionary<int, PerforceChangeSummary> ChangeNumberToSummary = Changes.ToDictionary(x => x.Number, x => x);
+			Dictionary<int, ChangesRecord> ChangeNumberToSummary = Changes.ToDictionary(x => x.Number, x => x);
 			for (int Idx = BuildList.Items.Count - 1; Idx >= 0; Idx--)
 			{
-				PerforceChangeSummary Change = BuildList.Items[Idx].Tag as PerforceChangeSummary;
+				ChangesRecord? Change = BuildList.Items[Idx].Tag as ChangesRecord;
 				if (Change != null)
 				{
-					PerforceChangeSummary Summary;
+					ChangesRecord? Summary;
 					if (ChangeNumberToSummary.TryGetValue(Change.Number, out Summary))
 					{
 						// Update
-						BuildList.Items[Idx].SubItems[DescriptionColumn.Index].Text = Change.Description.Replace('\n', ' ');
+						BuildList.Items[Idx].SubItems[DescriptionColumn.Index].Text = Change.Description!.Replace('\n', ' ');
 						ChangeNumberToSummary.Remove(Change.Number);
 					}
 					else
@@ -1305,13 +1238,13 @@ public enum LatestChangeType
 			}
 
 			// Add everything left over
-			foreach (PerforceChangeSummary Change in ChangeNumberToSummary.Values)
+			foreach (ChangesRecord Change in ChangeNumberToSummary.Values)
 			{
 				BuildList_AddItem(Change);
 			}
 
 			// Figure out which group the expand item should be in
-			ListViewGroup NewExpandItemGroup = null;
+			ListViewGroup? NewExpandItemGroup = null;
 			for (int Idx = BuildList.Items.Count - 1; Idx >= 0; Idx--)
 			{
 				ListViewItem Item = BuildList.Items[Idx];
@@ -1358,7 +1291,7 @@ public enum LatestChangeType
 			BuildList.EndUpdate();
 		}
 
-		ListViewGroup BuildList_FindOrAddGroup(PerforceChangeSummary Change, string GroupName)
+		ListViewGroup BuildList_FindOrAddGroup(ChangesRecord Change, string GroupName)
 		{
 			// Find or add the new group
 			int GroupIndex = 0;
@@ -1370,10 +1303,10 @@ public enum LatestChangeType
 					return NextGroup;
 				}
 
-				PerforceChangeSummary LastChange = null;
+				ChangesRecord? LastChange = null;
 				for (int Idx = NextGroup.Items.Count - 1; Idx >= 0 && LastChange == null; Idx--)
 				{
-					LastChange = NextGroup.Items[Idx].Tag as PerforceChangeSummary;
+					LastChange = NextGroup.Items[Idx].Tag as ChangesRecord;
 				}
 				if (LastChange == null || Change.Number > LastChange.Number)
 				{
@@ -1387,13 +1320,17 @@ public enum LatestChangeType
 			return Group;
 		}
 
-		void BuildList_AddItem(PerforceChangeSummary Change)
+		void BuildList_AddItem(ChangesRecord Change)
 		{
 			// Get the display time for this item
-			DateTime DisplayTime = Change.Date;
+			DateTime DisplayTime;
 			if (Settings.bShowLocalTimes)
 			{
-				DisplayTime = (DisplayTime - PerforceMonitor.ServerTimeZone).ToLocalTime();
+				DisplayTime = Change.Time.ToLocalTime();
+			}
+			else
+			{
+				DisplayTime = new DateTime(Change.Time.Ticks + PerforceMonitor.ServerTimeZone.Ticks, DateTimeKind.Local);
 			}
 
 			// Find or add the new group
@@ -1408,7 +1345,7 @@ public enum LatestChangeType
 			Columns[ChangeColumn.Index] = String.Format("{0}", Change.Number);
 
 			Columns[TimeColumn.Index] = DisplayTime.ToShortTimeString();
-			string UserName = FormatUserName(Change.User);
+			string UserName = FormatUserName(Change.User!);
 
 			// If annotate robomerge is on, add a prefix to the user name
 			if (Settings.bAnnotateRobmergeChanges && IsRobomergeChange(Change))
@@ -1417,7 +1354,7 @@ public enum LatestChangeType
 			}
 
 			Columns[AuthorColumn.Index] = UserName;
-			Columns[DescriptionColumn.Index] = Change.Description.Replace('\n', ' ');
+			Columns[DescriptionColumn.Index] = Change.Description!.Replace('\n', ' ');
 
 			for (int ColumnIdx = 1; ColumnIdx < BuildList.Columns.Count; ColumnIdx++)
 			{
@@ -1428,7 +1365,7 @@ public enum LatestChangeType
 			int GroupInsertIdx = 0;
 			for (; GroupInsertIdx < Group.Items.Count; GroupInsertIdx++)
 			{
-				PerforceChangeSummary OtherChange = Group.Items[GroupInsertIdx].Tag as PerforceChangeSummary;
+				ChangesRecord? OtherChange = Group.Items[GroupInsertIdx].Tag as ChangesRecord;
 				if (OtherChange == null || Change.Number >= OtherChange.Number)
 				{
 					break;
@@ -1445,18 +1382,18 @@ public enum LatestChangeType
 		/// </summary>
 		/// <param name="Change"></param>
 		/// <returns></returns>
-		bool IsRobomergeChange(PerforceChangeSummary Change)
+		bool IsRobomergeChange(ChangesRecord Change)
 		{
 			// If hiding robomerge, filter out based on workspace name. Note - don't look at the description because we
 			// *do* want to see conflicts that were manually merged by someone
-			return Change.Client.IndexOf("ROBOMERGE", StringComparison.OrdinalIgnoreCase) >= 0;
+			return Change.Client!.IndexOf("ROBOMERGE", StringComparison.OrdinalIgnoreCase) >= 0;
 		}
 
-		bool ShouldShowChange(PerforceChangeSummary Change, string[] ExcludeChanges)
+		bool ShouldShowChange(ChangesRecord Change, string[] ExcludeChanges)
 		{
 			if (ProjectSettings.FilterType != FilterType.None)
 			{
-				PerforceChangeDetails Details;
+				PerforceChangeDetails? Details;
 				if (!PerforceMonitor.TryGetChangeDetails(Change.Number, out Details))
 				{
 					return false;
@@ -1474,7 +1411,7 @@ public enum LatestChangeType
 			// if filtering by user, only show changes where the author contains the filter text
 			if (!string.IsNullOrEmpty(this.AuthorFilterText)
 				&& this.AuthorFilterText != AuthorFilterPlaceholderText
-				&& Change.User.IndexOf(this.AuthorFilterText, StringComparison.OrdinalIgnoreCase) < 0)
+				&& Change.User!.IndexOf(this.AuthorFilterText, StringComparison.OrdinalIgnoreCase) < 0)
 			{
 				return false;
 			}
@@ -1489,7 +1426,7 @@ public enum LatestChangeType
 				else if (Settings.ShowRobomerge == UserSettings.RobomergeShowChangesOption.Badged)
 				{
 					// if this change has any badges, we'll show it unless it's later filtered out
-					EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+					EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 					if (Summary == null || !Summary.Badges.Any())
 					{
 						return false;
@@ -1499,7 +1436,7 @@ public enum LatestChangeType
 
 			if (ProjectSettings.FilterBadges.Count > 0)
 			{
-				EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 				if (Summary == null || !Summary.Badges.Any(x => ProjectSettings.FilterBadges.Contains(x.BadgeName)))
 				{
 					return false;
@@ -1515,12 +1452,12 @@ public enum LatestChangeType
 					}
 				}
 
-				if (String.Compare(Change.User, "buildmachine", true) == 0 && Change.Description.IndexOf("lightmaps", StringComparison.InvariantCultureIgnoreCase) == -1)
+				if (String.Compare(Change.User, "buildmachine", true) == 0 && Change.Description!.IndexOf("lightmaps", StringComparison.InvariantCultureIgnoreCase) == -1)
 				{
 					return false;
 				}
 			}
-			if (IsBisectModeEnabled() && !WorkspaceSettings.ChangeNumberToBisectState.ContainsKey(Change.Number))
+			if (IsBisectModeEnabled() && !WorkspaceState.BisectChanges.Any(x => x.Change == Change.Number))
 			{
 				return false;
 			}
@@ -1536,9 +1473,9 @@ public enum LatestChangeType
 			}
 		}
 
-		string GetIssuesApiUrl()
+		string? GetIssuesApiUrl()
 		{
-			string IssuesApiUrl;
+			string? IssuesApiUrl;
 			if (!TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "IssuesApiUrl", out IssuesApiUrl))
 			{
 				IssuesApiUrl = ApiUrl;
@@ -1549,17 +1486,17 @@ public enum LatestChangeType
 		void UpdateBuildMetadata()
 		{
 			// Refresh the issue monitor if it's changed
-			string IssuesApiUrl = GetIssuesApiUrl();
+			string? IssuesApiUrl = GetIssuesApiUrl();
 			if (IssuesApiUrl != IssueMonitor.ApiUrl)
 			{
-				Log.WriteLine("Changing issues API url from {0} to {1}", IssueMonitor.ApiUrl, IssuesApiUrl);
-				IssueMonitor NewIssueMonitor = Owner.CreateIssueMonitor(IssuesApiUrl, Workspace.Perforce.UserName);
+				Logger.LogInformation("Changing issues API url from {OldApiUrl} to {ApiUrl}", IssueMonitor.ApiUrl, IssuesApiUrl);
+				IssueMonitor NewIssueMonitor = Owner.CreateIssueMonitor(IssuesApiUrl, PerforceSettings.UserName);
 				Owner.ReleaseIssueMonitor(IssueMonitor);
 				IssueMonitor = NewIssueMonitor;
 			}
 
 			// Update the column settings first, since this may affect the badges we hide
-			UpdateColumnSettings();
+			UpdateColumnSettings(false);
 
 			// Clear the badge size cache
 			BadgeLabelToSize.Clear();
@@ -1568,7 +1505,7 @@ public enum LatestChangeType
 			Dictionary<string, string> BadgeNameToGroup = new Dictionary<string, string>();
 
 			// Read the group mappings from the config file
-			string GroupDefinitions;
+			string? GroupDefinitions;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "BadgeGroups", out GroupDefinitions))
 			{
 				string[] GroupDefinitionsArray = GroupDefinitions.Split('\n');
@@ -1583,11 +1520,11 @@ public enum LatestChangeType
 			}
 
 			// Add a dummy group for any other badges we have
-			foreach (ListViewItem Item in BuildList.Items)
+			foreach (ListViewItem? Item in BuildList.Items)
 			{
-				if (Item.Tag != null)
+				if (Item != null && Item.Tag != null)
 				{
-					EventSummary Summary = EventMonitor.GetSummaryForChange(((PerforceChangeSummary)Item.Tag).Number);
+					EventSummary? Summary = EventMonitor.GetSummaryForChange(((ChangesRecord)Item.Tag).Number);
 					if (Summary != null)
 					{
 						foreach (BadgeData Badge in Summary.Badges)
@@ -1701,7 +1638,7 @@ public enum LatestChangeType
 				return true;
 			}
 
-			EventSummary Review = EventMonitor.GetSummaryForChange(ChangeNumber);
+			EventSummary? Review = EventMonitor.GetSummaryForChange(ChangeNumber);
 			if (Review != null)
 			{
 				if (Review.LastStarReview != null && Review.LastStarReview.Type == EventType.Starred)
@@ -1718,54 +1655,7 @@ public enum LatestChangeType
 
 		Dictionary<Guid, WorkspaceSyncCategory> GetSyncCategories()
 		{
-			Dictionary<Guid, WorkspaceSyncCategory> UniqueIdToCategory = new Dictionary<Guid, WorkspaceSyncCategory>();
-
-			// Add the custom filters
-			ConfigFile ProjectConfigFile = PerforceMonitor.LatestProjectConfigFile;
-			if (ProjectConfigFile != null)
-			{
-				string[] CategoryLines = ProjectConfigFile.GetValues("Options.SyncCategory", new string[0]);
-				foreach (string CategoryLine in CategoryLines)
-				{
-					ConfigObject Object = new ConfigObject(CategoryLine);
-
-					Guid UniqueId;
-					if (Guid.TryParse(Object.GetValue("UniqueId", ""), out UniqueId))
-					{
-						WorkspaceSyncCategory Category;
-						if (!UniqueIdToCategory.TryGetValue(UniqueId, out Category))
-						{
-							Category = new WorkspaceSyncCategory(UniqueId);
-							UniqueIdToCategory.Add(UniqueId, Category);
-						}
-
-						if (Object.GetValue("Clear", false))
-						{
-							Category.Paths = new string[0];
-							Category.Requires = new Guid[0];
-						}
-
-						Category.Name = Object.GetValue("Name", Category.Name);
-						Category.bEnable = Object.GetValue("Enable", Category.bEnable);
-						Category.Paths = Enumerable.Concat(Category.Paths, Object.GetValue("Paths", "").Split(';').Select(x => x.Trim())).Where(x => x.Length > 0).Distinct().OrderBy(x => x).ToArray();
-						Category.bHidden = Object.GetValue("Hidden", Category.bHidden);
-						Category.Requires = Enumerable.Concat(Category.Requires, ParseGuids(Object.GetValue("Requires", "").Split(';'))).Distinct().OrderBy(x => x).ToArray();
-					}
-				}
-			}
-			return UniqueIdToCategory;
-		}
-
-		static IEnumerable<Guid> ParseGuids(IEnumerable<string> Values)
-		{
-			foreach(string Value in Values)
-			{
-				Guid Guid;
-				if(Guid.TryParse(Value, out Guid))
-				{
-					yield return Guid;
-				}
-			}
+			return ConfigUtils.GetSyncCategories(PerforceMonitor.LatestProjectConfigFile);
 		}
 
 		List<string> GetProjectRoots(string InUProjectDirsPath)
@@ -1777,7 +1667,7 @@ public enum LatestChangeType
 				return ProjectRoots;
 			}
 
-			string UProjectDirsRoot = Path.GetDirectoryName(InUProjectDirsPath);
+			string UProjectDirsRoot = Path.GetDirectoryName(InUProjectDirsPath)!;
 
 			foreach (string Line in File.ReadLines(InUProjectDirsPath))
 			{
@@ -1821,7 +1711,7 @@ public enum LatestChangeType
 				try
 				{
 					string JsonString = File.ReadAllText(UncontrolledChangelistPersistencyFilePath);
-					UncontrolledChangelistPersistency UCLPersistency = JsonSerializer.Deserialize<UncontrolledChangelistPersistency>(JsonString, Program.DefaultJsonSerializerOptions);
+					UncontrolledChangelistPersistency UCLPersistency = JsonSerializer.Deserialize<UncontrolledChangelistPersistency>(JsonString, Utility.DefaultJsonSerializerOptions);
 
 					foreach (UncontrolledChangelist UCL in UCLPersistency.Changelists)
 					{
@@ -1833,7 +1723,7 @@ public enum LatestChangeType
 				}
 				catch (Exception Ex)
 				{
-					Log.WriteLine("Exception while parsing Uncontrolled Changelist persistency file: {0}", Ex.ToString());
+					Logger.LogError(Ex, "Exception while parsing Uncontrolled Changelist persistency file");
 				}
 			}
 		}
@@ -1883,7 +1773,7 @@ public enum LatestChangeType
 			Dictionary<string, BadgeData> TypeToLastSucceededBuild = new Dictionary<string, BadgeData>();
 			for (int Idx = SortedChangeNumbers.Count - 1; Idx >= 0; Idx--)
 			{
-				EventSummary Summary = EventMonitor.GetSummaryForChange(SortedChangeNumbers[Idx]);
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(SortedChangeNumbers[Idx]);
 				if (Summary != null)
 				{
 					foreach (BadgeData Badge in Summary.Badges)
@@ -1922,7 +1812,7 @@ public enum LatestChangeType
 					if (LastChangeByCurrentUserOfType > 0 && LastBuild.ChangeNumber >= LastChangeByCurrentUserOfType)
 					{
 						// And check that there wasn't a successful build after we submitted (if there was, we're in the clear)
-						BadgeData LastSuccessfulBuild;
+						BadgeData? LastSuccessfulBuild;
 						if (!TypeToLastSucceededBuild.TryGetValue(LastBuild.BuildType, out LastSuccessfulBuild) || LastSuccessfulBuild.ChangeNumber < LastChangeByCurrentUserOfType)
 						{
 							// Add it to the list of notifications
@@ -1987,9 +1877,9 @@ public enum LatestChangeType
 
 		class ExpandRowLayout
 		{
-			public string MainText;
+			public string? MainText;
 			public Rectangle MainRect;
-			public string LinkText;
+			public string? LinkText;
 			public Rectangle LinkRect;
 		}
 
@@ -2073,7 +1963,7 @@ public enum LatestChangeType
 				{
 					BuildList.DrawTrackedBackground(e.Graphics, e.Bounds);
 				}
-				else if (((PerforceChangeSummary)e.Item.Tag).Number == Workspace.PendingChangeNumber)
+				else if (((ChangesRecord)e.Item.Tag).Number == Workspace.PendingChangeNumber)
 				{
 					BuildList.DrawTrackedBackground(e.Graphics, e.Bounds);
 				}
@@ -2084,20 +1974,20 @@ public enum LatestChangeType
 			}
 		}
 
-		private string GetArchiveKeyForChangeNumber(IArchiveInfo Archive, int ChangeNumber)
+		private string? GetArchiveKeyForChangeNumber(IArchiveInfo Archive, int ChangeNumber)
 		{
-			string ArchivePath;
+			string? ArchivePath;
 
-			Dictionary<int, string> ChangeNumberToArchivePath;
+			Dictionary<int, string?>? ChangeNumberToArchivePath;
 			if (!ArchiveToChangeNumberToArchiveKey.TryGetValue(Archive.Name, out ChangeNumberToArchivePath))
 			{
-				ChangeNumberToArchivePath = new Dictionary<int, string>();
+				ChangeNumberToArchivePath = new Dictionary<int, string?>();
 				ArchiveToChangeNumberToArchiveKey[Archive.Name] = ChangeNumberToArchivePath;
 			}
 
 			if (!ChangeNumberToArchivePath.TryGetValue(ChangeNumber, out ArchivePath))
 			{
-				PerforceChangeDetails Details;
+				PerforceChangeDetails? Details;
 				if (PerforceMonitor.TryGetChangeDetails(ChangeNumber, out Details))
 				{
 					// Try to get the archive for this CL
@@ -2133,9 +2023,76 @@ public enum LatestChangeType
 			return SelectedArchives.Count == 0 || SelectedArchives.All(x => GetArchiveKeyForChangeNumber(x, ChangeNumber) != null);
 		}
 
-		private ChangeLayoutInfo GetChangeLayoutInfo(PerforceChangeSummary Change)
+		/// <summary>
+		/// Should read as Do Required Badges Exist and Are They Good.
+		/// Determines if the ini specified INI filter is a subset of the InBadges passed
+		/// BadgeGroupSyncFilter - is used as the ini 
+		/// </summary>
+		/// <param name="InBadges"></param>
+		/// <returns></returns>
+		private bool DoRequiredBadgesExist(List<string> RequiredBadgeList, List<BadgeData> InBadges)
 		{
-			ChangeLayoutInfo LayoutInfo;
+			Dictionary<string, BadgeData> InBadgeDictionary = new Dictionary<string, BadgeData>();
+			foreach (BadgeData Badge in InBadges)
+			{
+				InBadgeDictionary.Add(Badge.BadgeName, Badge);
+			}
+
+			// make sure all required badges exist in the InBadgeSet
+			foreach (string BadgeName in RequiredBadgeList)
+			{
+				BadgeData? Badge;
+				if (InBadgeDictionary.TryGetValue(BadgeName, out Badge))
+				{
+					// If any required badge is not successful then the filter isn't matched.
+					if (!Badge.IsSuccess)
+					{
+						return false;
+					}
+				}
+				else
+				{
+					// required badge not found.
+					return false;
+				}
+			}
+
+			// All required badges existed and were successful 
+			return true;
+		}
+
+		private bool CanSyncChangeType(LatestChangeType ChangeType, ChangesRecord Change, EventSummary? Summary)
+		{
+			if (ChangeType.bGood)
+			{
+				if (Summary == null || Summary.Verdict != ReviewVerdict.Good)
+				{
+					return false;
+				}
+			}
+
+			if (ChangeType.bStarred)
+			{
+				if ((Summary == null || Summary.LastStarReview == null || Summary.LastStarReview.Type != EventType.Starred) && !PromotedChangeNumbers.Contains(Change.Number))
+				{
+					return false;
+				}
+			}
+
+			if (ChangeType.RequiredBadges.Count > 0)
+			{
+				if (Summary == null || !DoRequiredBadgesExist(ChangeType.RequiredBadges, Summary.Badges))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		private ChangeLayoutInfo GetChangeLayoutInfo(ChangesRecord Change)
+		{
+			ChangeLayoutInfo? LayoutInfo;
 			if (!ChangeNumberToLayoutInfo.TryGetValue(Change.Number, out LayoutInfo))
 			{
 				LayoutInfo = new ChangeLayoutInfo();
@@ -2143,7 +2100,7 @@ public enum LatestChangeType
 				LayoutInfo.DescriptionBadges = CreateDescriptionBadges(Change);
 				LayoutInfo.TypeBadges = CreateTypeBadges(Change.Number);
 
-				EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 				LayoutInfo.BuildBadges = CreateBuildBadges(Change.Number, Summary);
 				LayoutInfo.CustomBadges = CreateCustomBadges(Change.Number, Summary);
 
@@ -2155,20 +2112,20 @@ public enum LatestChangeType
 		private void GetRemainingBisectRange(out int OutPassChangeNumber, out int OutFailChangeNumber)
 		{
 			int PassChangeNumber = -1;
-			foreach (KeyValuePair<int, BisectState> Pair in WorkspaceSettings.ChangeNumberToBisectState)
+			foreach (BisectEntry Entry in WorkspaceState.BisectChanges)
 			{
-				if (Pair.Value == BisectState.Pass && (Pair.Key > PassChangeNumber || PassChangeNumber == -1))
+				if (Entry.State == BisectState.Pass && (Entry.Change > PassChangeNumber || PassChangeNumber == -1))
 				{
-					PassChangeNumber = Pair.Key;
+					PassChangeNumber = Entry.Change;
 				}
 			}
 
 			int FailChangeNumber = -1;
-			foreach (KeyValuePair<int, BisectState> Pair in WorkspaceSettings.ChangeNumberToBisectState)
+			foreach (BisectEntry Entry in WorkspaceState.BisectChanges)
 			{
-				if (Pair.Value == BisectState.Fail && Pair.Key > PassChangeNumber && (Pair.Key < FailChangeNumber || FailChangeNumber == -1))
+				if (Entry.State == BisectState.Fail && Entry.Change > PassChangeNumber && (Entry.Change < FailChangeNumber || FailChangeNumber == -1))
 				{
-					FailChangeNumber = Pair.Key;
+					FailChangeNumber = Entry.Change;
 				}
 			}
 
@@ -2178,7 +2135,7 @@ public enum LatestChangeType
 
 		private void BuildList_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
 		{
-			PerforceChangeSummary Change = (PerforceChangeSummary)e.Item.Tag;
+			ChangesRecord Change = (ChangesRecord)e.Item.Tag;
 			if (Change == null)
 			{
 				return;
@@ -2194,11 +2151,11 @@ public enum LatestChangeType
 			Format.FormatFlags = StringFormatFlags.NoWrap;
 			Format.Trimming = StringTrimming.EllipsisCharacter;
 
-			Font CurrentFont = (Change.Number == Workspace.PendingChangeNumber || Change.Number == Workspace.CurrentChangeNumber) ? SelectedBuildFont : BuildFont;
+			Font CurrentFont = (Change.Number == Workspace.PendingChangeNumber || Change.Number == Workspace.CurrentChangeNumber) ? SelectedBuildFont! : BuildFont!;
 
 			bool bAllowSync = CanSyncChange(Change.Number);
 			int BadgeAlpha = bAllowSync ? 255 : 128;
-			Color TextColor = (bAllowSync || Change.Number == Workspace.PendingChangeNumber || Change.Number == Workspace.CurrentChangeNumber || (WorkspaceSettings != null && WorkspaceSettings.AdditionalChangeNumbers.Contains(Change.Number))) ? SystemColors.WindowText : Blend(SystemColors.Window, SystemColors.WindowText, 0.25f);
+			Color TextColor = (bAllowSync || Change.Number == Workspace.PendingChangeNumber || Change.Number == Workspace.CurrentChangeNumber || WorkspaceState.AdditionalChangeNumbers.Contains(Change.Number)) ? SystemColors.WindowText : Blend(SystemColors.Window, SystemColors.WindowText, 0.25f);
 
 			const int FadeRange = 6;
 			if (e.ItemIndex >= BuildList.Items.Count - FadeRange && NumChanges >= PerforceMonitor.CurrentMaxChanges && !IsBisectModeEnabled())
@@ -2210,14 +2167,14 @@ public enum LatestChangeType
 
 			if (e.ColumnIndex == IconColumn.Index)
 			{
-				EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 
 				float MinX = 4 * DpiScaleX;
 				if ((Summary != null && EventMonitor.WasSyncedByCurrentUser(Summary.ChangeNumber)) || (Workspace != null && Workspace.CurrentChangeNumber == Change.Number))
 				{
 					e.Graphics.DrawImage(Properties.Resources.Icons, MinX * DpiScaleX, IconY, PreviousSyncIcon, GraphicsUnit.Pixel);
 				}
-				else if (WorkspaceSettings != null && WorkspaceSettings.AdditionalChangeNumbers.Contains(Change.Number))
+				else if (WorkspaceSettings != null && WorkspaceState.AdditionalChangeNumbers.Contains(Change.Number))
 				{
 					e.Graphics.DrawImage(Properties.Resources.Icons, MinX * DpiScaleX, IconY, AdditionalSyncIcon, GraphicsUnit.Pixel);
 				}
@@ -2236,16 +2193,16 @@ public enum LatestChangeType
 						int FirstPass, FirstFail;
 						GetRemainingBisectRange(out FirstPass, out FirstFail);
 
-						BisectState State;
-						if (!WorkspaceSettings.ChangeNumberToBisectState.TryGetValue(Change.Number, out State) || State == BisectState.Exclude)
+						BisectEntry Entry = WorkspaceState.BisectChanges.FirstOrDefault(x => x.Change == Change.Number);
+						if (Entry == null || Entry.State == BisectState.Exclude)
 						{
 							QualityIcon = new Rectangle(0, 0, 0, 0);
 						}
-						if (State == BisectState.Pass)
+						else if (Entry.State == BisectState.Pass)
 						{
 							QualityIcon = BisectPassIcon;
 						}
-						else if (State == BisectState.Fail)
+						else if (Entry.State == BisectState.Fail)
 						{
 							QualityIcon = BisectFailIcon;
 						}
@@ -2366,7 +2323,7 @@ public enum LatestChangeType
 
 					if (Change.Number == Workspace.CurrentChangeNumber)
 					{
-						EventData Review = EventMonitor.GetReviewByCurrentUser(Change.Number);
+						EventData? Review = EventMonitor.GetReviewByCurrentUser(Change.Number);
 
 						MaxX -= FrownIcon.Width * DpiScaleX;
 						e.Graphics.DrawImage(Properties.Resources.Icons, MaxX, IconY, (Review == null || !EventMonitor.IsPositiveReview(Review.Type)) ? FrownIcon : DisabledFrownIcon, GraphicsUnit.Pixel);
@@ -2381,12 +2338,12 @@ public enum LatestChangeType
 						MaxX = SyncBadgeRectangle.Left - (int)(2 * DpiScaleX);
 					}
 
-					string SummaryText;
-					if (WorkspaceSettings.LastSyncChangeNumber == -1 || WorkspaceSettings.LastSyncChangeNumber != Change.Number || !GetLastUpdateMessage(WorkspaceSettings.LastSyncResult, WorkspaceSettings.LastSyncResultMessage, out SummaryText))
+					string? SummaryText;
+					if (WorkspaceState.LastSyncChangeNumber == -1 || WorkspaceState.LastSyncChangeNumber != Change.Number || !GetLastUpdateMessage(WorkspaceState.LastSyncResult, WorkspaceState.LastSyncResultMessage, out SummaryText))
 					{
 						StringBuilder SummaryTextBuilder = new StringBuilder();
 
-						EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+						EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 
 						AppendItemList(SummaryTextBuilder, " ", "Under investigation by {0}.", EventMonitor.GetInvestigatingUsers(Change.Number).Select(x => FormatUserName(x)));
 
@@ -2421,7 +2378,7 @@ public enum LatestChangeType
 				{
 					ChangeLayoutInfo Layout = GetChangeLayoutInfo(Change);
 
-					List<BadgeInfo> Badges;
+					List<BadgeInfo>? Badges;
 					if (Layout.CustomBadges.TryGetValue(Column.Text, out Badges) && Badges.Count > 0)
 					{
 						e.Graphics.IntersectClip(e.Bounds);
@@ -2510,11 +2467,11 @@ public enum LatestChangeType
 			}
 		}
 
-		private List<BadgeInfo> CreateDescriptionBadges(PerforceChangeSummary Change)
+		private List<BadgeInfo> CreateDescriptionBadges(ChangesRecord Change)
 		{
-			string Description = Change.Description;
+			string Description = Change.Description ?? String.Empty;
 
-			PerforceChangeDetails Details;
+			PerforceChangeDetails? Details;
 			if (PerforceMonitor.TryGetChangeDetails(Change.Number, out Details))
 			{
 				Description = Details.Description;
@@ -2531,40 +2488,43 @@ public enum LatestChangeType
 					foreach (string BadgeDefinition in BadgeDefinitions.Distinct())
 					{
 						ConfigObject BadgeDefinitionObject = new ConfigObject(BadgeDefinition);
-						string Pattern = BadgeDefinitionObject.GetValue("Pattern", null);
-						string Name = BadgeDefinitionObject.GetValue("Name", null);
-						string Group = BadgeDefinitionObject.GetValue("Group", null);
+						string? Pattern = BadgeDefinitionObject.GetValue("Pattern", null);
+						string? Name = BadgeDefinitionObject.GetValue("Name", null);
+						string? Group = BadgeDefinitionObject.GetValue("Group", null);
 						string Color = BadgeDefinitionObject.GetValue("Color", "#909090");
 						string HoverColor = BadgeDefinitionObject.GetValue("HoverColor", "#b0b0b0");
-						string Url = BadgeDefinitionObject.GetValue("Url", null);
-						string Arguments = BadgeDefinitionObject.GetValue("Arguments", null);
+						string? Url = BadgeDefinitionObject.GetValue("Url", null);
+						string? Arguments = BadgeDefinitionObject.GetValue("Arguments", null);
 						if (!String.IsNullOrEmpty(Name) && !String.IsNullOrEmpty(Pattern))
 						{
-							foreach (Match MatchResult in Regex.Matches(Description, Pattern, RegexOptions.Multiline))
+							foreach (Match? MatchResult in Regex.Matches(Description, Pattern, RegexOptions.Multiline))
 							{
-								Color BadgeColor = System.Drawing.ColorTranslator.FromHtml(Color);
-								Color HoverBadgeColor = System.Drawing.ColorTranslator.FromHtml(HoverColor);
-
-								string UniqueId = String.IsNullOrEmpty(Url) ? null : String.Format("Description:{0}:{1}", Change.Number, Badges.Count);
-
-								string ExpandedUrl = ReplaceRegexMatches(Url, MatchResult);
-								string ExpandedArguments = ReplaceRegexMatches(Arguments, MatchResult);
-
-								Action ClickHandler;
-								if (String.IsNullOrEmpty(ExpandedUrl))
+								if (MatchResult != null)
 								{
-									ClickHandler = null;
-								}
-								else if (String.IsNullOrEmpty(ExpandedArguments))
-								{
-									ClickHandler = () => SafeProcessStart(ExpandedUrl);
-								}
-								else
-								{
-									ClickHandler = () => SafeProcessStart(ExpandedUrl, ExpandedArguments);
-								}
+									Color BadgeColor = System.Drawing.ColorTranslator.FromHtml(Color);
+									Color HoverBadgeColor = System.Drawing.ColorTranslator.FromHtml(HoverColor);
 
-								Badges.Add(new BadgeInfo(ReplaceRegexMatches(Name, MatchResult), Group, UniqueId, BadgeColor, HoverBadgeColor, ClickHandler));
+									string? UniqueId = String.IsNullOrEmpty(Url) ? null : String.Format("Description:{0}:{1}", Change.Number, Badges.Count);
+
+									string? ExpandedUrl = ReplaceRegexMatches(Url, MatchResult);
+									string? ExpandedArguments = ReplaceRegexMatches(Arguments, MatchResult);
+
+									Action? ClickHandler;
+									if (String.IsNullOrEmpty(ExpandedUrl))
+									{
+										ClickHandler = null;
+									}
+									else if (String.IsNullOrEmpty(ExpandedArguments))
+									{
+										ClickHandler = () => SafeProcessStart(ExpandedUrl);
+									}
+									else
+									{
+										ClickHandler = () => SafeProcessStart(ExpandedUrl, ExpandedArguments);
+									}
+
+									Badges.Add(new BadgeInfo(ReplaceRegexMatches(Name, MatchResult), Group, UniqueId, BadgeColor, HoverBadgeColor, ClickHandler));
+								}
 							}
 						}
 					}
@@ -2577,6 +2537,47 @@ public enum LatestChangeType
 			LayoutBadges(Badges);
 
 			return Badges;
+		}
+
+		private void PrintLatestChangeTypeUsage(string ErroringDefinition)
+		{
+			string ErrorMessage = "Error: Name not set for config value in \"Sync.LatestChangeType\"";
+			string UsageMessage = "Expected Format under the [Sync] ini category: +LatestChangeType=(Name=[string], Description=[string], OrderIndex=[int], bGood=[bool], bStarred=[bool], RequiredBadges=\"List of Badges For Changelist to have\")";
+
+			ShowErrorDialog("{0} Erroring String({1}) \n {2}", ErrorMessage, ErroringDefinition, UsageMessage);
+		}
+
+
+		/**
+		 * Array of config specified options for what the Latest Change to Sync should be.
+		 * See PrintLatestChangeTypeUsage for usage information
+		 */
+		public List<LatestChangeType> GetCustomLatestChangeTypes()
+		{
+			List<LatestChangeType> FoundLatestChangeTypes = new List<LatestChangeType>();
+
+			// Add three default change types that can be synced to
+			FoundLatestChangeTypes.Add(LatestChangeType.LatestChange());
+			FoundLatestChangeTypes.Add(LatestChangeType.LatestGoodChange());
+			FoundLatestChangeTypes.Add(LatestChangeType.LatestStarredChange());
+
+			string[] LatestChangeTypeDefinitions = PerforceMonitor.LatestProjectConfigFile.GetValues("Sync.LatestChangeType", new string[0]);
+			foreach (string LatestChangeDefinition in LatestChangeTypeDefinitions.Distinct())
+			{
+				LatestChangeType? NewType;
+				if (LatestChangeType.TryParseConfigEntry(LatestChangeDefinition, out NewType))
+				{
+					FoundLatestChangeTypes.Add(NewType);
+				}
+				else
+				{
+					PrintLatestChangeTypeUsage(LatestChangeDefinition);
+				}
+			}
+
+			FoundLatestChangeTypes = FoundLatestChangeTypes.OrderBy(X => X.OrderIndex).ToList();
+
+			return FoundLatestChangeTypes;
 		}
 
 		private static void SafeProcessStart(ProcessStartInfo StartInfo)
@@ -2644,7 +2645,8 @@ public enum LatestChangeType
 			UpdateStatusPanel();
 		}
 
-		private string ReplaceRegexMatches(string Text, Match MatchResult)
+		[return: NotNullIfNotNull("Text")]
+		private string? ReplaceRegexMatches(string? Text, Match MatchResult)
 		{
 			if (Text != null)
 			{
@@ -2661,7 +2663,7 @@ public enum LatestChangeType
 		{
 			List<BadgeInfo> Badges = new List<BadgeInfo>();
 
-			PerforceChangeDetails Details;
+			PerforceChangeDetails? Details;
 			if (PerforceMonitor.TryGetChangeDetails(ChangeNumber, out Details))
 			{
 				if (Details.bContainsCode)
@@ -2682,49 +2684,14 @@ public enum LatestChangeType
 			return Badges;
 		}
 
-		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, out string Value)
+		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, [NotNullWhen(true)] out string? Value)
 		{
-			string Path = SelectedProjectIdentifier;
-			for(; ;)
-			{
-				ConfigSection ProjectSection = ProjectConfigFile.FindSection(Path);
-				if (ProjectSection != null)
-				{
-					string NewValue = ProjectSection.GetValue(Name, null);
-					if (NewValue != null)
-					{
-						Value = NewValue;
-						return true;
-					}
-				}
-
-				int LastSlash = Path.LastIndexOf('/');
-				if(LastSlash < 2)
-				{
-					break;
-				}
-
-				Path = Path.Substring(0, LastSlash);
-			}
-
-			ConfigSection DefaultSection = ProjectConfigFile.FindSection("Default");
-			if (DefaultSection != null)
-			{
-				string NewValue = DefaultSection.GetValue(Name, null);
-				if (NewValue != null)
-				{
-					Value = NewValue;
-					return true;
-				}
-			}
-
-			Value = null;
-			return false;
+			return ConfigUtils.TryGetProjectSetting(ProjectConfigFile, SelectedProjectIdentifier, Name, out Value);
 		}
 
-		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, out string[] Values)
+		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, [NotNullWhen(true)] out string[]? Values)
 		{
-			string ValueList;
+			string? ValueList;
 			if (TryGetProjectSetting(ProjectConfigFile, Name, out ValueList))
 			{
 				Values = ValueList.Split('\n').Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
@@ -2737,9 +2704,9 @@ public enum LatestChangeType
 			}
 		}
 
-		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, string LegacyName, out string Value)
+		private bool TryGetProjectSetting(ConfigFile ProjectConfigFile, string Name, string LegacyName, [NotNullWhen(true)] out string? Value)
 		{
-			string NewValue;
+			string? NewValue;
 			if (TryGetProjectSetting(ProjectConfigFile, Name, out NewValue))
 			{
 				Value = NewValue;
@@ -2757,7 +2724,7 @@ public enum LatestChangeType
 			return false;
 		}
 
-		private List<BadgeInfo> CreateBuildBadges(int ChangeNumber, EventSummary Summary)
+		private List<BadgeInfo> CreateBuildBadges(int ChangeNumber, EventSummary? Summary)
 		{
 			List<BadgeInfo> Badges = new List<BadgeInfo>();
 
@@ -2773,7 +2740,7 @@ public enum LatestChangeType
 				// Add all the badges, sorted by group
 				foreach (KeyValuePair<string, string> BadgeNameAndGroup in BadgeNameAndGroupPairs)
 				{
-					BadgeData BadgeData;
+					BadgeData? BadgeData;
 					BadgeNameToBuildData.TryGetValue(BadgeNameAndGroup.Key, out BadgeData);
 
 					BadgeInfo BadgeInfo = CreateBadge(ChangeNumber, BadgeNameAndGroup.Key, BadgeNameAndGroup.Value, BadgeData);
@@ -2791,7 +2758,7 @@ public enum LatestChangeType
 			return Badges;
 		}
 
-		private BadgeInfo CreateBadge(int ChangeNumber, string BadgeName, string BadgeGroup, BadgeData BadgeData)
+		private BadgeInfo CreateBadge(int ChangeNumber, string BadgeName, string BadgeGroup, BadgeData? BadgeData)
 		{
 			string BadgeLabel = BadgeName;
 			Color BadgeColor = Color.FromArgb(0, Color.White);
@@ -2804,7 +2771,7 @@ public enum LatestChangeType
 
 			Color HoverBadgeColor = Color.FromArgb(BadgeColor.A, Math.Min(BadgeColor.R + 32, 255), Math.Min(BadgeColor.G + 32, 255), Math.Min(BadgeColor.B + 32, 255));
 
-			Action ClickHandler;
+			Action? ClickHandler;
 			if (BadgeData == null || String.IsNullOrEmpty(BadgeData.Url))
 			{
 				ClickHandler = null;
@@ -2818,7 +2785,7 @@ public enum LatestChangeType
 			return new BadgeInfo(BadgeLabel, BadgeGroup, UniqueId, BadgeColor, HoverBadgeColor, ClickHandler);
 		}
 
-		private Dictionary<string, List<BadgeInfo>> CreateCustomBadges(int ChangeNumber, EventSummary Summary)
+		private Dictionary<string, List<BadgeInfo>> CreateCustomBadges(int ChangeNumber, EventSummary? Summary)
 		{
 			Dictionary<string, List<BadgeInfo>> ColumnNameToBadges = new Dictionary<string, List<BadgeInfo>>();
 			if (Summary != null && Summary.Badges.Count > 0)
@@ -2915,7 +2882,7 @@ public enum LatestChangeType
 			if (!BadgeLabelToSize.TryGetValue(BadgeText, out BadgeSize))
 			{
 				Size LabelSize = TextRenderer.MeasureText(BadgeText, BadgeFont);
-				int BadgeHeight = BadgeFont.Height + 1;
+				int BadgeHeight = BadgeFont!.Height + 1;
 
 				BadgeSize = new Size(LabelSize.Width + BadgeHeight - 4, BadgeHeight);
 				BadgeLabelToSize[BadgeText] = BadgeSize;
@@ -2923,7 +2890,7 @@ public enum LatestChangeType
 			return BadgeSize;
 		}
 
-		private static bool GetLastUpdateMessage(WorkspaceUpdateResult Result, string ResultMessage, out string Message)
+		private static bool GetLastUpdateMessage(WorkspaceUpdateResult Result, string? ResultMessage, [NotNullWhen(true)] out string? Message)
 		{
 			if (Result != WorkspaceUpdateResult.Success && ResultMessage != null)
 			{
@@ -2933,7 +2900,7 @@ public enum LatestChangeType
 			return GetGenericLastUpdateMessage(Result, out Message);
 		}
 
-		private static bool GetGenericLastUpdateMessage(WorkspaceUpdateResult Result, out string Message)
+		private static bool GetGenericLastUpdateMessage(WorkspaceUpdateResult Result, [NotNullWhen(true)] out string? Message)
 		{
 			switch (Result)
 			{
@@ -2984,7 +2951,7 @@ public enum LatestChangeType
 
 		private static void AppendItemList(StringBuilder Builder, string Separator, string Format, IEnumerable<string> Items)
 		{
-			string ItemList = FormatItemList(Format, Items);
+			string? ItemList = FormatItemList(Format, Items);
 			if (ItemList != null)
 			{
 				if (Builder.Length > 0)
@@ -2995,7 +2962,7 @@ public enum LatestChangeType
 			}
 		}
 
-		private static string FormatItemList(string Format, IEnumerable<string> Items)
+		private static string? FormatItemList(string Format, IEnumerable<string> Items)
 		{
 			string[] ItemsArray = Items.Distinct().ToArray();
 			if (ItemsArray.Length == 0)
@@ -3024,7 +2991,7 @@ public enum LatestChangeType
 				ListViewHitTestInfo HitTest = BuildList.HitTest(Args.Location);
 				if (HitTest.Item != null)
 				{
-					PerforceChangeSummary Change = (PerforceChangeSummary)HitTest.Item.Tag;
+					ChangesRecord Change = (ChangesRecord)HitTest.Item.Tag;
 					if (Change != null)
 					{
 						if (Change.Number == Workspace.CurrentChangeNumber)
@@ -3046,10 +3013,8 @@ public enum LatestChangeType
 			{
 				BuildConfig EditorBuildConfig = GetEditorBuildConfig();
 
-				List<string> ReceiptPaths = GetEditorReceiptPaths(EditorBuildConfig);
-
-				string EditorExe = GetEditorExePath(EditorBuildConfig);
-				if (ReceiptPaths.Any(x => File.Exists(x)) && File.Exists(EditorExe))
+				FileReference ReceiptFile = ConfigUtils.GetEditorReceiptFile(Workspace.Project, Workspace.ProjectConfigFile, EditorBuildConfig);
+				if (ConfigUtils.TryReadEditorReceipt(Workspace.Project, ReceiptFile, out TargetReceipt? Receipt) && Receipt.Launch != null && File.Exists(Receipt.Launch))
 				{
 					if (Settings.bEditorArgumentsPrompt && !ModifyEditorArguments())
 					{
@@ -3057,7 +3022,7 @@ public enum LatestChangeType
 					}
 
 					StringBuilder LaunchArguments = new StringBuilder();
-					if (SelectedFileName.EndsWith(".uproject", StringComparison.InvariantCultureIgnoreCase))
+					if (SelectedFileName.HasExtension(".uproject"))
 					{
 						LaunchArguments.AppendFormat("\"{0}\"", SelectedFileName);
 					}
@@ -3073,9 +3038,9 @@ public enum LatestChangeType
 						LaunchArguments.Append(" -debug");
 					}
 
-					if (!Utility.SpawnProcess(EditorExe, LaunchArguments.ToString()))
+					if (!Utility.SpawnProcess(Receipt.Launch, LaunchArguments.ToString()))
 					{
-						ShowErrorDialog("Unable to spawn {0} {1}", EditorExe, LaunchArguments.ToString());
+						ShowErrorDialog("Unable to spawn {0} {1}", Receipt.Launch, LaunchArguments.ToString());
 					}
 				}
 				else
@@ -3085,83 +3050,16 @@ public enum LatestChangeType
 						Owner.ShowAndActivate();
 
 						WorkspaceUpdateOptions Options = WorkspaceUpdateOptions.Build | WorkspaceUpdateOptions.RunAfterSync;
-						WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, Options, null, GetDefaultBuildStepObjects(), ProjectSettings.BuildSteps, null, GetWorkspaceVariables(Workspace.CurrentChangeNumber));
+						WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, Options, Settings.CompiledEditorBuildConfig, null, ProjectSettings.BuildSteps, null);
 						StartWorkspaceUpdate(Context, null);
 					}
 				}
 			}
 		}
 
-		// returns the default editor target name if not syncing pcbs or Target isn't specified
-		private string TryGetEditorNameFromArchive()
-		{
-			if(ShouldSyncPrecompiledEditor)
-			{
-				List<IArchiveInfo> Archives = GetSelectedArchives(PerforceMonitor.AvailableArchives);
-				foreach(IArchiveInfo Archive in Archives)
-				{
-					if(Archive.Type == EditorArchiveType)
-					{
-						if(Archive.Target != null)
-						{
-							return Archive.Target;
-						}
-					}
-				}
-			}
-			return EditorTargetName;
-		}
-
-		private class ReceiptJsonObject
-		{
-			public string Launch { get; set; }
-		}
-
-		private string GetEditorExePath(BuildConfig Config)
-		{
-			// Try to read the executable path from the target receipt
-			List<string> ReceiptFileNames = GetEditorReceiptPaths(Config);
-			foreach (string ReceiptFileName in ReceiptFileNames)
-			{
-				if (File.Exists(ReceiptFileName))
-				{
-					Log.WriteLine("Reading {0}", ReceiptFileName);
-					try
-					{
-						string Text = File.ReadAllText(ReceiptFileName);
-						ReceiptJsonObject Receipt = JsonSerializer.Deserialize<ReceiptJsonObject>(Text, Program.DefaultJsonSerializerOptions);
-
-						string LaunchFileName = Receipt.Launch;
-						if (LaunchFileName != null)
-						{
-							LaunchFileName = LaunchFileName.Replace("$(EngineDir)", Path.Combine(BranchDirectoryName, "Engine"));
-							LaunchFileName = LaunchFileName.Replace("$(ProjectDir)", Path.GetDirectoryName(SelectedFileName));
-							return Path.GetFullPath(LaunchFileName);
-						}
-					}
-					catch (Exception Ex)
-					{
-						Log.WriteLine("  Exception while parsing receipt: {0}", Ex.ToString());
-					}
-					break;
-				}
-			}
-
-			// Get the default editor target name
-			string TargetName = GetDefaultEditorTargetName();
-
-			// Otherwise use the standard editor path
-			string ExeFileName = String.Format("{0}.exe", TargetName);
-			if ((Config != BuildConfig.DebugGame || PerforceMonitor.LatestProjectConfigFile.GetValue("Options.DebugGameHasSeparateExecutable", false)) && Config != BuildConfig.Development)
-			{
-				ExeFileName = String.Format("{0}-Win64-{1}.exe", TargetName, Config.ToString());
-			}
-			return Path.Combine(BranchDirectoryName, "Engine", "Binaries", "Win64", ExeFileName);
-		}
-
 		private bool WaitForProgramsToFinish()
 		{
-			string[] ProcessFileNames = GetProcessesRunningInWorkspace();
+			FileReference[] ProcessFileNames = GetProcessesRunningInWorkspace();
 			if (ProcessFileNames.Length > 0)
 			{
 				ProgramsRunningWindow ProgramsRunning = new ProgramsRunningWindow(GetProcessesRunningInWorkspace, ProcessFileNames);
@@ -3173,7 +3071,7 @@ public enum LatestChangeType
 			return true;
 		}
 
-		private string[] GetProcessesRunningInWorkspace()
+		private FileReference[] GetProcessesRunningInWorkspace()
 		{
 			HashSet<string> ProcessNames = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 			ProcessNames.Add("Win64\\UE4Editor.exe");
@@ -3197,24 +3095,24 @@ public enum LatestChangeType
 			ProcessNames.Add("DotNET\\UnrealBuildTool\\UnrealBuildTool.exe");
 			ProcessNames.Add("DotNET\\AutomationTool\\AutomationTool.exe");
 
-			List<string> ProcessFileNames = new List<string>();
+			List<FileReference> ProcessFileNames = new List<FileReference>();
 			try
 			{
-				string BinariesRootPath = Path.Combine(Workspace.LocalRootPath, "Engine\\Binaries");
+				DirectoryReference BinariesRootPath = DirectoryReference.Combine(Workspace.Project.LocalRootPath, "Engine\\Binaries");
 
 				foreach (string ProcessName in ProcessNames)
 				{
 					try
 					{
-						string ProcessFilename = Path.Combine(BinariesRootPath, ProcessName);
+						FileReference ProcessFilename = FileReference.Combine(BinariesRootPath, ProcessName);
 
-						if (File.Exists(ProcessFilename))
+						if (FileReference.Exists(ProcessFilename))
 						{
 							try
 							{
 								// Try to open the file to determine whether the executable is running.
 								// We do this so that we can also find processes running under other user sessions, without needing PROCESS_QUERY_INFORMATION access rights.
-								using FileStream TestStream = File.OpenWrite(ProcessFilename);
+								using FileStream TestStream = File.OpenWrite(ProcessFilename.FullName);
 							}
 							catch (IOException)
 							{
@@ -3234,36 +3132,7 @@ public enum LatestChangeType
 			return ProcessFileNames.ToArray();
 		}
 
-		private List<string> GetEditorReceiptPaths(BuildConfig Config)
-		{
-			string ConfigSuffix = (Config == BuildConfig.Development) ? "" : String.Format("-Win64-{0}", Config.ToString());
-
-			List<string> PossiblePaths = new List<string>();
-			string ActualEditorName = TryGetEditorNameFromArchive();
-			if (ActualEditorName != null)
-			{
-				PossiblePaths.Add(Path.Combine(Path.GetDirectoryName(SelectedFileName), "Binaries", "Win64", String.Format("{0}{1}.target", ActualEditorName, ConfigSuffix)));
-			}
-			else if (SelectedFileName.EndsWith(".uproject", StringComparison.InvariantCultureIgnoreCase))
-			{
-				if (bIsEnterpriseProject)
-				{
-					PossiblePaths.Add(Path.Combine(Path.GetDirectoryName(SelectedFileName), "Binaries", "Win64", String.Format("StudioEditor{0}.target", ConfigSuffix)));
-				}
-				else
-				{
-					PossiblePaths.Add(Path.Combine(Path.GetDirectoryName(SelectedFileName), "Binaries", "Win64", String.Format("{0}{1}.target", GetDefaultEditorTargetName(), ConfigSuffix)));
-					PossiblePaths.Add(Path.Combine(Workspace.LocalRootPath, "Engine", "Binaries", "Win64", String.Format("{0}{1}.target", GetDefaultEditorTargetName(), ConfigSuffix)));
-				}
-			}
-			else
-			{
-				PossiblePaths.Add(Path.Combine(Path.GetDirectoryName(SelectedFileName), "Engine", "Binaries", "Win64", String.Format("{0}{1}.target", GetDefaultEditorTargetName(), ConfigSuffix)));
-			}
-			return PossiblePaths;
-		}
-
-		private void TimerCallback(object Sender, EventArgs Args)
+		private void TimerCallback(object? Sender, EventArgs Args)
 		{
 			Tuple<string, float> Progress = Workspace.CurrentProgress;
 			if (Progress != null && Progress.Item2 > 0.0f)
@@ -3281,15 +3150,15 @@ public enum LatestChangeType
 			BuildList.Refresh();
 		}
 
-		private string GetDefaultIssueFilter()
+		private string? GetDefaultIssueFilter()
 		{
-			string BuildHealthProject;
+			string? BuildHealthProject;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "BuildHealthProject", out BuildHealthProject))
 			{
 				return BuildHealthProject;
 			}
 
-			string DefaultIssueFilter;
+			string? DefaultIssueFilter;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "DefaultIssueFilter", out DefaultIssueFilter))
 			{
 				return DefaultIssueFilter;
@@ -3302,13 +3171,13 @@ public enum LatestChangeType
 		{
 			Dictionary<string, Func<IssueData, bool>> CustomFilters = new Dictionary<string, Func<IssueData, bool>>();
 
-			string BuildHealthProject;
+			string? BuildHealthProject;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "BuildHealthProject", out BuildHealthProject))
 			{
 				CustomFilters[BuildHealthProject] = x => !String.IsNullOrEmpty(x.Project) && x.Project.Equals(BuildHealthProject, StringComparison.OrdinalIgnoreCase);
 			}
 
-			string[] Filters;
+			string[]? Filters;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "IssueFilters", out Filters))
 			{
 				foreach (string Filter in Filters)
@@ -3317,12 +3186,12 @@ public enum LatestChangeType
 					{
 						ConfigObject Config = new ConfigObject(Filter);
 
-						string Name = Config.GetValue("Name", null);
-						string Pattern = Config.GetValue("Pattern", null);
+						string? Name = Config.GetValue("Name", null);
+						string? Pattern = Config.GetValue("Pattern", null);
 
-						if(Name != null && Pattern != null)
+						if(Name != null && Pattern != null && StreamName != null)
 						{
-							string DepotName;
+							string? DepotName;
 							if (PerforceUtils.TryGetDepotName(StreamName, out DepotName))
 							{
 								Pattern = Regex.Replace(Pattern, @"\$\(Depot\)", DepotName, RegexOptions.IgnoreCase);
@@ -3335,7 +3204,7 @@ public enum LatestChangeType
 					}
 					catch(Exception Ex)
 					{
-						Log.WriteLine("Unable to parse config filter '{0}': {1}", Filter, Ex);
+						Logger.LogError(Ex, "Unable to parse config filter '{Filter}'", Filter);
 					}
 				}
 			}
@@ -3346,9 +3215,9 @@ public enum LatestChangeType
 		private void OpenPerforce()
 		{
 			StringBuilder CommandLine = new StringBuilder();
-			if (Workspace != null && Workspace.Perforce != null)
+			if (Workspace != null)
 			{
-				CommandLine.Append(Workspace.Perforce.GetConnectionOptions());
+				CommandLine.Append(PerforceSettings.GetArgumentsForExternalProgram(true));
 			}
 			SafeProcessStart("p4v.exe", CommandLine.ToString());
 		}
@@ -3356,16 +3225,18 @@ public enum LatestChangeType
 
 		void RunTool(ToolDefinition Tool, ToolLink Link)
 		{
-			string ToolDir = Owner.ToolUpdateMonitor.GetToolPath(Tool.Name);
+			DirectoryReference? ToolDir = Owner.ToolUpdateMonitor.GetToolPath(Tool.Name);
+			if (ToolDir != null)
+			{
+				Dictionary<string, string> Variables = Workspace.GetVariables(GetEditorBuildConfig());
+				Variables["ToolDir"] = ToolDir.FullName;
 
-			Dictionary<string, string> Variables = GetWorkspaceVariables(Workspace.CurrentChangeNumber);
-			Variables["ToolDir"] = ToolDir;
+				string FileName = Utility.ExpandVariables(Link.FileName, Variables);
+				string Arguments = Utility.ExpandVariables(Link.Arguments ?? String.Empty, Variables);
+				string WorkingDir = Utility.ExpandVariables(Link.WorkingDir ?? ToolDir.FullName, Variables);
 
-			string FileName = Utility.ExpandVariables(Link.FileName, Variables);
-			string Arguments = Utility.ExpandVariables(Link.Arguments, Variables);
-			string WorkingDir = Utility.ExpandVariables(Link.WorkingDir ?? ToolDir, Variables);
-
-			SafeProcessStart(FileName, Arguments, WorkingDir);
+				SafeProcessStart(FileName, Arguments, WorkingDir);
+			}
 		}
 
 		private void UpdateStatusPanel_CrossThread()
@@ -3410,7 +3281,7 @@ public enum LatestChangeType
 				// Project
 				StatusLine ProjectLine = new StatusLine();
 				ProjectLine.AddText(String.Format("Opened "));
-				ProjectLine.AddLink(SelectedFileName + " \u25BE", FontStyle.Regular, (P, R) => { SelectRecentProject(R); });
+				ProjectLine.AddLink(SelectedFileName.FullName + " \u25BE", FontStyle.Regular, (P, R) => { SelectRecentProject(R); });
 				ProjectLine.AddText("  |  ");
 				ProjectLine.AddLink("Settings...", FontStyle.Regular, (P, R) => { Owner.EditSelectedProject(this); });
 				Lines.Add(ProjectLine);
@@ -3491,7 +3362,7 @@ public enum LatestChangeType
 					ProgramsLine.AddText("  |  ");
 				}
 
-				string[] SdkInfoEntries;
+				string[]? SdkInfoEntries;
 				if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "SdkInfo", out SdkInfoEntries))
 				{
 					ProgramsLine.AddLink("SDK Info", FontStyle.Regular, () => { ShowRequiredSdkInfo(); });
@@ -3525,7 +3396,7 @@ public enum LatestChangeType
 					ProgramsLine.AddText("  |  ");
 				}
 
-				ProgramsLine.AddLink("Windows Explorer", FontStyle.Regular, () => { SafeProcessStart("explorer.exe", String.Format("\"{0}\"", Path.GetDirectoryName(SelectedFileName))); });
+				ProgramsLine.AddLink("Windows Explorer", FontStyle.Regular, () => { SafeProcessStart("explorer.exe", String.Format("\"{0}\"", SelectedFileName.Directory.FullName)); });
 
 				if (GetDefaultIssueFilter() != null)
 				{
@@ -3557,19 +3428,19 @@ public enum LatestChangeType
 				Lines.Add(ProgramsLine);
 
 				// Get the summary of the last sync
-				if (WorkspaceSettings.LastSyncChangeNumber > 0)
+				if (WorkspaceState.LastSyncChangeNumber > 0)
 				{
-					string SummaryText;
-					if (WorkspaceSettings.LastSyncChangeNumber == Workspace.CurrentChangeNumber && WorkspaceSettings.LastSyncResult == WorkspaceUpdateResult.Success && WorkspaceSettings.LastSyncTime.HasValue)
+					string? SummaryText;
+					if (WorkspaceState.LastSyncChangeNumber == Workspace.CurrentChangeNumber && WorkspaceState.LastSyncResult == WorkspaceUpdateResult.Success && WorkspaceState.LastSyncTime.HasValue)
 					{
 						Lines.Add(new StatusLine() { LineHeight = 0.5f });
 
 						StatusLine SuccessLine = new StatusLine();
 						SuccessLine.AddIcon(Properties.Resources.StatusIcons, new Size(16, 16), 0);
-						SuccessLine.AddText(String.Format("  Sync took {0}{1}s, completed at {2}.", (WorkspaceSettings.LastSyncDurationSeconds >= 60) ? String.Format("{0}m ", WorkspaceSettings.LastSyncDurationSeconds / 60) : "", WorkspaceSettings.LastSyncDurationSeconds % 60, WorkspaceSettings.LastSyncTime.Value.ToLocalTime().ToString("h\\:mmtt").ToLowerInvariant()));
+						SuccessLine.AddText(String.Format("  Sync took {0}{1}s, completed at {2}.", (WorkspaceState.LastSyncDurationSeconds >= 60) ? String.Format("{0}m ", WorkspaceState.LastSyncDurationSeconds / 60) : "", WorkspaceState.LastSyncDurationSeconds % 60, WorkspaceState.LastSyncTime.Value.ToLocalTime().ToString("h\\:mmtt").ToLowerInvariant()));
 						Lines.Add(SuccessLine);
 					}
-					else if (GetLastUpdateMessage(WorkspaceSettings.LastSyncResult, WorkspaceSettings.LastSyncResultMessage, out SummaryText))
+					else if (GetLastUpdateMessage(WorkspaceState.LastSyncResult, WorkspaceState.LastSyncResultMessage, out SummaryText))
 					{
 						Lines.Add(new StatusLine() { LineHeight = 0.5f });
 
@@ -3599,26 +3470,26 @@ public enum LatestChangeType
 				}
 			}
 
-			StatusLine Caption = null;
+			StatusLine? Caption = null;
 			if (StreamName != null && !Workspace.IsBusy())
 			{
 				Caption = new StatusLine();
 				Caption.AddLink(StreamName + "\u25BE", FontStyle.Bold, (P, R) => { SelectOtherStream(R); });
 			}
 
-			StatusLine Alert = null;
+			StatusLine? Alert = null;
 			Color? TintColor = null;
 
 			ConfigFile ProjectConfigFile = PerforceMonitor.LatestProjectConfigFile;
 			if (ProjectConfigFile != null)
 			{
-				string Message;
+				string? Message;
 				if (TryGetProjectSetting(ProjectConfigFile, "Message", out Message))
 				{
 					Alert = CreateStatusLineFromMarkdown(Message);
 				}
 
-				string StatusPanelColor;
+				string? StatusPanelColor;
 				if (TryGetProjectSetting(ProjectConfigFile, "StatusPanelColor", out StatusPanelColor))
 				{
 					TintColor = System.Drawing.ColorTranslator.FromHtml(StatusPanelColor);
@@ -3650,8 +3521,9 @@ public enum LatestChangeType
 				BuildHealthContextMenu.Items.RemoveAt(MinSeparatorIdx + 1);
 			}
 
-			Func<IssueData, bool> Predicate;
-			if(!GetCustomIssueFilters().TryGetValue(GetDefaultIssueFilter(), out Predicate))
+			Func<IssueData, bool>? Predicate = null;
+			string? DefaultIssueFilter = GetDefaultIssueFilter();
+			if (DefaultIssueFilter == null || !GetCustomIssueFilters().TryGetValue(DefaultIssueFilter, out Predicate))
 			{
 				Predicate = x => true;
 			}
@@ -3664,7 +3536,7 @@ public enum LatestChangeType
 				{
 					Issues.Add(Issue);
 				}
-				else if (Issue.FixChange == 0 && Issue.Owner != null && String.Compare(Issue.Owner, Workspace.Perforce.UserName, StringComparison.OrdinalIgnoreCase) == 0)
+				else if (Issue.FixChange == 0 && Issue.Owner != null && String.Compare(Issue.Owner, PerforceSettings.UserName, StringComparison.OrdinalIgnoreCase) == 0)
 				{
 					bHasOtherAssignedIssue = true;
 				}
@@ -3715,7 +3587,7 @@ public enum LatestChangeType
 					{
 						Item.ForeColor = SystemColors.GrayText;
 					}
-					else if (Issue.Owner != null && String.Compare(Issue.Owner, Workspace.Perforce.UserName, StringComparison.OrdinalIgnoreCase) == 0)
+					else if (Issue.Owner != null && String.Compare(Issue.Owner, PerforceSettings.UserName, StringComparison.OrdinalIgnoreCase) == 0)
 					{
 						Item.Font = new Font(Item.Font, FontStyle.Bold);
 					}
@@ -3744,19 +3616,19 @@ public enum LatestChangeType
 
 		public void ShowIssueDetails(IssueData Issue)
 		{
-			IssueDetailsWindow.Show(ParentForm, IssueMonitor, Workspace.Perforce.ServerAndPort, Workspace.Perforce.UserName, GetServerTimeOffset(), Issue, Log, StreamName);
+			IssueDetailsWindow.Show(ParentForm, IssueMonitor, PerforceSettings, GetServerTimeOffset(), Issue, ServiceProvider, StreamName);
 		}
 
 		private void BuildHealthContextMenu_Browse_Click(object sender, EventArgs e)
 		{
-			string DefaultFilter = GetDefaultIssueFilter();
+			string? DefaultFilter = GetDefaultIssueFilter();
 			Dictionary<string, Func<IssueData, bool>> CustomFilters = GetCustomIssueFilters();
-			IssueBrowserWindow.Show(ParentForm, IssueMonitor, Workspace.Perforce.ServerAndPort, Workspace.Perforce.UserName, GetServerTimeOffset(), Log, StreamName, CustomFilters, DefaultFilter);
+			IssueBrowserWindow.Show(ParentForm, IssueMonitor, PerforceSettings, GetServerTimeOffset(), ServiceProvider, StreamName, CustomFilters, DefaultFilter);
 		}
 
 		private void BuildHealthContextMenu_Settings_Click(object sender, EventArgs e)
 		{
-			string BuildHealthProject;
+			string? BuildHealthProject;
 			TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "BuildHealthProject", out BuildHealthProject);
 
 			IssueSettingsWindow IssueSettings = new IssueSettingsWindow(Settings, BuildHealthProject ?? "");
@@ -3768,11 +3640,11 @@ public enum LatestChangeType
 
 		private void ShowRequiredSdkInfo()
 		{
-			string[] SdkInfoEntries;
+			string[]? SdkInfoEntries;
 			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "SdkInfo", out SdkInfoEntries))
 			{
-				Dictionary<string, string> Variables = GetWorkspaceVariables(-1);
-				SdkInfoWindow Window = new SdkInfoWindow(SdkInfoEntries, Variables, BadgeFont);
+				Dictionary<string, string> Variables = Workspace.GetVariables(GetEditorBuildConfig());
+				SdkInfoWindow Window = new SdkInfoWindow(SdkInfoEntries, Variables, BadgeFont!);
 				Window.ShowDialog();
 			}
 		}
@@ -3878,7 +3750,7 @@ public enum LatestChangeType
 			bool bShownContextMenu = false;
 			if (StreamName != null)
 			{
-				IReadOnlyList<string> OtherStreamNames = Workspace.ProjectStreamFilter;
+				IReadOnlyList<string>? OtherStreamNames = Workspace.ProjectStreamFilter;
 				if (OtherStreamNames != null)
 				{
 					StreamContextMenu.Items.Clear();
@@ -3921,8 +3793,8 @@ public enum LatestChangeType
 
 		private void SelectOtherStreamDialog()
 		{
-			string NewStreamName;
-			if (SelectStreamWindow.ShowModal(this, Workspace.Perforce, StreamName, Log, out NewStreamName))
+			string? NewStreamName;
+			if (SelectStreamWindow.ShowModal(this, PerforceSettings, StreamName, ServiceProvider, out NewStreamName))
 			{
 				SelectStream(NewStreamName);
 			}
@@ -3936,15 +3808,31 @@ public enum LatestChangeType
 				{
 					MessageBox.Show("Please retry after the current sync has finished.", "Sync in Progress");
 				}
-				else if (Workspace.Perforce != null)
+				else
 				{
-					if (!Workspace.Perforce.HasOpenFiles(Log) || MessageBox.Show("You have files open for edit in this workspace. If you continue, you will not be able to submit them until you switch back.\n\nContinue switching streams?", "Files checked out", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					for (int Idx = 0; Idx < 2; Idx++)
 					{
-						if (Workspace.Perforce.SwitchStream(NewStreamName, Log))
+						Func<IPerforceConnection, CancellationToken, Task<bool>> SwitchFunc = async (Perforce, CancellationToken) =>
+						{
+							if (Idx == 1 || !await Perforce.OpenedAsync(OpenedOptions.None, FileSpecList.Any, CancellationToken).AnyAsync())
+							{
+								await Perforce.SwitchClientToStreamAsync(Perforce.Settings.ClientName!, NewStreamName, SwitchClientOptions.IgnoreOpenFiles, CancellationToken);
+								return true;
+							}
+							return false;
+						};
+
+						ModalTask<bool>? SwitchTask = PerforceModalTask.Execute<bool>(this, "Switching streams", "Please wait...", PerforceSettings, SwitchFunc, Logger);
+						if (SwitchTask == null || !SwitchTask.Succeeded)
+						{
+							break;
+						}
+						if (SwitchTask.Result)
 						{
 							StatusPanel.SuspendLayout();
 							StreamChanged();
 							StatusPanel.ResumeLayout();
+							break;
 						}
 					}
 				}
@@ -3953,11 +3841,11 @@ public enum LatestChangeType
 
 		private void ViewLastSyncStatus()
 		{
-			string SummaryText;
-			if (GetLastUpdateMessage(WorkspaceSettings.LastSyncResult, WorkspaceSettings.LastSyncResultMessage, out SummaryText))
+			string? SummaryText;
+			if (GetLastUpdateMessage(WorkspaceState.LastSyncResult, WorkspaceState.LastSyncResultMessage, out SummaryText))
 			{
-				string CaptionText;
-				if (!GetGenericLastUpdateMessage(WorkspaceSettings.LastSyncResult, out CaptionText))
+				string? CaptionText;
+				if (!GetGenericLastUpdateMessage(WorkspaceState.LastSyncResult, out CaptionText))
 				{
 					CaptionText = "Sync error";
 				}
@@ -3990,14 +3878,17 @@ public enum LatestChangeType
 
 			PendingSelectedChangeNumber = -1;
 
-			foreach (ListViewItem Item in BuildList.Items)
+			foreach (ListViewItem? Item in BuildList.Items)
 			{
-				PerforceChangeSummary Summary = (PerforceChangeSummary)Item.Tag;
-				if (Summary != null && Summary.Number <= ChangeNumber)
+				if (Item != null)
 				{
-					Item.Selected = true;
-					Item.EnsureVisible();
-					return;
+					ChangesRecord Summary = (ChangesRecord)Item.Tag;
+					if (Summary != null && Summary.Number <= ChangeNumber)
+					{
+						Item.Selected = true;
+						Item.EnsureVisible();
+						return;
+					}
 				}
 			}
 
@@ -4039,7 +3930,7 @@ public enum LatestChangeType
 					}
 					else
 					{
-						PerforceChangeSummary Change = (PerforceChangeSummary)HitTest.Item.Tag;
+						ChangesRecord Change = (ChangesRecord)HitTest.Item.Tag;
 						if (Workspace.PendingChangeNumber == Change.Number)
 						{
 							Rectangle SubItemRect = HitTest.Item.SubItems[StatusColumn.Index].Bounds;
@@ -4110,7 +4001,7 @@ public enum LatestChangeType
 								Point BuildListLocation = GetBadgeListLocation(LayoutInfo.BuildBadges, HitTest.SubItem.Bounds, HorizontalAlign.Center, VerticalAlignment.Middle);
 								BuildListLocation.X = Math.Max(BuildListLocation.X, HitTest.SubItem.Bounds.Left);
 
-								BadgeInfo BadgeInfo = HitTestBadge(Args.Location, LayoutInfo.BuildBadges, BuildListLocation);
+								BadgeInfo? BadgeInfo = HitTestBadge(Args.Location, LayoutInfo.BuildBadges, BuildListLocation);
 								if (BadgeInfo != null && BadgeInfo.ClickHandler != null)
 								{
 									BadgeInfo.ClickHandler();
@@ -4122,14 +4013,14 @@ public enum LatestChangeType
 						{
 							if (CustomColumn.Index < HitTest.Item.SubItems.Count && HitTest.Item.SubItems[CustomColumn.Index] == HitTest.SubItem)
 							{
-								ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((PerforceChangeSummary)HitTest.Item.Tag);
+								ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((ChangesRecord)HitTest.Item.Tag);
 
-								List<BadgeInfo> Badges;
+								List<BadgeInfo>? Badges;
 								if (LayoutInfo.CustomBadges.TryGetValue(CustomColumn.Text, out Badges) && Badges.Count > 0)
 								{
 									Point ListLocation = GetBadgeListLocation(Badges, HitTest.SubItem.Bounds, HorizontalAlign.Center, VerticalAlignment.Middle);
 
-									BadgeInfo BadgeInfo = HitTestBadge(Args.Location, Badges, ListLocation);
+									BadgeInfo? BadgeInfo = HitTestBadge(Args.Location, Badges, ListLocation);
 									if (BadgeInfo != null && BadgeInfo.ClickHandler != null)
 									{
 										BadgeInfo.ClickHandler();
@@ -4158,13 +4049,13 @@ public enum LatestChangeType
 					}
 					else
 					{
-						ContextMenuChange = (PerforceChangeSummary)HitTest.Item.Tag;
+						ContextMenuChange = (ChangesRecord)HitTest.Item.Tag;
 
 						BuildListContextMenu_WithdrawReview.Visible = (EventMonitor.GetReviewByCurrentUser(ContextMenuChange.Number) != null);
 						BuildListContextMenu_StartInvestigating.Visible = !EventMonitor.IsUnderInvestigationByCurrentUser(ContextMenuChange.Number);
 						BuildListContextMenu_FinishInvestigating.Visible = EventMonitor.IsUnderInvestigation(ContextMenuChange.Number);
 
-						string CommentText;
+						string? CommentText;
 						bool bHasExistingComment = EventMonitor.GetCommentByCurrentUser(ContextMenuChange.Number, out CommentText);
 						BuildListContextMenu_LeaveComment.Visible = !bHasExistingComment;
 						BuildListContextMenu_EditComment.Visible = bHasExistingComment;
@@ -4183,8 +4074,7 @@ public enum LatestChangeType
 						BuildListContextMenu_OpenVisualStudio.Visible = !bIsBusy && bIsCurrentChange;
 						BuildListContextMenu_Cancel.Visible = bIsBusy;
 
-						BisectState State;
-						WorkspaceSettings.ChangeNumberToBisectState.TryGetValue(ContextMenuChange.Number, out State);
+						BisectState State = WorkspaceState.BisectChanges.FirstOrDefault(x => x.Change == ContextMenuChange.Number)?.State ?? BisectState.Include;
 						bool bIsBisectMode = IsBisectModeEnabled();
 						BuildListContextMenu_Bisect_Pass.Visible = bIsBisectMode && State != BisectState.Pass;
 						BuildListContextMenu_Bisect_Fail.Visible = bIsBisectMode && State != BisectState.Fail;
@@ -4196,7 +4086,7 @@ public enum LatestChangeType
 						BuildListContextMenu_MarkBad.Visible = !bIsBisectMode;
 						BuildListContextMenu_WithdrawReview.Visible = !bIsBisectMode;
 
-						EventSummary Summary = EventMonitor.GetSummaryForChange(ContextMenuChange.Number);
+						EventSummary? Summary = EventMonitor.GetSummaryForChange(ContextMenuChange.Number);
 						bool bStarred = (Summary != null && Summary.LastStarReview != null && Summary.LastStarReview.Type == EventType.Starred);
 						BuildListContextMenu_AddStar.Visible = !bStarred;
 						BuildListContextMenu_RemoveStar.Visible = bStarred;
@@ -4216,19 +4106,19 @@ public enum LatestChangeType
 							CustomToolEnd--;
 						}
 
-						ConfigFile ProjectConfigFile = PerforceMonitor.LatestProjectConfigFile;
+						ConfigFile? ProjectConfigFile = PerforceMonitor.LatestProjectConfigFile;
 						if (ProjectConfigFile != null)
 						{
-							Dictionary<string, string> Variables = GetWorkspaceVariables(ContextMenuChange.Number);
+							Dictionary<string, string> Variables = Workspace.GetVariables(GetEditorBuildConfig(), ContextMenuChange.Number, -1);
 
 							string[] ChangeContextMenuEntries = ProjectConfigFile.GetValues("Options.ContextMenu", new string[0]);
 							foreach (string ChangeContextMenuEntry in ChangeContextMenuEntries)
 							{
 								ConfigObject Object = new ConfigObject(ChangeContextMenuEntry);
 
-								string Label = Object.GetValue("Label");
-								string Execute = Object.GetValue("Execute");
-								string Arguments = Object.GetValue("Arguments");
+								string? Label = Object.GetValue("Label");
+								string? Execute = Object.GetValue("Execute");
+								string? Arguments = Object.GetValue("Arguments");
 
 								if (Label != null && Execute != null)
 								{
@@ -4246,8 +4136,8 @@ public enum LatestChangeType
 
 						BuildListContextMenu_CustomTool_End.Visible = (CustomToolEnd > CustomToolStart);
 
-						string SwarmURL;
-						BuildListContextMenu_ViewInSwarm.Visible = TryGetProjectSetting(ProjectConfigFile, "SwarmURL", out SwarmURL);
+						string? SwarmURL;
+						BuildListContextMenu_ViewInSwarm.Visible = ProjectConfigFile != null && TryGetProjectSetting(ProjectConfigFile, "SwarmURL", out SwarmURL);
 							
 						BuildListContextMenu.Show(BuildList, Args.Location);
 					}
@@ -4267,13 +4157,13 @@ public enum LatestChangeType
 				BuildList.Invalidate();
 			}
 
-			string NewHoverBadgeUniqueId = null;
-			if (HitTest.Item != null && HitTest.Item.Tag is PerforceChangeSummary)
+			string? NewHoverBadgeUniqueId = null;
+			if (HitTest.Item != null && HitTest.Item.Tag is ChangesRecord)
 			{
 				int ColumnIndex = HitTest.Item.SubItems.IndexOf(HitTest.SubItem);
 				if (ColumnIndex == DescriptionColumn.Index)
 				{
-					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((PerforceChangeSummary)HitTest.Item.Tag);
+					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((ChangesRecord)HitTest.Item.Tag);
 					if (LayoutInfo.DescriptionBadges.Count > 0)
 					{
 						Point ListLocation = GetBadgeListLocation(LayoutInfo.DescriptionBadges, HitTest.SubItem.Bounds, HorizontalAlign.Right, VerticalAlignment.Middle);
@@ -4282,13 +4172,13 @@ public enum LatestChangeType
 				}
 				else if (ColumnIndex == CISColumn.Index)
 				{
-					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((PerforceChangeSummary)HitTest.Item.Tag);
+					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((ChangesRecord)HitTest.Item.Tag);
 					if (LayoutInfo.BuildBadges.Count > 0)
 					{
 						Point BuildListLocation = GetBadgeListLocation(LayoutInfo.BuildBadges, HitTest.SubItem.Bounds, HorizontalAlign.Center, VerticalAlignment.Middle);
 						BuildListLocation.X = Math.Max(BuildListLocation.X, HitTest.SubItem.Bounds.Left);
 
-						BadgeInfo Badge = HitTestBadge(e.Location, LayoutInfo.BuildBadges, BuildListLocation);
+						BadgeInfo? Badge = HitTestBadge(e.Location, LayoutInfo.BuildBadges, BuildListLocation);
 						NewHoverBadgeUniqueId = (Badge != null) ? Badge.UniqueId : null;
 
 						if (HoverBadgeUniqueId != NewHoverBadgeUniqueId)
@@ -4308,9 +4198,9 @@ public enum LatestChangeType
 				{
 					ColumnHeader Column = BuildList.Columns[ColumnIndex];
 
-					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((PerforceChangeSummary)HitTest.Item.Tag);
+					ChangeLayoutInfo LayoutInfo = GetChangeLayoutInfo((ChangesRecord)HitTest.Item.Tag);
 
-					List<BadgeInfo> Badges;
+					List<BadgeInfo>? Badges;
 					if (LayoutInfo.CustomBadges.TryGetValue(Column.Text, out Badges) && Badges.Count > 0)
 					{
 						Point ListLocation = GetBadgeListLocation(Badges, HitTest.SubItem.Bounds, HorizontalAlign.Center, VerticalAlignment.Middle);
@@ -4336,7 +4226,7 @@ public enum LatestChangeType
 			}
 		}
 
-		private BadgeInfo HitTestBadge(Point Location, List<BadgeInfo> BadgeList, Point ListLocation)
+		private BadgeInfo? HitTestBadge(Point Location, List<BadgeInfo> BadgeList, Point ListLocation)
 		{
 			foreach (BadgeInfo Badge in BadgeList)
 			{
@@ -4436,7 +4326,7 @@ public enum LatestChangeType
 				OptionsContextMenu_SyncPrecompiledBinaries.ToolTipText = null;
 				OptionsContextMenu_SyncPrecompiledBinaries.Checked = SelectedArchives.Count > 0;
 
-				if (Archives.Count > 1 || Archives[0].Type != EditorArchiveType)
+				if (Archives.Count > 1 || Archives[0].Type != IArchiveInfo.EditorArchiveType)
 				{
 					ToolStripMenuItem DisableItem = new ToolStripMenuItem("Disable (compile locally)");
 					DisableItem.Checked = (SelectedArchives.Count == 0);
@@ -4479,14 +4369,14 @@ public enum LatestChangeType
 
 		private IReadOnlyList<IArchiveInfo> GetArchives()
 		{
-			IReadOnlyList<IArchiveInfo> AvailableArchives = JupiterMonitor?.AvailableArchives;
+			IReadOnlyList<IArchiveInfo>? AvailableArchives = JupiterMonitor?.AvailableArchives;
 			if (AvailableArchives != null && AvailableArchives.Count != 0)
 				return AvailableArchives;
 
 			// if jupiter had no archives we fallback to the perforce monitor
 			if (PerforceMonitor != null)
 			{
-				return PerforceMonitor?.AvailableArchives;
+				return PerforceMonitor.AvailableArchives;
 			}
 
 			return new List<IArchiveInfo>();
@@ -4538,7 +4428,7 @@ public enum LatestChangeType
 			}
 		}
 
-		private void BuildList_FontChanged(object sender, EventArgs e)
+		private void BuildList_FontChanged(object? sender, EventArgs e)
 		{
 			if (BuildFont != null)
 			{
@@ -4570,12 +4460,12 @@ public enum LatestChangeType
 				List<ConfigObject> UserBuildSteps = new List<ConfigObject>();
 				UserBuildSteps.Add(CustomBuildStep.ToConfigObject());
 
-				WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, WorkspaceUpdateOptions.Build, null, GetDefaultBuildStepObjects(), UserBuildSteps, new HashSet<Guid> { CustomBuildStep.UniqueId }, GetWorkspaceVariables(Workspace.CurrentChangeNumber));
+				WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, WorkspaceUpdateOptions.Build, GetEditorBuildConfig(), null, UserBuildSteps, new HashSet<Guid> { CustomBuildStep.UniqueId });
 				StartWorkspaceUpdate(Context, null);
 			}
 		}
 
-		public void SyncChange(int ChangeNumber, bool bSyncOnly, WorkspaceUpdateCallback Callback)
+		public void SyncChange(int ChangeNumber, bool bSyncOnly, WorkspaceUpdateCallback? Callback)
 		{
 			if(Workspace != null)
 			{
@@ -4590,14 +4480,23 @@ public enum LatestChangeType
 			SyncLatestChange(null);
 		}
 
-		public void SyncLatestChange(WorkspaceUpdateCallback Callback)
+		public void SyncLatestChange(WorkspaceUpdateCallback? Callback)
 		{
 			if (Workspace != null)
 			{
 				int ChangeNumber;
-				if (!FindChangeToSync(Settings.SyncType, out ChangeNumber))
+				if (!FindChangeToSync(Settings.SyncTypeID, out ChangeNumber))
 				{
-					ShowErrorDialog(String.Format("Couldn't find any {0}changelist. Double-click on the change you want to sync manually.", (Settings.SyncType == LatestChangeType.Starred) ? "starred " : (Settings.SyncType == LatestChangeType.Good) ? "good " : ""));
+					string SyncTypeName = "";
+					foreach (LatestChangeType ChangeType in GetCustomLatestChangeTypes())
+					{
+						if (ChangeType.Name == Settings.SyncTypeID)
+						{
+							SyncTypeName = ChangeType.Name;
+							break;
+						}
+					}
+					ShowErrorDialog(String.Format("Couldn't find any {0}changelist. Double-click on the change you want to sync manually.", SyncTypeName));
 				}
 				else if (ChangeNumber < Workspace.CurrentChangeNumber)
 				{
@@ -4612,32 +4511,50 @@ public enum LatestChangeType
 
 		private void BuildListContextMenu_MarkGood_Click(object sender, EventArgs e)
 		{
-			EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Good);
+			if (ContextMenuChange != null)
+			{
+				EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Good);
+			}
 		}
 
 		private void BuildListContextMenu_MarkBad_Click(object sender, EventArgs e)
 		{
-			EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Bad);
+			if (ContextMenuChange != null)
+			{
+				EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Bad);
+			}
 		}
 
 		private void BuildListContextMenu_WithdrawReview_Click(object sender, EventArgs e)
 		{
-			EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Unknown);
+			if (ContextMenuChange != null)
+			{
+				EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Unknown);
+			}
 		}
 
 		private void BuildListContextMenu_Sync_Click(object sender, EventArgs e)
 		{
-			StartSync(ContextMenuChange.Number);
+			if (ContextMenuChange != null)
+			{
+				StartSync(ContextMenuChange.Number);
+			}
 		}
 
 		private void BuildListContextMenu_SyncContentOnly_Click(object sender, EventArgs e)
 		{
-			StartWorkspaceUpdate(ContextMenuChange.Number, WorkspaceUpdateOptions.Sync | WorkspaceUpdateOptions.ContentOnly);
+			if (ContextMenuChange != null)
+			{
+				StartWorkspaceUpdate(ContextMenuChange.Number, WorkspaceUpdateOptions.Sync | WorkspaceUpdateOptions.ContentOnly);
+			}
 		}
 
 		private void BuildListContextMenu_SyncOnlyThisChange_Click(object sender, EventArgs e)
 		{
-			StartWorkspaceUpdate(ContextMenuChange.Number, WorkspaceUpdateOptions.SyncSingleChange);
+			if (ContextMenuChange != null)
+			{
+				StartWorkspaceUpdate(ContextMenuChange.Number, WorkspaceUpdateOptions.SyncSingleChange);
+			}
 		}
 
 		private void BuildListContextMenu_Build_Click(object sender, EventArgs e)
@@ -4662,44 +4579,59 @@ public enum LatestChangeType
 
 		private void BuildListContextMenu_MoreInfo_Click(object sender, EventArgs e)
 		{
-			Utility.SpawnP4VC(String.Format("{0} change {1}", Workspace.Perforce.GetConnectionOptions(), ContextMenuChange.Number));
+			if (ContextMenuChange != null)
+			{
+				Program.SpawnP4VC(String.Format("{0} change {1}", PerforceSettings.GetArgumentsForExternalProgram(true), ContextMenuChange.Number));
+			}
 		}
 
 		private void BuildListContextMenu_ViewInSwarm_Click(object sender, EventArgs e)
 		{
-			string SwarmURL;
-			if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "SwarmURL", out SwarmURL))
+			if (ContextMenuChange != null)
 			{
-				Utility.OpenUrl(String.Format("{0}/changes/{1}", SwarmURL, ContextMenuChange.Number));
-			}
-			else
-			{
-				MessageBox.Show("Swarm URL is not configured.");
+				string? SwarmURL;
+				if (TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "SwarmURL", out SwarmURL))
+				{
+					Utility.OpenUrl(String.Format("{0}/changes/{1}", SwarmURL, ContextMenuChange.Number));
+				}
+				else
+				{
+					MessageBox.Show("Swarm URL is not configured.");
+				}
 			}
 		}
 
 		private void BuildListContextMenu_CopyChangelistNumber_Click(object sender, EventArgs e)
 		{
-			System.Windows.Forms.Clipboard.SetText(ContextMenuChange.Number.ToString());
+			if (ContextMenuChange != null)
+			{
+				System.Windows.Forms.Clipboard.SetText(ContextMenuChange.Number.ToString());
+			}
 		}
 
 		private void BuildListContextMenu_AddStar_Click(object sender, EventArgs e)
 		{
-			if (MessageBox.Show("Starred builds are meant to convey a stable, verified build to the rest of the team. Do not star a build unless it has been fully tested.\n\nAre you sure you want to star this build?", "Confirm star", MessageBoxButtons.YesNo) == DialogResult.Yes)
+			if (ContextMenuChange != null)
 			{
-				EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Starred);
+				if (MessageBox.Show("Starred builds are meant to convey a stable, verified build to the rest of the team. Do not star a build unless it has been fully tested.\n\nAre you sure you want to star this build?", "Confirm star", MessageBoxButtons.YesNo) == DialogResult.Yes)
+				{
+					EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Starred);
+				}
 			}
 		}
 
 		private void BuildListContextMenu_RemoveStar_Click(object sender, EventArgs e)
 		{
-			EventSummary Summary = EventMonitor.GetSummaryForChange(ContextMenuChange.Number);
-			if (Summary != null && Summary.LastStarReview != null && Summary.LastStarReview.Type == EventType.Starred)
+			if (ContextMenuChange != null)
 			{
-				string Message = String.Format("This change was starred by {0}. Are you sure you want to remove it?", FormatUserName(Summary.LastStarReview.UserName));
-				if (MessageBox.Show(Message, "Confirm removing star", MessageBoxButtons.YesNo) == DialogResult.Yes)
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(ContextMenuChange.Number);
+				if (Summary != null && Summary.LastStarReview != null && Summary.LastStarReview.Type == EventType.Starred)
 				{
-					EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Unstarred);
+					string Message = String.Format("This change was starred by {0}. Are you sure you want to remove it?", FormatUserName(Summary.LastStarReview.UserName));
+					if (MessageBox.Show(Message, "Confirm removing star", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					{
+						EventMonitor.PostEvent(ContextMenuChange.Number, EventType.Unstarred);
+					}
 				}
 			}
 		}
@@ -4711,33 +4643,39 @@ public enum LatestChangeType
 
 		private void BuildListContextMenu_StartInvestigating_Click(object sender, EventArgs e)
 		{
-			string Message = String.Format("All changes from {0} onwards will be marked as bad while you are investigating an issue.\n\nAre you sure you want to continue?", ContextMenuChange.Number);
-			if (MessageBox.Show(Message, "Confirm investigating", MessageBoxButtons.YesNo) == DialogResult.Yes)
+			if (ContextMenuChange != null)
 			{
-				EventMonitor.StartInvestigating(ContextMenuChange.Number);
+				string Message = String.Format("All changes from {0} onwards will be marked as bad while you are investigating an issue.\n\nAre you sure you want to continue?", ContextMenuChange.Number);
+				if (MessageBox.Show(Message, "Confirm investigating", MessageBoxButtons.YesNo) == DialogResult.Yes)
+				{
+					EventMonitor.StartInvestigating(ContextMenuChange.Number);
+				}
 			}
 		}
 
 		private void BuildListContextMenu_FinishInvestigating_Click(object sender, EventArgs e)
 		{
-			int StartChangeNumber = EventMonitor.GetInvestigationStartChangeNumber(ContextMenuChange.Number);
-			if (StartChangeNumber != -1)
+			if (ContextMenuChange != null)
 			{
-				if (ContextMenuChange.Number > StartChangeNumber)
+				int StartChangeNumber = EventMonitor.GetInvestigationStartChangeNumber(ContextMenuChange.Number);
+				if (StartChangeNumber != -1)
 				{
-					string Message = String.Format("Mark all changes between {0} and {1} as bad?", StartChangeNumber, ContextMenuChange.Number);
-					if (MessageBox.Show(Message, "Finish investigating", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					if (ContextMenuChange.Number > StartChangeNumber)
 					{
-						foreach (PerforceChangeSummary Change in PerforceMonitor.GetChanges())
+						string Message = String.Format("Mark all changes between {0} and {1} as bad?", StartChangeNumber, ContextMenuChange.Number);
+						if (MessageBox.Show(Message, "Finish investigating", MessageBoxButtons.YesNo) == DialogResult.Yes)
 						{
-							if (Change.Number >= StartChangeNumber && Change.Number < ContextMenuChange.Number)
+							foreach (ChangesRecord Change in PerforceMonitor.GetChanges())
 							{
-								EventMonitor.PostEvent(Change.Number, EventType.Bad);
+								if (Change.Number >= StartChangeNumber && Change.Number < ContextMenuChange.Number)
+								{
+									EventMonitor.PostEvent(Change.Number, EventType.Bad);
+								}
 							}
 						}
 					}
+					EventMonitor.FinishInvestigating(ContextMenuChange.Number);
 				}
-				EventMonitor.FinishInvestigating(ContextMenuChange.Number);
 			}
 		}
 
@@ -4775,7 +4713,7 @@ public enum LatestChangeType
 			{
 				if (Args.Item.Bounds.Contains(ClientPoint))
 				{
-					PerforceChangeSummary Change = (PerforceChangeSummary)Args.Item.Tag;
+					ChangesRecord Change = (ChangesRecord)Args.Item.Tag;
 					if (Change == null)
 					{
 						return;
@@ -4798,7 +4736,7 @@ public enum LatestChangeType
 						}
 					}
 
-					EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
+					EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
 					if (Summary != null)
 					{
 						StringBuilder SummaryText = new StringBuilder();
@@ -4906,34 +4844,34 @@ public enum LatestChangeType
 		private void OpenSolution()
 		{
 			string MasterProjectName = "UE4";
-			if (File.Exists(Path.Combine(BranchDirectoryName, "UE5.sln")))
+			if (FileReference.Exists(FileReference.Combine(BranchDirectoryName, "UE5.sln")))
 			{
 				MasterProjectName = "UE5";
 			}
 
-			string MasterProjectNameFileName = Path.Combine(BranchDirectoryName, "Engine", "Intermediate", "ProjectFiles", "MasterProjectName.txt");
-			if (File.Exists(MasterProjectNameFileName))
+			FileReference MasterProjectNameFileName = FileReference.Combine(BranchDirectoryName, "Engine", "Intermediate", "ProjectFiles", "MasterProjectName.txt");
+			if (FileReference.Exists(MasterProjectNameFileName))
 			{
 				try
 				{
-					MasterProjectName = File.ReadAllText(MasterProjectNameFileName).Trim();
+					MasterProjectName = FileReference.ReadAllText(MasterProjectNameFileName).Trim();
 				}
 				catch (Exception Ex)
 				{
-					Log.WriteException(Ex, "Unable to read '{0}'", MasterProjectNameFileName);
+					Logger.LogError(Ex, "Unable to read '{File}'", MasterProjectNameFileName);
 				}
 			}
 
-			string SolutionFileName = Path.Combine(BranchDirectoryName, MasterProjectName + ".sln");
-			if (!File.Exists(SolutionFileName))
+			FileReference SolutionFileName = FileReference.Combine(BranchDirectoryName, MasterProjectName + ".sln");
+			if (!FileReference.Exists(SolutionFileName))
 			{
 				MessageBox.Show(String.Format("Couldn't find solution at {0}", SolutionFileName));
 			}
 			else
 			{
-				ProcessStartInfo StartInfo = new ProcessStartInfo(SolutionFileName);
+				ProcessStartInfo StartInfo = new ProcessStartInfo(SolutionFileName.FullName);
 				StartInfo.UseShellExecute = true;
-				StartInfo.WorkingDirectory = BranchDirectoryName;
+				StartInfo.WorkingDirectory = BranchDirectoryName.FullName;
 				SafeProcessStart(StartInfo);
 			}
 		}
@@ -4983,16 +4921,26 @@ public enum LatestChangeType
 		{
 			if (Settings.bScheduleEnabled)
 			{
-				Log.WriteLine("Scheduled sync at {0} for {1}.", DateTime.Now, Settings.ScheduleChange);
+				// Check the project config if they have a scheduled setting selected.
+				string? ScheduledSyncTypeID = null;
+				UserSelectedProjectSettings ProjectSetting = Settings.ScheduleProjects.First(x => x.LocalPath != null && x.LocalPath.Equals(SelectedProject.LocalPath, StringComparison.OrdinalIgnoreCase));
+				if (ProjectSetting != null)
+				{
+					ScheduledSyncTypeID = ProjectSetting.ScheduledSyncTypeID;
+				}
+
+				Logger.LogInformation("Scheduled sync at {0} for {1}.",
+					DateTime.Now,
+					ScheduledSyncTypeID != null ? ScheduledSyncTypeID : "Default");
 
 				int ChangeNumber;
-				if (!FindChangeToSync(Settings.ScheduleChange, out ChangeNumber))
+				if (!FindChangeToSync(ScheduledSyncTypeID, out ChangeNumber))
 				{
-					Log.WriteLine("Couldn't find any matching change");
+					SyncLog.AppendLine("Couldn't find any matching change");
 				}
 				else if (Workspace.CurrentChangeNumber >= ChangeNumber)
 				{
-					Log.WriteLine("Sync ignored; already at or ahead of CL ({0} >= {1})", Workspace.CurrentChangeNumber, ChangeNumber);
+					Logger.LogInformation("Sync ignored; already at or ahead of CL ({CurrentChange} >= {Change})", Workspace.CurrentChangeNumber, ChangeNumber);
 				}
 				else
 				{
@@ -5006,38 +4954,44 @@ public enum LatestChangeType
 			}
 		}
 
+		bool FindChangeToSync(string? ChangeTypeID, out int ChangeNumber)
+		{
+			if (ChangeTypeID != null)
+			{
+				LatestChangeType? ChangeTypeToSyncTo = null;
+				foreach (LatestChangeType ChangeType in GetCustomLatestChangeTypes())
+				{
+					if (ChangeType.Name == ChangeTypeID)
+					{
+						ChangeTypeToSyncTo = ChangeType;
+						break;
+					}
+				}
+
+				if (ChangeTypeToSyncTo != null)
+				{
+					return FindChangeToSync(ChangeTypeToSyncTo, out ChangeNumber);
+				}
+			}
+
+			SyncLog.AppendLine("Invalid or not set Scheduled Sync type using (Sync to Latest Good)");
+
+			return FindChangeToSync(LatestChangeType.LatestGoodChange(), out ChangeNumber);
+		}
+
 		bool FindChangeToSync(LatestChangeType ChangeType, out int ChangeNumber)
 		{
 			for (int Idx = 0; Idx < BuildList.Items.Count; Idx++)
 			{
-				PerforceChangeSummary Change = (PerforceChangeSummary)BuildList.Items[Idx].Tag;
+				ChangesRecord Change = (ChangesRecord)BuildList.Items[Idx].Tag;
 				if (Change != null)
 				{
-					if (ChangeType == LatestChangeType.Any)
+					EventSummary? Summary = EventMonitor.GetSummaryForChange(Change.Number);
+					if (CanSyncChange(Change.Number)
+						&& CanSyncChangeType(ChangeType, Change, Summary))
 					{
-						if (CanSyncChange(Change.Number))
-						{
-							ChangeNumber = FindNewestGoodContentChange(Change.Number);
-							return true;
-						}
-					}
-					else if (ChangeType == LatestChangeType.Good)
-					{
-						EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
-						if (Summary != null && Summary.Verdict == ReviewVerdict.Good && CanSyncChange(Change.Number))
-						{
-							ChangeNumber = FindNewestGoodContentChange(Change.Number);
-							return true;
-						}
-					}
-					else if (ChangeType == LatestChangeType.Starred)
-					{
-						EventSummary Summary = EventMonitor.GetSummaryForChange(Change.Number);
-						if (((Summary != null && Summary.LastStarReview != null && Summary.LastStarReview.Type == EventType.Starred) || PromotedChangeNumbers.Contains(Change.Number)) && CanSyncChange(Change.Number))
-						{
-							ChangeNumber = FindNewestGoodContentChange(Change.Number);
-							return true;
-						}
+						ChangeNumber = FindNewestGoodContentChange(Change.Number);
+						return true;
 					}
 				}
 			}
@@ -5058,13 +5012,13 @@ public enum LatestChangeType
 			{
 				int NextChangeNumber = SortedChangeNumbers[NextIndex];
 
-				PerforceChangeDetails Details;
+				PerforceChangeDetails? Details;
 				if (!PerforceMonitor.TryGetChangeDetails(NextChangeNumber, out Details) || Details.bContainsCode)
 				{
 					break;
 				}
 
-				EventSummary Summary = EventMonitor.GetSummaryForChange(NextChangeNumber);
+				EventSummary? Summary = EventMonitor.GetSummaryForChange(NextChangeNumber);
 				if (Summary != null && Summary.Verdict == ReviewVerdict.Bad)
 				{
 					break;
@@ -5082,7 +5036,7 @@ public enum LatestChangeType
 			{
 				LeaveCommentWindow LeaveComment = new LeaveCommentWindow();
 
-				string CommentText;
+				string? CommentText;
 				if (EventMonitor.GetCommentByCurrentUser(ContextMenuChange.Number, out CommentText))
 				{
 					LeaveComment.CommentTextBox.Text = CommentText;
@@ -5118,22 +5072,22 @@ public enum LatestChangeType
 				return;
 			}
 
-			string ExtraSafeToDeleteFolders;
+			string? ExtraSafeToDeleteFolders;
 			if (!TryGetProjectSetting(Workspace.ProjectConfigFile, "SafeToDeleteFolders", out ExtraSafeToDeleteFolders))
 			{
 				ExtraSafeToDeleteFolders = "";
 			}
 
-			string ExtraSafeToDeleteExtensions;
+			string? ExtraSafeToDeleteExtensions;
 			if (!TryGetProjectSetting(Workspace.ProjectConfigFile, "SafeToDeleteExtensions", out ExtraSafeToDeleteExtensions))
 			{
 				ExtraSafeToDeleteExtensions = "";
 			}
 
-			string[] CombinedSyncFilter = UserSettings.GetCombinedSyncFilter(GetSyncCategories(), Settings.SyncView, Settings.SyncCategories, WorkspaceSettings.SyncView, WorkspaceSettings.SyncCategories);
-			List<string> SyncPaths = Workspace.GetSyncPaths(WorkspaceSettings.bSyncAllProjects ?? Settings.bSyncAllProjects, CombinedSyncFilter);
+			string[] CombinedSyncFilter = UserSettings.GetCombinedSyncFilter(GetSyncCategories(), Settings.Global.Filter, WorkspaceSettings.Filter);
+			List<string> SyncPaths = WorkspaceUpdate.GetSyncPaths(Workspace.Project, WorkspaceSettings.Filter.AllProjects ?? Settings.Global.Filter.AllProjects ?? false, CombinedSyncFilter);
 
-			CleanWorkspaceWindow.DoClean(ParentForm, Workspace.Perforce, BranchDirectoryName, Workspace.ClientRootPath, SyncPaths, ExtraSafeToDeleteFolders.Split('\n'), ExtraSafeToDeleteExtensions.Split('\n'), Log);
+			CleanWorkspaceWindow.DoClean(ParentForm, PerforceSettings, BranchDirectoryName, Workspace.Project.ClientRootPath, SyncPaths, ExtraSafeToDeleteFolders.Split('\n'), ExtraSafeToDeleteExtensions.Split('\n'), ServiceProvider.GetRequiredService<ILogger<CleanWorkspaceWindow>>());
 		}
 
 		private void UpdateBuildSteps()
@@ -5187,7 +5141,7 @@ public enum LatestChangeType
 								}
 								else
 								{
-									ContextMenuStrip Menu;
+									ContextMenuStrip? Menu;
 									if (!NameToMenu.TryGetValue(MenuName, out Menu))
 									{
 										Menu = new ContextMenuStrip();
@@ -5242,46 +5196,24 @@ public enum LatestChangeType
 						}
 					}
 
-					Dictionary<string, string> Variables = GetWorkspaceVariables(Workspace.CurrentChangeNumber);
+					WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, WorkspaceUpdateOptions.Build, GetEditorBuildConfig(), null, ProjectSettings.BuildSteps, StepSet);
+
 					if (Step.ToolId != Guid.Empty)
 					{
-						string ToolName = Owner.ToolUpdateMonitor.GetToolName(Step.ToolId);
+						string? ToolName = Owner.ToolUpdateMonitor.GetToolName(Step.ToolId);
 						if (ToolName != null)
 						{
-							Variables["ToolDir"] = Owner.ToolUpdateMonitor.GetToolPath(ToolName);
+							DirectoryReference? ToolPath = Owner.ToolUpdateMonitor.GetToolPath(ToolName);
+							if (ToolPath != null)
+							{
+								Context.AdditionalVariables["ToolDir"] = ToolPath.FullName;
+							}
 						}
 					}
 
-					WorkspaceUpdateContext Context = new WorkspaceUpdateContext(Workspace.CurrentChangeNumber, WorkspaceUpdateOptions.Build, null, GetDefaultBuildStepObjects(), ProjectSettings.BuildSteps, StepSet, Variables);
 					StartWorkspaceUpdate(Context, null);
 				}
 			}
-		}
-
-		private Dictionary<string, string> GetWorkspaceVariables(int ChangeNumber)
-		{
-			BuildConfig EditorBuildConfig = GetEditorBuildConfig();
-
-			string SdkInstallerDir;
-			TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "SdkInstallerDir", out SdkInstallerDir);
-
-			Dictionary<string, string> Variables = new Dictionary<string, string>();
-			Variables.Add("Stream", StreamName);
-			Variables.Add("Change", ChangeNumber.ToString());
-			Variables.Add("ClientName", ClientName);
-			Variables.Add("BranchDir", BranchDirectoryName);
-			Variables.Add("ProjectDir", Path.GetDirectoryName(SelectedFileName));
-			Variables.Add("ProjectFile", SelectedFileName);
-			Variables.Add("UE4EditorExe", GetEditorExePath(EditorBuildConfig));
-			Variables.Add("UE4EditorCmdExe", GetEditorExePath(EditorBuildConfig).Replace(".exe", "-Cmd.exe"));
-			Variables.Add("UE4EditorConfig", EditorBuildConfig.ToString());
-			Variables.Add("UE4EditorDebugArg", (EditorBuildConfig == BuildConfig.Debug || EditorBuildConfig == BuildConfig.DebugGame) ? " -debug" : "");
-			Variables.Add("UseIncrementalBuilds", "1");
-			if (!String.IsNullOrEmpty(SdkInstallerDir))
-			{
-				Variables.Add("SdkInstallerDir", SdkInstallerDir);
-			}
-			return Variables;
 		}
 
 		private void OptionsContextMenu_EditBuildSteps_Click(object sender, EventArgs e)
@@ -5291,9 +5223,9 @@ public enum LatestChangeType
 			{
 				// Find all the target names for this project
 				List<string> TargetNames = new List<string>();
-				if (!String.IsNullOrEmpty(SelectedFileName) && SelectedFileName.EndsWith(".uproject", StringComparison.InvariantCultureIgnoreCase))
+				if (SelectedFileName != null && SelectedFileName.HasExtension(".uproject"))
 				{
-					DirectoryInfo SourceDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(SelectedFileName), "Source"));
+					DirectoryInfo SourceDirectory = DirectoryReference.Combine(SelectedFileName.Directory, "Source").ToDirectoryInfo();
 					if (SourceDirectory.Exists)
 					{
 						foreach (FileInfo TargetFile in SourceDirectory.EnumerateFiles("*.target.cs", SearchOption.TopDirectoryOnly))
@@ -5308,7 +5240,8 @@ public enum LatestChangeType
 				List<BuildStep> UserSteps = GetUserBuildSteps(ProjectBuildStepObjects);
 
 				// Show the dialog
-				ModifyBuildStepsWindow EditStepsWindow = new ModifyBuildStepsWindow(TargetNames, UserSteps, new HashSet<Guid>(ProjectBuildStepObjects.Keys), BranchDirectoryName, GetWorkspaceVariables(Workspace.CurrentChangeNumber));
+				Dictionary<string, string> Variables = Workspace.GetVariables(GetEditorBuildConfig());
+				ModifyBuildStepsWindow EditStepsWindow = new ModifyBuildStepsWindow(TargetNames, UserSteps, new HashSet<Guid>(ProjectBuildStepObjects.Keys), BranchDirectoryName, Variables);
 				EditStepsWindow.ShowDialog();
 
 				// Update the user settings
@@ -5317,10 +5250,10 @@ public enum LatestChangeType
 				{
 					if (Step.IsValid())
 					{
-						ConfigObject DefaultObject;
+						ConfigObject? DefaultObject;
 						ProjectBuildStepObjects.TryGetValue(Step.UniqueId, out DefaultObject);
 
-						ConfigObject UserConfigObject = Step.ToConfigObject(DefaultObject);
+						ConfigObject? UserConfigObject = Step.ToConfigObject(DefaultObject);
 						if (UserConfigObject != null && UserConfigObject.Pairs.Any(x => x.Key != "UniqueId"))
 						{
 							ModifiedBuildSteps.Add(UserConfigObject);
@@ -5347,7 +5280,7 @@ public enum LatestChangeType
 				// Add or apply Object to the list of steps in Steps. Do not modify Object; make a copy first.
 				ConfigObject NewObject = new ConfigObject(Object);
 
-				ConfigObject DefaultObject;
+				ConfigObject? DefaultObject;
 				if (Steps.TryGetValue(UniqueId, out DefaultObject))
 				{
 					NewObject.SetDefaults(DefaultObject);
@@ -5359,7 +5292,7 @@ public enum LatestChangeType
 
 		private bool ShouldSyncPrecompiledEditor
 		{
-			get { return Settings.Archives.Any(x => x.bEnabled && x.Type == EditorArchiveType) && GetArchives().Any(x => x.Type == "Editor"); }
+			get { return Settings.Archives.Any(x => x.bEnabled && x.Type == IArchiveInfo.EditorArchiveType) && GetArchives().Any(x => x.Type == "Editor"); }
 		}
 
 		public BuildConfig GetEditorBuildConfig()
@@ -5367,54 +5300,12 @@ public enum LatestChangeType
 			return ShouldSyncPrecompiledEditor ? BuildConfig.Development : Settings.CompiledEditorBuildConfig;
 		}
 
-		private string GetDefaultEditorTargetName()
-		{
-			string EditorTarget;
-			if (!TryGetProjectSetting(PerforceMonitor.LatestProjectConfigFile, "EditorTarget", out EditorTarget))
-			{
-				EditorTarget = "UE4Editor";
-			}
-			return EditorTarget;
-		}
-
-		private Dictionary<Guid, ConfigObject> GetDefaultBuildStepObjects()
-		{
-			string ProjectArgument = "";
-			if (SelectedFileName.EndsWith(".uproject", StringComparison.InvariantCultureIgnoreCase))
-			{
-				ProjectArgument = String.Format("\"{0}\"", SelectedFileName);
-			}
-
-			string ActualEditorTargetName;
-			if (EditorTargetName != null)
-			{
-				ActualEditorTargetName = EditorTargetName;
-			}
-			else if (SelectedFileName.EndsWith(".uproject", StringComparison.InvariantCultureIgnoreCase) && bIsEnterpriseProject)
-			{
-				ActualEditorTargetName = "StudioEditor";
-			}
-			else
-			{
-				ActualEditorTargetName = GetDefaultEditorTargetName();
-			}
-
-			bool bUseCrashReportClientEditor = PerforceMonitor.LatestProjectConfigFile.GetValue("Options.UseCrashReportClientEditor", false);
-
-			List<BuildStep> DefaultBuildSteps = new List<BuildStep>();
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{01F66060-73FA-4CC8-9CB3-E217FBBA954E}"), 0, "Compile UnrealHeaderTool", "Compiling UnrealHeaderTool...", 1, "UnrealHeaderTool", "Win64", "Development", "", !ShouldSyncPrecompiledEditor));
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{F097FF61-C916-4058-8391-35B46C3173D5}"), 1, String.Format("Compile {0}", ActualEditorTargetName), String.Format("Compiling {0}...", ActualEditorTargetName), 10, ActualEditorTargetName, "Win64", Settings.CompiledEditorBuildConfig.ToString(), ProjectArgument, !ShouldSyncPrecompiledEditor));
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{C6E633A1-956F-4AD3-BC95-6D06D131E7B4}"), 2, "Compile ShaderCompileWorker", "Compiling ShaderCompileWorker...", 1, "ShaderCompileWorker", "Win64", "Development", "", !ShouldSyncPrecompiledEditor));
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{24FFD88C-7901-4899-9696-AE1066B4B6E8}"), 3, "Compile UnrealLightmass", "Compiling UnrealLightmass...", 1, "UnrealLightmass", "Win64", "Development", "", !ShouldSyncPrecompiledEditor));
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{FFF20379-06BF-4205-8A3E-C53427736688}"), 4, "Compile CrashReportClient", "Compiling CrashReportClient...", 1, "CrashReportClient", "Win64", "Shipping", "", !ShouldSyncPrecompiledEditor && !bUseCrashReportClientEditor));
-			DefaultBuildSteps.Add(new BuildStep(new Guid("{7143D861-58D3-4F83-BADC-BC5DCB2079F6}"), 5, "Compile CrashReportClientEditor", "Compiling CrashReportClientEditor...", 1, "CrashReportClientEditor", "Win64", "Shipping", "", !ShouldSyncPrecompiledEditor && bUseCrashReportClientEditor));
-
-			return DefaultBuildSteps.ToDictionary(x => x.UniqueId, x => x.ToConfigObject());
-		}
-
 		private Dictionary<Guid, ConfigObject> GetProjectBuildStepObjects(ConfigFile ProjectConfigFile)
 		{
-			Dictionary<Guid, ConfigObject> ProjectBuildSteps = GetDefaultBuildStepObjects();
+			FileReference EditorTargetFile = ConfigUtils.GetEditorTargetFile(ProjectInfo, ProjectConfigFile);
+			string EditorTargetName = EditorTargetFile.GetFileNameWithoutAnyExtensions();
+
+			Dictionary<Guid, ConfigObject> ProjectBuildSteps = ConfigUtils.GetDefaultBuildStepObjects(ProjectInfo, EditorTargetName, Settings.CompiledEditorBuildConfig, ProjectConfigFile, ShouldSyncPrecompiledEditor);
 			foreach (string Line in ProjectConfigFile.GetValues("Build.Step", new string[0]))
 			{
 				AddOrUpdateBuildStep(ProjectBuildSteps, new ConfigObject(Line));
@@ -5439,7 +5330,7 @@ public enum LatestChangeType
 		{
 			if (OptionsContextMenu_SyncPrecompiledBinaries.DropDownItems.Count == 0)
 			{
-				IArchiveInfo EditorArchive = GetArchives().FirstOrDefault(x => x.Type == EditorArchiveType);
+				IArchiveInfo EditorArchive = GetArchives().FirstOrDefault(x => x.Type == IArchiveInfo.EditorArchiveType);
 				if (EditorArchive != null)
 				{
 					SetSelectedArchive(EditorArchive, !OptionsContextMenu_SyncPrecompiledBinaries.Checked);
@@ -5457,61 +5348,95 @@ public enum LatestChangeType
 			StringBuilder DiagnosticsText = new StringBuilder();
 			DiagnosticsText.AppendFormat("Application version: {0}\n", Program.GetVersionString());
 			DiagnosticsText.AppendFormat("Synced from: {0}\n", Program.SyncVersion ?? "(unknown)");
-			DiagnosticsText.AppendFormat("Selected file: {0}\n", (SelectedFileName == null) ? "(none)" : SelectedFileName);
+			DiagnosticsText.AppendFormat("Selected file: {0}\n", (SelectedFileName == null) ? "(none)" : SelectedFileName.FullName);
 			if (Workspace != null)
 			{
-				DiagnosticsText.AppendFormat("P4 server: {0}\n", Workspace.Perforce.ServerAndPort ?? "(default)");
-				DiagnosticsText.AppendFormat("P4 user: {0}\n", Workspace.Perforce.UserName);
-				DiagnosticsText.AppendFormat("P4 workspace: {0}\n", Workspace.Perforce.ClientName);
+				DiagnosticsText.AppendFormat("P4 server: {0}\n", PerforceSettings.ServerAndPort ?? "(default)");
+				DiagnosticsText.AppendFormat("P4 user: {0}\n", PerforceSettings.UserName);
+				DiagnosticsText.AppendFormat("P4 workspace: {0}\n", PerforceSettings.ClientName);
 			}
 			DiagnosticsText.AppendFormat("Perforce monitor: {0}\n", (PerforceMonitor == null) ? "(inactive)" : PerforceMonitor.LastStatusMessage);
 			DiagnosticsText.AppendFormat("Event monitor: {0}\n", (EventMonitor == null) ? "(inactive)" : EventMonitor.LastStatusMessage);
 			DiagnosticsText.AppendFormat("Issue monitor: {0}\n", (IssueMonitor == null) ? "(inactive)" : IssueMonitor.LastStatusMessage);
 
-			DiagnosticsWindow Diagnostics = new DiagnosticsWindow(DataFolder, DiagnosticsText.ToString());
+			DiagnosticsWindow Diagnostics = new DiagnosticsWindow(DataFolder, DiagnosticsText.ToString(), Settings.GetCachedFilePaths());
 			Diagnostics.ShowDialog(this);
 		}
 
 		private void OptionsContextMenu_SyncFilter_Click(object sender, EventArgs e)
 		{
-			SyncFilter Filter = new SyncFilter(GetSyncCategories(), Settings.SyncView, Settings.SyncCategories, Settings.bSyncAllProjects, Settings.bIncludeAllProjectsInSolution, WorkspaceSettings.SyncView, WorkspaceSettings.SyncCategories, WorkspaceSettings.bSyncAllProjects, WorkspaceSettings.bIncludeAllProjectsInSolution);
+			SyncFilter Filter = new SyncFilter(GetSyncCategories(), Settings.Global.Filter, WorkspaceSettings.Filter);
 			if (Filter.ShowDialog() == DialogResult.OK)
 			{
-				Settings.SyncCategories = Filter.GlobalSyncCategories;
-				Settings.SyncView = Filter.GlobalView;
-				Settings.bSyncAllProjects = Filter.bGlobalSyncAllProjects;
-				Settings.bIncludeAllProjectsInSolution = Filter.bGlobalIncludeAllProjectsInSolution;
-				WorkspaceSettings.SyncCategories = Filter.WorkspaceSyncCategories;
-				WorkspaceSettings.SyncView = Filter.WorkspaceView;
-				WorkspaceSettings.bSyncAllProjects = Filter.bWorkspaceSyncAllProjects;
-				WorkspaceSettings.bIncludeAllProjectsInSolution = Filter.bWorkspaceIncludeAllProjectsInSolution;
+				Settings.Global.Filter = Filter.GlobalFilter;
 				Settings.Save();
+
+				WorkspaceSettings.Filter = Filter.WorkspaceFilter;
+				WorkspaceSettings.Save();
+			}
+		}
+
+		/// <summary>
+		/// Used to load CustomLatestChangeTypes config data into the windows form.
+		/// </summary>
+		private void RefreshSyncMenuItems()
+		{
+			SyncContextMenu.Items.Clear();
+			SyncContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+			this.SyncContexMenu_EnterChangelist,
+			this.toolStripSeparator8});
+
+			foreach (LatestChangeType ChangeType in GetCustomLatestChangeTypes())
+			{
+				System.Windows.Forms.ToolStripMenuItem MenuItem = new System.Windows.Forms.ToolStripMenuItem();
+				MenuItem.Name = ChangeType.Name;
+				MenuItem.Text = ChangeType.Description;
+				MenuItem.Size = new System.Drawing.Size(189, 22);
+				MenuItem.Click += (sender, e) => this.SyncContextMenu_LatestChangeType_Click(sender, e, ChangeType.Name);
+
+				SyncContextMenu.Items.Add(MenuItem);
 			}
 		}
 
 		private void ShowSyncMenu(Rectangle Bounds)
 		{
-			SyncContextMenu_LatestChange.Checked = (Settings.SyncType == LatestChangeType.Any);
-			SyncContextMenu_LatestGoodChange.Checked = (Settings.SyncType == LatestChangeType.Good);
-			SyncContextMenu_LatestStarredChange.Checked = (Settings.SyncType == LatestChangeType.Starred);
+			RefreshSyncMenuItems();
+
+			string? NameOfLatestChangeType = null;
+			foreach (LatestChangeType ChangeType in GetCustomLatestChangeTypes())
+			{
+				if (ChangeType.Name == Settings.SyncTypeID)
+				{
+					NameOfLatestChangeType = ChangeType.Name;
+					break;
+				}
+			}
+
+			if (NameOfLatestChangeType != null)
+			{
+				foreach (int value in Enumerable.Range(0, SyncContextMenu.Items.Count))
+				{
+					System.Windows.Forms.ToolStripMenuItem? Item = SyncContextMenu.Items[value] as System.Windows.Forms.ToolStripMenuItem;
+					if (Item != null)
+					{
+						if (Item.Name == NameOfLatestChangeType)
+						{
+							Item.Checked = true;
+						}
+						else
+						{
+							Item.Checked = false;
+						}
+					}
+				}
+			}
+
 			SyncContextMenu.Show(StatusPanel, new Point(Bounds.Left, Bounds.Bottom), ToolStripDropDownDirection.BelowRight);
 		}
 
-		private void SyncContextMenu_LatestChange_Click(object sender, EventArgs e)
+		private void SyncContextMenu_LatestChangeType_Click(object? sender, EventArgs e, string SyncTypeID)
 		{
-			Settings.SyncType = LatestChangeType.Any;
-			Settings.Save();
-		}
-
-		private void SyncContextMenu_LatestGoodChange_Click(object sender, EventArgs e)
-		{
-			Settings.SyncType = LatestChangeType.Good;
-			Settings.Save();
-		}
-
-		private void SyncContextMenu_LatestStarredChange_Click(object sender, EventArgs e)
-		{
-			Settings.SyncType = LatestChangeType.Starred;
+			Settings.SyncTypeID = SyncTypeID;
 			Settings.Save();
 		}
 
@@ -5533,7 +5458,7 @@ public enum LatestChangeType
 		{
 			if (Args.Control && Args.KeyCode == Keys.C && BuildList.SelectedItems.Count > 0)
 			{
-				int SelectedChange = ((PerforceChangeSummary)BuildList.SelectedItems[0].Tag).Number;
+				int SelectedChange = ((ChangesRecord)BuildList.SelectedItems[0].Tag).Number;
 				Clipboard.SetText(String.Format("{0}", SelectedChange));
 			}
 		}
@@ -5790,7 +5715,7 @@ public enum LatestChangeType
 
 		private bool IsBisectModeEnabled()
 		{
-			return WorkspaceSettings.ChangeNumberToBisectState.Count >= 2;
+			return WorkspaceState.BisectChanges.Count >= 2;
 		}
 
 		private void EnableBisectMode()
@@ -5798,17 +5723,20 @@ public enum LatestChangeType
 			if (BuildList.SelectedItems.Count >= 2)
 			{
 				Dictionary<int, BisectState> ChangeNumberToBisectState = new Dictionary<int, BisectState>();
-				foreach (ListViewItem SelectedItem in BuildList.SelectedItems)
+				foreach (ListViewItem? SelectedItem in BuildList.SelectedItems)
 				{
-					PerforceChangeSummary Change = (PerforceChangeSummary)SelectedItem.Tag;
-					ChangeNumberToBisectState[Change.Number] = BisectState.Include;
+					if (SelectedItem != null)
+					{
+						ChangesRecord Change = (ChangesRecord)SelectedItem.Tag;
+						ChangeNumberToBisectState[Change.Number] = BisectState.Include;
+					}
 				}
 
 				ChangeNumberToBisectState[ChangeNumberToBisectState.Keys.Min()] = BisectState.Pass;
 				ChangeNumberToBisectState[ChangeNumberToBisectState.Keys.Max()] = BisectState.Fail;
 
-				WorkspaceSettings.ChangeNumberToBisectState = ChangeNumberToBisectState;
-				Settings.Save();
+				WorkspaceState.BisectChanges = ChangeNumberToBisectState.Select(x => new BisectEntry {  Change = x.Key, State = x.Value }).ToList();
+				WorkspaceState.Save();
 
 				UpdateBuildList();
 				UpdateStatusPanel();
@@ -5817,8 +5745,8 @@ public enum LatestChangeType
 
 		private void CancelBisectMode()
 		{
-			WorkspaceSettings.ChangeNumberToBisectState.Clear();
-			Settings.Save();
+			WorkspaceState.BisectChanges.Clear();
+			WorkspaceState.Save();
 
 			UpdateBuildList();
 			UpdateStatusPanel();
@@ -5826,16 +5754,16 @@ public enum LatestChangeType
 
 		private void SetBisectStateForSelection(BisectState State)
 		{
-			foreach (ListViewItem SelectedItem in BuildList.SelectedItems)
+			foreach (ListViewItem? SelectedItem in BuildList.SelectedItems)
 			{
-				PerforceChangeSummary Change = (PerforceChangeSummary)SelectedItem.Tag;
+				ChangesRecord? Change = SelectedItem?.Tag as ChangesRecord;
 				if (Change != null)
 				{
-					WorkspaceSettings.ChangeNumberToBisectState[Change.Number] = State;
+					WorkspaceState.SetBisectState(Change.Number, State);
 				}
 			}
 
-			Settings.Save();
+			WorkspaceState.Save();
 
 			ChangeNumberToLayoutInfo.Clear();
 			BuildList.Invalidate();
@@ -5850,11 +5778,11 @@ public enum LatestChangeType
 			GetRemainingBisectRange(out PassChangeNumber, out FailChangeNumber);
 
 			List<int> ChangeNumbers = new List<int>();
-			foreach (KeyValuePair<int, BisectState> Pair in WorkspaceSettings.ChangeNumberToBisectState)
+			foreach (BisectEntry Entry in WorkspaceState.BisectChanges)
 			{
-				if (Pair.Value == BisectState.Include && Pair.Key > PassChangeNumber && Pair.Key < FailChangeNumber)
+				if (Entry.State == BisectState.Include && Entry.Change > PassChangeNumber && Entry.Change < FailChangeNumber)
 				{
-					ChangeNumbers.Add(Pair.Key);
+					ChangeNumbers.Add(Entry.Change);
 				}
 			}
 
@@ -5920,7 +5848,7 @@ public enum LatestChangeType
 			List<KeyValuePair<string, string>> DisplayBadgeNameAndGroupPairs = new List<KeyValuePair<string, string>>(BadgeNameAndGroupPairs);
 			DisplayBadgeNameAndGroupPairs.AddRange(BadgeNames.Select(x => new KeyValuePair<string, string>(x, "User")));
 
-			string LastGroup = null;
+			string? LastGroup = null;
 			foreach (KeyValuePair<string, string> BadgeNameAndGroupPair in DisplayBadgeNameAndGroupPairs)
 			{
 				if (LastGroup != BadgeNameAndGroupPair.Value)
@@ -5964,6 +5892,7 @@ public enum LatestChangeType
 			{
 				ProjectSettings.FilterBadges.Add(BadgeName);
 			}
+			Settings.Save();
 
 			UpdateBuildListFilter();
 		}
@@ -5972,6 +5901,7 @@ public enum LatestChangeType
 		{
 			ProjectSettings.FilterBadges.Clear();
 			ProjectSettings.FilterType = FilterType.None;
+			Settings.Save();
 
 			Settings.bShowAutomatedChanges = false;
 			Settings.Save();
@@ -6064,6 +5994,7 @@ public enum LatestChangeType
 		{
 			ProjectSettings.FilterType = FilterType.None;
 			Settings.Save();
+
 			UpdateBuildListFilter();
 		}
 
@@ -6105,17 +6036,17 @@ public enum LatestChangeType
 			UpdateTintColor();
 		}
 
-		private string GetTintColorFileName()
+		private FileReference GetTintColorFileName()
 		{
-			return Path.Combine(Path.GetDirectoryName(SelectedFileName), "Saved", "Config", "Windows", "EditorPerProjectUserSettings.ini");
+			return FileReference.Combine(SelectedFileName.Directory, "Saved", "Config", "Windows", "EditorPerProjectUserSettings.ini");
 		}
 
 		private Color? GetTintColor()
 		{
 			try
 			{
-				string FileName = GetTintColorFileName();
-				if (!File.Exists(FileName))
+				FileReference FileName = GetTintColorFileName();
+				if (!FileReference.Exists(FileName))
 				{
 					return null;
 				}
@@ -6129,7 +6060,7 @@ public enum LatestChangeType
 					return null;
 				}
 
-				string OverrideValue = Section.GetValue("EditorMainWindowBackgroundOverride", null);
+				string? OverrideValue = Section.GetValue("EditorMainWindowBackgroundOverride", null);
 				if (OverrideValue == null)
 				{
 					return null;
@@ -6137,7 +6068,7 @@ public enum LatestChangeType
 
 				ConfigObject OverrideObject = new ConfigObject(OverrideValue);
 
-				string TintColorValue = OverrideObject.GetValue("TintColor");
+				string? TintColorValue = OverrideObject.GetValue("TintColor");
 				if (TintColorValue == null)
 				{
 					return null;
@@ -6149,7 +6080,13 @@ public enum LatestChangeType
 					return null;
 				}
 
-				ConfigObject SpecifiedColorObject = new ConfigObject(TintColorObject.GetValue("SpecifiedColor"));
+				string? SpecifiedColorValue = TintColorObject.GetValue("SpecifiedColor");
+				if(SpecifiedColorValue == null)
+				{
+					return null;
+				}
+
+				ConfigObject SpecifiedColorObject = new ConfigObject(SpecifiedColorValue);
 
 				float R, G, B;
 				if (!float.TryParse(SpecifiedColorObject.GetValue("R", ""), out R) || !float.TryParse(SpecifiedColorObject.GetValue("G", ""), out G) || !float.TryParse(SpecifiedColorObject.GetValue("B", ""), out B))

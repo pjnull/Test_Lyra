@@ -17,7 +17,7 @@ namespace EpicGames.Serialization.Converters
 	/// Converter for list types
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	class CbListConverter<T> : CbConverter<List<T>>
+	class CbListConverter<T> : CbConverterBase<List<T>>
 	{
 		/// <inheritdoc/>
 		public override List<T> Read(CbField Field)
@@ -59,7 +59,7 @@ namespace EpicGames.Serialization.Converters
 	/// <summary>
 	/// Specialization for serializing string lists
 	/// </summary>
-	sealed class CbStringListConverter : CbConverter<List<Utf8String>>
+	sealed class CbStringListConverter : CbConverterBase<List<Utf8String>>
 	{
 		/// <inheritdoc/>
 		public override List<Utf8String> Read(CbField Field)
@@ -67,7 +67,7 @@ namespace EpicGames.Serialization.Converters
 			List<Utf8String> List = new List<Utf8String>();
 			foreach (CbField ElementField in Field)
 			{
-				List.Add(ElementField.AsString());
+				List.Add(ElementField.AsUtf8String());
 			}
 			return List;
 		}
@@ -78,7 +78,7 @@ namespace EpicGames.Serialization.Converters
 			Writer.BeginUniformArray(CbFieldType.String);
 			foreach (Utf8String String in List)
 			{
-				Writer.WriteStringValue(String);
+				Writer.WriteUtf8StringValue(String);
 			}
 			Writer.EndUniformArray();
 		}
@@ -91,7 +91,7 @@ namespace EpicGames.Serialization.Converters
 				Writer.BeginUniformArray(Name, CbFieldType.String);
 				foreach (Utf8String String in List)
 				{
-					Writer.WriteStringValue(String);
+					Writer.WriteUtf8StringValue(String);
 				}
 				Writer.EndUniformArray();
 			}
@@ -104,7 +104,7 @@ namespace EpicGames.Serialization.Converters
 	class CbListConverterFactory : CbConverterFactory
 	{
 		/// <inheritdoc/>
-		public override CbConverter? CreateConverter(Type Type)
+		public override ICbConverter? CreateConverter(Type Type)
 		{
 			if (Type.IsGenericType && Type.GetGenericTypeDefinition() == typeof(List<>))
 			{
@@ -115,7 +115,7 @@ namespace EpicGames.Serialization.Converters
 				else
 				{
 					Type ConverterType = typeof(CbListConverter<>).MakeGenericType(Type.GenericTypeArguments);
-					return (CbConverter)Activator.CreateInstance(ConverterType)!;
+					return (ICbConverter)Activator.CreateInstance(ConverterType)!;
 				}
 			}
 			return null;

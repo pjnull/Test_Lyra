@@ -331,6 +331,11 @@ namespace HordeServer.Api
 		public DateTimeOffset UpdateTime { get; set; }
 
 		/// <summary>
+		/// Whether issues are being updated by this job
+		/// </summary>
+		public bool UpdateIssues { get; set; }
+
+		/// <summary>
 		/// Per-object permissions
 		/// </summary>
 		public GetAclResponse? Acl { get; set; }
@@ -368,6 +373,7 @@ namespace HordeServer.Api
 			this.Reports = Job.Reports?.ConvertAll(x => new GetReportResponse(x));
 			this.Arguments = Job.Arguments.ToList();
 			this.UpdateTime = new DateTimeOffset(Job.UpdateTimeUtc);
+			this.UpdateIssues = Job.UpdateIssues;
 			this.Acl = AclResponse;
 		}
 	}
@@ -377,6 +383,16 @@ namespace HordeServer.Api
 	/// </summary>
 	public class GetJobTimingResponse
 	{
+		/// <summary>
+		/// The job object
+		/// </summary>
+		public IJob? Job { get; set; }
+		
+		/// <summary>
+		/// A full job response
+		/// </summary>
+		public GetJobResponse? JobResponse { get; set; }
+		
 		/// <summary>
 		/// Timing info for each step
 		/// </summary>
@@ -390,12 +406,36 @@ namespace HordeServer.Api
 		/// <summary>
 		/// Constructor
 		/// </summary>
+		/// <param name="Job">The job object</param>
+		/// <param name="JobResponse">The job response</param>
 		/// <param name="Steps">Timing info for each steps</param>
 		/// <param name="Labels">Timing info for each label</param>
-		public GetJobTimingResponse(Dictionary<string, GetStepTimingInfoResponse> Steps, List<GetLabelTimingInfoResponse> Labels)
+		public GetJobTimingResponse(IJob? Job, GetJobResponse? JobResponse, Dictionary<string, GetStepTimingInfoResponse> Steps, List<GetLabelTimingInfoResponse> Labels)
 		{
+			this.Job = Job;
+			this.JobResponse = JobResponse;
 			this.Steps = Steps;
 			this.Labels = Labels;
+		}
+	}
+	
+	/// <summary>
+	/// The timing info for 
+	/// </summary>
+	public class FindJobTimingsResponse
+	{
+		/// <summary>
+		/// Timing info for each job
+		/// </summary>
+		public Dictionary<string, GetJobTimingResponse> Timings { get; set; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="Timings">Timing info for each job</param>
+		public FindJobTimingsResponse(Dictionary<string, GetJobTimingResponse> Timings)
+		{
+			this.Timings = Timings;
 		}
 	}
 
@@ -655,9 +695,14 @@ namespace HordeServer.Api
 		LostConnection = 8,
 
 		/// <summary>
-		/// Lease terminated prematurely
+		/// Lease terminated prematurely but can be retried.
 		/// </summary>
 		Incomplete = 9,
+
+		/// <summary>
+		/// An error ocurred while executing the lease. Cannot be retried.
+		/// </summary>
+		ExecutionError = 10,
 	}
 
 	/// <summary>
@@ -717,6 +762,11 @@ namespace HordeServer.Api
 		public string? AgentId { get; set; }
 
 		/// <summary>
+		/// Rate for using this agent (per hour)
+		/// </summary>
+		public double? AgentRate { get; set; }
+
+		/// <summary>
 		/// The agent session holding this lease
 		/// </summary>
 		public string? SessionId { get; set; }
@@ -746,8 +796,9 @@ namespace HordeServer.Api
 		/// </summary>
 		/// <param name="Batch">The batch to construct from</param>
 		/// <param name="Steps">Steps in this batch</param>
+		/// <param name="AgentRate">Rate for this agent</param>
 		/// <returns>Response instance</returns>
-		public GetBatchResponse(IJobStepBatch Batch, List<GetStepResponse> Steps)
+		public GetBatchResponse(IJobStepBatch Batch, List<GetStepResponse> Steps, double? AgentRate)
 		{
 			this.Id = Batch.Id.ToString();
 			this.LogId = Batch.LogId?.ToString();
@@ -756,6 +807,7 @@ namespace HordeServer.Api
 			this.Error = Batch.Error;
 			this.Steps = Steps;
 			this.AgentId = Batch.AgentId?.ToString();
+			this.AgentRate = AgentRate;
 			this.SessionId = Batch.SessionId?.ToString();
 			this.LeaseId = Batch.LeaseId?.ToString();
 			this.WeightedPriority = Batch.SchedulePriority;

@@ -30,6 +30,11 @@ namespace EpicGames.Core
 		public static EventId Exception { get; } = new EventId(2);
 
 		/// <summary>
+		/// Exit code error
+		/// </summary>
+		public static EventId ExitCode { get; } = new EventId(3);
+
+		/// <summary>
 		/// Compiler error
 		/// </summary>
 		public static EventId Compiler { get; } = new EventId(100);
@@ -140,6 +145,11 @@ namespace EpicGames.Core
 		public static EventId Systemic_Xge_ServiceNotRunning { get; } = new EventId(712);
 
 		/// <summary>
+		/// General build failed error
+		/// </summary>
+		public static EventId Systemic_Xge_BuildFailed { get; } = new EventId(713);
+
+		/// <summary>
 		/// DDC is slow
 		/// </summary>
 		public static EventId Systemic_SlowDDC { get; } = new EventId(720);
@@ -163,6 +173,16 @@ namespace EpicGames.Core
 		/// A systemic event from MSBuild
 		/// </summary>
 		public static EventId Systemic_MSBuild { get; } = new EventId(750);
+
+		/// <summary>
+		/// Horde error codes
+		/// </summary>
+		public static EventId Horde { get; } = new EventId(1000);
+
+		/// <summary>
+		/// Invalid preflight change
+		/// </summary>
+		public static EventId Horde_InvalidPreflight { get; } = new EventId(1001);
 	}
 #pragma warning restore CA1707 // Identifiers should not contain underscores
 }

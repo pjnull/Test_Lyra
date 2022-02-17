@@ -1363,6 +1363,7 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::SerializePackageFileSummaryInternal()
 FLinkerLoad::ELinkerStatus FLinkerLoad::SerializePackageFileSummary()
 {
 	DECLARE_SCOPE_CYCLE_COUNTER( TEXT( "FLinkerLoad::SerializePackageFileSummary" ), STAT_LinkerLoad_SerializePackageFileSummary, STATGROUP_LinkerLoad );
+	LLM_SCOPE(ELLMTag::UObject);
 
 	if (bHasSerializedPackageFileSummary == false)
 	{
@@ -3120,7 +3121,7 @@ bool FLinkerLoad::VerifyImportInner(const int32 ImportIndex, FString& WarningSuf
 					if (!FLinkerLoad::IsKnownMissingPackage(PackageToLoad))
 					{
 						FLinkerLoad::AddKnownMissingPackage(PackageToLoad);
-						UE_LOG(LogLinker, Warning, TEXT("VerifyImport: Failed to find script package for import object '%s'"), *GetImportFullName(ImportIndex));
+						UE_LOG(LogLinker, Warning, TEXT("VerifyImport for '%s': Failed to find script package for import object '%s'"), *GetDebugName(), *GetImportFullName(ImportIndex));
 					}
 					return nullptr;
 				}
@@ -4216,7 +4217,8 @@ void FLinkerLoad::Preload( UObject* Object )
 #endif
 						check(CurrentLoadContext);
 #if WITH_EDITOR
-						SCOPED_LOADTIMER_TEXT(*(Object->GetClass()->GetName() + TEXT("_Serialize")));
+						SCOPED_LOADTIMER_TEXT(*WriteToString<128>(Object->GetClass()->GetFName(), TEXTVIEW("_LoadSerialize")));
+						TRACE_CPUPROFILER_EVENT_SCOPE_TEXT_ON_CHANNEL(*Object->GetFullName(), AssetLoadTimeChannel);
 #endif
 
 						// Maintain the current SerializedObjects.
@@ -4242,10 +4244,6 @@ void FLinkerLoad::Preload( UObject* Object )
 						else
 #endif
 						{
-#if WITH_EDITOR
-							TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*(Object->GetClass()->GetName() + TEXT("_Serialize")));
-							TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*Object->GetFullName());
-#endif
 							Object->Serialize(*this);
 						}
 

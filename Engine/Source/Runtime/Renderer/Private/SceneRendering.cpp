@@ -76,6 +76,7 @@
 #include "RendererOnScreenNotification.h"
 #include "Rendering/NaniteCoarseMeshStreamingManager.h"
 #include "Rendering/NaniteStreamingManager.h"
+#include "RectLightTextureManager.h"
 
 /*-----------------------------------------------------------------------------
 	Globals
@@ -916,7 +917,7 @@ void FViewInfo::Init()
 		TranslucencyLightingVolumeSize[CascadeIndex] = FVector(0);
 	}
 
-	const int32 MaxMobileShadowCascadeCount = FMath::Clamp(CVarMaxMobileShadowCascades.GetValueOnAnyThread(), 0, MAX_MOBILE_SHADOWCASCADES);
+	const int32 MaxMobileShadowCascadeCount = FMath::Clamp(CVarMaxMobileShadowCascades.GetValueOnAnyThread(), 0, MAX_MOBILE_SHADOWCASCADES / FMath::Max(Family->Views.Num(), 1));
 	const int32 MaxShadowCascadeCountUpperBound = GetFeatureLevel() >= ERHIFeatureLevel::SM5 ? 10 : MaxMobileShadowCascadeCount;
 
 	MaxShadowCascades = FMath::Clamp<int32>(CVarMaxShadowCascades.GetValueOnAnyThread(), 0, MaxShadowCascadeCountUpperBound);
@@ -1590,10 +1591,10 @@ void FViewInfo::SetupUniformBufferParameters(
 		const FViewInfo* PrimaryView = GetPrimaryView();
 		PrimaryView->CalcTranslucencyLightingVolumeBounds(OutTranslucentCascadeBoundsArray, NumTranslucentCascades);
 
-	const int32 TranslucencyLightingVolumeDim = GetTranslucencyLightingVolumeDim();
-	for (int32 CascadeIndex = 0; CascadeIndex < NumTranslucentCascades; CascadeIndex++)
-	{
-		const float VolumeVoxelSize = (OutTranslucentCascadeBoundsArray[CascadeIndex].Max.X - OutTranslucentCascadeBoundsArray[CascadeIndex].Min.X) / TranslucencyLightingVolumeDim;
+		const int32 TranslucencyLightingVolumeDim = GetTranslucencyLightingVolumeDim();
+		for (int32 CascadeIndex = 0; CascadeIndex < NumTranslucentCascades; CascadeIndex++)
+		{
+			const float VolumeVoxelSize = (OutTranslucentCascadeBoundsArray[CascadeIndex].Max.X - OutTranslucentCascadeBoundsArray[CascadeIndex].Min.X) / TranslucencyLightingVolumeDim;
 			const FVector VolumeWorldMin = OutTranslucentCascadeBoundsArray[CascadeIndex].Min;
 			const FVector3f VolumeSize = FVector3f(OutTranslucentCascadeBoundsArray[CascadeIndex].Max - VolumeWorldMin);
 			const FVector3f VolumeTranslatedWorldMin = FVector3f(VolumeWorldMin + PrimaryView->ViewMatrices.GetPreViewTranslation());
@@ -1618,7 +1619,7 @@ void FViewInfo::SetupUniformBufferParameters(
 
 	// Subsurface
 	{
-	ViewUniformShaderParameters.bSubsurfacePostprocessEnabled = IsSubsurfaceEnabled() ? 1.0f : 0.0f;
+		ViewUniformShaderParameters.bSubsurfacePostprocessEnabled = IsSubsurfaceEnabled() ? 1.0f : 0.0f;
 
 		// Profiles
 		{
@@ -1729,7 +1730,7 @@ void FViewInfo::SetupUniformBufferParameters(
 	if (RHIFeatureLevel == ERHIFeatureLevel::ES3_1)
 	{
 		// Make sure there's no padding since we're going to cast to FVector4f*
-		static_assert(sizeof(ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap) == sizeof(FVector4f) * 7, "unexpected sizeof ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap");
+		static_assert(sizeof(ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap) == sizeof(FVector4f) * SKY_IRRADIANCE_ENVIRONMENT_MAP_VEC4_COUNT, "unexpected sizeof ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap");
 
 		const bool bSetupSkyIrradiance = Scene
 			&& Scene->SkyLight
@@ -1744,7 +1745,7 @@ void FViewInfo::SetupUniformBufferParameters(
 		}
 		else
 		{
-			FMemory::Memzero((FVector4f*)&ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap, sizeof(FVector4f) * 7);
+			FMemory::Memzero((FVector4f*)&ViewUniformShaderParameters.MobileSkyIrradianceEnvironmentMap, sizeof(FVector4f) * SKY_IRRADIANCE_ENVIRONMENT_MAP_VEC4_COUNT);
 		}
 	}
 	else
@@ -1897,6 +1898,18 @@ void FViewInfo::SetupUniformBufferParameters(
 	ViewUniformShaderParameters.LTCMatTexture = OrBlack2DIfNull(ViewUniformShaderParameters.LTCMatTexture);
 	ViewUniformShaderParameters.LTCAmpTexture = OrBlack2DIfNull(ViewUniformShaderParameters.LTCAmpTexture);
 
+	// Rect light. atlas
+	{
+		FRHITexture* AtlasTexture = RectLightAtlas::GetRectLightAtlasTexture();
+		if (!AtlasTexture) AtlasTexture = GSystemTextures.BlackDummy->GetRHI();
+		const FIntVector AtlasSize = AtlasTexture->GetSizeXYZ();
+		ViewUniformShaderParameters.RectLightAtlasTexture = AtlasTexture;
+		ViewUniformShaderParameters.RectLightAtlasSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+		ViewUniformShaderParameters.RectLightAtlasMaxMipLevel = AtlasTexture->GetNumMips()-1;
+		ViewUniformShaderParameters.RectLightAtlasSizeAndInvSize = FVector4f(AtlasSize.X, AtlasSize.Y, 1.0f / AtlasSize.X, 1.0f / AtlasSize.Y);
+		ViewUniformShaderParameters.RectLightAtlasTexture = OrBlack2DIfNull(ViewUniformShaderParameters.RectLightAtlasTexture);
+	}
+
 	// Hair global resources 
 	SetUpViewHairRenderInfo(*this, ViewUniformShaderParameters.HairRenderInfo, ViewUniformShaderParameters.HairRenderInfoBits, ViewUniformShaderParameters.HairComponents);
 	ViewUniformShaderParameters.HairScatteringLUTTexture = nullptr;
@@ -2044,7 +2057,7 @@ const FViewInfo* FViewInfo::GetInstancedView() const
 {
 	// Extra checks are needed because some code relies on this function to return NULL if ISR is disabled.
 	if (bIsInstancedStereoEnabled || bIsMobileMultiViewEnabled)
-		{
+	{
 		return static_cast<const FViewInfo*>(GetInstancedSceneView());
 	}
 	return nullptr;
@@ -3047,8 +3060,8 @@ void FSceneRenderer::ComputeFamilySize()
 		MaxFamilyX = FMath::Max(MaxFamilyX, FinalViewMaxX);
 		MaxFamilyY = FMath::Max(MaxFamilyY, FinalViewMaxY);
 
-			InstancedStereoWidth = FPlatformMath::Max(InstancedStereoWidth, static_cast<uint32>(View.ViewRect.Max.X));
-		}
+		InstancedStereoWidth = FPlatformMath::Max(InstancedStereoWidth, static_cast<uint32>(View.ViewRect.Max.X));
+	}
 
 	for (FViewInfo& View : Views)
 	{
@@ -3448,7 +3461,7 @@ void FSceneRenderer::RenderFinish(FRDGBuilder& GraphBuilder, FRDGTextureRef View
 						if (bMultipleDirLightsConflictForForwardShading)
 						{
 							static const FText Message = NSLOCTEXT("Renderer", "MultipleDirLightsConflictForForwardShading", "Multiple directional lights are competing to be the single one used for forward shading, translucent, water or volumetric fog. Please adjust their ForwardShadingPriority.\nAs a fallback, the main directional light will be selected based on overall brightness.");
-							Writer.DrawLine(Message);
+							Writer.DrawLine(Message, 10, FColor::Orange);
 						}
 
 						FSkyLightSceneProxy* SkyLight = Scene->SkyLight;
@@ -4045,7 +4058,7 @@ static void RenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, 
 
 	{
 		SCOPE_CYCLE_COUNTER_VERBOSE(STAT_TotalSceneRenderingTime, ViewFamily.ProfileDescription.IsEmpty() ? nullptr : *ViewFamily.ProfileDescription);
-	
+
 		{
 			const ERHIFeatureLevel::Type FeatureLevel = SceneRenderer->FeatureLevel;
 
@@ -5201,14 +5214,14 @@ void FSceneRenderer::UpdateSkyIrradianceGpuBuffer(FRHICommandListImmediate& RHIC
 
 	if (!Scene->SkyIrradianceEnvironmentMap.Buffer)
 	{
-		Scene->SkyIrradianceEnvironmentMap.Initialize(TEXT("SkyIrradianceEnvironmentMap"), sizeof(FVector4f), 7);
+		Scene->SkyIrradianceEnvironmentMap.Initialize(TEXT("SkyIrradianceEnvironmentMap"), sizeof(FVector4f), SKY_IRRADIANCE_ENVIRONMENT_MAP_VEC4_COUNT);
 	}
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(UpdateSkyIrradianceGpuBuffer);
 
-	FVector4f OutSkyIrradianceEnvironmentMap[7];
+	FVector4f OutSkyIrradianceEnvironmentMap[SKY_IRRADIANCE_ENVIRONMENT_MAP_VEC4_COUNT];
 	// Make sure there's no padding since we're going to cast to FVector4f*
-	checkSlow(sizeof(OutSkyIrradianceEnvironmentMap) == sizeof(FVector4f) * 7);
+	checkSlow(sizeof(OutSkyIrradianceEnvironmentMap) == sizeof(FVector4f) * SKY_IRRADIANCE_ENVIRONMENT_MAP_VEC4_COUNT);
 	check(Scene);
 	const bool bUploadIrradiance = 
 		Scene->SkyLight
@@ -5222,10 +5235,14 @@ void FSceneRenderer::UpdateSkyIrradianceGpuBuffer(FRHICommandListImmediate& RHIC
 		const FSHVectorRGB3& SkyIrradiance = Scene->SkyLight->IrradianceEnvironmentMap;
 		SetupSkyIrradianceEnvironmentMapConstantsFromSkyIrradiance(OutSkyIrradianceEnvironmentMap, SkyIrradiance);
 
+		const float SkyLightAverageBrightness = Scene->SkyLight->AverageBrightness;
+		const FVector4f SkyAverageBrightness = FVector4f(SkyLightAverageBrightness, SkyLightAverageBrightness, SkyLightAverageBrightness, SkyLightAverageBrightness);
+
 		// Set the captured environment map data
-		void* DataPtr = RHICmdList.LockBuffer(Scene->SkyIrradianceEnvironmentMap.Buffer, 0, Scene->SkyIrradianceEnvironmentMap.NumBytes, RLM_WriteOnly);
+		FVector4f* DataPtr = (FVector4f*)RHICmdList.LockBuffer(Scene->SkyIrradianceEnvironmentMap.Buffer, 0, Scene->SkyIrradianceEnvironmentMap.NumBytes, RLM_WriteOnly);
 		checkSlow(Scene->SkyIrradianceEnvironmentMap.NumBytes == sizeof(OutSkyIrradianceEnvironmentMap));
-		FPlatformMemory::Memcpy(DataPtr, &OutSkyIrradianceEnvironmentMap, sizeof(OutSkyIrradianceEnvironmentMap));
+		FPlatformMemory::Memcpy(DataPtr    , &OutSkyIrradianceEnvironmentMap,	sizeof(FVector4f) * 7);
+		FPlatformMemory::Memcpy(DataPtr + 7, &SkyAverageBrightness,				sizeof(FVector4f) * 1);
 		RHICmdList.UnlockBuffer(Scene->SkyIrradianceEnvironmentMap.Buffer);
 	}
 	else if (Scene->SkyIrradianceEnvironmentMap.NumBytes == 0)

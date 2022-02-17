@@ -99,6 +99,7 @@
 #include "Interfaces/ITargetPlatform.h"
 #include "Misc/AutomationTest.h"
 #include "ActorFolder.h"
+#include "Materials/MaterialInterface.h"
 
 // needed for the RemotePropagator
 #include "AudioDevice.h"
@@ -243,6 +244,7 @@
 #include "DerivedDataBuildLocalExecutor.h"
 #include "DerivedDataBuildRemoteExecutor.h"
 #include "DerivedDataBuildWorkers.h"
+#include "AssetCompilingManager.h"
 
 #if WITH_CHAOS
 #include "ChaosSolversModule.h"
@@ -1098,11 +1100,6 @@ void UEditorEngine::Init(IEngineLoop* InEngineLoop)
 					FModuleManager::Get().LoadModule( Modules[Index] );
 				}
 			}
-		}
-
-		if (!IsRunningCommandlet())
-		{
-			FModuleManager::Get().LoadModule(TEXT("IntroTutorials"));
 		}
 
 		if( FParse::Param( FCommandLine::Get(),TEXT( "PListEditor" ) ) )
@@ -3739,9 +3736,10 @@ void UEditorEngine::BuildReflectionCaptures(UWorld* World)
 	GWarn->StatusUpdate(0, 1, StatusText);
 
 	// Wait for shader compiling to finish so we don't capture the default material
-	if (GShaderCompilingManager != NULL)
+	if (GShaderCompilingManager != nullptr)
 	{
-		GShaderCompilingManager->FinishAllCompilation();
+		UMaterialInterface::SubmitRemainingJobsForWorld(World);
+		FAssetCompilingManager::Get().FinishAllCompilation();
 	}
 
 	// Process any outstanding captures before we start operating on scenarios
@@ -6156,15 +6154,11 @@ bool UEditorEngine::ShouldThrottleCPUUsage() const
 	
 
 	bool bShouldThrottle = false;
-
-	const bool bRunningCommandlet = IsRunningCommandlet();
-
-	const bool bHasFocus = FApp::HasFocus();
-
+	
 	// Always check if in foreground, since VR apps will only have focus when running (PIE, etc).
 	const bool bIsForeground = FPlatformApplicationMisc::IsThisApplicationForeground();
-
-	if( !bIsForeground && !bHasFocus && !bRunningCommandlet )
+	
+	if (!bIsForeground &&!FApp::HasFocus() && !IsRunningCommandlet() && !GIsAutomationTesting && !FApp::IsBenchmarking())
 	{
 		const UEditorPerformanceSettings* Settings = GetDefault<UEditorPerformanceSettings>();
 		bShouldThrottle = Settings->bThrottleCPUWhenNotForeground;
@@ -7056,7 +7050,8 @@ void UEditorEngine::VerifyLoadMapWorldCleanup()
 				UE_LOG(LogLoad, Error, TEXT("Previously active world %s not cleaned up by garbage collection!"), *World->GetPathName());
 				UE_LOG(LogLoad, Error, TEXT("Once a world has become active, it cannot be reused and must be destroyed and reloaded. World referenced by:"));
 			
-				FindAndPrintStaleReferencesToObject(World, UObjectBaseUtility::IsPendingKillEnabled() ? ELogVerbosity::Fatal : ELogVerbosity::Error);
+				FindAndPrintStaleReferencesToObject(World, 
+					UObjectBaseUtility::IsPendingKillEnabled() ? EPrintStaleReferencesOptions::Fatal : (EPrintStaleReferencesOptions::Error | EPrintStaleReferencesOptions::Ensure));
 			}
 		}
 	}

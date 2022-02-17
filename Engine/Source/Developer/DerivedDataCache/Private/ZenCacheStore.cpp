@@ -113,7 +113,7 @@ public:
 	virtual bool WouldCache(const TCHAR* CacheKey, TArrayView<const uint8> InData) override;
 	virtual bool ApplyDebugOptions(FBackendDebugOptions& InOptions) override;
 
-	virtual EBackendLegacyMode GetLegacyMode() const override { return EBackendLegacyMode::LegacyOnly; }
+	virtual EBackendLegacyMode GetLegacyMode() const override { return EBackendLegacyMode::ValueWithLegacyFallback; }
 
 	// ICacheStore
 
@@ -848,6 +848,7 @@ void FZenCacheStore::Get(
 		Zen::FZenHttpRequest::Result HttpResult = Zen::FZenHttpRequest::Result::Failed;
 
 		{
+			LLM_SCOPE_BYTAG(UntaggedDDCResult);
 			Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 			HttpResult = Request->PerformRpc(TEXT("/z$/$rpc"_SV), BatchRequest.Save().AsObject(), BatchResponse);
 		}
@@ -1078,6 +1079,7 @@ void FZenCacheStore::GetValue(
 			Zen::FZenHttpRequest::Result HttpResult = Zen::FZenHttpRequest::Result::Failed;
 
 			{
+				LLM_SCOPE_BYTAG(UntaggedDDCResult);
 				Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 				HttpResult = Request->PerformRpc(TEXT("/z$/$rpc"_SV), BatchRequest.Save().AsObject(), BatchResponse);
 			}
@@ -1221,6 +1223,7 @@ void FZenCacheStore::GetChunks(
 		Zen::FZenHttpRequest::Result HttpResult = Zen::FZenHttpRequest::Result::Failed;
 
 		{
+			LLM_SCOPE_BYTAG(UntaggedDDCResult);
 			Zen::FZenScopedRequestPtr Request(RequestPool.Get());
 			HttpResult = Request->PerformRpc(TEXT("/z$/$rpc"_SV), BatchRequest.Save().AsObject(), BatchResponse);
 		}

@@ -15,6 +15,12 @@ public class LowLevelTestsTarget : TargetRules
 		Type = TargetType.Program;
 		LinkType = TargetLinkType.Monolithic;
 
+		// LowLevelTests to produce executable with Core tests
+		if (GetType() == typeof(LowLevelTestsTarget))
+		{
+			bIncludeAllTestsOverride = true;
+		}
+
 		bDeployAfterCompile = false;
 		bIsBuildingConsoleApplication = true;
 
@@ -48,6 +54,17 @@ public class LowLevelTestsTarget : TargetRules
 			bDebugBuildsActuallyUseDebugCRT = true;
 		}
 
+		SetupPreprocessorDefinitions(Target);
+	}
+
+	protected void SetupModule()
+	{
+		LaunchModuleName = this.GetType().Name.Replace("Target", string.Empty);
+		ExeBinariesSubFolder = LaunchModuleName;
+	}
+
+	protected virtual void SetupPreprocessorDefinitions(TargetInfo Target)
+	{
 		GlobalDefinitions.Add("STATS=0");
 
 		// Platform specific setup
@@ -71,11 +88,5 @@ public class LowLevelTestsTarget : TargetRules
 			// Required for IOS, but needs to fix compilation errors
 			bCompileAgainstApplicationCore = true;
 		}
-	}
-
-	protected void SetupModule()
-	{
-		LaunchModuleName = this.GetType().Name.Replace("Target", string.Empty);
-		ExeBinariesSubFolder = LaunchModuleName;
 	}
 }

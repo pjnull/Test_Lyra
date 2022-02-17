@@ -126,10 +126,6 @@ void UTransientBufferDataInterface::GetHLSL(FString& OutHLSL) const
 	if (SupportsAtomics()) { OutHLSL += TEXT("#undef BUFFER_TYPE_SUPPORTS_ATOMIC\n"); }
 }
 
-void UTransientBufferDataInterface::ModifyCompilationEnvironment(FShaderCompilerEnvironment& OutEnvironment) const
-{
-}
-
 void UTransientBufferDataInterface::GetSourceTypes(TArray<UClass*>& OutSourceTypes) const
 {
 	// Default setup with an assumption that we want to size to match a USkeletalMeshComponent.
@@ -198,17 +194,19 @@ void FTransientBufferDataProviderProxy::AllocateResources(FRDGBuilder& GraphBuil
 	}
 }
 
-void FTransientBufferDataProviderProxy::GetBindings(int32 InvocationIndex, TCHAR const* UID, FBindings& OutBindings) const
+void FTransientBufferDataProviderProxy::GatherDispatchData(FDispatchSetup const& InDispatchSetup, FCollectedDispatchData& InOutDispatchData)
 {
-	FTransientBufferDataInterfaceParameters Parameters;
-	FMemory::Memset(&Parameters, 0, sizeof(Parameters));
-	Parameters.StartOffset = 0;
-	Parameters.BufferSize = NumElements;
-	Parameters.BufferSRV = BufferSRV[InvocationIndex];
-	Parameters.BufferUAV = BufferUAV[InvocationIndex];
+	if (!ensure(InDispatchSetup.ParameterStructSizeForValidation == sizeof(FTransientBufferDataInterfaceParameters)))
+	{
+		return;
+	}
 
-	TArray<uint8> ParamData;
-	ParamData.SetNum(sizeof(Parameters));
-	FMemory::Memcpy(ParamData.GetData(), &Parameters, sizeof(Parameters));
-	OutBindings.Structs.Add(TTuple<FString, TArray<uint8> >(UID, MoveTemp(ParamData)));
+	for (int32 InvocationIndex = 0; InvocationIndex < NumInvocations; ++InvocationIndex)
+	{
+		FTransientBufferDataInterfaceParameters* Parameters = (FTransientBufferDataInterfaceParameters*)(InOutDispatchData.ParameterBuffer + InDispatchSetup.ParameterBufferOffset + InDispatchSetup.ParameterBufferStride * InvocationIndex);
+		Parameters->StartOffset = 0;
+		Parameters->BufferSize = NumElements;
+		Parameters->BufferSRV = BufferSRV[InvocationIndex];
+		Parameters->BufferUAV = BufferUAV[InvocationIndex];
+	}
 }

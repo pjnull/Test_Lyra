@@ -17,6 +17,7 @@ namespace HordeServer.Collections.Impl
 	using LeaseId = ObjectId<ILease>;
 	using LogId = ObjectId<ILogFile>;
 	using PoolId = StringId<IPool>;
+	using SessionId = ObjectId<ISession>;
 	using StreamId = StringId<IStream>;
 
 	/// <summary>
@@ -32,7 +33,7 @@ namespace HordeServer.Collections.Impl
 			public LeaseId Id { get; set; }
 			public string Name { get; set; }
 			public AgentId AgentId { get; set; }
-			public ObjectId SessionId { get; set; }
+			public SessionId SessionId { get; set; }
 			public StreamId? StreamId { get; set; }
 			public PoolId? PoolId { get; set; }
 			public LogId? LogId { get; set; }
@@ -54,7 +55,7 @@ namespace HordeServer.Collections.Impl
 				Payload = null!;
 			}
 
-			public LeaseDocument(LeaseId Id, string Name, AgentId AgentId, ObjectId SessionId, StreamId? StreamId, PoolId? PoolId, LogId? LogId, DateTime StartTime, byte[] Payload)
+			public LeaseDocument(LeaseId Id, string Name, AgentId AgentId, SessionId SessionId, StreamId? StreamId, PoolId? PoolId, LogId? LogId, DateTime StartTime, byte[] Payload)
 			{
 				this.Id = Id;
 				this.Name = Name;
@@ -67,11 +68,34 @@ namespace HordeServer.Collections.Impl
 				this.Payload = Payload;
 			}
 		}
+		
+		class DatabaseIndexes : BaseDatabaseIndexes
+		{
+			public readonly string AgentId;
+			public readonly string SessionId;
+			public readonly string StartTime;
+			public readonly string FinishTime;
+			public readonly string FinishTimeStartTimeCompound;
+
+			public DatabaseIndexes(IMongoCollection<LeaseDocument> Leases, bool DatabaseReadOnlyMode) : base(DatabaseReadOnlyMode)
+			{
+				AgentId = CreateOrGetIndex(Leases, "AgentId_1", Builders<LeaseDocument>.IndexKeys.Ascending(x => x.AgentId));
+				SessionId = CreateOrGetIndex(Leases, "SessionId_1", Builders<LeaseDocument>.IndexKeys.Ascending(x => x.SessionId));
+				StartTime = CreateOrGetIndex(Leases, "StartTime_1", Builders<LeaseDocument>.IndexKeys.Ascending(x => x.StartTime));
+				FinishTime = CreateOrGetIndex(Leases, "FinishTime_1", Builders<LeaseDocument>.IndexKeys.Ascending(x => x.FinishTime));
+				FinishTimeStartTimeCompound = CreateOrGetIndex(Leases, "FinishTime_1_StartTime_-1", Builders<LeaseDocument>.IndexKeys.Ascending(x => x.FinishTime).Descending(x => x.StartTime));
+			}
+		}
 
 		/// <summary>
 		/// Collection of lease documents
 		/// </summary>
 		readonly IMongoCollection<LeaseDocument> Leases;
+		
+		/// <summary>
+		/// Creation and lookup of indexes
+		/// </summary>
+		DatabaseIndexes Indexes;
 
 		/// <summary>
 		/// Constructor
@@ -80,18 +104,11 @@ namespace HordeServer.Collections.Impl
 		public LeaseCollection(DatabaseService DatabaseService)
 		{
 			Leases = DatabaseService.GetCollection<LeaseDocument>("Leases");
-
-			if (!DatabaseService.ReadOnlyMode)
-			{
-				Leases.Indexes.CreateOne(new CreateIndexModel<LeaseDocument>(Builders<LeaseDocument>.IndexKeys.Ascending(x => x.AgentId)));
-				Leases.Indexes.CreateOne(new CreateIndexModel<LeaseDocument>(Builders<LeaseDocument>.IndexKeys.Ascending(x => x.SessionId)));
-				Leases.Indexes.CreateOne(new CreateIndexModel<LeaseDocument>(Builders<LeaseDocument>.IndexKeys.Ascending(x => x.StartTime)));
-				Leases.Indexes.CreateOne(new CreateIndexModel<LeaseDocument>(Builders<LeaseDocument>.IndexKeys.Ascending(x => x.FinishTime)));
-			}
+			Indexes = new DatabaseIndexes(Leases, DatabaseService.ReadOnlyMode);
 		}
 
 		/// <inheritdoc/>
-		public async Task<ILease> AddAsync(LeaseId Id, string Name, AgentId AgentId, ObjectId SessionId, StreamId? StreamId, PoolId? PoolId, LogId? LogId, DateTime StartTime, byte[] Payload)
+		public async Task<ILease> AddAsync(LeaseId Id, string Name, AgentId AgentId, SessionId SessionId, StreamId? StreamId, PoolId? PoolId, LogId? LogId, DateTime StartTime, byte[] Payload)
 		{
 			LeaseDocument Lease = new LeaseDocument(Id, Name, AgentId, SessionId, StreamId, PoolId, LogId, StartTime, Payload);
 			await Leases.ReplaceOneAsync(x => x.Id == Id, Lease, new ReplaceOptions { IsUpsert = true });
@@ -111,10 +128,11 @@ namespace HordeServer.Collections.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<List<ILease>> FindLeasesAsync(AgentId? AgentId, ObjectId? SessionId, DateTime? MinTime, DateTime? MaxTime, int? Index, int? Count)
+		public async Task<List<ILease>> FindLeasesAsync(AgentId? AgentId, SessionId? SessionId, DateTime? MinTime, DateTime? MaxTime, int? Index, int? Count, string? IndexHint = null, bool ConsistentRead = true)
 		{
+			IMongoCollection<LeaseDocument> Collection = ConsistentRead ? Leases : Leases.WithReadPreference(ReadPreference.SecondaryPreferred);
+			
 			FilterDefinitionBuilder<LeaseDocument> FilterBuilder = Builders<LeaseDocument>.Filter;
-
 			FilterDefinition<LeaseDocument> Filter = FilterDefinition<LeaseDocument>.Empty;
 			if (AgentId != null)
 			{
@@ -132,9 +150,20 @@ namespace HordeServer.Collections.Impl
 			{
 				Filter &= FilterBuilder.Lt(x => x.StartTime, MaxTime.Value);
 			}
+			FindOptions? FindOptions = null;
+			if (IndexHint != null)
+			{
+				FindOptions = new FindOptions { Hint = new BsonString(IndexHint) };
+			}
 
-			List<LeaseDocument> Results = await Leases.Find(Filter).SortByDescending(x => x.StartTime).Range(Index, Count).ToListAsync();
+			List<LeaseDocument> Results = await Collection.Find(Filter, FindOptions).SortByDescending(x => x.StartTime).Range(Index, Count).ToListAsync();
 			return Results.ConvertAll<ILease>(x => x);
+		}
+
+		/// <inheritdoc/>
+		public async Task<List<ILease>> FindLeasesAsync(DateTime? MinTime, DateTime? MaxTime)
+		{
+			return await FindLeasesAsync(null, null, MinTime, MaxTime, null, null, Indexes.FinishTimeStartTimeCompound, false);
 		}
 
 		/// <inheritdoc/>

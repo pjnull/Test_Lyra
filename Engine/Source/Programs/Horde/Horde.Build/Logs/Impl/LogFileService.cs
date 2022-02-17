@@ -32,11 +32,14 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 using Stream = System.IO.Stream;
 using OpenTracing.Util;
 using OpenTracing;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HordeServer.Services
 {
 	using JobId = ObjectId<IJob>;
 	using LogId = ObjectId<ILogFile>;
+	using SessionId = ObjectId<ISession>;
 
 	/// <summary>
 	/// Metadata about a log file
@@ -66,7 +69,7 @@ namespace HordeServer.Services
 		/// <param name="SessionId">Agent session allowed to update the log</param>
 		/// <param name="Type">Type of events to be stored in the log</param>
 		/// <returns>The new log file document</returns>
-		Task<ILogFile> CreateLogFileAsync(JobId JobId, ObjectId? SessionId, LogType Type);
+		Task<ILogFile> CreateLogFileAsync(JobId JobId, SessionId? SessionId, LogType Type);
 
 		/// <summary>
 		/// Gets a logfile by ID
@@ -223,15 +226,15 @@ namespace HordeServer.Services
 				byte[] WriteBuffer = new byte[4096];
 				int WriteBufferLength = 0;
 
-				while(Length > 0)
+				while (Length > 0)
 				{
 					// Add more data to the buffer
-					int ReadBytes = await Stream.ReadAsync(ReadBuffer, ReadBufferLength, ReadBuffer.Length - ReadBufferLength);
+					int ReadBytes = await Stream.ReadAsync(ReadBuffer.AsMemory(ReadBufferLength, ReadBuffer.Length - ReadBufferLength));
 					ReadBufferLength += ReadBytes;
 
 					// Copy as many lines as possible to the output
 					int ConvertedBytes = 0;
-					for(int EndIdx = 1; EndIdx < ReadBufferLength; EndIdx++)
+					for (int EndIdx = 1; EndIdx < ReadBufferLength; EndIdx++)
 					{
 						if (ReadBuffer[EndIdx] == '\n')
 						{
@@ -246,7 +249,7 @@ namespace HordeServer.Services
 						if (Offset < WriteBufferLength)
 						{
 							int WriteLength = (int)Math.Min((long)WriteBufferLength - Offset, Length);
-							await OutputStream.WriteAsync(WriteBuffer, (int)Offset, WriteLength);
+							await OutputStream.WriteAsync(WriteBuffer.AsMemory((int)Offset, WriteLength));
 							Length -= WriteLength;
 						}
 						Offset = Math.Max(Offset - WriteBufferLength, 0);
@@ -259,14 +262,14 @@ namespace HordeServer.Services
 						Buffer.BlockCopy(ReadBuffer, ConvertedBytes, ReadBuffer, 0, ReadBufferLength - ConvertedBytes);
 						ReadBufferLength -= ConvertedBytes;
 					}
-					else if(ReadBufferLength > 0)
+					else if (ReadBufferLength > 0)
 					{
 						Array.Resize(ref ReadBuffer, ReadBuffer.Length + 128);
 						WriteBuffer = new byte[ReadBuffer.Length];
 					}
 
 					// Exit if we didn't read anything in this iteration
-					if(ReadBytes == 0)
+					if (ReadBytes == 0)
 					{
 						break;
 					}
@@ -278,7 +281,7 @@ namespace HordeServer.Services
 	/// <summary>
 	/// Wraps functionality for manipulating logs
 	/// </summary>
-	public class LogFileService : TickedBackgroundService, ILogFileService
+	public sealed class LogFileService : IHostedService, ILogFileService, IDisposable
 	{
 		/// <summary>
 		/// Information Logger
@@ -432,14 +435,20 @@ namespace HordeServer.Services
 			/// <inheritdoc/>
 			public override async Task<int> ReadAsync(byte[] Buffer, int Offset, int Length, CancellationToken CancellationToken)
 			{
+				return await ReadAsync(Buffer.AsMemory(Offset, Length), CancellationToken);
+			}
+
+			/// <inheritdoc/>
+			public override async ValueTask<int> ReadAsync(Memory<byte> Buffer, CancellationToken CancellationToken)
+			{
 				int ReadBytes = 0;
-				while (ReadBytes < Length)
+				while (ReadBytes < Buffer.Length)
 				{
 					if (SourcePos < SourceEnd)
 					{
 						// Try to copy from the current buffer
-						int BlockSize = Math.Min(SourceEnd - SourcePos, Length - ReadBytes);
-						SourceBuffer.Slice(SourcePos, BlockSize).Span.CopyTo(Buffer.AsSpan(Offset + ReadBytes));
+						int BlockSize = Math.Min(SourceEnd - SourcePos, Buffer.Length - ReadBytes);
+						SourceBuffer.Slice(SourcePos, BlockSize).Span.CopyTo(Buffer.Slice(ReadBytes).Span);
 						CurrentOffset += BlockSize;
 						ReadBytes += BlockSize;
 						SourcePos += BlockSize;
@@ -450,14 +459,6 @@ namespace HordeServer.Services
 						while (ChunkIdx + 1 < LogFile.Chunks.Count && CurrentOffset >= LogFile.Chunks[ChunkIdx + 1].Offset)
 						{
 							ChunkIdx++;
-						}
-
-						// Get the end of this chunk
-						long NextOffset = ResponseOffset + ResponseLength;
-						if (ChunkIdx + 1 < LogFile.Chunks.Count)
-						{
-							ILogChunk NextChunk = LogFile.Chunks[ChunkIdx + 1];
-							NextOffset = Math.Min(NextOffset, NextChunk.Offset);
 						}
 
 						// Get the chunk data
@@ -493,27 +494,47 @@ namespace HordeServer.Services
 			public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
 		}
 
+		ITicker Ticker;
+
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="LogFiles">The log file collection</param>
-		/// <param name="LogEvents">The log events collection</param>
-		/// <param name="Builder">The log builder</param>
-		/// <param name="Storage">THe log storage hierarchy</param>
-		/// <param name="Logger">Log interface</param>
-		public LogFileService(ILogFileCollection LogFiles, ILogEventCollection LogEvents, ILogBuilder Builder, ILogStorage Storage, ILogger<LogFileService> Logger)
-			: base(TimeSpan.FromSeconds(30.0), Logger)
+		public LogFileService(ILogFileCollection LogFiles, ILogEventCollection LogEvents, ILogBuilder Builder, ILogStorage Storage, IClock Clock, ILogger<LogFileService> Logger)
 		{
 			this.LogFiles = LogFiles;
 			this.LogEvents = LogEvents;
-			this.Logger = Logger;
 			this.LogFileCache = new MemoryCache(new MemoryCacheOptions());
 			this.Builder = Builder;
 			this.Storage = Storage;
+			this.Ticker = Clock.AddTicker(TimeSpan.FromSeconds(30.0), TickAsync, Logger);
+			this.Logger = Logger;
 		}
 
 		/// <inheritdoc/>
-		public Task<ILogFile> CreateLogFileAsync(JobId JobId, ObjectId? SessionId, LogType Type)
+		public Task StartAsync(CancellationToken CancellationToken) => Ticker.StartAsync();
+
+		/// <inheritdoc/>
+		public async Task StopAsync(CancellationToken CancellationToken)
+		{
+			Logger.LogInformation("Stopping log file service");
+			if (Builder.FlushOnShutdown)
+			{
+				await FlushAsync();
+			}
+			await Ticker.StopAsync();
+			Logger.LogInformation("Log service stopped");
+		}
+
+		/// <inheritdoc/>
+		public void Dispose()
+		{
+			LogFileCache.Dispose();
+			Storage.Dispose();
+			Ticker.Dispose();
+		}
+
+		/// <inheritdoc/>
+		public Task<ILogFile> CreateLogFileAsync(JobId JobId, SessionId? SessionId, LogType Type)
 		{
 			return LogFiles.CreateLogFileAsync(JobId, SessionId, Type);
 		}
@@ -989,7 +1010,7 @@ namespace HordeServer.Services
 		/// Executes a background task
 		/// </summary>
 		/// <param name="StoppingToken">Cancellation token</param>
-		protected override async Task TickAsync(CancellationToken StoppingToken)
+		async ValueTask TickAsync(CancellationToken StoppingToken)
 		{
 			lock (WriteLock)
 			{
@@ -1004,15 +1025,7 @@ namespace HordeServer.Services
 			}
 			await IncrementalFlush();
 		}
-		
-		/// <summary>
-		/// Executes a background task. Publicly exposed for tests.
-		/// </summary>
-		public async Task TickOnlyForTestingAsync()
-		{
-			await TickAsync(new CancellationToken());
-		}
-		
+				
 		/// <summary>
 		/// Flushes complete chunks to the storage provider
 		/// </summary>
@@ -1033,21 +1046,6 @@ namespace HordeServer.Services
 			WriteCompleteChunks(FlushChunks, true);
 		}
 
-		/// <summary>
-		/// Called when the service is shutting down
-		/// </summary>
-		/// <param name="CancellationToken"></param>
-		/// <returns></returns>
-		[SuppressMessage("Design", "CA1031:Do not catch general exception types")]
-		public override async Task StopAsync(CancellationToken CancellationToken)
-		{
-			Logger.LogInformation("Stopping log file service");
-			if (Builder.FlushOnShutdown)
-			{
-				await FlushAsync();
-			}
-			Logger.LogInformation("Log service stopped");
-		}
 
 		/// <summary>
 		/// Flushes the write cache

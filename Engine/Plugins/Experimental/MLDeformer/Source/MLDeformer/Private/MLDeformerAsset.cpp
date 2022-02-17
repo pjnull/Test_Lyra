@@ -89,10 +89,10 @@ void UMLDeformerAsset::PostLoad()
 }
 
 // Used for the FBoenReference, so it knows what skeleton to pick bones from.
-USkeleton* UMLDeformerAsset::GetSkeleton(bool& bInvalidSkeletonIsError)
+USkeleton* UMLDeformerAsset::GetSkeleton(bool& bInvalidSkeletonIsError, const IPropertyHandle* PropertyHandle)
 {
-	bInvalidSkeletonIsError = false;
 #if WITH_EDITOR
+	bInvalidSkeletonIsError = false;
 	if (SkeletalMesh)
 	{
 		return SkeletalMesh->GetSkeleton();
@@ -733,7 +733,7 @@ FMLDeformerInputInfo UMLDeformerAsset::CreateInputInfo() const
 	}
 	else
 	{
-		UE_LOG(LogMLDeformer, Display, TEXT("Including ALL bones of skeleton in training."));
+		UE_LOG(LogMLDeformer, Display, TEXT("Including ALL curves of skeleton in training."));
 	}
 
 	Result.Init(Settings);

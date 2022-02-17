@@ -98,6 +98,12 @@ static FAutoConsoleVariableRef CVarDormancyHysteresis(
 	TEXT("When > 0, represents the time we'll wait before letting a channel become fully dormant (in seconds). This can prevent churn when objects are going in and out of dormant more frequently than normal.")
 );
 
+static TAutoConsoleVariable<bool> CVarEnableNetInitialSubObjects(
+	TEXT("net.EnableNetInitialSubObjects"),
+	true,
+	TEXT("Enables new SubObjects to set bNetInitial to true to make sure all replicated properties are replicated.")
+);
+
 namespace UE
 {
 	namespace Net
@@ -3999,7 +4005,7 @@ UObject* UActorChannel::ReadContentBlockHeader(FInBunch& Bunch, bool& bObjectDel
 				// When replicating subobjects, the engine will by default replicate lower subobjects before their outers, using the owning actor as the outer on the client.
 				// To have a chain of subobjects maintain their correct outers on the client, the subobjects should be replicated top-down, so the outers are received before any subobjects they own.
 				UE_LOG(LogNetTraffic, Log, TEXT("UActorChannel::ReadContentBlockHeader: Unable to serialize subobject's outer, using owning actor as outer instead. Class: %s, Actor: %s"), *GetNameSafe(SubObjClass), *GetNameSafe(Actor));
-
+				
 				ObjOuter = Actor;
 			}
 		}
@@ -4526,6 +4532,7 @@ bool UActorChannel::WriteSubObjectInBunch(UObject * Obj, FOutBunch & Bunch, cons
 
 	bool NewSubobject = false;
 	
+	FReplicationFlags ObjRepFlags = RepFlags;
 	TSharedRef<FObjectReplicator>& ObjectReplicator = !bFoundReplicator ? CreateReplicator(Obj, !bFoundInvalidReplicator) : *FoundReplicator;
 	if (!bFoundReplicator)
 	{
@@ -4536,9 +4543,13 @@ bool UActorChannel::WriteSubObjectInBunch(UObject * Obj, FOutBunch & Bunch, cons
 		// to spawn this on the client).
 		Bunch.bReliable = true;
 		NewSubobject = true;
+		if (CVarEnableNetInitialSubObjects.GetValueOnAnyThread())
+		{
+			ObjRepFlags.bNetInitial = true;
+		}	
 	}
 	UE_NET_TRACE_OBJECT_SCOPE(ObjectReplicator->ObjectNetGUID, Bunch, GetTraceCollector(Bunch), ENetTraceVerbosity::Trace);
-	bool bWroteSomething = ObjectReplicator.Get().ReplicateProperties(Bunch, RepFlags);
+	bool bWroteSomething = ObjectReplicator.Get().ReplicateProperties(Bunch, ObjRepFlags);
 	if (NewSubobject && !bWroteSomething)
 	{
 		// Write empty payload to force object creation

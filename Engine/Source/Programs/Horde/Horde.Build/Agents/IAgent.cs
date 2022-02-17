@@ -28,6 +28,7 @@ namespace HordeServer.Models
 	using LeaseId = ObjectId<ILease>;
 	using LogId = ObjectId<ILogFile>;
 	using PoolId = StringId<IPool>;
+	using SessionId = ObjectId<ISession>;
 	using StreamId = StringId<IStream>;
 	using AgentSoftwareVersion = StringId<IAgentSoftwareCollection>;
 	using AgentSoftwareChannelName = StringId<AgentSoftwareChannels>;
@@ -304,47 +305,6 @@ namespace HordeServer.Models
 		}
 
 		/// <summary>
-		/// Gets user-readable payload information
-		/// </summary>
-		/// <param name="Payload">The payload data</param>
-		/// <returns>Dictionary of key/value pairs for the payload</returns>
-		public static Dictionary<string, string>? GetPayloadDetails(ReadOnlyMemory<byte>? Payload)
-		{
-			Dictionary<string, string>? Details = null;
-			if (Payload != null)
-			{
-				Any BasePayload = Any.Parser.ParseFrom(Payload.Value.ToArray());
-
-				Details = new Dictionary<string, string>();
-
-				ConformTask ConformTask;
-				if(BasePayload.TryUnpack(out ConformTask))
-				{
-					Details["Type"] = "Conform";
-					Details["LogId"] = ConformTask.LogId;
-				}
-
-				ExecuteJobTask JobTask;
-				if (BasePayload.TryUnpack(out JobTask))
-				{
-					Details["Type"] = "Job";
-					Details["JobId"] = JobTask.JobId;
-					Details["BatchId"] = JobTask.BatchId;
-					Details["LogId"] = JobTask.LogId;
-				}
-
-				UpgradeTask UpgradeTask;
-				if (BasePayload.TryUnpack(out UpgradeTask))
-				{
-					Details["Type"] = "Upgrade";
-					Details["SoftwareId"] = UpgradeTask.SoftwareId;
-					Details["LogId"] = UpgradeTask.LogId;
-				}
-			}
-			return Details;
-		}
-
-		/// <summary>
 		/// Converts this lease to an RPC message
 		/// </summary>
 		/// <returns>RPC message</returns>
@@ -402,7 +362,7 @@ namespace HordeServer.Models
 		/// <summary>
 		/// The current session id, if it's online
 		/// </summary>
-		public ObjectId? SessionId { get; }
+		public SessionId? SessionId { get; }
 
 		/// <summary>
 		/// Time at which the current session expires. 
@@ -475,6 +435,11 @@ namespace HordeServer.Models
 		public bool RequestConform { get; }
 
 		/// <summary>
+		/// Whether a full conform is requested
+		/// </summary>
+		public bool RequestFullConform { get; }
+
+		/// <summary>
 		/// Whether a machine restart is requested
 		/// </summary>
 		public bool RequestRestart { get; }
@@ -483,6 +448,11 @@ namespace HordeServer.Models
 		/// Whether the machine should be shutdown
 		/// </summary>
 		public bool RequestShutdown { get; }
+
+		/// <summary>
+		/// The reason for the last agent shutdown
+		/// </summary>
+		public string? LastShutdownReason { get; }
 
 		/// <summary>
 		/// List of workspaces currently synced to this machine
@@ -598,7 +568,7 @@ namespace HordeServer.Models
 				if (Index < 0)
 				{
 					Index = ~Index;
-					while (Index < Agent.Properties.Count)
+					for (; Index < Agent.Properties.Count; Index++)
 					{
 						string Property = Agent.Properties[Index];
 						if (Property.Length <= Name.Length || !Property.StartsWith(Name, StringComparison.OrdinalIgnoreCase) || Property[Name.Length] != '=')

@@ -8,8 +8,10 @@ using System.Threading.Tasks;
 using Cassandra;
 using Cassandra.Mapping;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Jupiter.Implementation;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace Horde.Storage.Implementation
 {
@@ -18,6 +20,9 @@ namespace Horde.Storage.Implementation
         private readonly ISession _session;
         private readonly IMapper _mapper;
         private readonly IOptionsMonitor<ScyllaSettings> _settings;
+        private readonly ILogger _logger = Log.ForContext<ScyllaReferencesStore>();
+        private readonly PreparedStatement _getObjectsStatement;
+        private readonly PreparedStatement _getNamespacesStatement;
 
         public ScyllaReferencesStore(IScyllaSessionManager scyllaSessionManager, IOptionsMonitor<ScyllaSettings> settings)
         {
@@ -55,24 +60,41 @@ namespace Horde.Storage.Implementation
             ));
 
 
+            _getObjectsStatement = _session.Prepare("SELECT bucket, name, last_access_time FROM objects WHERE namespace = ? ALLOW FILTERING");
+            _getNamespacesStatement = _session.Prepare("SELECT DISTINCT namespace FROM buckets");
         }
 
-        public async Task<ObjectRecord> Get(NamespaceId ns, BucketId bucket, KeyId name)
+        public async Task<ObjectRecord> Get(NamespaceId ns, BucketId bucket, IoHashKey name, IReferencesStore.FieldFlags flags)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.get");
+            using IScope _ = Tracer.Instance.StartActive("scylla.get");
 
-            ScyllaObject? o = await _mapper.SingleOrDefaultAsync<ScyllaObject>("WHERE namespace = ? AND bucket = ? AND name = ?", ns.ToString(), bucket.ToString(), name.ToString());
+            ScyllaObject? o;
+            bool includePayload = (flags & IReferencesStore.FieldFlags.IncludePayload) != 0;
+            if (includePayload)
+            {
+                o = await _mapper.SingleOrDefaultAsync<ScyllaObject>("WHERE namespace = ? AND bucket = ? AND name = ?", ns.ToString(), bucket.ToString(), name.ToString());
+            }
+            else
+            {
+                // fetch everything except for the inline blob which is quite large
+                o = await _mapper.SingleOrDefaultAsync<ScyllaObject>("SELECT namespace, bucket, name , payload_hash, is_finalized, last_access_time FROM objects WHERE namespace = ? AND bucket = ? AND name = ?", ns.ToString(), bucket.ToString(), name.ToString());
+            }
 
             if (o == null)
                 throw new ObjectNotFoundException(ns, bucket, name);
 
-            // TODO: Check returned values for null
-            return new ObjectRecord(new NamespaceId(o.Namespace!), new BucketId(o.Bucket!), new KeyId(o.Name!), o.LastAccessTime, o.InlinePayload, o.PayloadHash!.AsBlobIdentifier(), o.IsFinalized!.Value);
+            if (o.RequiredFieldsAreMissing())
+            {
+                _logger.Warning("Partial object found {Namespace} {Bucket} {Name} ignoring object", ns, bucket, name);
+                throw new ObjectNotFoundException(ns, bucket, name);
+            }
+
+            return new ObjectRecord(new NamespaceId(o.Namespace!), new BucketId(o.Bucket!), new IoHashKey(o.Name!), o.LastAccessTime, o.InlinePayload, o.PayloadHash!.AsBlobIdentifier(), o.IsFinalized!.Value);
         }
 
-        public async Task Put(NamespaceId ns, BucketId bucket, KeyId name, BlobIdentifier blobHash, byte[] blob, bool isFinalized)
+        public async Task Put(NamespaceId ns, BucketId bucket, IoHashKey name, BlobIdentifier blobHash, byte[] blob, bool isFinalized)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.put");
+            using IScope _ = Tracer.Instance.StartActive("scylla.put");
             if (blob.LongLength > _settings.CurrentValue.InlineBlobMaxSize)
             {
                 // do not inline large blobs
@@ -89,21 +111,16 @@ namespace Horde.Storage.Implementation
         }
 
 
-        public async Task Finalize(NamespaceId ns, BucketId bucket, KeyId name, BlobIdentifier blobHash)
+        public async Task Finalize(NamespaceId ns, BucketId bucket, IoHashKey name, BlobIdentifier blobIdentifier)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.finalize");
-            ObjectRecord o = await Get(ns, bucket, name);
-            if (!o.BlobIdentifier.Equals(blobHash))
-                throw new ObjectHashMismatchException(ns, bucket, name, blobHash);
+            using IScope _ = Tracer.Instance.StartActive("scylla.finalize");
 
-            AppliedInfo<ScyllaObject> info = await _mapper.UpdateIfAsync<ScyllaObject>("SET is_finalized=true WHERE namespace=? AND bucket=? AND name=?", ns.ToString(), bucket.ToString(), name.ToString());
-            if (!info.Applied)
-                throw new InvalidOperationException("Failed to finalize object even though it existed and hashes matched");
+            await _mapper.UpdateAsync<ScyllaObject>("SET is_finalized=true WHERE namespace=? AND bucket=? AND name=?", ns.ToString(), bucket.ToString(), name.ToString());
         }
 
-        private async Task CreateTTLRecord(NamespaceId ns, BucketId bucket, KeyId name, sbyte partitionIndex)
+        private async Task CreateTTLRecord(NamespaceId ns, BucketId bucket, IoHashKey name, sbyte partitionIndex)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.create_ttl_record");
+            using IScope _ = Tracer.Instance.StartActive("scylla.create_ttl_record");
             DateTime now = DateTime.Now;
             LocalDate lastAccessAt = new LocalDate(now.Year, now.Month, now.Day);
             await _mapper.UpdateAsync<ScyllaObjectLastAccessAt>("SET objects = objects + ? WHERE accessed_at = ? AND namespace = ? AND partition_index = ? ", new string[] {$"{bucket}#{name}"},  lastAccessAt, ns.ToString(), partitionIndex);
@@ -114,18 +131,18 @@ namespace Horde.Storage.Implementation
             return RemoveTTLRecord(record.Namespace, record.Bucket, record.Name, record.LastAccess, (sbyte)record.BlobIdentifier.HashData[0]);
         }
 
-        private async Task RemoveTTLRecord(NamespaceId ns, BucketId bucket, KeyId name, DateTime lastAccess, sbyte partitionIndex)
+        private async Task RemoveTTLRecord(NamespaceId ns, BucketId bucket, IoHashKey name, DateTime lastAccess, sbyte partitionIndex)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.remove_ttl_record");
+            using IScope _ = Tracer.Instance.StartActive("scylla.remove_ttl_record");
             LocalDate lastAccessAt = new LocalDate(lastAccess.Year, lastAccess.Month, lastAccess.Day);
             await _mapper.UpdateAsync<ScyllaObjectLastAccessAt>("SET objects = objects - ? WHERE accessed_at = ? AND namespace = ? AND partition_index = ?", new string[] {$"{bucket}#{name}"},  lastAccessAt, ns.ToString(), partitionIndex);
         }
 
-        public async Task UpdateLastAccessTime(NamespaceId ns, BucketId bucket, KeyId name, DateTime lastAccessTime)
+        public async Task UpdateLastAccessTime(NamespaceId ns, BucketId bucket, IoHashKey name, DateTime lastAccessTime)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.update_last_access_time");
+            using IScope _ = Tracer.Instance.StartActive("scylla.update_last_access_time");
             // fetch the old record
-            ObjectRecord objectRecord = await Get(ns, bucket, name);
+            /* ObjectRecord objectRecord = await Get(ns, bucket, name);
 
             // update the object tracking
             Task updateObjectTracking = _mapper.UpdateAsync<ScyllaObject>("SET last_access_time = ? WHERE namespace=? AND bucket = ? AND name = ?", lastAccessTime, ns.ToString(), bucket.ToString(), name.ToString());
@@ -141,25 +158,37 @@ namespace Horde.Storage.Implementation
                 await _mapper.UpdateAsync<ScyllaObjectLastAccessAt>("SET objects = objects + ? WHERE accessed_at=? AND namespace = ? AND partition_index = ?", new string[] {$"{bucket}#{name}"}, newLastAccessAt, ns.ToString(), partitionIndex);
             }
 
-            await updateObjectTracking;
+            await updateObjectTracking;*/
+
+            await _mapper.UpdateAsync<ScyllaObject>("SET last_access_time = ? WHERE namespace = ? AND bucket = ? AND name = ?", lastAccessTime, ns.ToString(), bucket.ToString(), name.ToString());
+
+            
         }
 
-        public async IAsyncEnumerator<ObjectRecord> GetOldestRecords(NamespaceId ns)
+        /*public async IAsyncEnumerable<ObjectRecord> GetRecords(NamespaceId ns)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.get_records");
+            using IScope _ = Tracer.Instance.StartActive("scylla.get_records");
             for (sbyte partitionIndex = sbyte.MinValue; partitionIndex < sbyte.MaxValue; partitionIndex++)
             {
-                RowSet rowSetDateBuckets = await _session.ExecuteAsync(new SimpleStatement("SELECT accessed_at FROM object_last_access WHERE namespace = ? AND partition_index = ? ALLOW FILTERING", ns.ToString(), partitionIndex));
+                using IScope scope = Tracer.Instance.StartActive("scylla.get_records_partition");
+                scope.Span.ResourceName = $"partition_{partitionIndex}";
+
                 SortedSet<DateTime> dateBuckets = new SortedSet<DateTime>();
-                foreach (Row row in rowSetDateBuckets)
                 {
-                    if (rowSetDateBuckets.GetAvailableWithoutFetching() == 0)
-                        await rowSetDateBuckets.FetchMoreResultsAsync();
+                    using IScope dateBucketsScope = Tracer.Instance.StartActive("scylla.get_records.date_buckets");
 
-                    LocalDate date = row.GetValue<LocalDate>("accessed_at");
+                    RowSet rowSetDateBuckets = await _session.ExecuteAsync(new SimpleStatement("SELECT accessed_at FROM object_last_access WHERE namespace = ? AND partition_index = ? PER PARTITION LIMIT 1 ALLOW FILTERING", ns.ToString(), partitionIndex));
+                    foreach (Row row in rowSetDateBuckets)
+                    {
+                        if (rowSetDateBuckets.GetAvailableWithoutFetching() == 0)
+                            await rowSetDateBuckets.FetchMoreResultsAsync();
 
-                    dateBuckets.Add(new DateTime(date.Year, date.Month, date.Day));
+                        LocalDate date = row.GetValue<LocalDate>("accessed_at");
+
+                        dateBuckets.Add(new DateTime(date.Year, date.Month, date.Day));
+                    }
                 }
+
 
                 foreach (DateTime dateBucket in dateBuckets)
                 {
@@ -170,7 +199,7 @@ namespace Horde.Storage.Implementation
                         {
                             int bucketSeparator = o.IndexOf("#", StringComparison.InvariantCultureIgnoreCase);
                             BucketId bucket = new BucketId(o.Substring(0, bucketSeparator));
-                            KeyId name = new KeyId(o.Substring(bucketSeparator + 1));
+                            IoHashKey name = new IoHashKey(o.Substring(bucketSeparator + 1));
 
                             ObjectRecord record;
                             try
@@ -188,12 +217,33 @@ namespace Horde.Storage.Implementation
                 }
 
             }
+        }*/
+        
+        public async IAsyncEnumerable<(BucketId, IoHashKey, DateTime)> GetRecords(NamespaceId ns)
+        {
+            using IScope _ = Tracer.Instance.StartActive("scylla.get_records");
+
+            RowSet rowSet = await _session.ExecuteAsync(_getObjectsStatement.Bind(ns.ToString()));
+            foreach (Row row in rowSet)
+            {
+                if (rowSet.GetAvailableWithoutFetching() == 0)
+                    await rowSet.FetchMoreResultsAsync();
+
+                string bucket = row.GetValue<string>("bucket");
+                string name = row.GetValue<string>("name");
+                DateTime lastAccessTime = row.GetValue<DateTime>("last_access_time");
+
+                // skip any names that are not conformant to io hash
+                if (name.Length != 40)
+                    continue;
+                yield return (new BucketId(bucket), new IoHashKey(name), lastAccessTime);
+            }
         }
 
-        public async IAsyncEnumerator<NamespaceId> GetNamespaces()
+        public async IAsyncEnumerable<NamespaceId> GetNamespaces()
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.get_namespaces");
-            RowSet rowSet = await _session.ExecuteAsync(new SimpleStatement("SELECT DISTINCT namespace FROM buckets"));
+            using IScope _ = Tracer.Instance.StartActive("scylla.get_namespaces");
+            RowSet rowSet = await _session.ExecuteAsync(_getNamespacesStatement.Bind());
 
             foreach (Row row in rowSet)
             {
@@ -204,18 +254,18 @@ namespace Horde.Storage.Implementation
             }
         }
 
-        public async Task<long> Delete(NamespaceId ns, BucketId bucket, KeyId key)
+        public async Task<bool> Delete(NamespaceId ns, BucketId bucket, IoHashKey key)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.delete_record");
+            using IScope _ = Tracer.Instance.StartActive("scylla.delete_record");
             ObjectRecord record;
             try
             {
-                record = await Get(ns, bucket, key);
+                record = await Get(ns, bucket, key, IReferencesStore.FieldFlags.None);
             }
             catch (ObjectNotFoundException)
             {
                 // if the record does not exist we do not need to do anything
-                return 0L;
+                return false;
             }
 
             Task removeTTL = RemoveTTLRecord(record);
@@ -223,14 +273,14 @@ namespace Horde.Storage.Implementation
 
             await removeTTL;
             if (info.Applied)
-                return 1L;
+                return true;
 
-            return 0L;
+            return false;
         }
 
         public async Task<long> DropNamespace(NamespaceId ns)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.delete_namespace");
+            using IScope _ = Tracer.Instance.StartActive("scylla.delete_namespace");
             RowSet rowSet = await _session.ExecuteAsync(new SimpleStatement("SELECT bucket, name FROM objects WHERE namespace = ? ALLOW FILTERING;", ns.ToString()));
             long deletedCount = 0;
             foreach (Row row in rowSet)
@@ -238,7 +288,7 @@ namespace Horde.Storage.Implementation
                 string bucket = row.GetValue<string>("bucket");
                 string name = row.GetValue<string>("name");
 
-                await Delete(ns, new BucketId(bucket), new KeyId(name));
+                await Delete(ns, new BucketId(bucket), new IoHashKey(name));
 
                 deletedCount++;
             }
@@ -251,14 +301,14 @@ namespace Horde.Storage.Implementation
 
         public async Task<long> DeleteBucket(NamespaceId ns, BucketId bucket)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.delete_bucket");
+            using IScope _ = Tracer.Instance.StartActive("scylla.delete_bucket");
             RowSet rowSet = await _session.ExecuteAsync(new SimpleStatement("SELECT name FROM objects WHERE namespace = ? AND bucket = ? ALLOW FILTERING;", ns.ToString(), bucket.ToString()));
             long deletedCount = 0;
             foreach (Row row in rowSet)
             {
                 string name = row.GetValue<string>("name");
 
-                await Delete(ns, bucket, new KeyId(name));
+                await Delete(ns, bucket, new IoHashKey(name));
                 deletedCount++;
             }
 
@@ -270,14 +320,14 @@ namespace Horde.Storage.Implementation
 
         private async Task MaybeAddBucket(NamespaceId ns, BucketId bucket)
         {
-            using Scope _ = Tracer.Instance.StartActive("scylla.add_bucket");
+            using IScope _ = Tracer.Instance.StartActive("scylla.add_bucket");
             await _mapper.UpdateAsync<ScyllaBucket>("SET bucket = bucket + ? WHERE namespace = ?", new string[] {bucket.ToString()}, ns.ToString());
         }
     }
 
     public class ObjectHashMismatchException : Exception
     {
-        public ObjectHashMismatchException(NamespaceId ns, BucketId bucket, KeyId name, BlobIdentifier blobHash) : base($"Object {name} in bucket {bucket} and namespace {ns} did not reference hash {blobHash}")
+        public ObjectHashMismatchException(NamespaceId ns, BucketId bucket, IoHashKey name, BlobIdentifier suppliedHash, BlobIdentifier actualHash) : base($"Object {name} in bucket {bucket} and namespace {ns} did not reference hash {suppliedHash} was referencing {actualHash}")
         {
         }
     }
@@ -299,6 +349,30 @@ namespace Horde.Storage.Implementation
         public BlobIdentifier AsBlobIdentifier()
         {
             return new BlobIdentifier(Hash!); 
+        }
+    }
+
+    public class ScyllaObjectReference
+    {
+        // used by the cassandra mapper
+        public ScyllaObjectReference()
+        {
+            Bucket = null!;
+            Key = null!;
+        }
+
+        public ScyllaObjectReference(BucketId bucket, IoHashKey key)
+        {
+            Bucket = bucket.ToString();
+            Key = key.ToString();
+        }
+
+        public string Bucket { get;set; }
+        public string Key { get; set; }
+
+        public (BucketId, IoHashKey) AsTuple()
+        {
+            return (new BucketId(Bucket), new IoHashKey(Key));
         }
     }
 
@@ -351,7 +425,7 @@ namespace Horde.Storage.Implementation
 
         }
 
-        public ScyllaObject(NamespaceId ns, BucketId bucket, KeyId name, byte[] payload, BlobIdentifier payloadHash, bool isFinalized)
+        public ScyllaObject(NamespaceId ns, BucketId bucket, IoHashKey name, byte[] payload, BlobIdentifier payloadHash, bool isFinalized)
         {
             Namespace = ns.ToString();
             Bucket = bucket.ToString();
@@ -362,11 +436,6 @@ namespace Horde.Storage.Implementation
             IsFinalized = isFinalized;
 
             LastAccessTime = DateTime.Now;
-        }
-
-        public static string BuildKey(string ns, string bucket, string name)
-        {
-            return $"{ns}.{bucket}.{name}";
         }
 
         [Cassandra.Mapping.Attributes.PartitionKey(0)]
@@ -388,6 +457,27 @@ namespace Horde.Storage.Implementation
         public bool? IsFinalized { get;set; }
         [Cassandra.Mapping.Attributes.Column("last_access_time")]
         public DateTime LastAccessTime { get; set; }
+
+        public bool RequiredFieldsAreMissing()
+        {
+            if (string.IsNullOrEmpty(Namespace))
+                //throw new ArgumentException("Namespace was not valid", nameof(Namespace));
+                return true;
+            if (string.IsNullOrEmpty(Bucket))
+                //throw new ArgumentException("Bucket was not valid", nameof(Bucket));
+                return true;
+            if (string.IsNullOrEmpty(Name))
+                //throw new ArgumentException("Name was not valid", nameof(Name));
+                return true;
+            if (PayloadHash == null)
+                //throw new ArgumentException("PayloadHash was not valid", nameof(PayloadHash));
+                return true;
+            if (!IsFinalized.HasValue)
+                //throw new ArgumentException("IsFinalized was not valid", nameof(IsFinalized));
+                return true;
+
+            return false;
+        }
     }
 
     [Cassandra.Mapping.Attributes.Table("buckets")]

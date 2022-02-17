@@ -17,6 +17,7 @@ class UMaterial;
 class UTexture;
 struct FPropertyChangedEvent;
 struct FMaterialShadingModelField;
+struct FStrataOperator;
 
 class FMaterialHLSLGenerator;
 enum class EMaterialNewScopeFlag : uint8;
@@ -129,7 +130,7 @@ public:
 	ENGINE_API bool GenerateHLSLStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const;
 
 	/** Creates a new scope, and populates it with the expression connected to this input */
-	ENGINE_API UE::HLSLTree::FScope* NewScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope) const;
+	ENGINE_API UE::HLSLTree::FScope* NewOwnedScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FStatement& Owner) const;
 	ENGINE_API UE::HLSLTree::FScope* NewScopeWithStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, EMaterialNewScopeFlag Flags) const;
 #endif // WITH_EDITOR
 private:
@@ -141,12 +142,6 @@ struct FExpressionExecOutputEntry
 {
 	FName Name;
 	FExpressionExecOutput* Output = nullptr;
-};
-
-enum class EMaterialGenerateHLSLStatus : uint8
-{
-	Success,
-	Error,
 };
 
 enum class EMaterialExpressionSetParameterValueFlags : uint32
@@ -310,9 +305,9 @@ class ENGINE_API UMaterialExpression : public UObject
 	 * For example, a for-loop expression might generate a statement for the execution input, but also generate an expression to access the loop index
 	 * These methods replace the Compile() method; once we switch over to the new system, Compile() will be removed
 	 */
-	virtual EMaterialGenerateHLSLStatus GenerateHLSLStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope);
-	virtual EMaterialGenerateHLSLStatus GenerateHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FExpression* &OutExpression);
-	virtual EMaterialGenerateHLSLStatus GenerateHLSLTexture(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FTextureParameterDeclaration*& OutTexture);
+	virtual bool GenerateHLSLStatements(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope);
+	virtual bool GenerateHLSLExpression(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FExpression* &OutExpression);
+	virtual bool GenerateHLSLTexture(FMaterialHLSLGenerator& Generator, UE::HLSLTree::FScope& Scope, int32 OutputIndex, UE::HLSLTree::FTextureParameterDeclaration*& OutTexture);
 
 #endif // WITH_EDITOR
 
@@ -427,6 +422,13 @@ class ENGINE_API UMaterialExpression : public UObject
 	 * Recursively parse nodes outputing strata material in order to gather all the possible shading models used in a material graph output a Strata material.
 	 */
 	virtual void GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex) { }
+
+	/**
+	 * A starta material is a tree with FrontMateiral being its root and BSDF being leaves, with operators in the middle.
+	 * This recursively parse nodes outputing strata material in order to gather the maximum distance to any leaves. 
+	 * This is used to drive the bottom up order processing of those nodes.
+	 */
+	virtual FStrataOperator* StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex) { return nullptr; }
 
 	/**
 	 * If true, discards the output index when caching this expression which allows more cases to re-use the output instead of adding a separate instruction

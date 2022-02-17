@@ -1,11 +1,14 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Cassandra;
+using Dasync.Collections;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Jupiter;
 using Jupiter.Implementation;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,24 +24,26 @@ namespace Horde.Storage.Implementation
         private readonly IServiceProvider _provider;
         private readonly ILeaderElection _leaderElection;
         private readonly IRefsStore _refsStore;
+        private readonly IReferencesStore _referencesStore;
         private readonly ILogger _logger = Log.ForContext<ConsistencyCheckService>();
 
         public class ConsistencyState
         {
         }
 
-        public override bool ShouldStartPolling()
+        protected override bool ShouldStartPolling()
         {
             return _settings.CurrentValue.Enabled;
         }
 
-        public ConsistencyCheckService(IOptionsMonitor<ConsistencyCheckSettings> settings, IServiceProvider provider, ILeaderElection leaderElection, IRefsStore refsStore) :
+        public ConsistencyCheckService(IOptionsMonitor<ConsistencyCheckSettings> settings, IServiceProvider provider, ILeaderElection leaderElection, IRefsStore refsStore, IReferencesStore referencesStore) :
             base(serviceName: nameof(ConsistencyCheckService), TimeSpan.FromSeconds(settings.CurrentValue.ConsistencyCheckPollFrequencySeconds), new ConsistencyState())
         {
             _settings = settings;
             _provider = provider;
             _leaderElection = leaderElection;
             _refsStore = refsStore;
+            _referencesStore = referencesStore;
         }
 
         public override async Task<bool> OnPoll(ConsistencyState state, CancellationToken cancellationToken)
@@ -55,7 +60,7 @@ namespace Horde.Storage.Implementation
                 return false;
             }
 
-            using Scope scope = Tracer.Instance.StartActive("consistency_check.run");
+            using IScope scope = Tracer.Instance.StartActive("consistency_check.poll");
 
             await RunConsistencyCheck();
 
@@ -81,12 +86,17 @@ namespace Horde.Storage.Implementation
                 return;
             }
 
+            List<NamespaceId> namespaces = await _refsStore.GetNamespaces().ToListAsync();
+            namespaces.AddRange(await _referencesStore.GetNamespaces().ToListAsync());
+
             long countOfBlobsChecked = 0;
-            DateTime objectCutoff = DateTime.Now;
             // technically this does not need to be run per namespace but per s3 bucket
-            await foreach (NamespaceId ns in _refsStore.GetNamespaces())
+            await foreach (NamespaceId ns in namespaces)
             {
-                await foreach (BlobIdentifier blob in s3Store.ListOldObjects(ns, objectCutoff))
+                using IScope scope = Tracer.Instance.StartActive("consistency_check.run");
+                scope.Span.ResourceName = ns.ToString();
+
+                await foreach ((BlobIdentifier blob, DateTime lastModified) in s3Store.ListObjects(ns))
                 {
                     if (countOfBlobsChecked % 100 == 0)
                         _logger.Information("Consistency check running on S3 blob store, count of blobs processed so far: {CountOfBlobs}", countOfBlobsChecked);
@@ -98,7 +108,9 @@ namespace Horde.Storage.Implementation
                     BlobIdentifier newHash = await BlobIdentifier.FromStream(s);
                     if (!blob.Equals(newHash))
                     {
-                        _logger.Error("Mismatching hash for S3 object {Blob} in {Namespace}, new hash has {NewHash}", blob, ns, newHash);
+                        _logger.Error("Mismatching hash for S3 object {Blob} in {Namespace}, new hash has {NewHash}. Deleting incorrect blob.", blob, ns, newHash);
+
+                        await s3Store.DeleteObject(ns, blob);
                     }
                 }
                 

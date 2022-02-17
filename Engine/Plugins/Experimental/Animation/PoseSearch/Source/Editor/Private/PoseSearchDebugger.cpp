@@ -2,9 +2,11 @@
 
 #include "PoseSearchDebugger.h"
 #include "IAnimationProvider.h"
-#include "Editor/EditorEngine.h"
+#include "IGameplayProvider.h"
 #include "PoseSearch/PoseSearch.h"
+#include "Animation/AnimationPoseData.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/MirrorDataTable.h"
 #include "RewindDebuggerInterface/Public/IRewindDebugger.h"
 #include "ObjectTrace.h"
 #include "TraceServices/Model/AnalysisSession.h"
@@ -13,56 +15,214 @@
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SHyperlink.h"
+#include "Widgets/Input/SNumericEntryBox.h"
+#include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Images/SImage.h"
 #include "Styling/SlateIconFinder.h"
 #include "TraceServices/Model/Frames.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "Editor.h"
+#include "Algo/AllOf.h"
 
 #define LOCTEXT_NAMESPACE "PoseSearchDebugger"
 
 
-UPoseSearchDebuggerReflection::UPoseSearchDebuggerReflection(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+void FPoseSearchDebuggerPoseVectorChannel::Reset()
 {
+	Positions.Reset();
+	LinearVelocities.Reset();
+	FacingDirections.Reset();
 }
 
-void FPoseSearchDebuggerFeatureReflection::EmptyAll()
+void FPoseSearchDebuggerPoseVector::Reset()
 {
-	Positions.Empty();
-	LinearVelocities.Empty();
-	AngularVelocities.Empty();
+	Pose.Reset();
+	TrajectoryTimeBased.Reset();
+	TrajectoryDistanceBased.Reset();
 }
 
-namespace UE { namespace PoseSearch {
+void FPoseSearchDebuggerPoseVector::ExtractFeatures(const UE::PoseSearch::FFeatureVectorReader& Reader)
+{
+	using namespace UE::PoseSearch;
+
+	Reset();
+
+	FPoseSearchDebuggerPoseVectorChannel* Channels[] = 
+	{
+		&Pose,
+		&TrajectoryTimeBased,
+		&TrajectoryDistanceBased
+	};
+
+	for (const FPoseSearchFeatureDesc& Feature: Reader.GetLayout()->Features)
+	{
+		if (Feature.ChannelIdx >= UE_ARRAY_COUNT(Channels))
+		{
+			continue;
+		}
+
+		FVector Vector;
+		if (Reader.GetVector(Feature, &Vector))
+		{
+			if (Feature.Type == EPoseSearchFeatureType::Position)
+			{
+				Channels[Feature.ChannelIdx]->Positions.Add(Vector);
+			}
+			else if (Feature.Type == EPoseSearchFeatureType::LinearVelocity)
+			{
+				Channels[Feature.ChannelIdx]->LinearVelocities.Add(Vector);
+			}
+			else if (Feature.Type == EPoseSearchFeatureType::ForwardVector)
+			{
+				Channels[Feature.ChannelIdx]->FacingDirections.Add(Vector);
+			}
+		}
+		
+	}
+
+	for (FPoseSearchDebuggerPoseVectorChannel* Channel : Channels)
+	{
+		Channel->bShowPositions = !Channel->Positions.IsEmpty();
+		Channel->bShowLinearVelocities = !Channel->LinearVelocities.IsEmpty();
+		Channel->bShowFacingDirections = !Channel->FacingDirections.IsEmpty();
+	}
+
+	bShowPose = !Pose.IsEmpty();
+	bShowTrajectoryTimeBased = !TrajectoryTimeBased.IsEmpty();
+	bShowTrajectoryDistanceBased = !TrajectoryDistanceBased.IsEmpty();
+}
+
+void UPoseSearchMeshComponent::Initialize(const FTransform& InComponentToWorld)
+{
+	SetComponentToWorld(InComponentToWorld);
+	const FReferenceSkeleton& SkeletalMeshRefSkeleton = SkeletalMesh->GetRefSkeleton();
+
+	// set up bone visibility states as this gets skipped since we allocate the component array before registration
+	for (int32 BaseIndex = 0; BaseIndex < 2; ++BaseIndex)
+	{
+		BoneVisibilityStates[BaseIndex].SetNum(SkeletalMeshRefSkeleton.GetNum());
+		for (int32 BoneIndex = 0; BoneIndex < SkeletalMeshRefSkeleton.GetNum(); BoneIndex++)
+		{
+			BoneVisibilityStates[BaseIndex][BoneIndex] = BVS_ExplicitlyHidden;
+		}
+	}
+
+	StartingTransform = InComponentToWorld;
+	Refresh();
+}
+
+void UPoseSearchMeshComponent::Refresh()
+{
+	// Flip buffers once to copy the directly-written component space transforms
+	bNeedToFlipSpaceBaseBuffers = true;
+	bHasValidBoneTransform = false;
+	FlipEditableSpaceBases();
+	bHasValidBoneTransform = true;
+
+	InvalidateCachedBounds();
+	UpdateBounds();
+	MarkRenderTransformDirty();
+	MarkRenderDynamicDataDirty();
+	MarkRenderStateDirty();
+}
+
+void UPoseSearchMeshComponent::ResetToStart()
+{
+	SetComponentToWorld(StartingTransform);
+	Refresh();
+}
+
+void UPoseSearchMeshComponent::UpdatePose(const FUpdateContext& UpdateContext)
+{
+	FMemMark Mark(FMemStack::Get());
+
+	FCompactPose CompactPose;
+	CompactPose.SetBoneContainer(&RequiredBones);
+	FBlendedCurve Curve;
+	Curve.InitFrom(RequiredBones);
+	UE::Anim::FStackAttributeContainer Attributes;
+	FAnimationPoseData PoseData(CompactPose, Curve, Attributes);
+
+	float AdvancedTime = UpdateContext.SequenceStartTime;
+	FAnimationRuntime::AdvanceTime(
+		UpdateContext.bLoop,
+		UpdateContext.SequenceTime - UpdateContext.SequenceStartTime,
+		AdvancedTime,
+		UpdateContext.Sequence->GetPlayLength());
+
+	FAnimExtractContext ExtractionCtx;
+	ExtractionCtx.CurrentTime = AdvancedTime;
+
+	UpdateContext.Sequence->GetAnimationPose(PoseData, ExtractionCtx);
+	if (UpdateContext.bMirrored)
+	{
+		FAnimationRuntime::MirrorPose(
+			CompactPose, 
+			UpdateContext.MirrorDataTable->MirrorAxis, 
+			*UpdateContext.CompactPoseMirrorBones, 
+			*UpdateContext.ComponentSpaceRefRotations);
+	}
+
+	FCSPose<FCompactPose> ComponentSpacePose;
+	ComponentSpacePose.InitPose(CompactPose);
+
+	for (const FBoneIndexType BoneIndex : RequiredBones.GetBoneIndicesArray())
+	{
+		const FTransform BoneTransform = 
+			ComponentSpacePose.GetComponentSpaceTransform(FCompactPoseBoneIndex(BoneIndex));
+
+		FSkeletonPoseBoneIndex SkeletonBoneIndex =
+			RequiredBones.GetSkeletonPoseIndexFromCompactPoseIndex(FCompactPoseBoneIndex(BoneIndex));
+		FName BoneName = 
+			RequiredBones.GetSkeletonAsset()->GetReferenceSkeleton().GetBoneName(SkeletonBoneIndex.GetInt());
+		SetBoneTransformByName(BoneName, BoneTransform, EBoneSpaces::ComponentSpace);
+	}
+
+	LastRootMotionDelta = UpdateContext.Sequence->ExtractRootMotion(
+		UpdateContext.SequenceStartTime, 
+		UpdateContext.SequenceTime - UpdateContext.SequenceStartTime,
+		UpdateContext.bLoop);
+
+	if (UpdateContext.bMirrored)
+	{
+		const EAxis::Type MirrorAxis = UpdateContext.MirrorDataTable->MirrorAxis;
+		FVector T = LastRootMotionDelta.GetTranslation();
+		T = FAnimationRuntime::MirrorVector(T, MirrorAxis);
+		const FQuat ReferenceRotation = (*UpdateContext.ComponentSpaceRefRotations)[FCompactPoseBoneIndex(0)];
+		FQuat Q = LastRootMotionDelta.GetRotation();
+		Q = FAnimationRuntime::MirrorQuat(Q, MirrorAxis);
+		Q *= FAnimationRuntime::MirrorQuat(ReferenceRotation, MirrorAxis).Inverse() * ReferenceRotation;
+		LastRootMotionDelta = FTransform(Q, T, LastRootMotionDelta.GetScale3D());
+	}
+
+	const FTransform ComponentTransform = LastRootMotionDelta * StartingTransform;
+
+	SetComponentToWorld(ComponentTransform);
+	FillComponentSpaceTransforms();
+	Refresh();
+}
+
+
+namespace UE::PoseSearch {
 
 class FDebuggerDatabaseRowData : public TSharedFromThis<FDebuggerDatabaseRowData>
 {
 public:
 	FDebuggerDatabaseRowData() = default;
-	FDebuggerDatabaseRowData(
-	    int32 InPoseIdx, 
-	    const FString& InAnimSequenceName,
-	    float InTime,
-	    float InLength,
-	    float InScore,
-	    float InPoseScore,
-	    float InTrajectoryScore
-	)
-		: PoseIdx(InPoseIdx)
-		, AnimSequenceName(InAnimSequenceName)
-		, Time(InTime)
-		, Length(InLength)
-		, Score(InScore)
-		, PoseScore(InPoseScore)
-		, TrajectoryScore(InTrajectoryScore)
-	{
-	}
+	
+	float GetPoseCost() const { return PoseCostDetails.ChannelCosts.Num() ? PoseCostDetails.ChannelCosts[0] : 0.0f; }
+	float GetTrajectoryCost() const { return PoseCostDetails.ChannelCosts.Num() >= 3 ? PoseCostDetails.ChannelCosts[1] + PoseCostDetails.ChannelCosts[2] : 0.0f; }
+	float GetAddendsCost() const { return PoseCostDetails.NotifyCostAddend + PoseCostDetails.MirrorMismatchCostAddend; }
 
 	int32 PoseIdx = 0;
 	FString AnimSequenceName = "";
+	FString AnimSequencePath = "";
+	int32 DbSequenceIdx = 0;
+	int32 AnimFrame = 0;
 	float Time = 0.0f;
-	float Length = 0.0f;
-	float Score = 0.0f;
-	float PoseScore = 0.0f;
-	float TrajectoryScore = 0.0f;
+	bool bMirrored = false;
+	FPoseCostDetails PoseCostDetails;
 };
 
 namespace DebuggerDatabaseColumns
@@ -75,9 +235,9 @@ namespace DebuggerDatabaseColumns
 			, bEnabled(InEnabled)
 		{
 		}
-		
+
 		virtual ~IColumn() = default;
-		
+
 		/** Sorted left to right based on this index */
 		int32 SortIndex = 0;
 		/** Current width, starts at 1 to be evenly spaced between all columns */
@@ -86,16 +246,26 @@ namespace DebuggerDatabaseColumns
 		bool bEnabled = false;
 
 		virtual FName GetName() const = 0;
-		
+
 		using FRowDataRef = TSharedRef<FDebuggerDatabaseRowData>;
 		using FSortPredicate = TFunctionRef<bool(const FRowDataRef&, const FRowDataRef&)>;
+
+		virtual FSortPredicate GetSortPredicate() const = 0;
+
+		virtual TSharedRef<SWidget> GenerateWidget(const FRowDataRef& RowData) const = 0;
+	};
+
+	/** Column struct to represent each column in the debugger database */
+	struct ITextColumn : IColumn
+	{
+		explicit ITextColumn(int32 InSortIndex, bool InEnabled = true)
+			: IColumn(InSortIndex, InEnabled)
+		{
+		}
+
+		virtual ~ITextColumn() = default;
 		
-		/** Sort predicate to sort list in ascending order by this column */
-		virtual const FSortPredicate& GetSortPredicateAscending() const = 0;
-		/** Sort predicate to sort list in descending order by this column */
-		virtual const FSortPredicate& GetSortPredicateDescending() const = 0;
-		
-		TSharedRef<STextBlock> GenerateTextWidget(const FRowDataRef& RowData) const
+		virtual TSharedRef<SWidget> GenerateWidget(const FRowDataRef& RowData) const override
 		{
 			static FSlateFontInfo RowFont = FEditorStyle::Get().GetFontStyle("DetailsView.CategoryTextStyle");
 			
@@ -109,30 +279,23 @@ namespace DebuggerDatabaseColumns
 		virtual FText GetRowText(const FRowDataRef& Row) const = 0;
 	};
 
-	struct FPoseIdx : IColumn
+	struct FPoseIdx : ITextColumn
 	{
-		using IColumn::IColumn;
+		using ITextColumn::ITextColumn;
 		static const FName Name;
 		virtual FName GetName() const override { return Name; }
 
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
+		virtual FSortPredicate GetSortPredicate() const override
 		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseIdx < Row1->PoseIdx; };
-			return Predicate;
-		}
-		
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseIdx >= Row1->PoseIdx; };
-			return Predicate;
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseIdx < Row1->PoseIdx; };
 		}
 
 		virtual FText GetRowText(const FRowDataRef& Row) const override
 		{
-			return FText::AsNumber(Row->PoseIdx);
+			return FText::AsNumber(Row->PoseIdx, &FNumberFormattingOptions::DefaultNoGrouping());
 		}
 	};
-	const FName FPoseIdx::Name = "PoseIdx";
+	const FName FPoseIdx::Name = "Pose Index";
 
 	struct FAnimSequenceName : IColumn
 	{
@@ -140,151 +303,155 @@ namespace DebuggerDatabaseColumns
 		static const FName Name;
 		virtual FName GetName() const override { return Name; }
 		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
+		virtual FSortPredicate GetSortPredicate() const override
 		{
 			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->AnimSequenceName < Row1->AnimSequenceName; };
 			return Predicate;
 		}
 
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
+		virtual TSharedRef<SWidget> GenerateWidget(const FRowDataRef& RowData) const override
 		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->AnimSequenceName >= Row1->AnimSequenceName; };
-			return Predicate;
-		}
-
-		virtual FText GetRowText(const FRowDataRef& Row) const override
-		{
-			return FText::FromString(Row->AnimSequenceName);
+			return SNew(SHyperlink)
+				.Text_Lambda([RowData]() -> FText { return FText::FromString(RowData->AnimSequenceName); })
+				.TextStyle(&FCoreStyle::Get().GetWidgetStyle<FTextBlockStyle>("SmallText"))
+				.ToolTipText_Lambda([RowData]() -> FText 
+					{ 
+						return FText::Format(
+							LOCTEXT("AssetHyperlinkTooltipFormat", "Open asset '{0}'"), 
+							FText::FromString(RowData->AnimSequencePath)); 
+					})
+				.OnNavigate_Lambda([RowData]()
+					{
+						GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(RowData->AnimSequencePath);
+					});
 		}
 	};
-	const FName FAnimSequenceName::Name = "AnimSequence";
+	const FName FAnimSequenceName::Name = "Sequence";
 
-	struct FTime : IColumn
+	struct FFrame : ITextColumn
 	{
-		using IColumn::IColumn;
+		using ITextColumn::ITextColumn;
 		static const FName Name;
 		virtual FName GetName() const override { return Name; }
 		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
+		virtual FSortPredicate GetSortPredicate() const override
 		{
 			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Time < Row1->Time; };
 			return Predicate;
 		}
-		
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Time >= Row1->Time; };
-			return Predicate;
-		}
 
 		virtual FText GetRowText(const FRowDataRef& Row) const override
 		{
-			return FText::AsNumber(Row->Time);
+			FNumberFormattingOptions TimeFormattingOptions = FNumberFormattingOptions()
+				.SetUseGrouping(false)
+				.SetMaximumFractionalDigits(2);
+
+			return FText::Format(
+				FText::FromString("{0} ({1})"),
+				FText::AsNumber(Row->AnimFrame, &FNumberFormattingOptions::DefaultNoGrouping()),
+				FText::AsNumber(Row->Time, &TimeFormattingOptions)
+			);
 		}
 	};
-	const FName FTime::Name = "Time";
+	const FName FFrame::Name = "Frame";
 
-	struct FLength : IColumn
+	struct FCost : ITextColumn
 	{
-		using IColumn::IColumn;
+		using ITextColumn::ITextColumn;
 		static const FName Name;
 		virtual FName GetName() const override { return Name; }
 		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
+		virtual FSortPredicate GetSortPredicate() const override
 		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Length < Row1->Length; };
-			return Predicate;
-		}
-
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Length >= Row1->Length; };
-			return Predicate;
-		}
-
-		virtual FText GetRowText(const FRowDataRef& Row) const override
-		{
-			return FText::AsNumber(Row->Length);
-		}
-	};
-	const FName FLength::Name = "Length";
-
-	struct FScore : IColumn
-	{
-		using IColumn::IColumn;
-		static const FName Name;
-		virtual FName GetName() const override { return Name; }
-		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Score < Row1->Score; };
-			return Predicate;
-		}
-
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->Score >= Row1->Score; };
-			return Predicate;
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseCostDetails.PoseCost < Row1->PoseCostDetails.PoseCost; };
 		}
 		
 		virtual FText GetRowText(const FRowDataRef& Row) const override
         {
-        	return FText::AsNumber(Row->Score);
+        	return FText::AsNumber(Row->PoseCostDetails.PoseCost.TotalCost);
         }
 	};
-	const FName FScore::Name = "Score";
+	const FName FCost::Name = "Cost";
 
 
-	struct FPoseScore : IColumn
+	struct FPoseCostColumn : ITextColumn
 	{
-		using IColumn::IColumn;
+		using ITextColumn::ITextColumn;
 		static const FName Name;
 		virtual FName GetName() const override { return Name; }
 		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
+		virtual FSortPredicate GetSortPredicate() const override
 		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseScore < Row1->PoseScore; };
-			return Predicate;
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->GetPoseCost() < Row1->GetPoseCost(); };
 		}
 
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
+		virtual FText GetRowText(const FRowDataRef& Row) const override
 		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->PoseScore >= Row1->PoseScore; };
-			return Predicate;
+			return FText::AsNumber(Row->GetPoseCost());
+		}
+	};
+	const FName FPoseCostColumn::Name = "Pose Cost";
+
+
+	struct FTrajectoryCost : ITextColumn
+	{
+		using ITextColumn::ITextColumn;
+		static const FName Name;
+		virtual FName GetName() const override { return Name; }
+		
+		virtual FSortPredicate GetSortPredicate() const override
+		{
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->GetTrajectoryCost() < Row1->GetTrajectoryCost(); };
 		}
 		
 		virtual FText GetRowText(const FRowDataRef& Row) const override
 		{
-			return FText::AsNumber(Row->PoseScore);
-		}
-	};
-	const FName FPoseScore::Name = "Pose Score";
-
-
-	struct FTrajectoryScore : IColumn
-	{
-		using IColumn::IColumn;
-		static const FName Name;
-		virtual FName GetName() const override { return Name; }
-		
-		virtual const FSortPredicate& GetSortPredicateAscending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->TrajectoryScore < Row1->TrajectoryScore; };
-			return Predicate;
-		}
-
-		virtual const FSortPredicate& GetSortPredicateDescending() const override
-		{
-			static FSortPredicate Predicate = [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool { return Row0->TrajectoryScore >= Row1->TrajectoryScore; };
-			return Predicate;
-		}
-		
-		virtual FText GetRowText(const FRowDataRef& Row) const override
-		{
-			return FText::AsNumber(Row->TrajectoryScore);
+			return FText::AsNumber(Row->GetTrajectoryCost());
         }
 	};
-	const FName FTrajectoryScore::Name = "Trajectory Score";
+	const FName FTrajectoryCost::Name = "Trajectory Cost";
+
+	struct FCostModifier : ITextColumn
+	{
+		using ITextColumn::ITextColumn;
+		static const FName Name;
+		virtual FName GetName() const override { return Name; }
+
+		virtual FSortPredicate GetSortPredicate() const override
+		{
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool 
+			{ 
+				return Row0->GetAddendsCost() < Row1->GetAddendsCost();
+			};
+		}
+
+		virtual FText GetRowText(const FRowDataRef& Row) const override
+		{
+			return FText::AsNumber(Row->GetAddendsCost());
+		}
+	};
+	const FName FCostModifier::Name = "Cost Modifier";
+
+	struct FMirrored : ITextColumn
+	{
+		using ITextColumn::ITextColumn;
+		static const FName Name;
+		virtual FName GetName() const override { return Name; }
+
+		virtual FSortPredicate GetSortPredicate() const override
+		{
+			return [](const FRowDataRef& Row0, const FRowDataRef& Row1) -> bool 
+			{ 
+				return Row0->bMirrored < Row1->bMirrored; 
+			};
+		}
+
+		virtual FText GetRowText(const FRowDataRef& Row) const override
+		{
+			return FText::Format(LOCTEXT("Mirrored", "{0}"), { Row->bMirrored } );
+		}
+	};
+	const FName FMirrored::Name = "Mirrored";
 }
 
 
@@ -328,7 +495,7 @@ class SDebuggerDatabaseRow : public SMultiColumnTableRow<TSharedRef<FDebuggerDat
 		const TSharedRef<DebuggerDatabaseColumns::IColumn>& Column = (*ColumnMap.Get())[InColumnName];
 		
 		static FSlateFontInfo NormalFont = FEditorStyle::Get().GetFontStyle("DetailsView.CategoryTextStyle");
-		const TSharedRef<SWidget> Widget = Column->GenerateTextWidget(Row.ToSharedRef());
+		const TSharedRef<SWidget> Widget = Column->GenerateWidget(Row.ToSharedRef());
 		
 		return
 			SNew(SBorder)
@@ -384,12 +551,26 @@ void SDebuggerDatabaseView::Update(const FTraceMotionMatchingStateMessage& State
 	UpdateRows(State, Database);
 }
 
+const TSharedRef<FDebuggerDatabaseRowData>& SDebuggerDatabaseView::GetPoseIdxDatabaseRow(int32 PoseIdx) const
+{
+	const TSharedRef<FDebuggerDatabaseRowData>* RowPtr = UnfilteredDatabaseRows.FindByPredicate(
+		[=](TSharedRef<FDebuggerDatabaseRowData>& Row)
+	{
+		return Row->PoseIdx == PoseIdx;
+	});
+
+	check(RowPtr != nullptr);
+
+	return *RowPtr;
+}
+
+
 void SDebuggerDatabaseView::RefreshColumns()
 {
 	using namespace DebuggerDatabaseColumns;
 	
 	ActiveView.HeaderRow->ClearColumns();
-	DatabaseView.HeaderRow->ClearColumns();
+	FilteredDatabaseView.HeaderRow->ClearColumns();
 	
 	// Sort columns by index
 	Columns.ValueSort([](const TSharedRef<IColumn> Column0, const TSharedRef<IColumn> Column1)
@@ -415,7 +596,7 @@ void SDebuggerDatabaseView::RefreshColumns()
 				.HAlignHeader(HAlign_Center)
 				.HAlignCell(HAlign_Fill);
 
-			DatabaseView.HeaderRow->AddColumn(ColumnArgs);
+			FilteredDatabaseView.HeaderRow->AddColumn(ColumnArgs);
 			
 			// Every time the active column is changed, update the database column
 			ActiveView.HeaderRow->AddColumn(ColumnArgs.OnWidthChanged(this, &SDebuggerDatabaseView::OnColumnWidthChanged, ColumnName));
@@ -452,6 +633,7 @@ void SDebuggerDatabaseView::OnColumnSortModeChanged(const EColumnSortPriority::T
 	SortColumn = ColumnId;
 	SortMode = InSortMode;
 	SortDatabaseRows();
+	FilterDatabaseRows();
 }
 
 void SDebuggerDatabaseView::OnColumnWidthChanged(const float NewWidth, FName ColumnId) const
@@ -461,91 +643,152 @@ void SDebuggerDatabaseView::OnColumnWidthChanged(const float NewWidth, FName Col
 	Columns[ColumnId]->Width = NewWidth;
 }
 
+void SDebuggerDatabaseView::OnFilterTextChanged(const FText& SearchText)
+{
+	FilterText = SearchText;
+	FilterDatabaseRows();
+}
+
+
+void SDebuggerDatabaseView::OnDatabaseRowSelectionChanged(
+	TSharedPtr<FDebuggerDatabaseRowData> Row, 
+	ESelectInfo::Type SelectInfo)
+{
+	if (Row.IsValid())
+	{
+		OnPoseSelectionChanged.ExecuteIfBound(Row->PoseIdx, Row->Time);
+	}
+}
+
+ECheckBoxState SDebuggerDatabaseView::IsSequenceFilterEnabled() const
+{
+	return bSequenceFilterEnabled ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+
+void SDebuggerDatabaseView::OnSequenceFilterEnabledChanged(ECheckBoxState NewState)
+{
+	bSequenceFilterEnabled = NewState == ECheckBoxState::Checked;
+	FilterDatabaseRows();
+}
 
 void SDebuggerDatabaseView::SortDatabaseRows()
 {
 	if (SortMode == EColumnSortMode::Ascending)
 	{
-		DatabaseView.Rows.Sort(Columns[SortColumn]->GetSortPredicateAscending());
+		UnfilteredDatabaseRows.Sort(Columns[SortColumn]->GetSortPredicate());
 	}
 	else if (SortMode == EColumnSortMode::Descending)
 	{
-		DatabaseView.Rows.Sort(Columns[SortColumn]->GetSortPredicateDescending());
+		auto DescendingPredicate = [this](const auto& Lhs, const auto& Rhs) -> bool
+		{
+			return !Columns[SortColumn]->GetSortPredicate()(Lhs, Rhs);
+		};
+
+		UnfilteredDatabaseRows.Sort(DescendingPredicate);
+	}
+}
+
+void SDebuggerDatabaseView::FilterDatabaseRows()
+{
+	FilteredDatabaseView.Rows.Empty();
+
+	FString FilterString = FilterText.ToString();
+	TArray<FString> Tokens;
+	FilterString.ParseIntoArrayWS(Tokens);
+
+	if (Tokens.Num() == 0)
+	{
+		for (const auto& UnfilteredRow : UnfilteredDatabaseRows)
+		{
+			if (!bSequenceFilterEnabled || DatabaseSequenceFilter[UnfilteredRow->DbSequenceIdx])
+			{
+				FilteredDatabaseView.Rows.Add(UnfilteredRow);
+			}
+		}
+	}
+	else
+	{
+		for (const auto& UnfilteredRow : UnfilteredDatabaseRows)
+		{
+			if (!bSequenceFilterEnabled || DatabaseSequenceFilter[UnfilteredRow->DbSequenceIdx])
+			{
+				bool bMatchesAllTokens = Algo::AllOf(
+					Tokens,
+					[&](FString Token)
+				{
+					return UnfilteredRow->AnimSequenceName.Contains(Token);
+				});
+
+				if (bMatchesAllTokens)
+				{
+					FilteredDatabaseView.Rows.Add(UnfilteredRow);
+				}
+			}
+		}
 	}
 
-	DatabaseView.ListView->RequestListRefresh();
+	FilteredDatabaseView.ListView->RequestListRefresh();
 }
 
 void SDebuggerDatabaseView::CreateRows(const UPoseSearchDatabase& Database)
 {
 	const int32 NumPoses = Database.SearchIndex.NumPoses;
-	DatabaseView.Rows.Reserve(NumPoses);
+	UnfilteredDatabaseRows.Reset(NumPoses);
+
+	RowsSourceDatabase = &Database;
 
 	// Build database rows
-	for(const FPoseSearchDatabaseSequence& DbSequence : Database.Sequences)
+	for(const FPoseSearchIndexAsset& SearchIndexAsset : Database.SearchIndex.Assets)
 	{
-		const int32 LastPoseIdx = DbSequence.FirstPoseIdx + DbSequence.NumPoses;
-		for (int32 PoseIdx = DbSequence.FirstPoseIdx; PoseIdx != LastPoseIdx; ++PoseIdx)
+		const FPoseSearchDatabaseSequence& DbSequence = Database.GetSourceAsset(&SearchIndexAsset);
+		const int32 LastPoseIdx = SearchIndexAsset.FirstPoseIdx + SearchIndexAsset.NumPoses;
+		for (int32 PoseIdx = SearchIndexAsset.FirstPoseIdx; PoseIdx != LastPoseIdx; ++PoseIdx)
 		{
-			TSharedRef<FDebuggerDatabaseRowData> Row = DatabaseView.Rows.Add_GetRef(MakeShared<FDebuggerDatabaseRowData>());
+			float Time = Database.GetTimeOffset(PoseIdx);
+
+			TSharedRef<FDebuggerDatabaseRowData> Row = UnfilteredDatabaseRows.Add_GetRef(MakeShared<FDebuggerDatabaseRowData>());
 			Row->PoseIdx = PoseIdx;
-
-			const FString SequenceName = DbSequence.Sequence->GetName();
-			const float SequenceLength = DbSequence.Sequence->GetPlayLength();
-			FFloatInterval Range = DbSequence.SamplingRange;
-
-			// @TODO: Update this when range is computed natively as part of the sequence class
-			const bool bSampleAll = (Range.Min == 0.0f) && (Range.Max == 0.0f);
-			const float SequencePlayLength = DbSequence.Sequence->GetPlayLength();
-			Range.Min = bSampleAll ? 0.0f : Range.Min;
-			Range.Max = bSampleAll ? SequencePlayLength : FMath::Min(SequencePlayLength, Range.Max);
-			// ---
-
-			Row->AnimSequenceName = SequenceName;
-			// Cap time in sequence to end of range
-			Row->Time = FGenericPlatformMath::Min(Range.Min + (PoseIdx - DbSequence.FirstPoseIdx) * Database.Schema->SamplingInterval, Range.Max);
-			Row->Length = SequenceLength;
+			Row->AnimSequenceName = DbSequence.Sequence->GetName();
+			Row->AnimSequencePath = DbSequence.Sequence->GetPathName();
+			Row->DbSequenceIdx = SearchIndexAsset.SourceAssetIdx;
+			Row->Time = Time;
+			Row->AnimFrame = DbSequence.Sequence->GetFrameAtTime(Time);
+			Row->bMirrored = SearchIndexAsset.bMirrored;
 		}
 	}
 
+	ActiveView.Rows.Reset();
 	ActiveView.Rows.Add(MakeShared<FDebuggerDatabaseRowData>());
 }
 
 void SDebuggerDatabaseView::UpdateRows(const FTraceMotionMatchingStateMessage& State, const UPoseSearchDatabase& Database)
 {
-	if (DatabaseView.Rows.IsEmpty())
+	const bool bNewDatabase = RowsSourceDatabase != &Database;
+
+	if (bNewDatabase || UnfilteredDatabaseRows.IsEmpty())
 	{
-		check(ActiveView.Rows.IsEmpty());
 		CreateRows(Database);
 	}
 	check(ActiveView.Rows.Num() == 1);
-	
+
 	FPoseSearchWeightsContext StateWeights;
 	StateWeights.Update(State.Weights, &Database);
 
-	FPoseSearchWeightsContext PoseWeights;
+	UE::PoseSearch::FSearchContext SearchContext;
+	SearchContext.SetSource(&Database);
+	SearchContext.QueryValues = State.QueryVectorNormalized;
+	SearchContext.WeightsContext = &StateWeights;
+	if (const FPoseSearchIndexAsset* CurrentIndexAsset = Database.SearchIndex.FindAssetForPose(State.DbPoseIdx))
 	{
-		FPoseSearchDynamicWeightParams WeightParams = State.Weights;
-		WeightParams.TrajectoryDynamicWeights.ChannelWeightScale = 0.0f;
-		PoseWeights.Update(WeightParams, &Database);
-	}
-
-	FPoseSearchWeightsContext TrajectoryWeights;
-	{
-		FPoseSearchDynamicWeightParams WeightParams = State.Weights;
-		WeightParams.PoseDynamicWeights.ChannelWeightScale = 0.0f;
-		TrajectoryWeights.Update(WeightParams, &Database);
+		SearchContext.QueryMirrorRequest = CurrentIndexAsset->bMirrored ? 
+			EPoseSearchBooleanRequest::TrueValue : EPoseSearchBooleanRequest::FalseValue;
 	}
 	
-	const FPoseSearchIndex& SearchIndex = Database.SearchIndex;
-
-	for(const TSharedRef<FDebuggerDatabaseRowData>& Row : DatabaseView.Rows)
+	for(const TSharedRef<FDebuggerDatabaseRowData>& Row : UnfilteredDatabaseRows)
 	{
 		const int32 PoseIdx = Row->PoseIdx;
-		
-		Row->Score = ComparePoses(SearchIndex, PoseIdx, State.QueryVectorNormalized, &StateWeights);
-		Row->PoseScore = ComparePoses(SearchIndex, PoseIdx, State.QueryVectorNormalized, &PoseWeights);
-		Row->TrajectoryScore = ComparePoses(SearchIndex, PoseIdx, State.QueryVectorNormalized, &TrajectoryWeights);
+
+		ComparePoses(PoseIdx, SearchContext, Row->PoseCostDetails);
 
 		// If we are on the active pose for the frame
 		if (PoseIdx == State.DbPoseIdx)
@@ -554,13 +797,21 @@ void SDebuggerDatabaseView::UpdateRows(const FTraceMotionMatchingStateMessage& S
 		}
 	}
 
+	DatabaseSequenceFilter = State.DatabaseSequenceFilter;
+
 	SortDatabaseRows();
+	FilterDatabaseRows();
+
+	if (bNewDatabase)
+	{
+		FilteredDatabaseView.ListView->ClearSelection();
+	}
 }
 
 TSharedRef<ITableRow> SDebuggerDatabaseView::HandleGenerateDatabaseRow(TSharedRef<FDebuggerDatabaseRowData> Item, const TSharedRef<STableViewBase>& OwnerTable) const
 {
 	return
-		SNew(SDebuggerDatabaseRow, OwnerTable, Item, DatabaseView.RowStyle, &DatabaseView.RowBrush, FMargin(0.0f, 2.0f, 6.0f, 2.0f))
+		SNew(SDebuggerDatabaseRow, OwnerTable, Item, FilteredDatabaseView.RowStyle, &FilteredDatabaseView.RowBrush, FMargin(0.0f, 2.0f, 6.0f, 2.0f))
 		.ColumnMap(this, &SDebuggerDatabaseView::GetColumnMap);
 	
 }
@@ -576,15 +827,20 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 {
 	using namespace DebuggerDatabaseColumns;
 
+	ParentDebuggerViewPtr = InArgs._Parent;
+	OnPoseSelectionChanged = InArgs._OnPoseSelectionChanged;
+	check(OnPoseSelectionChanged.IsBound());
+
 	// @TODO: Support runtime reordering of these indices
 	// Construct all column types
 	AddColumn(MakeShared<FAnimSequenceName>(0));
-	AddColumn(MakeShared<FPoseIdx>(1));
-	AddColumn(MakeShared<FTime>(2));
-	AddColumn(MakeShared<FLength>(3));
-	AddColumn(MakeShared<FScore>(4));
-	AddColumn(MakeShared<FPoseScore>(5));
-	AddColumn(MakeShared<FTrajectoryScore>(6));
+	AddColumn(MakeShared<FCost>(1));
+	AddColumn(MakeShared<FPoseCostColumn>(2));
+	AddColumn(MakeShared<FTrajectoryCost>(3));
+	AddColumn(MakeShared<FCostModifier>(4));
+	AddColumn(MakeShared<FFrame>(5));
+	AddColumn(MakeShared<FMirrored>(6));
+	AddColumn(MakeShared<FPoseIdx>(7));
 
 	// Active Row
 	ActiveView.HeaderRow = SNew(SHeaderRow);
@@ -608,28 +864,30 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 	ActiveView.RowStyle = FEditorStyle::GetWidgetStyle<FTableRowStyle>("TableView.Row");
 	ActiveView.RowBrush = *FEditorStyle::GetBrush("DetailsView.CategoryTop");
 
-	// Database 
-	DatabaseView.ScrollBar =
+
+	// Filtered Database
+	FilteredDatabaseView.ScrollBar =
 		SNew(SScrollBar)
 		.Orientation(Orient_Vertical)
 		.HideWhenNotInUse(false)
 		.AlwaysShowScrollbar(true)
 		.AlwaysShowScrollbarTrack(true);
-	DatabaseView.HeaderRow = SNew(SHeaderRow).Visibility(EVisibility::Collapsed);
-	
-	DatabaseView.ListView = SNew(SListView<TSharedRef<FDebuggerDatabaseRowData>>)
-			.ListItemsSource(&DatabaseView.Rows)
-			.HeaderRow(DatabaseView.HeaderRow.ToSharedRef())
-			.OnGenerateRow(this, &SDebuggerDatabaseView::HandleGenerateDatabaseRow)
-			.ExternalScrollbar(DatabaseView.ScrollBar)
-			.SelectionMode(ESelectionMode::SingleToggle)
-			.ConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
+	FilteredDatabaseView.HeaderRow = SNew(SHeaderRow).Visibility(EVisibility::Collapsed);
 
-	DatabaseView.RowStyle = FEditorStyle::GetWidgetStyle<FTableRowStyle>("TableView.Row");
+	FilteredDatabaseView.ListView = SNew(SListView<TSharedRef<FDebuggerDatabaseRowData>>)
+		.ListItemsSource(&FilteredDatabaseView.Rows)
+		.HeaderRow(FilteredDatabaseView.HeaderRow.ToSharedRef())
+		.OnGenerateRow(this, &SDebuggerDatabaseView::HandleGenerateDatabaseRow)
+		.ExternalScrollbar(FilteredDatabaseView.ScrollBar)
+		.SelectionMode(ESelectionMode::SingleToggle)
+		.ConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible)
+		.OnSelectionChanged(this, &SDebuggerDatabaseView::OnDatabaseRowSelectionChanged);
+
+	FilteredDatabaseView.RowStyle = FEditorStyle::GetWidgetStyle<FTableRowStyle>("TableView.Row");
 	// Set selected color to white to retain visibility when multi-selecting
-	DatabaseView.RowStyle.SetSelectedTextColor(FLinearColor(FVector3f(0.8f)));
-	DatabaseView.RowBrush = *FEditorStyle::GetBrush("ToolPanel.GroupBorder");
-	
+	FilteredDatabaseView.RowStyle.SetSelectedTextColor(FLinearColor(FVector3f(0.8f)));
+	FilteredDatabaseView.RowBrush = *FEditorStyle::GetBrush("ToolPanel.GroupBorder");
+
 	ChildSlot
 	[
 		SNew(SVerticalBox)
@@ -712,7 +970,7 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Fill)
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString("Selected Poses"))	
+						.Text(FText::FromString("Pose Database"))	
 					]
 				]
 				.AutoWidth()
@@ -721,7 +979,7 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Fill)
 				[
 					SNew(SBorder)
-					.BorderImage(&DatabaseView.RowStyle.EvenRowBackgroundBrush)
+					.BorderImage(&FilteredDatabaseView.RowStyle.EvenRowBackgroundBrush)
 				]
 			]
 			.AutoHeight()
@@ -737,7 +995,30 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Fill)
 				.VAlign(VAlign_Fill)
 			]
-			
+
+			+ SVerticalBox::Slot()
+			.Padding(0.0f, 0.0f, 0.0f, 5.0f)
+			.AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(10, 5, 10, 5)
+				[
+					SNew(SCheckBox)
+					.IsChecked(this, &SDebuggerDatabaseView::IsSequenceFilterEnabled)
+					.OnCheckStateChanged(this, &SDebuggerDatabaseView::OnSequenceFilterEnabledChanged)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("PoseSearchDebuggerGroupFiltering", "Apply Group Filtering"))
+					]
+				]
+				+ SHorizontalBox::Slot()
+				[
+					SAssignNew(FilterBox, SSearchBox)
+					.OnTextChanged(this, &SDebuggerDatabaseView::OnFilterTextChanged)
+				]
+			]
 		
 			+ SVerticalBox::Slot()
 			[
@@ -749,20 +1030,20 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 					.BorderImage(FEditorStyle::GetBrush("NoBorder"))
 					.Padding(0.0f)
 					[
-						DatabaseView.ListView.ToSharedRef()
+						FilteredDatabaseView.ListView.ToSharedRef()
 					]
 				]
 				
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
-					DatabaseView.ScrollBar.ToSharedRef()
+					FilteredDatabaseView.ScrollBar.ToSharedRef()
 				]
 			]
 		]
 	];
 	
-	SortColumn = FPoseIdx::Name;
+	SortColumn = FCost::Name;
 	SortMode = EColumnSortMode::Ascending;
 
 	// Active view scroll bar only for indenting the columns to align w/ database
@@ -773,10 +1054,11 @@ void SDebuggerDatabaseView::Construct(const FArguments& InArgs)
 
 void SDebuggerDetailsView::Construct(const FArguments& InArgs)
 {
+	ParentDebuggerViewPtr = InArgs._Parent;
+
 	// Add property editor (detail view) UObject to world root so that it persists when PIE is stopped
 	Reflection = NewObject<UPoseSearchDebuggerReflection>();
 	Reflection->AddToRoot();
-	
 	check(IsValid(Reflection));
 
 	// @TODO: Convert this to a custom builder instead of of a standard details view
@@ -784,10 +1066,9 @@ void SDebuggerDetailsView::Construct(const FArguments& InArgs)
 	FPropertyEditorModule& PropPlugin = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	FDetailsViewArgs DetailsViewArgs;
     DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::HideNameArea;
+	DetailsViewArgs.DefaultsOnlyVisibility = EEditDefaultsOnlyNodeVisibility::Hide;
 
-	// @TODO: Hide arrays with zero elements in the detail view, if possible
 	Details = PropPlugin.CreateDetailView(DetailsViewArgs);
-
 	Details->SetObject(Reflection);
 	
 	ChildSlot
@@ -818,103 +1099,74 @@ void SDebuggerDetailsView::UpdateReflection(const FTraceMotionMatchingStateMessa
 	Reflection->CurrentDatabaseName = Database.GetName();
 	Reflection->ElapsedPoseJumpTime = State.ElapsedPoseJumpTime;
 	Reflection->bFollowUpAnimation = EnumHasAnyFlags(State.Flags, FTraceMotionMatchingState::EFlags::FollowupAnimation);
-	
-	Reflection->PoseFeatures.EmptyAll();
-	Reflection->DistanceTrajectoryFeatures.EmptyAll();
-	Reflection->TimeTrajectoryFeatures.EmptyAll();
+
+	Reflection->AssetPlayerSequenceName = FString();
+	if (const FPoseSearchIndexAsset* IndexAsset = Database.SearchIndex.FindAssetForPose(State.DbPoseIdx))
+	{
+		Reflection->AssetPlayerSequenceName = Database.GetSourceAsset(IndexAsset).Sequence->GetName();
+	}
+
+	Reflection->AssetPlayerTime = State.AssetPlayerTime;
+	Reflection->LastDeltaTime = State.DeltaTime;
+	Reflection->SimLinearVelocity = State.SimLinearVelocity;
+	Reflection->SimAngularVelocity = State.SimAngularVelocity;
+	Reflection->AnimLinearVelocity = State.AnimLinearVelocity;
+	Reflection->AnimAngularVelocity = State.AnimAngularVelocity;
 
 	FFeatureVectorReader Reader;
-	// Ensure parity between Layout and QueryVector
 	Reader.Init(&Schema->Layout);
+
+	// Query pose
 	Reader.SetValues(State.QueryVector);
+	Reflection->QueryPoseVector.ExtractFeatures(Reader);
 
-	int32 NumSubsamples = Schema->PoseSampleTimes.Num();
-	const int32 NumBones = Schema->Bones.Num();
+	// Active pose
+	TArray<float> Pose(Database.SearchIndex.GetPoseValues(State.DbPoseIdx));
+	Database.SearchIndex.InverseNormalize(Pose);
+	Reader.SetValues(Pose);
+	Reflection->ActivePoseVector.ExtractFeatures(Reader);
 
-	FPoseSearchFeatureDesc Feature;
-	
-	// Aggregate all features and place into the reflection struct
-	auto Extract = [](
-		const FFeatureVectorReader& InReader,
-		const FPoseSearchFeatureDesc& InFeature,
-		FPoseSearchDebuggerFeatureReflection& ReflectionRef
-	)
+	auto DebuggerView = ParentDebuggerViewPtr.Pin();
+	if (DebuggerView.IsValid()) 
 	{
-		FVector OutputVec;
-		if (InReader.GetPosition(InFeature, &OutputVec))
+		TArray<TSharedRef<FDebuggerDatabaseRowData>> SelectedRows = DebuggerView->GetSelectedDatabaseRows();
+		if (!SelectedRows.IsEmpty())
 		{
-			ReflectionRef.Positions.Add(OutputVec);
-		}
-		if (InReader.GetLinearVelocity(InFeature, &OutputVec))
-		{
-			ReflectionRef.LinearVelocities.Add(OutputVec);
-		}
-		if (InReader.GetAngularVelocity(InFeature, &OutputVec))
-        {
-        	ReflectionRef.AngularVelocities.Add(OutputVec);
-        }
-	};
+			const TSharedRef<FDebuggerDatabaseRowData>& Selected = SelectedRows[0];
+			Pose = Database.SearchIndex.GetPoseValues(Selected->PoseIdx);
+			Database.SearchIndex.InverseNormalize(Pose);
+			Reader.SetValues(Pose);
+			Reflection->SelectedPoseVector.ExtractFeatures(Reader);
 
-	// Pose samples
-	Feature.Domain = EPoseSearchFeatureDomain::Time;
-	for (int32 SchemaSubsampleIndex = 0; SchemaSubsampleIndex < NumSubsamples; ++SchemaSubsampleIndex)
-	{
-		Feature.SubsampleIdx = SchemaSubsampleIndex;
+			Pose = Selected->PoseCostDetails.CostVector;
+			//Database.SearchIndex.InverseNormalize(Pose);
+			Reader.SetValues(Pose);
+			Reflection->CostVector.ExtractFeatures(Reader);
 
-		for(int32 SchemaBoneIdx = 0; SchemaBoneIdx < NumBones; ++SchemaBoneIdx)
-		{
-			Feature.SchemaBoneIdx = SchemaBoneIdx;
-			Extract(Reader, Feature, Reflection->PoseFeatures);
+			const TSharedRef<FDebuggerDatabaseRowData>& ActiveRow = 
+				DebuggerView->GetPoseIdxDatabaseRow(State.DbPoseIdx);
+
+			TArray<float> ActiveCostDifference(Pose);
+			for (int i = 0; i < ActiveCostDifference.Num(); ++i)
+			{
+				ActiveCostDifference[i] -= ActiveRow->PoseCostDetails.CostVector[i];
+			}
+
+			Reader.SetValues(ActiveCostDifference);
+			Reflection->CostVectorDifference.ExtractFeatures(Reader);
 		}
-	}
-
-	// Used for classifying trajectories instead of bones, special index
-	Feature.SchemaBoneIdx = FPoseSearchFeatureDesc::TrajectoryBoneIndex;
-	
-	// Trajectory time samples
-	NumSubsamples = Schema->TrajectorySampleTimes.Num();
-	for (int32 SchemaSubsampleIndex = 0; SchemaSubsampleIndex < NumSubsamples; ++SchemaSubsampleIndex)
-	{
-		Feature.SubsampleIdx = SchemaSubsampleIndex;
-		Extract(Reader, Feature, Reflection->TimeTrajectoryFeatures);
-	}
-	// Trajectory distance samples
-	NumSubsamples = Schema->TrajectorySampleDistances.Num();
-	Feature.Domain = EPoseSearchFeatureDomain::Distance;
-	for (int32 SchemaSubsampleIndex = 0; SchemaSubsampleIndex < NumSubsamples; ++SchemaSubsampleIndex)
-	{
-		Feature.SubsampleIdx = SchemaSubsampleIndex;
-		Extract(Reader, Feature, Reflection->DistanceTrajectoryFeatures);
 	}
 }
 
 void SDebuggerView::Construct(const FArguments& InArgs, uint64 InAnimInstanceId)
 {
-	MotionMatchingNodeIds = InArgs._MotionMatchingNodeIds;
-	MotionMatchingState = InArgs._MotionMatchingState;
-	PoseSearchDatabase = InArgs._PoseSearchDatabase;
-	OnUpdateSelection = InArgs._OnUpdateSelection;
-	IsPIESimulating = InArgs._IsPIESimulating;
-	IsRecording = InArgs._IsRecording;
-	RecordingDuration = InArgs._RecordingDuration;
-	NodesNum = InArgs._NodesNum;
-	World = InArgs._World;
-	RootTransform = InArgs._RootTransform;
-	OnUpdate = InArgs._OnUpdate;
+	ViewModel = InArgs._ViewModel;
 	OnViewClosed = InArgs._OnViewClosed;
 
+	
+
 	// Validate the existence of the passed getters
-	check(MotionMatchingNodeIds.IsBound());
-    check(MotionMatchingState.IsBound());
-	check(PoseSearchDatabase.IsBound());
-	check(OnUpdateSelection.IsBound());
-	check(IsPIESimulating.IsBound())
-    check(IsRecording.IsBound());
-    check(RecordingDuration.IsBound());
-	check(NodesNum.IsBound());
-	check(World.IsBound());
-	check(RootTransform.IsBound());
-	check(OnUpdate.IsBound());
+	check(ViewModel.IsBound())
 	check(OnViewClosed.IsBound());
 	
 	AnimInstanceId = InAnimInstanceId;
@@ -969,7 +1221,7 @@ void SDebuggerView::Construct(const FArguments& InArgs, uint64 InAnimInstanceId)
 
 void SDebuggerView::SetTimeMarker(double InTimeMarker)
 {
-	if (IsPIESimulating.Get())
+	if (FDebugger::IsPIESimulating())
 	{
 		return;
 	}
@@ -979,13 +1231,12 @@ void SDebuggerView::SetTimeMarker(double InTimeMarker)
 
 void SDebuggerView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
-	if (IsPIESimulating.Get())
+	if (FDebugger::IsPIESimulating())
 	{
 		return;
 	}
-	
-	const UWorld* DebuggerWorld = World.Get();
-    // World should be always valid at this point
+
+	const UWorld* DebuggerWorld = FDebugger::GetWorld();
     check(DebuggerWorld);
 	
 	// @TODO: Handle editor world when those features are enabled for the Rewind Debugger
@@ -998,10 +1249,9 @@ void SDebuggerView::Tick(const FGeometry& AllottedGeometry, const double InCurre
 	const bool bSameTime = FMath::Abs(TimeMarker - PreviousTimeMarker) < DOUBLE_SMALL_NUMBER;
 	PreviousTimeMarker = TimeMarker;
 
-	OnUpdate.Execute(AnimInstanceId);
-	OnUpdateSelection.Execute(SelectedNodeId);
-	const FTraceMotionMatchingStateMessage* State = MotionMatchingState.Get();
-	const UPoseSearchDatabase* Database = PoseSearchDatabase.Get();
+	TSharedPtr<FDebuggerViewModel> Model = ViewModel.Get();
+
+	bool bNeedUpdate = Model->NeedsUpdate();
 
 	// We haven't reached the update point yet
 	if (CurrentConsecutiveFrames < ConsecutiveFramesUpdateThreshold)
@@ -1023,41 +1273,36 @@ void SDebuggerView::Tick(const FGeometry& AllottedGeometry, const double InCurre
 		// Haven't updated since passing through frame gate, update once
 		else if (!bUpdated)
 		{
-			const bool bNodeSelected = UpdateSelection();
-			if (bNodeSelected)
-			{
-				OnUpdateSelection.Execute(SelectedNodeId);
-				// Refresh state and database info after update
-				State = MotionMatchingState.Get();
-				Database = PoseSearchDatabase.Get();
-				if (!State || !Database)
-				{
-					return;
-				}
-				
-				UpdateViews(*State, *Database);
-			}
-			bUpdated = true;	
+			bNeedUpdate = true;
 		}
 	}
-	
-	const FTransform* Transform = RootTransform.Get();
-	if (!State || !Database || !Transform)
+
+	if (bNeedUpdate)
 	{
-		return;
+		Model->OnUpdate();
+		if (UpdateSelection())
+		{
+			Model->OnUpdateNodeSelection(SelectedNodeId);
+			UpdateViews();
+		}
+		bUpdated = true;
 	}
 
-	// Drawing of the debug vector should occur regardless of database update threshold
-	DrawFeatures(*DebuggerWorld, *State, *Database, *Transform);
+	Model->UpdateAnimSequence();
+	
+	// Draw visualization every tick
+	DrawVisualization();
 }
 
 bool SDebuggerView::UpdateSelection()
 {
+	TSharedPtr<FDebuggerViewModel> Model = ViewModel.Get();
+
 	// Update selection view if no node selected
 	bool bNodeSelected = SelectedNodeId != INDEX_NONE;
 	if (!bNodeSelected)
 	{
-		const TArray<int32>& NodeIds = *MotionMatchingNodeIds.Get();
+		const TArray<int32>& NodeIds = *Model->GetNodeIds();
 		// Only one node active, bypass selection view
 		if (NodeIds.Num() == 1)
 		{
@@ -1070,14 +1315,14 @@ bool SDebuggerView::UpdateSelection()
 			SelectionView->ClearChildren();
 			for (int32 NodeId : NodeIds)
 			{
-				OnUpdateSelection.Execute(NodeId);
+				Model->OnUpdateNodeSelection(NodeId);
 				SelectionView->AddSlot()
 				.HAlign(HAlign_Fill)
 				.VAlign(VAlign_Center)
 				.Padding(10.0f)
 				[
 					SNew(SButton)
-					.Text(FText::FromString(PoseSearchDatabase.Get()->GetName()))
+					.Text(FText::FromString(Model->GetPoseSearchDatabase()->GetName()))
 					.HAlign(HAlign_Center)
 					.VAlign(VAlign_Center)
 					.ContentPadding(10.0f)
@@ -1090,10 +1335,39 @@ bool SDebuggerView::UpdateSelection()
 	return bNodeSelected;
 }
 
-void SDebuggerView::UpdateViews(const FTraceMotionMatchingStateMessage& State, const UPoseSearchDatabase& Database) const
+void SDebuggerView::UpdateViews() const
 {
-	DatabaseView->Update(State, Database);
-	DetailsView->Update(State, Database);
+	const FTraceMotionMatchingStateMessage* State = ViewModel.Get()->GetMotionMatchingState();
+	const UPoseSearchDatabase* Database = ViewModel.Get()->GetPoseSearchDatabase();
+	if (State && Database)
+	{
+		DatabaseView->Update(*State, *Database);
+		DetailsView->Update(*State, *Database);
+	}
+}
+
+void SDebuggerView::DrawVisualization() const
+{
+	const UWorld* DebuggerWorld = FDebugger::GetWorld();
+	check(DebuggerWorld);
+
+	const FTraceMotionMatchingStateMessage* State = ViewModel.Get()->GetMotionMatchingState();
+	const UPoseSearchDatabase* Database = ViewModel.Get()->GetPoseSearchDatabase();
+	const FTransform* Transform = ViewModel.Get()->GetRootTransform();
+	if (State && Database && Transform)
+	{
+		DrawFeatures(*DebuggerWorld, *State, *Database, *Transform);
+	}
+}
+
+TArray<TSharedRef<FDebuggerDatabaseRowData>> SDebuggerView::GetSelectedDatabaseRows() const
+{
+	return DatabaseView->GetDatabaseRows()->GetSelectedItems();
+}
+
+const TSharedRef<FDebuggerDatabaseRowData>& SDebuggerView::GetPoseIdxDatabaseRow(int32 PoseIdx) const
+{
+	return DatabaseView->GetPoseIdxDatabaseRow(PoseIdx);
 }
 
 void SDebuggerView::DrawFeatures(
@@ -1131,11 +1405,22 @@ void SDebuggerView::DrawFeatures(
 		{
 			InDrawParams.Flags |= EDebugDrawFlags::IncludeTrajectory;
 		}
+
+		if (Options.bDrawSampleLabels)
+		{
+			InDrawParams.Flags |= EDebugDrawFlags::DrawSampleLabels;
+		}
+
+		if (Options.bDrawSamplesWithColorGradient)
+		{
+			InDrawParams.Flags |= EDebugDrawFlags::DrawSamplesWithColorGradient;
+		}
 	};
 
 	// Draw query vector
 	DrawParams.Color = &FLinearColor::Blue;
 	SetDrawFlags(DrawParams, Reflection->QueryDrawOptions);
+	DrawParams.LabelPrefix = TEXT("Q");
 	Draw(DrawParams);
 	DrawParams.PoseVector = {};
 
@@ -1144,7 +1429,15 @@ void SDebuggerView::DrawFeatures(
 
 	// Red for non-active database view
 	DrawParams.Color = &FLinearColor::Red;
+	DrawParams.LabelPrefix = TEXT("S");
 	SetDrawFlags(DrawParams, Reflection->SelectedPoseDrawOptions);
+
+	FSkeletonDrawParams SkeletonDrawParams;
+	const bool bDrawSelectedPose = Reflection->bDrawSelectedSkeleton;
+	if (bDrawSelectedPose)
+	{
+		SkeletonDrawParams.Flags |= ESkeletonDrawFlags::SelectedPose;
+	}
 
 	// Draw any selected database vectors
 	for (const TSharedRef<FDebuggerDatabaseRowData>& Row : Selected)
@@ -1165,29 +1458,38 @@ void SDebuggerView::DrawFeatures(
 		
 		// Use the motion-matching state's pose idx, as the active row may be update-throttled at this point
 		DrawParams.PoseIdx = State.DbPoseIdx;
+		DrawParams.LabelPrefix = TEXT("A");
 		Draw(DrawParams);
 	}
+
+	if (Reflection->bDrawActiveSkeleton)
+	{
+		SkeletonDrawParams.Flags |= ESkeletonDrawFlags::ActivePose;
+	}
+
+	SkeletonDrawParams.Flags |= ESkeletonDrawFlags::AnimSequence;
+
+	ViewModel.Get()->OnDraw(SkeletonDrawParams);
 }
 
 int32 SDebuggerView::SelectView() const
 {
 	// Currently recording
-	if (IsPIESimulating.Get())
+	if (FDebugger::IsPIESimulating() && FDebugger::IsRecording())
 	{
-		if (IsRecording.Get())
-		{
-			return RecordingMsg;
-		}
+		return RecordingMsg;
 	}
 
 	// Data has not been recorded yet
-	if (RecordingDuration.Get() < DOUBLE_SMALL_NUMBER)
+	if (FDebugger::GetRecordingDuration() < DOUBLE_SMALL_NUMBER)
 	{
 		return StoppedMsg;
 	}
 
-	const bool bNoActiveNodes = NodesNum.Get() == 0;
-	const bool bNodeSelectedWithoutData = SelectedNodeId != INDEX_NONE && MotionMatchingState.Get() == nullptr;
+	const TSharedPtr<FDebuggerViewModel> Model = ViewModel.Get();
+
+	const bool bNoActiveNodes = Model->GetNodesNum() == 0;
+	const bool bNodeSelectedWithoutData = SelectedNodeId != INDEX_NONE && Model->GetMotionMatchingState() == nullptr;
 
 	// No active nodes, or node selected has no data
 	if (bNoActiveNodes || bNodeSelectedWithoutData)
@@ -1205,11 +1507,55 @@ int32 SDebuggerView::SelectView() const
 	return Debugger;
 }
 
+void SDebuggerView::OnPoseSelectionChanged(int32 PoseIdx, float Time)
+{
+	const TSharedPtr<FDebuggerViewModel> Model = ViewModel.Get();
+	const FTraceMotionMatchingStateMessage* State = Model->GetMotionMatchingState();
+	const UPoseSearchDatabase* Database = Model->GetPoseSearchDatabase();
+
+	if (State && Database)
+	{
+		DetailsView->Update(*State, *Database);
+	}
+	
+	if (PoseIdx == INDEX_NONE)
+	{
+		Model->ClearSelectedSkeleton();
+	}
+	else
+	{
+		Model->ShowSelectedSkeleton(PoseIdx, Time);
+		// Stop sequence player when switching selections
+		Model->StopSelection();
+	}
+}
+
 FReply SDebuggerView::OnUpdateNodeSelection(int32 InSelectedNodeId)
 {
 	// -1 will backtrack to selection view
 	SelectedNodeId = InSelectedNodeId;
 	bUpdated = false;
+	return FReply::Handled();
+}
+
+FReply SDebuggerView::TogglePlaySelectedSequences() const
+{
+	const TSharedPtr<SListView<TSharedRef<FDebuggerDatabaseRowData>>>& DatabaseRows = DatabaseView->GetDatabaseRows();
+	TArray<TSharedRef<FDebuggerDatabaseRowData>> Selected = DatabaseRows->GetSelectedItems();
+	const bool bPlaying = ViewModel.Get()->IsPlayingSelections();
+	if (!bPlaying)
+	{
+		if (!Selected.IsEmpty())
+		{
+			// @TODO: Make functional with multiple poses being selected
+			ViewModel.Get()->PlaySelection(Selected[0]->PoseIdx, Selected[0]->Time);
+		}
+	}
+	else
+	{
+		ViewModel.Get()->StopSelection();
+	}
+
 	return FReply::Handled();
 }
 
@@ -1219,7 +1565,7 @@ TSharedRef<SWidget> SDebuggerView::GenerateNoDataMessageView()
 	ReturnButtonView->SetVisibility(TAttribute<EVisibility>::CreateLambda([this]() -> EVisibility
 	{
 		// Hide the return button for the no data message if we have no nodes at all
-		return NodesNum.Get() > 0 ? EVisibility::Visible : EVisibility::Hidden;
+		return ViewModel.Get()->GetNodesNum() > 0 ? EVisibility::Visible : EVisibility::Hidden;
 	}));
 	
 	return 
@@ -1240,7 +1586,7 @@ TSharedRef<SWidget> SDebuggerView::GenerateNoDataMessageView()
 		];
 }
 
-TSharedRef<SWidget> SDebuggerView::GenerateReturnButtonView()
+TSharedRef<SHorizontalBox> SDebuggerView::GenerateReturnButtonView()
 {
 	return
 		SNew(SHorizontalBox)
@@ -1251,6 +1597,7 @@ TSharedRef<SWidget> SDebuggerView::GenerateReturnButtonView()
 		[
 			SNew(SButton)
 			.VAlign(VAlign_Center)
+			.Visibility_Lambda([this] { return ViewModel.Get()->GetNodesNum() > 1 ? EVisibility::Visible : EVisibility::Hidden; })
 			.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
 			.ContentPadding( FMargin(1, 0) )
 			.OnClicked(this, &SDebuggerView::OnUpdateNodeSelection, static_cast<int32>(INDEX_NONE))
@@ -1281,14 +1628,76 @@ TSharedRef<SWidget> SDebuggerView::GenerateReturnButtonView()
 
 TSharedRef<SWidget> SDebuggerView::GenerateNodeDebuggerView()
 {
-	TSharedRef<SWidget> ReturnButtonView = GenerateReturnButtonView();
-	ReturnButtonView->SetVisibility(TAttribute<EVisibility>::CreateLambda([this]() -> EVisibility
-		{
-			// Collapse this view if we have don't have more than 1 node
-			return NodesNum.Get() > 1 ? EVisibility::Visible : EVisibility::Collapsed;
-		}
-	));
+	TSharedRef<SHorizontalBox> ReturnButtonView = GenerateReturnButtonView();
+	ReturnButtonView->AddSlot()
+	.VAlign(VAlign_Center)
+	.HAlign(HAlign_Fill)
+	.Padding(32, 5, 0, 0)
+	.AutoWidth()
+	[
+		SNew(SButton)
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Fill)
+		.ButtonStyle(FEditorStyle::Get(), "Button")
+		.ContentPadding( FMargin(5, 0) )
+		.OnClicked(this, &SDebuggerView::TogglePlaySelectedSequences)
+		[
+			SNew(SHorizontalBox)
+			// Icon
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			[
+				SNew(SImage)
+				.Image_Lambda([this]
+				{
+					const bool bPlayingSelections = ViewModel.Get()->IsPlayingSelections();
+					return FSlateIcon("FEditorStyle", bPlayingSelections ? "PlayWorld.StopPlaySession.Small" : "PlayWorld.PlayInViewport.Small").GetSmallIcon();
+				})
+			]
+			// Text
+			+ SHorizontalBox::Slot()
+			.Padding(FMargin(8, 0, 0, 0))
+			.AutoWidth()
+			[
+				SNew(STextBlock)
+				.Text_Lambda([this] { return ViewModel.Get()->IsPlayingSelections() ? FText::FromString("Stop Selected Sequence") : FText::FromString("Play Selected Sequence"); })
+				.Justification(ETextJustify::Center)
+			]
+		]
+	];
 	
+	ReturnButtonView->AddSlot()
+	.VAlign(VAlign_Center)
+	.HAlign(HAlign_Left)
+	.Padding(64, 5, 0, 0)
+	.AutoWidth()
+	[
+		SNew(SHorizontalBox)
+		
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(0, 5, 0, 0)
+		[
+			SNew(STextBlock)
+			.Text(FText::FromString("Sequence Play Rate: "))
+		]
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(8, 0, 0, 0)
+		[
+			SNew(SNumericEntryBox<float>)
+			.MinValue(0.0f)
+			.MaxValue(5.0f)
+			.MinSliderValue(0.0f)
+			.MaxSliderValue(5.0f)
+			.Delta(0.01f)
+			.AllowSpin(true)
+			// Lambda to accomodate the TOptional this requires (for now)
+			.Value_Lambda([this] { return ViewModel.Get()->GetPlayRate(); })
+			.OnValueChanged(ViewModel.Get().ToSharedRef(), &FDebuggerViewModel::ChangePlayRate)	
+		]
+	];
+
 	return 
 		SNew(SSplitter)
 		.Orientation(Orient_Horizontal)
@@ -1309,6 +1718,8 @@ TSharedRef<SWidget> SDebuggerView::GenerateNodeDebuggerView()
 			+ SVerticalBox::Slot()
 			[
 				SAssignNew(DatabaseView, SDebuggerDatabaseView)
+				.Parent(SharedThis(this))
+				.OnPoseSelectionChanged(this, &SDebuggerView::OnPoseSelectionChanged)
 			]
 		]
 
@@ -1317,6 +1728,7 @@ TSharedRef<SWidget> SDebuggerView::GenerateNodeDebuggerView()
 		.Value(0.35f)
 		[
 			SAssignNew(DetailsView, SDebuggerDetailsView)
+			.Parent(SharedThis(this))
 		];
 }
 
@@ -1336,60 +1748,31 @@ SDebuggerView::~SDebuggerView()
 	OnViewClosed.Execute(AnimInstanceId);
 }
 
-void FDebuggerInstance::UpdateMotionMatchingStates(uint64 InAnimInstanceId)
-{
-	NodeIds.Empty();
-	MotionMatchingStates.Empty();
-	if (!RewindDebugger)
-	{
-		return;
-	}
-	
-	// Get provider and validate
-	const TraceServices::IAnalysisSession* Session = RewindDebugger->GetAnalysisSession();
-	TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session);
-	
-	const FTraceProvider* TraceProvider = Session->ReadProvider<FTraceProvider>(FTraceProvider::ProviderName);
-	if (!TraceProvider)
-	{
-		return;
-	}
-
-	const double TraceTime = RewindDebugger->CurrentTraceTime();
-	TraceServices::FFrame Frame;
-	ReadFrameProvider(*Session).GetFrameFromTime(TraceFrameType_Game, TraceTime, Frame);
-	
-
-	TraceProvider->EnumerateMotionMatchingStateTimelines(InAnimInstanceId, [this, &Frame](const FTraceProvider::FMotionMatchingStateTimeline& InTimeline)
-	{
-		const FTraceMotionMatchingStateMessage* Message = nullptr;
-		
-		InTimeline.EnumerateEvents(Frame.StartTime, Frame.EndTime, [this, &Message, &Frame](double InStartTime, double InEndTime, const FTraceMotionMatchingStateMessage& InMessage)
-		{
-			Message = &InMessage;
-			return TraceServices::EEventEnumerate::Stop;
-		});
-
-		if (Message)
-		{
-			NodeIds.Add(Message->NodeId);
-			MotionMatchingStates.Add(Message);
-		}
-	});
-}
-
-
-FDebuggerInstance::FDebuggerInstance(uint64 InAnimInstanceId)
+FDebuggerViewModel::FDebuggerViewModel(uint64 InAnimInstanceId)
 	: AnimInstanceId(InAnimInstanceId)
 {
+	Skeletons.AddDefaulted(ESkeletonIndex::Num);
 }
 
-const FTraceMotionMatchingStateMessage* FDebuggerInstance::GetMotionMatchingState() const
+FDebuggerViewModel::~FDebuggerViewModel()
+{
+	for (FSkeleton& Skeleton : Skeletons)
+	{
+		if (Skeleton.Actor.IsValid())
+		{
+			Skeleton.Actor->Destroy();
+		}
+	}
+
+	Skeletons.Empty();
+}
+
+const FTraceMotionMatchingStateMessage* FDebuggerViewModel::GetMotionMatchingState() const
 {
 	return ActiveMotionMatchingState;
 }
 
-const UPoseSearchDatabase* FDebuggerInstance::GetPoseSearchDatabase() const
+const UPoseSearchDatabase* FDebuggerViewModel::GetPoseSearchDatabase() const
 {
 	if (!ActiveMotionMatchingState)
 	{
@@ -1419,77 +1802,408 @@ const UPoseSearchDatabase* FDebuggerInstance::GetPoseSearchDatabase() const
 	return Database;
 }
 
-const TArray<int32>* FDebuggerInstance::GetNodeIds() const
+const FPoseSearchDatabaseSequence* FDebuggerViewModel::GetAnimSequence(int32 SequenceIdx) const
+{
+	const UPoseSearchDatabase* Database = GetPoseSearchDatabase();
+	if (Database && Database->Sequences.IsValidIndex(SequenceIdx))
+	{
+		const FPoseSearchDatabaseSequence* DatabaseSequence = &Database->Sequences[SequenceIdx];
+		if (DatabaseSequence)
+		{
+			return DatabaseSequence;
+		}
+	}
+	return nullptr;
+}
+
+void FDebuggerViewModel::ShowSelectedSkeleton(int32 PoseIdx, float Time)
+{
+	const UPoseSearchDatabase* Database = GetPoseSearchDatabase();
+	if (!Database)
+	{
+		return;
+	}
+	UPoseSearchMeshComponent* Component = Skeletons[SelectedPose].Component;
+	if (!Component)
+	{
+		return;
+	}
+
+	Component->ResetToStart();
+	bSelecting = true;
+	const FPoseSearchIndexAsset* Asset = Database->SearchIndex.FindAssetForPose(PoseIdx);
+	Skeletons[SelectedPose].SequenceIdx = Asset->SourceAssetIdx;
+	Skeletons[SelectedPose].Time = Time;
+	Skeletons[SelectedPose].bMirrored = Asset->bMirrored;
+}
+
+void FDebuggerViewModel::ClearSelectedSkeleton()
+{
+	bSelecting = false;
+}
+
+const TArray<int32>* FDebuggerViewModel::GetNodeIds() const
 {
 	return &NodeIds;
 }
 
-
-int32 FDebuggerInstance::GetNodesNum() const
+int32 FDebuggerViewModel::GetNodesNum() const
 {
 	return MotionMatchingStates.Num();
 }
 
-const FTransform* FDebuggerInstance::GetRootTransform() const
+const FTransform* FDebuggerViewModel::GetRootTransform() const
 {
-	if (!RewindDebugger || !ActiveMotionMatchingState)
-	{
-		return nullptr;
-	}
-	
-	// Get provider and validate
-	const TraceServices::IAnalysisSession* Session = RewindDebugger->GetAnalysisSession();
-	TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session);
-	
-	const IAnimationProvider* AnimationProvider = Session->ReadProvider<IAnimationProvider>("AnimationProvider");
-	if (!AnimationProvider)
-	{
-		return nullptr;
-	}
-
-	const double TraceTime = RewindDebugger->CurrentTraceTime();
-	TraceServices::FFrame Frame;
-	ReadFrameProvider(*Session).GetFrameFromTime(TraceFrameType_Game, TraceTime, Frame);
-
-	const FTransform* RootTransform = nullptr;
-
-	AnimationProvider->ReadSkeletalMeshPoseTimeline(ActiveMotionMatchingState->SkeletalMeshComponentId, [&RootTransform, &Frame](const IAnimationProvider::SkeletalMeshPoseTimeline& TimelineData, bool bHasCurves)
-	{
-		TimelineData.EnumerateEvents(Frame.StartTime, Frame.EndTime,
-			[&RootTransform, &Frame](double InStartTime, double InEndTime, uint32 InDepth, const FSkeletalMeshPoseMessage& PoseMessage)
-			{
-				RootTransform = &PoseMessage.ComponentToWorld;
-				return TraceServices::EEventEnumerate::Stop;
-			});
-	});
-
 	return RootTransform;
 }
 
-void FDebuggerInstance::OnUpdate(uint64 InAnimInstanceId)
+bool FDebuggerViewModel::NeedsUpdate() const
 {
-	UpdateMotionMatchingStates(InAnimInstanceId);
+	const UPoseSearchDatabase* NewDatabase = GetPoseSearchDatabase();
+	const bool bDatabaseChanged = NewDatabase != CurrentDatabase;
+	return bDatabaseChanged;
 }
 
-void FDebuggerInstance::OnUpdateSelection(int32 InNodeId)
+void FDebuggerViewModel::OnUpdate()
+{
+	if (!bSkeletonsInitialized)
+	{
+		UWorld* World = RewindDebugger.Get()->GetWorldToVisualize();
+		for (FSkeleton& Skeleton : Skeletons)
+		{
+			FActorSpawnParameters ActorSpawnParameters;
+			ActorSpawnParameters.bHideFromSceneOutliner = false;
+			ActorSpawnParameters.ObjectFlags |= RF_Transient;
+			Skeleton.Actor = World->SpawnActor<AActor>(ActorSpawnParameters);
+			Skeleton.Actor->SetActorLabel(TEXT("PoseSearch"));
+			Skeleton.Component = NewObject<UPoseSearchMeshComponent>(Skeleton.Actor.Get());
+			Skeleton.Actor->AddInstanceComponent(Skeleton.Component);
+			Skeleton.Component->RegisterComponentWithWorld(World);
+		}
+		FWorldDelegates::OnWorldCleanup.AddRaw(this, &FDebuggerViewModel::OnWorldCleanup);
+		bSkeletonsInitialized = true;
+	}
+
+	UpdateFromTimeline();
+}
+
+void FDebuggerViewModel::OnUpdateNodeSelection(int32 InNodeId)
 {
 	if (InNodeId == INDEX_NONE)
 	{
 		return;
 	}
-	
+
+	ActiveMotionMatchingState = nullptr;
+
 	// Find node in all motion matching states this frame
 	const int32 NodesNum = NodeIds.Num();
-	for(int i = 0; i < NodesNum; ++i)
+	for (int i = 0; i < NodesNum; ++i)
 	{
 		if (NodeIds[i] == InNodeId)
 		{
 			ActiveMotionMatchingState = MotionMatchingStates[i];
+			break;
+		}
+	}
+
+	const UPoseSearchDatabase* NewDatabase = GetPoseSearchDatabase();
+
+	if (ActiveMotionMatchingState)
+	{
+		//todo: this seems wrong, sequenceidx == poseidx? let's test doing it right
+		//Skeletons[ActivePose].SequenceIdx = ActiveMotionMatchingState->DbPoseIdx;
+
+		const FPoseSearchIndexAsset* Asset = 
+			NewDatabase->SearchIndex.FindAssetForPose(ActiveMotionMatchingState->DbPoseIdx);
+		Skeletons[ActivePose].SequenceIdx = Asset->SourceAssetIdx;
+	}
+
+	if (NewDatabase != CurrentDatabase)
+	{
+		ClearSelectedSkeleton();
+		CurrentDatabase = NewDatabase;
+	}
+}
+
+void FDebuggerViewModel::OnDraw(FSkeletonDrawParams& DrawParams)
+{
+	// Returns if it is to be drawn this frame
+	auto SetDrawSkeleton = [this](UPoseSearchMeshComponent* InComponent, bool bDraw)
+	{
+		const bool bIsDrawingSkeleton = InComponent->ShouldDrawDebugSkeleton();
+		if (bIsDrawingSkeleton != bDraw)
+		{
+			InComponent->SetDrawDebugSkeleton(bDraw);
+		}
+		InComponent->MarkRenderStateDirty();
+	};
+	const bool bDrawActivePose = EnumHasAnyFlags(DrawParams.Flags, ESkeletonDrawFlags::ActivePose);
+	SetDrawSkeleton(Skeletons[ActivePose].Component, bDrawActivePose);
+	// If flag is set and we are currently in a valid drawing state
+	const bool bDrawSelectedPose = EnumHasAnyFlags(DrawParams.Flags, ESkeletonDrawFlags::SelectedPose) && bSelecting;
+	SetDrawSkeleton(Skeletons[SelectedPose].Component, bDrawSelectedPose);
+
+	FillCompactPoseAndComponentRefRotations();
+
+	UPoseSearchMeshComponent::FUpdateContext UpdateContext;
+	UpdateContext.MirrorDataTable = GetPoseSearchDatabase()->Schema->MirrorDataTable;
+	UpdateContext.CompactPoseMirrorBones = &CompactPoseMirrorBones;
+	UpdateContext.ComponentSpaceRefRotations = &ComponentSpaceRefRotations;
+
+	if (bDrawSelectedPose)
+	{
+		UPoseSearchMeshComponent* Component = Skeletons[SelectedPose].Component;
+		const FPoseSearchDatabaseSequence* DatabaseSequence = GetAnimSequence(Skeletons[SelectedPose].SequenceIdx);
+		UAnimSequence* Sequence = DatabaseSequence->Sequence;
+
+		UpdateContext.Sequence = Sequence;
+		UpdateContext.SequenceStartTime = Skeletons[SelectedPose].Time;
+		UpdateContext.SequenceTime = Skeletons[SelectedPose].Time;
+		UpdateContext.bMirrored = Skeletons[SelectedPose].bMirrored;
+		UpdateContext.bLoop = DatabaseSequence->bLoopAnimation;
+
+		Component->UpdatePose(UpdateContext);
+	}
+
+	const bool bDrawSequence = EnumHasAnyFlags(DrawParams.Flags, ESkeletonDrawFlags::AnimSequence);
+	if (bDrawSequence && SequenceData.bActive)
+	{
+		UPoseSearchMeshComponent* Component = Skeletons[AnimSequence].Component;
+		SetDrawSkeleton(Component, true);
+
+		const FPoseSearchDatabaseSequence* DatabaseSequence = GetAnimSequence(Skeletons[AnimSequence].SequenceIdx);
+		UAnimSequence* Sequence = DatabaseSequence->Sequence;
+
+		UpdateContext.Sequence = Sequence;
+		UpdateContext.SequenceStartTime = SequenceData.StartTime;
+		UpdateContext.SequenceTime = Skeletons[AnimSequence].Time;
+		UpdateContext.bMirrored = Skeletons[SelectedPose].bMirrored;
+		UpdateContext.bLoop = DatabaseSequence->bLoopAnimation;
+
+
+		Component->UpdatePose(UpdateContext);
+	}
+}
+
+void FDebuggerViewModel::UpdateFromTimeline()
+{
+	NodeIds.Empty();
+	MotionMatchingStates.Empty();
+	SkeletalMeshComponentId = 0;
+
+	// Get provider and validate
+	const TraceServices::IAnalysisSession* Session = RewindDebugger.Get()->GetAnalysisSession();
+	TraceServices::FAnalysisSessionReadScope SessionReadScope(*Session);
+
+	const FTraceProvider* PoseSearchProvider = Session->ReadProvider<FTraceProvider>(FTraceProvider::ProviderName);
+	const IAnimationProvider* AnimationProvider = Session->ReadProvider<IAnimationProvider>("AnimationProvider");
+	const IGameplayProvider* GameplayProvider = Session->ReadProvider<IGameplayProvider>("GameplayProvider");
+	if (!(PoseSearchProvider && AnimationProvider && GameplayProvider))
+	{
+		return;
+	}
+	const double TraceTime = RewindDebugger.Get()->CurrentTraceTime();
+	TraceServices::FFrame Frame;
+	ReadFrameProvider(*Session).GetFrameFromTime(TraceFrameType_Game, TraceTime, Frame);
+	PoseSearchProvider->EnumerateMotionMatchingStateTimelines(AnimInstanceId, [&](const FTraceProvider::FMotionMatchingStateTimeline& InTimeline)
+	{
+		const FTraceMotionMatchingStateMessage* Message = nullptr;
+
+		InTimeline.EnumerateEvents(Frame.StartTime, Frame.EndTime, [&Message](double InStartTime, double InEndTime, const FTraceMotionMatchingStateMessage& InMessage)
+		{
+			Message = &InMessage;
+			return TraceServices::EEventEnumerate::Stop;
+		});
+		if (Message)
+		{
+			NodeIds.Add(Message->NodeId);
+			MotionMatchingStates.Add(Message);
+			SkeletalMeshComponentId = Message->SkeletalMeshComponentId;
+		}
+	});
+	/** No active motion matching state as no messages were read */
+	if (SkeletalMeshComponentId == 0)
+	{
+		return;
+	}
+	AnimationProvider->ReadSkeletalMeshPoseTimeline(SkeletalMeshComponentId, [&](const IAnimationProvider::SkeletalMeshPoseTimeline& TimelineData, bool bHasCurves)
+	{
+		TimelineData.EnumerateEvents(Frame.StartTime, Frame.EndTime, [&](double InStartTime, double InEndTime, uint32 InDepth, const FSkeletalMeshPoseMessage& PoseMessage) -> TraceServices::EEventEnumerate
+		{
+			// Update root transform
+			RootTransform = &PoseMessage.ComponentToWorld;
+			const FSkeletalMeshInfo* SkeletalMeshInfo = AnimationProvider->FindSkeletalMeshInfo(PoseMessage.MeshId);
+			const FObjectInfo* SkeletalMeshObjectInfo = GameplayProvider->FindObjectInfo(PoseMessage.MeshId);
+			if (!SkeletalMeshInfo || !SkeletalMeshObjectInfo)
+			{
+
+				return TraceServices::EEventEnumerate::Stop;
+			}
+			UPoseSearchMeshComponent* ActiveComponent = Skeletons[ActivePose].Component;
+			UPoseSearchMeshComponent* SelectedComponent = Skeletons[SelectedPose].Component;
+			UPoseSearchMeshComponent* SequenceComponent = Skeletons[AnimSequence].Component;
+			USkeletalMesh* SkeletalMesh = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(SkeletalMeshObjectInfo->PathName)).LoadSynchronous();
+			if (SkeletalMesh)
+			{
+				ActiveComponent->SetSkeletalMesh(SkeletalMesh);
+				SelectedComponent->SetSkeletalMesh(SkeletalMesh);
+				SequenceComponent->SetSkeletalMesh(SkeletalMesh);
+			}
+			FTransform ComponentWorldTransform;
+			// Active skeleton is simply the traced bone transforms
+			AnimationProvider->GetSkeletalMeshComponentSpacePose(PoseMessage, *SkeletalMeshInfo, ComponentWorldTransform, ActiveComponent->GetEditableComponentSpaceTransforms());
+			ActiveComponent->Initialize(ComponentWorldTransform);
+			ActiveComponent->SetDebugDrawColor(FLinearColor::Green);
+			SelectedComponent->SetDebugDrawColor(FLinearColor::Blue);
+			SelectedComponent->Initialize(ComponentWorldTransform);
+			SequenceComponent->SetDebugDrawColor(FLinearColor::Red);
+			SequenceComponent->Initialize(ComponentWorldTransform);
+
+			return TraceServices::EEventEnumerate::Stop;
+		});
+	});
+}
+
+void FDebuggerViewModel::UpdateAnimSequence()
+{
+	if (!IsPlayingSelections())
+	{
+		return;
+	}
+
+	const UPoseSearchDatabase* Database = GetPoseSearchDatabase();
+	const FPoseSearchDatabaseSequence* DatabaseSequence = GetAnimSequence(Skeletons[AnimSequence].SequenceIdx);
+	UAnimSequence* Sequence = DatabaseSequence->Sequence;
+	FSkeleton& SequenceSkeleton = Skeletons[AnimSequence];
+	UPoseSearchMeshComponent* Component = SequenceSkeleton.Component;
+	auto RestartSequence = [&]()
+	{
+		Component->ResetToStart();
+		SequenceData.AccumulatedTime = 0.0;
+		SequenceSkeleton.Time = SequenceData.StartTime;
+	};
+
+	if (Sequence)
+
+
+	{
+		const float DT = static_cast<float>(FApp::GetDeltaTime()) * SequencePlayRate;
+		const float PlayLength = Sequence->GetPlayLength();
+
+		const float DistanceHorizon = Database->Schema->GetTrajectoryFutureDistanceHorizon();
+		const bool bExceededDistanceHorizon = Component->LastRootMotionDelta.GetTranslation().Size() > DistanceHorizon;
+		const float TimeHorizon = Database->Schema->GetTrajectoryFutureTimeHorizon();
+		const bool bExceededTimeHorizon = (SequenceSkeleton.Time - SequenceData.StartTime) > TimeHorizon;
+		const bool bExceededHorizon = bExceededDistanceHorizon && bExceededTimeHorizon;
+		if (DatabaseSequence->bLoopAnimation)
+		{
+			if (bExceededHorizon)
+			{
+				// Delay before restarting the sequence to give the user some idea of where it would land
+				if (SequenceData.AccumulatedTime > SequenceData.StopDuration)
+				{
+					RestartSequence();
+				}
+				else
+				{
+					SequenceData.AccumulatedTime += DT;
+				}
+				return;
+			}
+
+			SequenceSkeleton.Time += DT;
+			SequenceData.AccumulatedTime += DT;
+		}
+		else
+		{
+			// Used to cap the sequence, but avoid modding when updating the pose
+			static constexpr float LengthOffset = 0.001f;
+			const bool bFinishedSequence = SequenceSkeleton.Time >= PlayLength - LengthOffset;
+
+			// Sequence player reached end of clip or reached distance horizon of trajectory vector
+			if (bFinishedSequence || bExceededHorizon)
+			{
+				// Delay before restarting the sequence to give the user some idea of where it would land
+				if (SequenceData.AccumulatedTime > SequenceData.StopDuration)
+				{
+					RestartSequence();
+				}
+				else
+				{
+					SequenceData.AccumulatedTime += DT;
+				}
+			}
+			else
+			{
+				// If we haven't finished, update the play time capped by the anim sequence (not looping)
+				SequenceSkeleton.Time += DT;
+			}
+		}
+	}
+}
+
+void FDebuggerViewModel::FillCompactPoseAndComponentRefRotations()
+{
+	const UPoseSearchDatabase* Database = GetPoseSearchDatabase();
+	if (Database != nullptr)
+	{
+		UMirrorDataTable* MirrorDataTable = Database->Schema->MirrorDataTable;
+		if (MirrorDataTable != nullptr)
+		{
+			if (CompactPoseMirrorBones.Num() == 0 || ComponentSpaceRefRotations.Num() == 0)
+			{
+				MirrorDataTable->FillCompactPoseAndComponentRefRotations(
+					Skeletons[ActivePose].Component->RequiredBones,
+					CompactPoseMirrorBones,
+					ComponentSpaceRefRotations);
+			}
+
 			return;
 		}
 	}
 
-	ActiveMotionMatchingState = nullptr;
+	CompactPoseMirrorBones.Reset();
+	ComponentSpaceRefRotations.Reset();
+}
+
+void FDebuggerViewModel::PlaySelection(int32 PoseIdx, float Time)
+{
+	const UPoseSearchDatabase* Database = GetPoseSearchDatabase();
+	if (!Database)
+	{
+		return;
+	}
+	UPoseSearchMeshComponent* Component = Skeletons[AnimSequence].Component;
+	if (!Component)
+	{
+		return;
+	}
+
+	const FPoseSearchIndexAsset* Asset = Database->SearchIndex.FindAssetForPose(PoseIdx);
+
+	Component->ResetToStart();
+	Skeletons[AnimSequence].SequenceIdx = Asset->SourceAssetIdx;
+	Skeletons[AnimSequence].Time = SequenceData.StartTime = Time;
+	Skeletons[AnimSequence].bMirrored = Asset->bMirrored;
+	SequenceData.AccumulatedTime = 0.0f;
+	SequenceData.bActive = true;
+}
+void FDebuggerViewModel::StopSelection()
+{
+	UPoseSearchMeshComponent* Component = Skeletons[AnimSequence].Component;
+	if (!Component)
+	{
+		return;
+	}
+
+	SequenceData = {};
+	// @TODO: Make more functionality rely on checking if it should draw the sequence
+	Component->SetDrawDebugSkeleton(false);
+}
+void FDebuggerViewModel::OnWorldCleanup(UWorld* InWorld, bool bSessionEnded, bool bCleanupResources)
+{
+	bSkeletonsInitialized = false;
 }
 
 FDebugger* FDebugger::Debugger;
@@ -1506,72 +2220,75 @@ void FDebugger::Shutdown()
 	delete Debugger;
 }
 
+bool FDebugger::IsPIESimulating()
+{
+	return Debugger->RewindDebugger->IsPIESimulating();
+}
+
+bool FDebugger::IsRecording()
+{
+	return Debugger->RewindDebugger->IsRecording();
+
+}
+
+double FDebugger::GetRecordingDuration()
+{
+	return Debugger->RewindDebugger->GetRecordingDuration();
+}
+
+UWorld* FDebugger::GetWorld()
+{
+	return Debugger->RewindDebugger->GetWorldToVisualize();
+}
+
+const IRewindDebugger* FDebugger::GetRewindDebugger()
+{
+	return Debugger->RewindDebugger;
+}
+
 void FDebugger::Update(float DeltaTime, IRewindDebugger* InRewindDebugger)
 {
 	// Update active rewind debugger in use
 	RewindDebugger = InRewindDebugger;
-
-	for (TSharedRef<FDebuggerInstance>& DebuggerInstance : DebuggerInstances)
-	{
-		DebuggerInstance->RewindDebugger = RewindDebugger;
-	}
-}
-
-bool FDebugger::IsPIESimulating() const
-{
-	return RewindDebugger->IsPIESimulating();
-}
-
-bool FDebugger::IsRecording() const
-{
-	return RewindDebugger->IsRecording();
-}
-
-double FDebugger::GetRecordingDuration() const
-{
-	return RewindDebugger->GetRecordingDuration();
-}
-
-const UWorld* FDebugger::GetWorld() const
-{
-	return RewindDebugger->GetWorldToVisualize();
 }
 
 void FDebugger::OnViewClosed(uint64 InAnimInstanceId)
 {
-	for (int i = 0; i < DebuggerInstances.Num(); ++i)
+	TArray<TSharedRef<FDebuggerViewModel>>& Models = Debugger->ViewModels;
+	for (int i = 0; i < Models.Num(); ++i)
 	{
-		if (DebuggerInstances[i]->AnimInstanceId == InAnimInstanceId)
+		if (Models[i]->AnimInstanceId == InAnimInstanceId)
 		{
-			DebuggerInstances.RemoveAtSwap(i);
+			Models.RemoveAtSwap(i);
 			return;
 		}
 	}
-
 	// Should always be a valid remove
 	checkNoEntry();
 }
 
+TSharedPtr<FDebuggerViewModel> FDebugger::GetViewModel(uint64 InAnimInstanceId)
+{
+	TArray<TSharedRef<FDebuggerViewModel>>& Models = Debugger->ViewModels;
+	for (int i = 0; i < Models.Num(); ++i)
+	{
+		if (Models[i]->AnimInstanceId == InAnimInstanceId)
+		{
+			return Models[i];
+		}
+	}
+	return nullptr;
+}
+
 TSharedPtr<SDebuggerView> FDebugger::GenerateInstance(uint64 InAnimInstanceId)
 {
-	TSharedRef<FDebuggerInstance>& DebuggerInstance = DebuggerInstances.Add_GetRef(MakeShared<FDebuggerInstance>(InAnimInstanceId));
-	
+	ViewModels.Add_GetRef(MakeShared<FDebuggerViewModel>(InAnimInstanceId))->RewindDebugger.BindStatic(&FDebugger::GetRewindDebugger);
+
 	TSharedPtr<SDebuggerView> DebuggerView;
 
 	SAssignNew(DebuggerView, SDebuggerView, InAnimInstanceId)
-	.MotionMatchingNodeIds(DebuggerInstance, &FDebuggerInstance::GetNodeIds)
-	.MotionMatchingState(DebuggerInstance, &FDebuggerInstance::GetMotionMatchingState)
-	.PoseSearchDatabase(DebuggerInstance, &FDebuggerInstance::GetPoseSearchDatabase)
-	.NodesNum(DebuggerInstance, &FDebuggerInstance::GetNodesNum)
-	.RootTransform(DebuggerInstance, &FDebuggerInstance::GetRootTransform)
-	.OnUpdateSelection(DebuggerInstance, &FDebuggerInstance::OnUpdateSelection)
-	.OnUpdate(DebuggerInstance, &FDebuggerInstance::OnUpdate)
-	// Rewind debugger callbacks gathered from shared object
-	.World_Raw(this, &FDebugger::GetWorld)
-	.IsRecording_Raw(this, &FDebugger::IsRecording)
-	.IsPIESimulating_Raw(this, &FDebugger::IsPIESimulating)
-	.RecordingDuration_Raw(this, &FDebugger::GetRecordingDuration)
-	.OnViewClosed_Raw(this, &FDebugger::OnViewClosed);
+		.ViewModel_Static(&FDebugger::GetViewModel, InAnimInstanceId)
+		.OnViewClosed_Static(&FDebugger::OnViewClosed);
 
 	return DebuggerView;
 }
@@ -1608,4 +2325,4 @@ FName FDebuggerViewCreator::GetName() const
 	return Name;
 }
 
-}} // namespace UE::PoseSearch
+} // namespace UE::PoseSearch

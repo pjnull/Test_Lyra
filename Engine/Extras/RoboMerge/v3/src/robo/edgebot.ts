@@ -1,14 +1,18 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+import * as fs from 'fs';
+import * as p4util from '../common/p4util';
+
 import { ContextualLogger } from "../common/logger";
 import { Recipients } from "../common/mailer";
-import { Change, ClientSpec, ConflictedResolveNFile, EditOwnerOpts, IntegrationSource }  from "../common/perforce";
+import { Change, ClientSpec, ConflictedResolveNFile, EditOwnerOpts, IntegrationSource } from "../common/perforce";
+import { coercePerforceWorkspace, getRootDirectoryForBranch } from "../common/perforce";
 import { IntegrationTarget, isExecP4Error, OpenedFileRecord, PerforceContext, EXCLUSIVE_CHECKOUT_REGEX } from "../common/perforce";
 import { VersionReader } from "../common/version";
 import { EdgeBotInterface, IPCControls, ReconsiderArgs } from "./bot-interfaces";
 import { PauseState } from "./state-interfaces";
 import { BlockagePauseInfo, BlockagePauseInfoMinimal } from "./status-types";
-import { AlreadyIntegrated, Branch, ChangeInfo, ConflictingFile, Failure, MergeAction, MergeMode, PendingChange } from "./branch-interfaces";
+import { AlreadyIntegrated, Branch, ChangeInfo, ConflictingFile, Failure, MergeAction, PendingChange } from "./branch-interfaces";
 import { PersistentConflict } from "./conflict-interfaces";
 import { BotEventTriggers } from "./events";
 import { NodeBot } from "./nodebot";
@@ -37,7 +41,7 @@ const JIRA_REGEX = /^\s*#jira\s+(.*)/i
 
 const MAX_CONFLICTS_TO_LIST = 5
 
-type ResolveResultDetail = 'quick' | 'detailed'
+// type ResolveResultDetail = 'quick' | 'detailed'
 
 type EdgeIntegrationResult = 'ok' | 'shelved' | 'nothing to do' | 'skipped' | 'error'
 
@@ -292,18 +296,6 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		return results
 	}
 
-	private async handleIntegrationError(failure: Failure, pending: PendingChange) {
-		// Revert on Integration Error
-		if (pending.newCl > 0) {
-			await this.revertAndDelete(pending.newCl)
-			pending.newCl = -1
-		}
-		
-		// Pause Edge
-		const pauseInfo = this.createEdgeBlockageInfo(failure, pending)
-		this.block(pauseInfo, FAILED_CHANGELIST_PAUSE_TIMEOUT_SECONDS)
-	}
-
 	/** Handle any failures after a successful integration, e.g. conflicts or submit errors */
 	private async handlePostIntegrationFailure(failure: Failure, pending: PendingChange) {
 		const logMessage = `Post-integration failure while integrating CL ${pending.change.cl} to ${this.branch.name}`
@@ -423,15 +415,11 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			description += `#ROBOMERGE-CONFLICT from-shelf\n`
 		}
 
-
 		if (target.flags.has('disregardexcludedauthors')) {
 			description += '#ROBOMERGE[ALL]: #DISREGARDEXCLUDEDAUTHORS\n'
 		}
 
 		let flags = '' // not all flags propagate, build them piecemeal
-		if (target.flags.has('review')) {
-			flags += ' #REVIEW'
-		}
 
 		const thisBotMergeCommands = target.furtherMerges
 			.filter(target => !target.otherBot)
@@ -440,8 +428,8 @@ class EdgeBotImpl extends PerforceStatefulBot {
 				target.mergeMode === 'null' ? '!' : '') + target.branchName)
 
 		if (flags || thisBotMergeCommands.length !== 0) {
-			const thisBotname = 
-				(this.incognitoMode && this.sourceNode.branchGraph.config.alias) ||
+			const botAliases = this.sourceNode.branchGraph.config.aliases
+			const thisBotname = this.incognitoMode && botAliases.length > 0 ? botAliases[0] :
 				this.graphBotName
 
 			description += `#ROBOMERGE[${thisBotname}]: ${thisBotMergeCommands.join(' ')}${flags}\n`
@@ -479,37 +467,65 @@ class EdgeBotImpl extends PerforceStatefulBot {
 	}
 
 	private async integrate(info: ChangeInfo, target: MergeAction) : Promise<EdgeIntegrationDetails> {
-		let to_integrate = info.cl
+		const to_integrate = info.cl
 		this._log_action(`Integrating CL ${to_integrate} to ${this.targetBranch.name}`)
 
 		// if required, add author review here so they're not in target.description, which is used for shelf description in case of conflict
-		let desc = target.description! // target.description always ends in newline
+		const desc = target.description! // target.description always ends in newline
 
-		if (target.flags.has('review')) {
-			const owner = getIntegrationOwner(this.targetBranch, info.owner) || info.author
-			desc += `#CodeReview: ${owner}\n`
+		info.targetWorkspaceOverride = coercePerforceWorkspace(this.targetBranch.workspace)!.name
+		const edgeServer = info.edgeServerToHostShelf
+		if (edgeServer) {
+
+			info.targetWorkspaceOverride += '_' + edgeServer.id.toUpperCase()
+
+			// make sure target workspace/directory exists (always reset for now)
+
+			// ensure local directory exists (_initWorkspacesForGraphBot)
+			const path = getRootDirectoryForBranch(info.targetWorkspaceOverride);
+			if (!fs.existsSync(path)) {
+				this.edgeBotLogger.info(`Making directory ${path}`);
+				fs.mkdirSync(path);
+			}
+
+			// do we already have a workspace? (_initBranchWorkspacesForAllBots, _getExistingWorkspaces)
+			const existingWorkspaceInfos = await this.p4.find_workspaces(undefined, edgeServer.address)
+			if (existingWorkspaceInfos.map(ws => ws.client).indexOf(info.targetWorkspaceOverride) >= 0) {
+				await p4util.cleanWorkspaces(this.p4, [[info.targetWorkspaceOverride, target.branch.rootPath]], edgeServer.address)
+			}
+			else {
+				// create one 
+				if (!target.branch.stream) {
+					throw new Error('only stream workspaces supported on edge servers')
+				}
+				await this.p4.newGraphBotWorkspace(info.targetWorkspaceOverride, {Stream: target.branch.stream}, edgeServer)
+
+				// _initWorkspacesForGraphBot does clean-up stuff here, but I don't think it's necessary
+			}
 		}
 
+		const edgeServerAddress: string | undefined = edgeServer && edgeServer.address
+
 		// create a new CL
-		const changenum = await this.p4.new_cl(this.targetBranch.workspace, desc)
+		const changenum = await this.p4.new_cl(info.targetWorkspaceOverride, desc, undefined, edgeServerAddress)
 
 		// try to integrate
 		const branchSpecToTarget = this.sourceBranch.branchspec.get(this.targetBranch.upperName)
-		let source : IntegrationSource = {
+		const source : IntegrationSource = {
 			branchspec: branchSpecToTarget,
 			changelist: to_integrate,
 			depot: this.sourceBranch.depot,
 			path_from: this.sourceBranch.rootPath,
 			stream: this.sourceBranch.stream
 		}
-		let integTarget : IntegrationTarget = {
+		const integTarget : IntegrationTarget = {
 			depot: this.targetBranch.depot,
 			path_to: this.targetBranch.rootPath,
 			stream: this.targetBranch.stream
 		}
 
 		this.currentIntegrationStartTimestamp = Date.now()
-		const [mode, results] = await this.p4.integrate(this.targetBranch.workspace, source, changenum, integTarget)
+		const [mode, results] = await this.p4.integrate(info.targetWorkspaceOverride, source, changenum, integTarget, edgeServerAddress)
 
 		const pending: PendingChange = {change: info, action: target, newCl: changenum}
 
@@ -527,7 +543,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 
 				// integration not necessary
 				this.edgeBotLogger.info(msg)
-				await this.p4.deleteCl(this.targetBranch.workspace, changenum)
+				await this.p4.deleteCl(info.targetWorkspaceOverride, changenum, edgeServerAddress)
 				return new EdgeIntegrationDetails('nothing to do', msg)
 			}
 		}
@@ -549,8 +565,19 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		else {
 			failure  = { kind: 'Integration error', description }
 		}
+
+		// Revert attempt
+		if (pending.newCl > 0) {
+			await this.revertAndDelete(pending.newCl)
+			pending.newCl = -1
+		}
 		
-		await this.handleIntegrationError(failure, pending)
+		if (!pending.change.userRequest) {
+			// Pause Edge
+			const pauseInfo = this.createEdgeBlockageInfo(failure, pending)
+			this.block(pauseInfo, FAILED_CHANGELIST_PAUSE_TIMEOUT_SECONDS)
+		}
+
 		// Send to source node to facilitate notification handling
 		if (this.sourceNode.handleMergeFailure(failure, pending)) {
 			this.gate.onBlockage()
@@ -577,11 +604,6 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		}
 	}
 
-	private performResolve(changelist: number, mergeMode: MergeMode, detail: ResolveResultDetail) {
-		return this.p4.resolve(this.targetBranch.workspace, changelist, mergeMode, detail === 'quick')
-	}
-
-
 	/**
 	 * Perform a resolve of the change described by pending
 	 * @param {PendingChange} pending Pending change to resolve and submit
@@ -590,8 +612,16 @@ class EdgeBotImpl extends PerforceStatefulBot {
 	async _resolveChangelist(pending: PendingChange, submitRetries  = 3) : Promise<EdgeIntegrationDetails> {
 		// do a resolve with P4
 		this._log_action(`Resolving CL ${pending.change.cl} against ${this.targetBranch.name}`)
-		let detail: ResolveResultDetail = 'detailed'
-		const result = await this.performResolve(pending.newCl, pending.action.mergeMode, detail)
+//		const detail: ResolveResultDetail = 'detailed'
+
+		const result = await this.p4.resolve(
+			pending.change.targetWorkspaceOverride || this.targetBranch.workspace,
+			pending.newCl,
+			pending.action.mergeMode,
+			false, // detail === 'quick',
+			pending.change.edgeServerToHostShelf && pending.change.edgeServerToHostShelf.address
+			)
+
 		if (pending.action.flags.has('manual') || pending.change.forceCreateAShelf) {
 			// the user requested manual merge
 			await this.shelveChangelist(pending)
@@ -621,18 +651,45 @@ class EdgeBotImpl extends PerforceStatefulBot {
 				}
 			}
 		}
-
-		if (!failure) {
+		else
+		{
+			// no conflicts, try to submit
 			const result = await this.submitChangelist(pending, submitRetries)
 			if (result.result !== 'error') {
 				return result
 			}
 
-			failure = { kind: 'Commit failure', description: result.message }
+			// todo: lock a target stream in the tests, print error message
+			// or lock a test stream and try to commit
+			// then look for error message in result.message
+			if (!this.options.approval) {
+				failure = { kind: 'Commit failure', description: result.message }
+			}
 		}
 
-		await this.handlePostIntegrationFailure(failure, pending)
-		await this.sourceNode.handleMergeFailure(failure, pending, true)
+		// no failure set means the change needs approval
+		if (failure) {
+			await this.handlePostIntegrationFailure(failure, pending)
+			this.sourceNode.handleMergeFailure(failure, pending, true)
+		}
+		else {
+			const approval = this.options.approval!
+
+			// shelve
+			await this.shelveChangelist(pending)
+
+			// still notify as a 'failure' to trigger normal blockage mechanism
+			failure = { kind: 'Approval required', description: approval.description }
+
+			// pause this bot
+			this.block(this.createEdgeBlockageInfo(failure, pending))
+			this.sourceNode.findOrCreateBlockage(failure, pending,
+				`Integration of CL#${pending.change.cl} to ${pending.action.branch.name} needs approval: ${approval.description}`,
+				{
+					settings: approval,
+					shelfCl: pending.newCl
+				});
+		}
 
 		return new EdgeIntegrationDetails('error', `${failure.kind}: ${failure.description}`)
 	}
@@ -735,20 +792,23 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			final_desc += pending.change.additionalDescriptionText
 		}
 
+		const edgeServerAddress = pending.change.edgeServerToHostShelf && pending.change.edgeServerToHostShelf.address
+		const destRoboWorkspace = pending.change.targetWorkspaceOverride || this.targetBranch.workspace
+
 		// abort shelve if this is a buildmachine / robomerge change (unless we are forcing the shelf)
 		let failed = false
 		if (isUserAKnownBot(owner) && !pending.change.forceCreateAShelf) {
 			// revert the changes locally
 			this._log_action(`Reverting shelf due to '${owner}' being a known bot`)
-			await this.p4.revert(this.targetBranch.workspace, changenum)
+			await this.p4.revert(destRoboWorkspace, changenum, undefined, edgeServerAddress)
 			failed = true
 		}
 		else {
 			// edit the CL description
-			await this.p4.editDescription(this.targetBranch.workspace, changenum, final_desc)
+			await this.p4.editDescription(destRoboWorkspace, changenum, final_desc, edgeServerAddress)
 
 			// shelve the files as we see them (should trigger a codereview email)
-			if (!await this.p4.shelve(this.targetBranch.workspace, changenum)) {
+			if (!await this.p4.shelve(destRoboWorkspace, changenum, edgeServerAddress)) {
 				failed = true
 			}
 		}
@@ -757,7 +817,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			// abort abort!
 			// delete the cl
 			this._log_action(`Deleting CL ${changenum}`)
-			await this.p4.deleteCl(this.targetBranch.workspace, changenum)
+			await this.p4.deleteCl(destRoboWorkspace, changenum, edgeServerAddress)
 
 			pending.newCl = -1
 
@@ -767,7 +827,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 
 		// revert the changes locally
 		this._log_action(`Reverting CL ${changenum} locally. (conflict owner: ${owner})`)
-		await this.p4.revert(this.targetBranch.workspace, changenum)
+		await this.p4.revert(destRoboWorkspace, changenum, [], edgeServerAddress)
 
 		// figure out what workspace to put it in
 		const branch_stream = this.targetBranch.stream ? this.targetBranch.stream.toLowerCase() : null
@@ -806,7 +866,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		}
 
 		// log if we couldn't find a workspace
-		const opts: EditOwnerOpts = {}
+		const opts: EditOwnerOpts = {edgeServerAddress}
 
 		if (targetWorkspace) {
 			this.edgeBotLogger.info(`Moving CL ${changenum} to workspace '${targetWorkspace}'`)
@@ -817,7 +877,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		}
 
 		// edit the owner to the author so they can resolve and submit themselves
-		await this.p4.editOwner(this.targetBranch.workspace, changenum, owner, opts)
+		await this.p4.editOwner(destRoboWorkspace, changenum, owner, opts)
 	}
 
 	onGlobalChange(info: ChangeInfo) {

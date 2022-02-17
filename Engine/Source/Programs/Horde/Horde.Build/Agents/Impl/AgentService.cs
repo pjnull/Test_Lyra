@@ -1,7 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using EpicGames.Core;
-using Google.Protobuf;
+using EpicGames.Redis;
+using EpicGames.Serialization;
 using Google.Protobuf.WellKnownTypes;
 using HordeCommon;
 using HordeServer.Collections;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using StackExchange.Redis;
 using StatsdClient;
 using System;
 using System.Collections.Generic;
@@ -26,11 +28,25 @@ namespace HordeServer.Services
 	using AgentSoftwareChannelName = StringId<AgentSoftwareChannels>;
 	using LeaseId = ObjectId<ILease>;
 	using PoolId = StringId<IPool>;
+	using SessionId = ObjectId<ISession>;
+
+	/// <summary>
+	/// Singleton used to store agent costs
+	/// </summary>
+	[RedisConverter(typeof(RedisCbConverter<>))]
+	public class AgentRateTable
+	{
+		/// <summary>
+		/// List of costs for different agent types
+		/// </summary>
+		[CbField]
+		public List<AgentRateConfig> Entries { get; set; } = new List<AgentRateConfig>();
+	}
 
 	/// <summary>
 	/// Wraps funtionality for manipulating agents
 	/// </summary>
-	public sealed class AgentService : TickedBackgroundService
+	public sealed class AgentService : IHostedService, IDisposable
 	{
 		/// <summary>
 		/// Maximum time between updates for an agent to be considered online
@@ -47,14 +63,7 @@ namespace HordeServer.Services
 		/// </summary>
 		public static readonly TimeSpan SessionRenewTime = TimeSpan.FromSeconds(50);
 
-		/// <summary>
-		/// The ACL service instance
-		/// </summary>
 		AclService AclService;
-
-		/// <summary>
-		/// The downtime service instance
-		/// </summary>
 		IDowntimeService DowntimeService;
 
 		/// <summary>
@@ -62,93 +71,102 @@ namespace HordeServer.Services
 		/// </summary>
 		public IAgentCollection Agents { get; }
 
-		/// <summary>
-		/// Collection of lease documents
-		/// </summary>
 		ILeaseCollection Leases;
-
-		/// <summary>
-		/// Collection of session documents
-		/// </summary>
 		ISessionCollection Sessions;
-
-		/// <summary>
-		/// DogStatsD metric client
-		/// </summary>
 		IDogStatsd DogStatsd;
-
-		/// <summary>
-		/// List of task sources
-		/// </summary>
 		ITaskSource[] TaskSources;
-
-		/// <summary>
-		/// The application lifetime instance
-		/// </summary>
 		IHostApplicationLifetime ApplicationLifetime;
-
-		/// <summary>
-		/// Log output writer
-		/// </summary>
-		ILogger<AgentService> Logger;
+		IClock Clock;
+		ILogger Logger;
+		ITicker Ticker;
 		
-		/// <summary>
-		/// Clock
-		/// </summary>
-		readonly IClock Clock;
+		RedisString<AgentRateTable> AgentRateTableData;
+		RedisService RedisService;
 
-		/// <summary>
-		/// Lazily updated list of current pools
-		/// </summary>
+		// Lazily updated costs for different agent types
+		AsyncCachedValue<AgentRateTable?> AgentRateTable;
+		
+		// Lazily updated list of current pools
 		AsyncCachedValue<List<IPool>> PoolsList;
 
-		/// <summary>
-		/// All the agents currently performing a long poll for work on this server
-		/// </summary>
+		// All the agents currently performing a long poll for work on this server
 		Dictionary<AgentId, CancellationTokenSource> WaitingAgents = new Dictionary<AgentId, CancellationTokenSource>();
-
-		/// <summary>
-		/// Subscription for update events
-		/// </summary>
+		
+		// Subscription for update events
 		IDisposable Subscription;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public AgentService(IAgentCollection Agents, ILeaseCollection Leases, ISessionCollection Sessions, AclService AclService, IDowntimeService DowntimeService, IPoolCollection PoolCollection, IDogStatsd DogStatsd, IEnumerable<ITaskSource> TaskSources, IHostApplicationLifetime ApplicationLifetime, ILogger<AgentService> Logger, IClock Clock)
-			: base(TimeSpan.FromSeconds(30.0), Logger)
+		public AgentService(IAgentCollection Agents, ILeaseCollection Leases, ISessionCollection Sessions, AclService AclService, IDowntimeService DowntimeService, IPoolCollection PoolCollection, IDogStatsd DogStatsd, IEnumerable<ITaskSource> TaskSources, RedisService RedisService, IHostApplicationLifetime ApplicationLifetime, IClock Clock, ILogger<AgentService> Logger)
 		{
 			this.Agents = Agents;
 			this.Leases = Leases;
 			this.Sessions = Sessions;
 			this.AclService = AclService;
 			this.DowntimeService = DowntimeService;
+			this.AgentRateTableData = new RedisString<AgentRateTable>(RedisService.Database, "agent-rates");
+			this.AgentRateTable = new AsyncCachedValue<AgentRateTable?>(() => AgentRateTableData.GetAsync(), TimeSpan.FromSeconds(2.0));//.FromMinutes(5.0));
 			this.PoolsList = new AsyncCachedValue<List<IPool>>(() => PoolCollection.GetAsync(), TimeSpan.FromSeconds(30.0));
 			this.DogStatsd = DogStatsd;
 			this.TaskSources = TaskSources.ToArray();
 			this.ApplicationLifetime = ApplicationLifetime;
-			this.Logger = Logger;
+			this.RedisService = RedisService;
 			this.Clock = Clock;
+			this.Ticker = Clock.AddTicker(TimeSpan.FromSeconds(30.0), TickAsync, Logger);
+			this.Logger = Logger;
 
 			Subscription = Agents.SubscribeToUpdateEventsAsync(OnAgentUpdate).Result;
 		}
 
 		/// <inheritdoc/>
-		public override void Dispose()
+		public Task StartAsync(CancellationToken cancellationToken) => Ticker.StartAsync();
+
+		/// <inheritdoc/>
+		public Task StopAsync(CancellationToken cancellationToken) => Ticker.StopAsync();
+
+		/// <inheritdoc/>
+		public void Dispose()
 		{
-			base.Dispose();
 			Subscription.Dispose();
+			Ticker.Dispose();
+		}
+
+		/// <summary>
+		/// Gets user-readable payload information
+		/// </summary>
+		/// <param name="Payload">The payload data</param>
+		/// <returns>Dictionary of key/value pairs for the payload</returns>
+		public Dictionary<string, string>? GetPayloadDetails(ReadOnlyMemory<byte>? Payload)
+		{
+			Dictionary<string, string>? Details = null;
+			if (Payload != null)
+			{
+				Any BasePayload = Any.Parser.ParseFrom(Payload.Value.ToArray());
+				foreach (ITaskSource TaskSource in TaskSources)
+				{
+					if (BasePayload.Is(TaskSource.Descriptor))
+					{
+						Details = new Dictionary<string, string>();
+						TaskSource.GetLeaseDetails(BasePayload, Details);
+						break;
+					}
+				}
+			}
+			return Details;
 		}
 
 		/// <summary>
 		/// Issues a bearer token for the given session id
 		/// </summary>
+		/// <param name="AgentId">The agent id</param>
 		/// <param name="SessionId">The session id</param>
 		/// <returns>Bearer token for the agent</returns>
-		public string IssueSessionToken(ObjectId SessionId)
+		public string IssueSessionToken(AgentId AgentId, SessionId SessionId)
 		{
 			List<AclClaim> Claims = new List<AclClaim>();
-			Claims.Add(AclService.AgentClaim);
+			Claims.Add(AclService.AgentRoleClaim);
+			Claims.Add(AclService.GetAgentClaim(AgentId));
 			Claims.Add(AclService.GetSessionClaim(SessionId));
 			return AclService.IssueBearerToken(Claims, null);
 		}
@@ -179,14 +197,14 @@ namespace HordeServer.Services
 		/// <summary>
 		/// Finds all agents matching certain criteria
 		/// </summary>
-		/// <param name="Pool">The pool containing the agent</param>
+		/// <param name="PoolId">The pool containing the agent</param>
 		/// <param name="ModifiedAfter">If set, only returns agents modified after this time</param>
 		/// <param name="Index">Index within the list of results</param>
 		/// <param name="Count">Number of results to return</param>
 		/// <returns>List of agents matching the given criteria</returns>
-		public Task<List<IAgent>> FindAgentsAsync(ObjectId? Pool, DateTime? ModifiedAfter, int? Index, int? Count)
+		public Task<List<IAgent>> FindAgentsAsync(PoolId? PoolId, DateTime? ModifiedAfter, int? Index, int? Count)
 		{
-			return Agents.FindAsync(Pool, null, ModifiedAfter, null, Index, Count);
+			return Agents.FindAsync(PoolId, ModifiedAfter, null, Index, Count);
 		}
 
 		/// <summary>
@@ -285,7 +303,7 @@ namespace HordeServer.Services
 					}
 
 					// Create a new session document
-					ISession NewSession = await Sessions.AddAsync(ObjectId.GenerateNewId(), Agent.Id, Clock.UtcNow, Properties, Resources, Version);
+					ISession NewSession = await Sessions.AddAsync(SessionId.GenerateNewId(), Agent.Id, Clock.UtcNow, Properties, Resources, Version);
 					DateTime SessionExpiresAt = UtcNow + SessionExpiryTime;
 
 					// Get the new dynamic pools for the agent
@@ -334,6 +352,23 @@ namespace HordeServer.Services
 		}
 
 		/// <summary>
+		/// Determines whether a task source can currently issue tasks
+		/// </summary>
+		bool CanUseTaskSource(IAgent Agent, ITaskSource TaskSource)
+		{
+			TaskSourceFlags Flags = TaskSource.Flags;
+			if ((Flags & TaskSourceFlags.AllowWhenDisabled) == 0 && !Agent.Enabled)
+			{
+				return false;
+			}
+			if ((Flags & TaskSourceFlags.AllowDuringDowntime) == 0 && DowntimeService.IsDowntimeActive)
+			{
+				return false;
+			}
+			return true;
+		}
+
+		/// <summary>
 		/// Waits for a lease to be assigned to an agent
 		/// </summary>
 		/// <param name="Agent">The agent to assign a lease to</param>
@@ -370,18 +405,21 @@ namespace HordeServer.Services
 						WaitingAgents[Agent.Id] = CancellationSource;
 					}
 
-					// If we're in a maintenance window, just wait for the time to expire
-					if (DowntimeService.IsDowntimeActive)
-					{
-						await AsyncUtils.DelayNoThrow(MaxWaitTime, CancellationToken);
-						break;
-					}
-
 					// Create all the tasks to wait for
 					List<Task<(ITaskSource, AgentLease)?>> Tasks = new List<Task<(ITaskSource, AgentLease)?>>();
 					foreach (ITaskSource TaskSource in TaskSources)
 					{
-						Tasks.Add(GuardedWaitForLeaseAsync(TaskSource, Agent, CancellationSource.Token));
+						if (CanUseTaskSource(Agent, TaskSource))
+						{
+							Tasks.Add(GuardedWaitForLeaseAsync(TaskSource, Agent, CancellationSource.Token));
+						}
+					}
+
+					// If no task source is valid, just add a delay
+					if (Tasks.Count == 0)
+					{
+						await AsyncUtils.DelayNoThrow(MaxWaitTime, CancellationToken);
+						break;
 					}
 
 					// Wait for a lease to be available
@@ -391,15 +429,14 @@ namespace HordeServer.Services
 
 						for (int Idx = 0; Idx < Tasks.Count; Idx++)
 						{
-							Task<(ITaskSource, AgentLease)?> Task = Tasks[Idx];
-							if (!Task.IsCompleted)
+							(ITaskSource, AgentLease)? TaskResult;
+							if (!Tasks[Idx].TryGetResult(out TaskResult))
 							{
 								continue;
 							}
 
 							Tasks.RemoveAt(Idx--);
 
-							(ITaskSource, AgentLease)? TaskResult = Task.Result;
 							if (!TaskResult.HasValue)
 							{
 								continue;
@@ -410,7 +447,7 @@ namespace HordeServer.Services
 								Result = TaskResult;
 								CancellationSource.Cancel();
 							}
-							else
+							else if (TaskResult.Value.Item2 != AgentLease.Drain)
 							{
 								(ITaskSource TaskSource, AgentLease TaskLease) = TaskResult.Value;
 								await TaskSource.CancelLeaseAsync(Agent, TaskLease.Id, Any.Parser.ParseFrom(TaskLease.Payload));
@@ -490,7 +527,7 @@ namespace HordeServer.Services
 		/// <summary>
 		/// 
 		/// </summary>
-		public async Task<IAgent?> UpdateSessionWithWaitAsync(IAgent InAgent, ObjectId SessionId, AgentStatus Status, IReadOnlyList<string>? Properties, IReadOnlyDictionary<string, int>? Resources, IList<HordeCommon.Rpc.Messages.Lease> NewLeases, CancellationToken CancellationToken)
+		public async Task<IAgent?> UpdateSessionWithWaitAsync(IAgent InAgent, SessionId SessionId, AgentStatus Status, IReadOnlyList<string>? Properties, IReadOnlyDictionary<string, int>? Resources, IList<HordeCommon.Rpc.Messages.Lease> NewLeases, CancellationToken CancellationToken)
 		{
 			IAgent? Agent = InAgent;
 
@@ -516,7 +553,7 @@ namespace HordeServer.Services
 		/// <param name="Resources">New agent resources</param>
 		/// <param name="NewLeases">New list of leases for this session</param>
 		/// <returns>Updated agent state</returns>
-		public async Task<IAgent?> UpdateSessionAsync(IAgent InAgent, ObjectId SessionId, AgentStatus Status, IReadOnlyList<string>? Properties, IReadOnlyDictionary<string, int>? Resources, IList<HordeCommon.Rpc.Messages.Lease> NewLeases)
+		public async Task<IAgent?> UpdateSessionAsync(IAgent InAgent, SessionId SessionId, AgentStatus Status, IReadOnlyList<string>? Properties, IReadOnlyDictionary<string, int>? Resources, IList<HordeCommon.Rpc.Messages.Lease> NewLeases)
 		{
 			DateTime UtcNow = Clock.UtcNow;
 
@@ -656,7 +693,7 @@ namespace HordeServer.Services
 			}
 
 			// Save off the session id and current leases
-			ObjectId SessionId = Agent.SessionId.Value;
+			SessionId SessionId = Agent.SessionId.Value;
 			List<AgentLease> Leases = new List<AgentLease>(Agent.Leases);
 
 			// Clear the current session
@@ -709,7 +746,7 @@ namespace HordeServer.Services
 		/// <param name="Index">Index of the first result to return</param>
 		/// <param name="Count">Number of results to return</param>
 		/// <returns>List of leases matching the given criteria</returns>
-		public Task<List<ILease>> FindLeasesAsync(AgentId? AgentId, ObjectId? SessionId, DateTime? StartTime, DateTime? FinishTime, int Index, int Count)
+		public Task<List<ILease>> FindLeasesAsync(AgentId? AgentId, SessionId? SessionId, DateTime? StartTime, DateTime? FinishTime, int Index, int Count)
 		{
 			return Leases.FindLeasesAsync(AgentId, SessionId, StartTime, FinishTime, Index, Count);
 		}
@@ -775,7 +812,7 @@ namespace HordeServer.Services
 		/// </summary>
 		/// <param name="SessionId">The unique session id</param>
 		/// <returns>The session information</returns>
-		public Task<ISession?> GetSessionAsync(ObjectId SessionId)
+		public Task<ISession?> GetSessionAsync(SessionId SessionId)
 		{
 			return Sessions.GetAsync(SessionId);
 		}
@@ -795,11 +832,72 @@ namespace HordeServer.Services
 		}
 
 		/// <summary>
+		/// Update the rate table for different agent types
+		/// </summary>
+		/// <param name="Entries">New entries for the rate table</param>
+		/// <returns></returns>
+		public async Task UpdateRateTableAsync(List<AgentRateConfig> Entries)
+		{
+			await AgentRateTableData.SetAsync(new AgentRateTable { Entries = Entries });
+		}
+
+		/// <summary>
+		/// Gets the rate for the given agent
+		/// </summary>
+		/// <param name="AgentId">Agent id to query</param>
+		/// <returns>Hourly rate of running the given agent</returns>
+		public async ValueTask<double?> GetRateAsync(AgentId AgentId)
+		{
+			RedisKey Key = $"agent-rate/{AgentId}";
+
+			// Try to get the current value
+			RedisValue Value = await RedisService.Database.StringGetAsync(Key);
+			if (!Value.IsNull)
+			{
+				double Rate = (double)Value;
+				if (Rate == 0.0)
+				{
+					return null;
+				}
+				else
+				{
+					return Rate;
+				}
+			}
+			else
+			{
+				double Rate = 0.0;
+
+				// Get the rate table
+				AgentRateTable? RateTable = await AgentRateTable.GetAsync();
+				if (RateTable != null && RateTable.Entries.Count > 0)
+				{
+					IAgent? Agent = await GetAgentAsync(AgentId);
+					if (Agent != null)
+					{
+						foreach (AgentRateConfig Config in RateTable.Entries)
+						{
+							if (Config.Condition != null && Config.Condition.Evaluate(x => Agent.GetPropertyValues(x)))
+							{
+								Rate = Config.Rate;
+								break;
+							}
+						}
+					}
+				}
+
+				// Cache it for future reference
+				await RedisService.Database.StringSetAsync(Key, Rate, TimeSpan.FromMinutes(5.0), flags: CommandFlags.FireAndForget);
+				return Rate;
+			}
+		}
+
+		/// <summary>
 		/// Terminate any sessions for agents that are offline
 		/// </summary>
 		/// <param name="StoppingToken">Token indicating the service is shutting down</param>
 		/// <returns>Async task</returns>
-		protected override async Task TickAsync(CancellationToken StoppingToken)
+		async ValueTask TickAsync(CancellationToken StoppingToken)
 		{
 			while (!StoppingToken.IsCancellationRequested)
 			{

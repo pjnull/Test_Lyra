@@ -12,8 +12,13 @@ namespace EpicGames.Perforce
 	/// <summary>
 	/// Base interface for Perforce clients
 	/// </summary>
-	public interface IPerforceConnection
+	public interface IPerforceConnection : IDisposable
 	{
+		/// <summary>
+		/// Connection settings
+		/// </summary>
+		IPerforceSettings Settings { get; }
+
 		/// <summary>
 		/// Logger for this connection
 		/// </summary>
@@ -26,8 +31,9 @@ namespace EpicGames.Perforce
 		/// <param name="Arguments">Arguments for the command</param>
 		/// <param name="FileArguments">File arguments (may be put into a response file)</param>
 		/// <param name="InputData">Input data to be passed to the command</param>
+		/// <param name="InterceptIo">Whether to intercept file I/O and return it in the reponse stream. Only supported by the native client.</param>
 		/// <returns>Response object</returns>
-		Task<IPerforceOutput> CommandAsync(string Command, IReadOnlyList<string> Arguments, IReadOnlyList<string>? FileArguments, byte[]? InputData);
+		Task<IPerforceOutput> CommandAsync(string Command, IReadOnlyList<string> Arguments, IReadOnlyList<string>? FileArguments, byte[]? InputData, bool InterceptIo);
 
 		/// <summary>
 		/// Execute the 'login' command
@@ -35,23 +41,6 @@ namespace EpicGames.Perforce
 		/// <param name="Password">Password to use to login</param>
 		/// <param name="CancellationToken">Token used to cancel the operation</param>
 		/// <returns>Response from the server</returns>
-		Task LoginAsync(string Password, CancellationToken CancellationToken = default);
-
-		/// <summary>
-		/// Sets an environment variable
-		/// </summary>
-		/// <param name="Name">Name of the variable to set</param>
-		/// <param name="Value">Value for the variable</param>
-		/// <param name="CancellationToken">Token used to cancel the operation</param>
-		/// <returns>Response from the server</returns>
-		Task SetAsync(string Name, string Value, CancellationToken CancellationToken = default);
-
-		/// <summary>
-		/// Gets the setting of a Perforce variable
-		/// </summary>
-		/// <param name="Name">Name of the variable to get</param>
-		/// <param name="CancellationToken">Cancellation token for the request</param>
-		/// <returns>Value of the variable</returns>
-		Task<string?> TryGetSettingAsync(string Name, CancellationToken CancellationToken = default);
+		Task<IPerforceOutput> LoginCommandAsync(string Password, CancellationToken CancellationToken = default);
 	}
 }

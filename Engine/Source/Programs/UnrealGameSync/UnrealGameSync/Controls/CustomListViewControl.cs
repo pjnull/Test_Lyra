@@ -47,7 +47,7 @@ namespace UnrealGameSync
 
 		public void ConditionalLayout(Control Owner, Rectangle Bounds)
 		{
-			if(RequiresLayout() || PreviousBounds.Value != Bounds)
+			if(RequiresLayout() || PreviousBounds == null || PreviousBounds.Value != Bounds)
 			{
 				using(Graphics Graphics = Owner.CreateGraphics())
 				{
@@ -88,8 +88,8 @@ namespace UnrealGameSync
 		}
 
 		Rectangle Bounds;
-		StatusElement MouseDownElement;
-		StatusElement MouseOverElement;
+		StatusElement? MouseDownElement;
+		StatusElement? MouseOverElement;
 
 		public StatusLineListViewWidget(ListViewItem Item, StatusElementResources Resources)
 			: base(Item)
@@ -105,7 +105,7 @@ namespace UnrealGameSync
 
 		public override void OnMouseDown(Point Location)
 		{
-			StatusElement Element;
+			StatusElement? Element;
 			if(Line.HitTest(Location, out Element))
 			{
 				MouseDownElement = Element;
@@ -135,7 +135,7 @@ namespace UnrealGameSync
 
 		public override void OnMouseMove(Point Location)
 		{
-			StatusElement NewMouseOverElement;
+			StatusElement? NewMouseOverElement;
 			Line.HitTest(Location, out NewMouseOverElement);
 
 			if(MouseOverElement != NewMouseOverElement)
@@ -198,12 +198,12 @@ namespace UnrealGameSync
 
 	partial class CustomListViewControl : ListView
 	{
-		VisualStyleRenderer SelectedItemRenderer;
-		VisualStyleRenderer TrackedItemRenderer;
+		VisualStyleRenderer? SelectedItemRenderer;
+		VisualStyleRenderer? TrackedItemRenderer;
 		public int HoverItem = -1;
 
-		CustomListViewWidget MouseOverWidget;
-		CustomListViewWidget MouseDownWidget;
+		CustomListViewWidget? MouseOverWidget;
+		CustomListViewWidget? MouseDownWidget;
 
 		public CustomListViewControl()
 		{
@@ -249,16 +249,16 @@ namespace UnrealGameSync
 			}
 		}
 
-		protected CustomListViewWidget FindWidget(Point Location)
+		protected CustomListViewWidget? FindWidget(Point Location)
 		{
 			return FindWidget(HitTest(Location));
 		}
 
-		protected CustomListViewWidget FindWidget(ListViewHitTestInfo HitTest)
+		protected CustomListViewWidget? FindWidget(ListViewHitTestInfo HitTest)
 		{
 			if(HitTest.Item != null)
 			{
-				CustomListViewWidget Widget = HitTest.Item.Tag as CustomListViewWidget;
+				CustomListViewWidget? Widget = HitTest.Item.Tag as CustomListViewWidget;
 				if(Widget != null)
 				{
 					return Widget;
@@ -266,7 +266,7 @@ namespace UnrealGameSync
 			}
 			if(HitTest.SubItem != null)
 			{
-				CustomListViewWidget Widget = HitTest.SubItem.Tag as CustomListViewWidget;
+				CustomListViewWidget? Widget = HitTest.SubItem.Tag as CustomListViewWidget;
 				if(Widget != null)
 				{
 					return Widget;
@@ -338,7 +338,7 @@ namespace UnrealGameSync
 		{
 			ListViewHitTestInfo HitTest = this.HitTest(e.Location);
 
-			CustomListViewWidget NewMouseOverWidget = FindWidget(HitTest);
+			CustomListViewWidget? NewMouseOverWidget = FindWidget(HitTest);
 			if(MouseOverWidget != null && MouseOverWidget != NewMouseOverWidget)
 			{
 				Cursor = Cursors.Arrow;
@@ -405,12 +405,12 @@ namespace UnrealGameSync
 
 		public void DrawCustomSubItem(Graphics Graphics, ListViewItem.ListViewSubItem SubItem)
 		{
-			CustomListViewWidget Widget = SubItem.Tag as CustomListViewWidget;
+			CustomListViewWidget? Widget = SubItem.Tag as CustomListViewWidget;
 			if(Widget != null)
 			{
-				foreach(ListViewItem.ListViewSubItem OtherSubItem in Widget.Item.SubItems)
+				foreach(ListViewItem.ListViewSubItem? OtherSubItem in Widget.Item.SubItems)
 				{
-					if(OtherSubItem.Tag == Widget)
+					if(OtherSubItem != null && OtherSubItem.Tag == Widget)
 					{
 						if(OtherSubItem == SubItem)
 						{
@@ -446,7 +446,7 @@ namespace UnrealGameSync
 
 		public void DrawSelectedBackground(Graphics Graphics, Rectangle Bounds)
 		{
-			if(Application.RenderWithVisualStyles)
+			if (SelectedItemRenderer != null)
 			{
 				SelectedItemRenderer.DrawBackground(Graphics, Bounds);
 			}
@@ -458,7 +458,7 @@ namespace UnrealGameSync
 
 		public void DrawTrackedBackground(Graphics Graphics, Rectangle Bounds)
 		{
-			if(Application.RenderWithVisualStyles)
+			if (TrackedItemRenderer != null)
 			{
 				TrackedItemRenderer.DrawBackground(Graphics, Bounds);
 			}

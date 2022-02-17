@@ -7,7 +7,7 @@ public class UnrealEd : ModuleRules
 {
 	public UnrealEd(ReadOnlyTargetRules Target) : base(Target)
 	{
-		if(Target.Type != TargetType.Editor)
+		if(!Target.bCompileAgainstEditor)
 		{
 			throw new BuildException("Unable to instantiate UnrealEd module for non-editor targets.");
 		}
@@ -52,7 +52,6 @@ public class UnrealEd : ModuleRules
 				"AudioEditor",
 				"ViewportSnapping",
 				"SourceCodeAccess",
-				"IntroTutorials",
 				"OutputLog",
 				"Landscape",
 				"LocalizationService",
@@ -245,7 +244,6 @@ public class UnrealEd : ModuleRules
 				"SettingsEditor",
 				"StringTableEditor",
 				"Blutility",
-				"IntroTutorials",
 				"WorkspaceMenuStructure",
 				"PlacementMode",
 				"MeshUtilities",

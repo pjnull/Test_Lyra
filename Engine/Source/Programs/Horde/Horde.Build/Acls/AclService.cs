@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 namespace HordeServer.Services
 {
 	using UserId = ObjectId<IUser>;
+	using SessionId = ObjectId<ISession>;
 
 	/// <summary>
 	/// Cache of global ACL
@@ -28,9 +29,9 @@ namespace HordeServer.Services
 	public class GlobalPermissionsCache
 	{
 		/// <summary>
-		/// The global permissions list
+		/// The root acl
 		/// </summary>
-		public GlobalPermissions? GlobalPermissions { get; set; }
+		public Acl? RootAcl { get; set; }
 	}
 
 	/// <summary>
@@ -66,7 +67,7 @@ namespace HordeServer.Services
 		/// <summary>
 		/// Role for all agents
 		/// </summary>
-		public static AclClaim AgentClaim { get; } = new AclClaim(HordeClaimTypes.Role, "agent");
+		public static AclClaim AgentRoleClaim { get; } = new AclClaim(HordeClaimTypes.Role, "agent");
 
 		/// <summary>
 		/// The default permissions
@@ -79,11 +80,6 @@ namespace HordeServer.Services
 		DatabaseService DatabaseService;
 
 		/// <summary>
-		/// The global permissions singleton
-		/// </summary>
-		ISingletonDocument<GlobalPermissions> GlobalPermissions;
-
-		/// <summary>
 		/// The settings object
 		/// </summary>
 		ServerSettings Settings;
@@ -92,12 +88,10 @@ namespace HordeServer.Services
 		/// Constructor
 		/// </summary>
 		/// <param name="DatabaseService">The database service instance</param>
-		/// <param name="GlobalPermissions">The global permissions instance</param>
 		/// <param name="Settings">The settings object</param>
-		public AclService(DatabaseService DatabaseService, ISingletonDocument<GlobalPermissions> GlobalPermissions, IOptionsMonitor<ServerSettings> Settings)
+		public AclService(DatabaseService DatabaseService, IOptionsMonitor<ServerSettings> Settings)
 		{
 			this.DatabaseService = DatabaseService;
-			this.GlobalPermissions = GlobalPermissions;
 			this.Settings = Settings.CurrentValue;
 
 			List<AclAction> AdminActions = new List<AclAction>();
@@ -108,8 +102,8 @@ namespace HordeServer.Services
 
 			DefaultAcl = new Acl();
 			DefaultAcl.Entries.Add(new AclEntry(new AclClaim(ClaimTypes.Role, "internal:AgentRegistration"), new[] { AclAction.CreateAgent, AclAction.CreateSession }));
-			DefaultAcl.Entries.Add(new AclEntry(AgentRegistrationClaim, new[] { AclAction.CreateAgent, AclAction.CreateSession, AclAction.UpdateAgent, AclAction.DownloadSoftware }));
-			DefaultAcl.Entries.Add(new AclEntry(AgentClaim, new[] { AclAction.ViewProject, AclAction.ViewStream, AclAction.CreateEvent, AclAction.DownloadSoftware }));
+			DefaultAcl.Entries.Add(new AclEntry(AgentRegistrationClaim, new[] { AclAction.CreateAgent, AclAction.CreateSession, AclAction.UpdateAgent, AclAction.DownloadSoftware, AclAction.CreatePool, AclAction.UpdatePool, AclAction.ViewPool, AclAction.DeletePool, AclAction.ListPools, AclAction.ViewStream, AclAction.ViewProject, AclAction.ViewJob, AclAction.ViewCosts }));
+			DefaultAcl.Entries.Add(new AclEntry(AgentRoleClaim, new[] { AclAction.ViewProject, AclAction.ViewStream, AclAction.CreateEvent, AclAction.DownloadSoftware }));
 			DefaultAcl.Entries.Add(new AclEntry(DownloadSoftwareClaim, new[] { AclAction.DownloadSoftware }));
 			DefaultAcl.Entries.Add(new AclEntry(UploadSoftwareClaim, new[] { AclAction.UploadSoftware }));
 			DefaultAcl.Entries.Add(new AclEntry(ConfigureProjectsClaim, new[] { AclAction.CreateProject, AclAction.UpdateProject, AclAction.ViewProject, AclAction.CreateStream, AclAction.UpdateStream, AclAction.ViewStream, AclAction.ChangePermissions }));
@@ -126,19 +120,10 @@ namespace HordeServer.Services
 		/// Gets the root ACL scope table
 		/// </summary>
 		/// <returns>Scopes instance</returns>
-		public Task<GlobalPermissions> GetGlobalPermissionsAsync()
+		public async Task<Acl> GetRootAcl()
 		{
-			return GlobalPermissions.GetAsync();
-		}
-
-		/// <summary>
-		/// Updates the root ACL scopes
-		/// </summary>
-		/// <param name="NewPermissions">New permissions</param>
-		/// <returns>Async task</returns>
-		public Task<bool> TryUpdateGlobalPermissionsAsync(GlobalPermissions NewPermissions)
-		{
-			return GlobalPermissions.TryUpdateAsync(NewPermissions);
+			Globals Globals = await DatabaseService.GetGlobalsAsync();
+			return Globals.RootAcl ?? new Acl();
 		}
 
 		/// <summary>
@@ -150,20 +135,20 @@ namespace HordeServer.Services
 		/// <returns>Async task</returns>
 		public async Task<bool> AuthorizeAsync(AclAction Action, ClaimsPrincipal User, GlobalPermissionsCache? Cache = null)
 		{
-			GlobalPermissions? GlobalPermissions;
+			Acl? RootAcl;
 			if(Cache == null)
 			{
-				GlobalPermissions = await GetGlobalPermissionsAsync();
+				RootAcl = await GetRootAcl();
 			}
-			else if(Cache.GlobalPermissions == null)
+			else if(Cache.RootAcl == null)
 			{
-				GlobalPermissions = Cache.GlobalPermissions = await GetGlobalPermissionsAsync();
+				RootAcl = Cache.RootAcl = await GetRootAcl();
 			}
 			else
 			{
-				GlobalPermissions = Cache.GlobalPermissions;
+				RootAcl = Cache.RootAcl;
 			}
-			return GlobalPermissions.Acl.Authorize(Action, User) ?? DefaultAcl.Authorize(Action, User) ?? false;
+			return RootAcl.Authorize(Action, User) ?? DefaultAcl.Authorize(Action, User) ?? false;
 		}
 
 		/// <summary>
@@ -212,11 +197,39 @@ namespace HordeServer.Services
 		}
 
 		/// <summary>
-		/// Gets the role for a specific user
+		/// Gets the agent id associated with a particular user
+		/// </summary>
+		/// <param name="User"></param>
+		/// <returns></returns>
+		public static AgentId? GetAgentId(ClaimsPrincipal User)
+		{
+			Claim? Claim = User.Claims.FirstOrDefault(x => x.Type == HordeClaimTypes.AgentId);
+			if (Claim == null)
+			{
+				return null;
+			}
+			else
+			{
+				return new AgentId(Claim.Value);
+			}
+		}
+
+		/// <summary>
+		/// Gets the role for a specific agent
+		/// </summary>
+		/// <param name="AgentId">The session id</param>
+		/// <returns>New claim instance</returns>
+		public static AclClaim GetAgentClaim(AgentId AgentId)
+		{
+			return new AclClaim(HordeClaimTypes.AgentId, AgentId.ToString());
+		}
+
+		/// <summary>
+		/// Gets the role for a specific agent session
 		/// </summary>
 		/// <param name="SessionId">The session id</param>
 		/// <returns>New claim instance</returns>
-		public static AclClaim GetSessionClaim(ObjectId SessionId)
+		public static AclClaim GetSessionClaim(SessionId SessionId)
 		{
 			return new AclClaim(HordeClaimTypes.AgentSessionId, SessionId.ToString());
 		}
@@ -243,21 +256,21 @@ namespace HordeServer.Services
 
 	static class ClaimExtensions
 	{
-		public static bool HasSessionClaim(this ClaimsPrincipal User, ObjectId SessionId)
+		public static bool HasSessionClaim(this ClaimsPrincipal User, SessionId SessionId)
 		{
 			return User.HasClaim(HordeClaimTypes.AgentSessionId, SessionId.ToString());
 		}
 
-		public static ObjectId? GetSessionClaim(this ClaimsPrincipal User)
+		public static SessionId? GetSessionClaim(this ClaimsPrincipal User)
 		{
 			Claim? Claim = User.FindFirst(HordeClaimTypes.AgentSessionId);
-			if (Claim == null || !ObjectId.TryParse(Claim.Value, out ObjectId SessionId))
+			if (Claim == null || !SessionId.TryParse(Claim.Value, out SessionId SessionIdValue))
 			{
 				return null;
 			}
 			else
 			{
-				return SessionId;
+				return SessionIdValue;
 			}
 		}
 		

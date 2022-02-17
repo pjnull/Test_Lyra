@@ -123,6 +123,8 @@
 #define LOCTEXT_NAMESPACE "Cooker"
 
 DEFINE_LOG_CATEGORY(LogCook);
+LLM_DEFINE_TAG(Cooker);
+
 
 int32 GCookProgressDisplay = (int32)ECookProgressDisplayMode::RemainingPackages;
 static FAutoConsoleVariableRef CVarCookDisplayMode(
@@ -267,14 +269,11 @@ class UCookOnTheFlyServer::FCookOnTheFlyServerInterface final
 public:
 	FCookOnTheFlyServerInterface(UCookOnTheFlyServer& InCooker)
 		: Cooker(InCooker)
-		, FlushCompletedEvent(FPlatformProcess::GetSynchEventFromPool(true))
 	{
-		FlushCompletedEvent->Trigger();
 	}
 
 	virtual ~FCookOnTheFlyServerInterface()
 	{
-		FPlatformProcess::ReturnSynchEventToPool(FlushCompletedEvent);
 	}
 
 	virtual FString GetSandboxDirectory() const override
@@ -336,34 +335,10 @@ public:
 		if (const ITargetPlatform* TargetPlatform = Cooker.AddCookOnTheFlyPlatform(CookPackageRequest.PlatformName))
 		{
 			Cooker.CookOnTheFlyDeferredInitialize();
-			Cooker.PlatformManager->AddRefCookOnTheFlyPlatform(CookPackageRequest.PlatformName, Cooker);
 			FName StandardFileName(*FPaths::CreateStandardFilename(CookPackageRequest.Filename));
-			FRequest* Request = AllocRequest();
-			Request->CookPackageRequest = MoveTemp(CookPackageRequest);
-
-			FCompletionCallback CookCompleted = [this, Request](FPackageData* PackageData)
-			{
-				const FPlatformData* PlatformData = Cooker.PlatformManager->GetPlatformDataByName(Request->CookPackageRequest.PlatformName);
-				check(PlatformData);
-				const ECookResult CookResult = PackageData
-					? PackageData->GetCookResults(PlatformData->TargetPlatform)
-					: ECookResult::Failed;
-				
-				UE_LOG(LogCook, Verbose, TEXT("Cook request completed, Filename='%s', Platform='%s', CookResult='%d'"),
-					*Request->CookPackageRequest.Filename, *Request->CookPackageRequest.PlatformName.ToString(), uint32(CookResult));
-				
-				if (Request->CookPackageRequest.CompletionCallback)
-				{
-					Request->CookPackageRequest.CompletionCallback(CookResult);
-				}
-				
-				Cooker.PlatformManager->ReleaseCookOnTheFlyPlatform(Request->CookPackageRequest.PlatformName);
-				FreeRequest(Request);
-			};
-
-			UE_LOG(LogCook, Verbose, TEXT("Enqueing cook request, Filename='%s', Platform='%s'"), *Request->CookPackageRequest.Filename, *Request->CookPackageRequest.PlatformName.ToString());
+			UE_LOG(LogCook, Verbose, TEXT("Enqueing cook request, Filename='%s', Platform='%s'"), *CookPackageRequest.Filename, *CookPackageRequest.PlatformName.ToString());
 			Cooker.ExternalRequests->EnqueueUnique(
-				FFilePlatformRequest(StandardFileName, EInstigator::CookOnTheFly, TargetPlatform, MoveTemp(CookCompleted)),
+				FFilePlatformRequest(StandardFileName, EInstigator::CookOnTheFly, TargetPlatform, MoveTemp(CookPackageRequest.CompletionCallback)),
 				true);
 			if (Cooker.ExternalRequests->CookRequestEvent)
 			{
@@ -380,6 +355,27 @@ public:
 		}
 	};
 
+	virtual void MarkPackageDirty(const FName& PackageName) override
+	{
+		Cooker.ExternalRequests->AddCallback([this, PackageName]()
+			{
+				UE::Cook::FPackageData* PackageData = Cooker.PackageDatas->FindPackageDataByPackageName(PackageName);
+				if (!PackageData)
+				{
+					return;
+				}
+				if (PackageData->IsInProgress())
+				{
+					return;
+				}
+				if (!PackageData->HasAnyCookedPlatform())
+				{
+					return;
+				}
+				PackageData->ClearCookProgress();
+			});
+	}
+
 	virtual bool EnqueueRecompileShaderRequest(UE::Cook::FRecompileShaderRequest RecompileShaderRequest) override
 	{
 		UE_LOG(LogCook, Verbose, TEXT("Enqueing recompile shader(s) request, Platform='%s', ShaderPlatform='%d'"),
@@ -395,71 +391,8 @@ public:
 		return Cooker.FindOrCreatePackageWriter(TargetPlatform);
 	}
 
-	virtual double WaitForPendingFlush() override
-	{
-		const double StartTime = bIsFlushing ? FPlatformTime::Seconds() : 0.0;
-
-		FlushCompletedEvent->Wait();
-
-		return StartTime > 0.0 ? FPlatformTime::Seconds() - StartTime : 0.0;
-	}
-
-	void Flush()
-	{
-		bIsFlushing = true;
-		FlushCompletedEvent->Reset();
-
-		UE_LOG(LogCook, Log, TEXT("Flushing..."));
-
-		for (UE::Cook::FCookSavePackageContext* Context : Cooker.SavePackageContexts)
-		{
-			Context->PackageWriter->Flush();
-		}
-
-		UE_LOG(LogCook, Log, TEXT("Flush completed"));
-
-		bIsFlushing = false;
-		FlushCompletedEvent->Trigger();
-	}
-
 private:
-	struct FRequest
-	{
-		FRequest* NextFree = nullptr;
-		UE::Cook::FCookPackageRequest CookPackageRequest;
-	};
-
-	FRequest* AllocRequest()
-	{
-		FScopeLock _(&RequestsCriticalSection);
-		if (FRequest* Request = FirstFree)
-		{
-			FirstFree = Request->NextFree;
-			Request->NextFree = nullptr;
-			return Request;
-		}
-		else
-		{
-			const int32 RequestIndex = Requests.Add();
-			return &Requests[RequestIndex];
-		}
-	}
-
-	void FreeRequest(FRequest* Request)
-	{
-		FScopeLock _(&RequestsCriticalSection);
-		check(Request->NextFree == nullptr);
-		Request->NextFree = FirstFree;
-		FirstFree = Request;
-	}
-
 	UCookOnTheFlyServer& Cooker;
-	FEvent* FlushCompletedEvent;
-	FCriticalSection FlushCriticalSection;
-	FCriticalSection RequestsCriticalSection;
-	TChunkedArray<FRequest> Requests;
-	FRequest* FirstFree = nullptr;
-	TAtomic<bool> bIsFlushing = {false};
 };
 
 /* UCookOnTheFlyServer functions
@@ -495,6 +428,7 @@ UCookOnTheFlyServer::~UCookOnTheFlyServer()
 void UCookOnTheFlyServer::Tick(float DeltaTime)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UCookOnTheFlyServer::Tick);
+	LLM_SCOPE_BYTAG(Cooker);
 
 	check(IsCookingInEditor());
 
@@ -522,6 +456,7 @@ void UCookOnTheFlyServer::Tick(float DeltaTime)
 	uint32 CookedPackagesCount = 0;
 	const static float CookOnTheSideTimeSlice = 0.1f; // seconds
 	TickCookOnTheSide( CookOnTheSideTimeSlice, CookedPackagesCount);
+	TickRequestManager();
 	TickRecompileShaderRequests();
 }
 
@@ -537,6 +472,7 @@ TStatId UCookOnTheFlyServer::GetStatId() const
 
 bool UCookOnTheFlyServer::StartCookOnTheFly(FCookOnTheFlyOptions InCookOnTheFlyOptions)
 {
+	LLM_SCOPE_BYTAG(Cooker);
 #if WITH_COTF
 	check(IsCookOnTheFlyMode());
 	//GetDerivedDataCacheRef().WaitForQuiescence(false);
@@ -1219,6 +1155,7 @@ bool UCookOnTheFlyServer::RequestPackage(const FName& StandardPackageFName, cons
 
 uint32 UCookOnTheFlyServer::TickCookOnTheSide(const float TimeSlice, uint32 &CookedPackageCount, ECookTickFlags TickFlags)
 {
+	LLM_SCOPE_BYTAG(Cooker);
 	TickCancels();
 	TickNetwork();
 	if (!IsInSession())
@@ -1334,11 +1271,6 @@ uint32 UCookOnTheFlyServer::TickCookOnTheSide(const float TimeSlice, uint32 &Coo
 		// if we are out of stuff and we are in cook by the book from the editor mode then we finish up
 		UpdateDisplay(TickFlags, true /* bForceDisplay */);
 		CookByTheBookFinished();
-	}
-
-	if (IsCookOnTheFlyMode() && bCookComplete)
-	{
-		CookOnTheFlyServerInterface->Flush();
 	}
 
 	CookedPackageCount += StackData.CookedPackageCount;
@@ -2113,6 +2045,11 @@ void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& Pac
 		return;
 	}
 
+	if (CookOnTheFlyRequestManager && PackageData.IsGenerated())
+	{
+		CookOnTheFlyRequestManager->OnPackageGenerated(PackageData.GetPackageName());
+	}
+	
 	if (!PackageData.IsInProgress() &&
 		(PackageData.IsGenerated() || !IsCookByTheBookMode() || !CookByTheBookOptions->bSkipHardReferences))
 	{
@@ -2592,9 +2529,9 @@ bool UCookOnTheFlyServer::BeginPrepareSave(UE::Cook::FPackageData& PackageData, 
 			*CurrentAsyncCache -= 1;
 		}
 
-		Obj->BeginCacheForCookedPlatformData(TargetPlatform);
+		RouteBeginCacheForCookedPlatformData(Obj, TargetPlatform);
 		++CookedPlatformDataNextIndex;
-		if (Obj->IsCachedCookedPlatformDataLoaded(TargetPlatform))
+		if (RouteIsCachedCookedPlatformDataLoaded(Obj, TargetPlatform))
 		{
 			if (CurrentAsyncCache)
 			{
@@ -2843,7 +2780,11 @@ bool UCookOnTheFlyServer::LoadPackageForCooking(UE::Cook::FPackageData& PackageD
 			}
 		}
 
-		UPackage* LoadedPackage = LoadPackage(LoadIntoPackage, *FileName, LOAD_None);
+		UPackage* LoadedPackage;
+		{
+			LLM_SCOPE(ELLMTag::Untagged); // Reset the scope so that untagged memory in the package shows up as Untagged rather than Cooker
+			LoadedPackage = LoadPackage(LoadIntoPackage, *FileName, LOAD_None);
+		}
 		if (IsValid(LoadedPackage) && LoadedPackage->IsFullyLoaded())
 		{
 			OutPackage = LoadedPackage;
@@ -3312,9 +3253,9 @@ void UCookOnTheFlyServer::TickPrecacheObjectsForPlatforms(const float TimeSlice,
 			{
 				continue;
 			}
-			if (!Material->IsCachedCookedPlatformDataLoaded(TargetPlatform))
+			if (!RouteIsCachedCookedPlatformDataLoaded(Material, TargetPlatform))
 			{
-				Material->BeginCacheForCookedPlatformData(TargetPlatform);
+				RouteBeginCacheForCookedPlatformData(Material, TargetPlatform);
 				AllMaterialsCompiled = false;
 			}
 		}
@@ -3353,9 +3294,9 @@ void UCookOnTheFlyServer::TickPrecacheObjectsForPlatforms(const float TimeSlice,
 			{
 				continue;
 			}
-			if (!Texture->IsCachedCookedPlatformDataLoaded(TargetPlatform))
+			if (!RouteIsCachedCookedPlatformDataLoaded(Texture, TargetPlatform))
 			{
-				Texture->BeginCacheForCookedPlatformData(TargetPlatform);
+				RouteBeginCacheForCookedPlatformData(Texture, TargetPlatform);
 			}
 		}
 		if (Timer.IsTimeUp())
@@ -3571,7 +3512,7 @@ void UCookOnTheFlyServer::MarkPackageDirtyForCookerFromSchedulerThread(const FNa
 	{
 		check(IsInGameThread()); // We're editing scheduler data, which is only allowable from the scheduler thread
 		bool bHadCookedPlatforms = PackageData->HasAnyCookedPlatform();
-		PackageData->SetPlatformsNotCooked();
+		PackageData->ClearCookProgress();
 		if (PackageData->IsInProgress())
 		{
 			PackageData->SendToState(UE::Cook::EPackageState::Request, UE::Cook::ESendFlags::QueueAddAndRemove);
@@ -3625,7 +3566,15 @@ uint32 UCookOnTheFlyServer::GetPackagesPerPartialGC() const
 
 double UCookOnTheFlyServer::GetIdleTimeToGC() const
 {
-	return IdleTimeToGC;
+	if (CurrentCookMode == ECookMode::CookOnTheFly)
+	{
+		// For COTF outside of the editor we want to release open linker file handles promptly but still give some time for new requests to come in
+		return 0.5;
+	}
+	else
+	{
+		return IdleTimeToGC;
+	}
 }
 
 uint64 UCookOnTheFlyServer::GetMaxMemoryAllowance() const
@@ -3899,6 +3848,14 @@ void UCookOnTheFlyServer::BeginDestroy()
 	ShutdownCookOnTheFly();
 
 	Super::BeginDestroy();
+}
+
+void UCookOnTheFlyServer::TickRequestManager()
+{
+	if (CookOnTheFlyRequestManager)
+	{
+		CookOnTheFlyRequestManager->Tick();
+	}
 }
 
 void UCookOnTheFlyServer::TickRecompileShaderRequests()
@@ -7490,6 +7447,7 @@ void UCookOnTheFlyServer::TermSandbox()
 void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions& CookByTheBookStartupOptions )
 {
 	UE_SCOPED_COOKTIMER(StartCookByTheBook);
+	LLM_SCOPE_BYTAG(Cooker);
 
 	const TArray<FString>& CookMaps = CookByTheBookStartupOptions.CookMaps;
 	const TArray<FString>& CookDirectories = CookByTheBookStartupOptions.CookDirectories;
@@ -8299,7 +8257,10 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 					const FString BuildFilename = BuildFilenameFName.ToString();
 					GIsCookerLoadingPackage = true;
 					UE_SCOPED_HIERARCHICAL_COOKTIMER(LoadPackage);
-					LoadPackage(nullptr, *BuildFilename, LOAD_None);
+					{
+						LLM_SCOPE(ELLMTag::Untagged); // Reset the scope so that untagged memory in the package shows up as Untagged rather than Cooker
+						LoadPackage(nullptr, *BuildFilename, LOAD_None);
+					}
 					if (GShaderCompilingManager)
 					{
 						GShaderCompilingManager->ProcessAsyncResults(true, false);
@@ -8464,8 +8425,8 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 								{
 									UE_SCOPED_HIERARCHICAL_COOKTIMER(FullLoadAndSave_BeginCache);
 									UE_TRACK_REFERENCING_PACKAGE_SCOPED(Package, PackageAccessTrackingOps::NAME_CookerBuildObject);
-									Obj->BeginCacheForCookedPlatformData(TargetPlatform);
-									if (!Obj->IsCachedCookedPlatformDataLoaded(TargetPlatform))
+									RouteBeginCacheForCookedPlatformData(Obj, TargetPlatform);
+									if (!RouteIsCachedCookedPlatformDataLoaded(Obj, TargetPlatform))
 									{
 										bAllPlatformDataLoaded = false;
 									}
@@ -8530,7 +8491,10 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 				FName BuildFilenameFName = PackageDatas->GetFileNameByPackageName(FName(*ToLoad));
 				if (!PackageTracker->NeverCookPackageList.Contains(BuildFilenameFName))
 				{
-					LoadPackage(nullptr, *ToLoad, LOAD_None);
+					{
+						LLM_SCOPE(ELLMTag::Untagged); // Reset the scope so that untagged memory in the package shows up as Untagged rather than Cooker
+						LoadPackage(nullptr, *ToLoad, LOAD_None);
+					}
 					if (GShaderCompilingManager)
 					{
 						GShaderCompilingManager->ProcessAsyncResults(true, false);
@@ -8582,7 +8546,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 				UE_TRACK_REFERENCING_PACKAGE_SCOPED(Obj->GetPackage(), PackageAccessTrackingOps::NAME_CookerBuildObject);
 				for (const ITargetPlatform* TargetPlatform : TargetPlatforms)
 				{
-					if (!Obj->IsCachedCookedPlatformDataLoaded(TargetPlatform))
+					if (!RouteIsCachedCookedPlatformDataLoaded(Obj, TargetPlatform))
 					{
 						bAllPlatformDataLoaded = false;
 						break;
@@ -8651,7 +8615,7 @@ uint32 UCookOnTheFlyServer::FullLoadAndSave(uint32& CookedPackageCount)
 
 						for (const ITargetPlatform* TargetPlatform : TargetPlatforms)
 						{
-							Obj->BeginCacheForCookedPlatformData(TargetPlatform);
+							RouteBeginCacheForCookedPlatformData(Obj, TargetPlatform);
 						}
 					}
 				}

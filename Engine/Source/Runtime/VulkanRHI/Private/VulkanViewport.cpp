@@ -338,7 +338,19 @@ FVulkanFramebuffer::FVulkanFramebuffer(FVulkanDevice& Device, const FRHISetRende
 		FVulkanTextureView RTView;
 		if (Texture->Surface.GetViewType() == VK_IMAGE_VIEW_TYPE_2D || Texture->Surface.GetViewType() == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
 		{
-			RTView.Create(*Texture->Surface.Device, Texture->Surface.Image, Texture->Surface.GetViewType(), Texture->Surface.GetFullAspectMask(), Texture->Surface.PixelFormat, Texture->Surface.ViewFormat, MipIndex, 1, FMath::Max(0, (int32)InRTInfo.ColorRenderTarget[Index].ArraySliceIndex), Texture->Surface.GetNumberOfArrayLevels(), true);
+			uint32 ArraySliceIndex, NumArraySlices;
+			if (InRTInfo.ColorRenderTarget[Index].ArraySliceIndex == -1)
+			{
+				ArraySliceIndex = 0;
+				NumArraySlices = Texture->Surface.GetNumberOfArrayLevels();
+			}
+			else
+			{
+				ArraySliceIndex = InRTInfo.ColorRenderTarget[Index].ArraySliceIndex;
+				NumArraySlices = 1;
+				check(ArraySliceIndex < Texture->Surface.GetNumberOfArrayLevels());
+			}
+			RTView.Create(*Texture->Surface.Device, Texture->Surface.Image, Texture->Surface.GetViewType(), Texture->Surface.GetFullAspectMask(), Texture->Surface.PixelFormat, Texture->Surface.ViewFormat, MipIndex, 1, ArraySliceIndex, NumArraySlices, true);
 		}
 		else if (Texture->Surface.GetViewType() == VK_IMAGE_VIEW_TYPE_CUBE)
 		{

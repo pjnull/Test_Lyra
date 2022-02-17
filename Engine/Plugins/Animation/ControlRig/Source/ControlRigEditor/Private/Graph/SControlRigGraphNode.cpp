@@ -205,7 +205,7 @@ void SControlRigGraphNode::Construct( const FArguments& InArgs )
 				PinInfo.bHideInputWidget = !bIsStructEditable;
 				PinInfo.bAutoHeight = bIsStructEditable;
 			}
-			else if(PinInfo.bHasChildren)
+			else if(PinInfo.bHasChildren && !ModelPin->IsBoundToVariable())
 			{
 				PinInfo.bHideInputWidget = true;
 			}
@@ -977,10 +977,6 @@ void SControlRigGraphNode::GetNodeInfoPopups(FNodeInfoContext* Context, TArray<F
 							FString PinHash = URigVMCompiler::GetPinHash(ModelPin, nullptr, true);
 							if (const FRigVMOperand* WatchOperand = RigBlueprint->PinToOperandMap.Find(PinHash))
 							{
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-								FRigVMMemoryContainer& Memory = ActiveObject->GetVM()->GetDebugMemory();
-								DefaultValues = Memory.GetRegisterValueAsString(*WatchOperand, ModelPin->GetCPPType(), ModelPin->GetCPPTypeObject());
-#else
 								URigVMMemoryStorage* Memory = ActiveObject->GetVM()->GetDebugMemory();
 								// We mark PPF_ExternalEditor so that default values are also printed
 								const FString DebugValue = Memory->GetDataAsStringSafe(WatchOperand->GetRegisterIndex(), PPF_ExternalEditor | STRUCT_ExportTextItemNative);
@@ -988,7 +984,6 @@ void SControlRigGraphNode::GetNodeInfoPopups(FNodeInfoContext* Context, TArray<F
 								{
 									DefaultValues = URigVMPin::SplitDefaultValue(DebugValue);
 								}
-#endif
 							}
 						}
 

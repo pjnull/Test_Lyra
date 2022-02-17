@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Nodes/InterchangeBaseNodeUtilities.h"
 #include "Types/AttributeStorage.h"
 #include "UObject/Class.h"
 #include "UObject/Object.h"
@@ -96,78 +97,20 @@ namespace InterchangePrivateNodeBase
 const UE::Interchange::FAttributeKey Macro_Custom##AttributeName##Key = UE::Interchange::FAttributeKey(TEXT(#AttributeName));
 
 #if WITH_ENGINE
-#define IMPLEMENT_NODE_ATTRIBUTE_APPLY_UOBJECT_BYNAME(AttributeName, AttributeType, ObjectType, PropertyName)	\
-bool ApplyCustom##AttributeName##ToAsset(UObject* Asset) const													\
-{																												\
-	if (!Asset)																									\
-	{																											\
-		return false;																							\
-	}																											\
-	ObjectType* TypedObject = Cast<ObjectType>(Asset);															\
-	if (!TypedObject)																							\
-	{																											\
-		return false;																							\
-	}																											\
-	AttributeType ValueData;																					\
-	if (GetCustom##AttributeName(ValueData))																	\
-	{																											\
-		TVariant<UObject*, uint8*> Container;																	\
-		Container.Set<UObject*>(Asset);																			\
-		if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Asset->GetClass(), PropertyName))\
-		{																										\
-			if (Container.IsType<UObject*>())																	\
-			{																									\
-				*(Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<UObject*>())) = ValueData;		\
-			}																									\
-			else																								\
-			{																									\
-				*(Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<uint8*>())) = ValueData;		\
-			}																									\
-		}																										\
-		return true;																							\
-	}																											\
-	return false;																								\
-}																												\
-																												\
-bool FillCustom##AttributeName##FromAsset(UObject* Asset)														\
-{																												\
-	if (!Asset)																									\
-	{																											\
-		return false;																							\
-	}																											\
-	ObjectType* TypedObject = Cast<ObjectType>(Asset);															\
-	if (!TypedObject)																							\
-	{																											\
-		return false;																							\
-	}																											\
-	TVariant<UObject*, uint8*> Container;																		\
-	Container.Set<UObject*>(Asset);																				\
-	if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Asset->GetClass(), PropertyName))\
-	{																											\
-		AttributeType ValueData;																				\
-		if (Container.IsType<UObject*>())																		\
-		{																										\
-			ValueData = *(Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<UObject*>()));			\
-		}																										\
-		else																									\
-		{																										\
-			ValueData = *(Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<uint8*>()));			\
-		}																										\
-		if (SetCustom##AttributeName(ValueData, false))															\
-		{																										\
-			return true;																						\
-		}																										\
-	}																											\
-																												\
-	return false;																								\
+#define IMPLEMENT_NODE_ATTRIBUTE_DELEGATE_BY_PROPERTYNAME(AttributeName, AttributeType, ObjectType, PropertyName)		\
+bool ApplyCustom##AttributeName##ToAsset(UObject* Asset) const														\
+{																													\
+	return ApplyAttributeToObject<AttributeType>(Macro_Custom##AttributeName##Key.ToString(), Asset, PropertyName);	\
+}																													\
+																													\
+bool FillCustom##AttributeName##FromAsset(UObject* Asset)															\
+{																													\
+	return FillAttributeFromObject<AttributeType>(Macro_Custom##AttributeName##Key.ToString(), Asset, PropertyName);\
 }
-#define IMPLEMENT_NODE_ATTRIBUTE_APPLY_UOBJECT(AttributeName, AttributeType, ObjectType)						\
-	IMPLEMENT_NODE_ATTRIBUTE_APPLY_UOBJECT_BYNAME(AttributeName, AttributeType, ObjectType, TEXT(#AttributeName))
 
 #else //#if WITH_ENGINE
 
-#define IMPLEMENT_NODE_ATTRIBUTE_APPLY_UOBJECT(AttributeName, AttributeType, AssetType)
-#define IMPLEMENT_NODE_ATTRIBUTE_APPLY_UOBJECT_BYNAME(AttributeName, AttributeType, AssetType, PropertyName)
+#define IMPLEMENT_NODE_ATTRIBUTE_DELEGATE_BY_PROPERTYNAME(AttributeName, AttributeType, AssetType, PropertyName)
 
 #endif //#if WITH_ENGINE
 
@@ -175,13 +118,25 @@ bool FillCustom##AttributeName##FromAsset(UObject* Asset)														\
 	FString OperationName = GetTypeName() + TEXT(".Get" #AttributeName);																				\
 	return InterchangePrivateNodeBase::GetCustomAttribute<AttributeType>(*Attributes, Macro_Custom##AttributeName##Key, OperationName, AttributeValue);
 
-#define IMPLEMENT_NODE_ATTRIBUTE_SETTER_NODELEGATE(AttributeName, AttributeType)															\
+#define IMPLEMENT_NODE_ATTRIBUTE_SETTER_NODELEGATE(AttributeName, AttributeType)																		\
 	FString OperationName = GetTypeName() + TEXT(".Set" #AttributeName);																				\
 	return InterchangePrivateNodeBase::SetCustomAttribute<AttributeType>(*Attributes, Macro_Custom##AttributeName##Key, OperationName, AttributeValue);
 
 #if WITH_ENGINE
 
 #define IMPLEMENT_NODE_ATTRIBUTE_SETTER(NodeClassName, AttributeName, AttributeType, AssetType)														\
+	FString OperationName = GetTypeName() + TEXT(".Set" #AttributeName);																			\
+	if(InterchangePrivateNodeBase::SetCustomAttribute<AttributeType>(*Attributes, Macro_Custom##AttributeName##Key, OperationName, AttributeValue))	\
+	{																																				\
+		if(bAddApplyDelegate)																														\
+		{																																			\
+			AddApplyAndFillDelegates<AttributeType>(Macro_Custom##AttributeName##Key.ToString(), AssetType::StaticClass(), *Macro_Custom##AttributeName##Key.ToString()); \
+		}																																			\
+		return true;																																\
+	}																																				\
+	return false;
+
+#define IMPLEMENT_NODE_ATTRIBUTE_SETTER_WITH_CUSTOM_DELEGATE(NodeClassName, AttributeName, AttributeType, AssetType)								\
 	FString OperationName = GetTypeName() + TEXT(".Set" #AttributeName);																			\
 	if(InterchangePrivateNodeBase::SetCustomAttribute<AttributeType>(*Attributes, Macro_Custom##AttributeName##Key, OperationName, AttributeValue))	\
 	{																																				\
@@ -202,6 +157,9 @@ bool FillCustom##AttributeName##FromAsset(UObject* Asset)														\
 	FString OperationName = GetTypeName() + TEXT(".Set" #AttributeName);																				\
 	return InterchangePrivateNodeBase::SetCustomAttribute<AttributeType>(*Attributes, Macro_Custom##AttributeName##Key, OperationName, AttributeValue);
 
+#define IMPLEMENT_NODE_ATTRIBUTE_SETTER_WITH_CUSTOM_DELEGATE(NodeClassName, AttributeName, AttributeType, AssetType)								\
+	IMPLEMENT_NODE_ATTRIBUTE_SETTER(NodeClassName, AttributeName, AttributeType, AssetType)
+
 #endif //#if WITH_ENGINE
 
 #define INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(ValueType)																									\
@@ -221,616 +179,26 @@ namespace UE
 {
 	namespace Interchange
 	{
-
 		DECLARE_DELEGATE_RetVal_OneParam(bool, FApplyAttributeToAsset, UObject*);
 		DECLARE_DELEGATE_RetVal_OneParam(bool, FFillAttributeToAsset, UObject*);
-
-		class FNameAttributeArrayHelper
-		{
-		public:
-			~FNameAttributeArrayHelper()
-			{
-				Attributes = nullptr;
-				KeyCount = NAME_None;
-			}
-
-			void Initialize(const TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe>& InAttributes, const FString& BaseKeyName)
-			{
-				Attributes = InAttributes;
-				check(Attributes.IsValid());
-				FString BaseTryName = BaseKeyName;
-				KeyCount = BaseTryName;
-			}
-
-			static const FString& IndexKey()
-			{
-				static FString IndexKeyString = TEXT("_NameIndex_");
-				return IndexKeyString;
-			}
-
-			int32 GetCount() const
-			{
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					return 0;
-				}
-				int32 NameCount = 0;
-				if (AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					FAttributeStorage::TAttributeHandle<int32> Handle = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-					if (Handle.IsValid())
-					{
-						Handle.Get(NameCount);
-					}
-				}
-				return NameCount;
-			}
-
-			void GetName(const int32 Index, FString& OutName) const
-			{
-				OutName.Empty();
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					return;
-				}
-				int32 NameCount = 0;
-				if (!AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					return;
-				}
-
-				FAttributeStorage::TAttributeHandle<int32> Handle = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-				if (!Handle.IsValid())
-				{
-					return;
-				}
-				Handle.Get(NameCount);
-				if (Index >= NameCount)
-				{
-					return;
-				}
-				FAttributeKey DepIndexKey = GetIndexKey(Index);
-				FAttributeStorage::TAttributeHandle<FString> HandleName = AttributePtr->GetAttributeHandle<FString>(DepIndexKey);
-				if (!HandleName.IsValid())
-				{
-					return;
-				}
-				HandleName.Get(OutName);
-			}
-
-			void GetNames(TArray<FString>& OutNames) const
-			{
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					OutNames.Empty();
-					return;
-				}
-				int32 NameCount = 0;
-				if (!AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					OutNames.Empty();
-					return;
-				}
-
-				//Reuse as much memory we can to avoid allocation
-				OutNames.Reset(NameCount);
-
-				FAttributeStorage::TAttributeHandle<int32> Handle = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-				if (!Handle.IsValid())
-				{
-					return;
-				}
-				Handle.Get(NameCount);
-				for (int32 NameIndex = 0; NameIndex < NameCount; ++NameIndex)
-				{
-					FAttributeKey DepIndexKey = GetIndexKey(NameIndex);
-					FAttributeStorage::TAttributeHandle<FString> HandleName = AttributePtr->GetAttributeHandle<FString>(DepIndexKey);
-					if (!HandleName.IsValid())
-					{
-						continue;
-					}
-					FString& OutName = OutNames.AddDefaulted_GetRef();
-					HandleName.Get(OutName);
-				}
-			}
-
-			bool AddName(const FString& Name)
-			{
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					return false;
-				}
-
-				if (!AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					const int32 DependencyCount = 0;
-					EAttributeStorageResult Result = AttributePtr->RegisterAttribute<int32>(GetKeyCount(), DependencyCount);
-					if (!IsAttributeStorageResultSuccess(Result))
-					{
-						LogAttributeStorageErrors(Result, TEXT("FNameAttributeArrayHelper.AddName"), GetKeyCount());
-						return false;
-					}
-				}
-				FAttributeStorage::TAttributeHandle<int32> Handle = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-				if (!ensure(Handle.IsValid()))
-				{
-					return false;
-				}
-				int32 NameIndex = 0;
-				Handle.Get(NameIndex);
-				FAttributeKey NameIndexKey = GetIndexKey(NameIndex);
-				//Increment the name counter
-				NameIndex++;
-				Handle.Set(NameIndex);
-
-				EAttributeStorageResult AddNameResult = AttributePtr->RegisterAttribute<FString>(NameIndexKey, Name);
-				if (!IsAttributeStorageResultSuccess(AddNameResult))
-				{
-					LogAttributeStorageErrors(AddNameResult, TEXT("FNameAttributeArrayHelper.AddName"), NameIndexKey);
-					return false;
-				}
-				return true;
-			}
-
-			bool RemoveName(const FString& NameToDelete)
-			{
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					return false;
-				}
-
-				int32 NameCount = 0;
-				if (!AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					return false;
-				}
-				FAttributeStorage::TAttributeHandle<int32> Handle = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-				if (!Handle.IsValid())
-				{
-					return false;
-				}
-				Handle.Get(NameCount);
-				bool DecrementKey = false;
-				for (int32 NameIndex = 0; NameIndex < NameCount; ++NameIndex)
-				{
-					FAttributeKey DepIndexKey = GetIndexKey(NameIndex);
-					FAttributeStorage::TAttributeHandle<FString> HandleName = AttributePtr->GetAttributeHandle<FString>(DepIndexKey);
-					if (!HandleName.IsValid())
-					{
-						continue;
-					}
-					FString Name;
-					HandleName.Get(Name);
-					if (Name == NameToDelete)
-					{
-						//Remove this entry
-						AttributePtr->UnregisterAttribute(DepIndexKey);
-						Handle.Set(NameCount - 1);
-						//We have to rename the key for all the next item
-						DecrementKey = true;
-					}
-					else if (DecrementKey)
-					{
-						FAttributeKey NewDepIndexKey = GetIndexKey(NameIndex - 1);
-						EAttributeStorageResult UnregisterResult = AttributePtr->UnregisterAttribute(DepIndexKey);
-						if (IsAttributeStorageResultSuccess(UnregisterResult))
-						{
-							EAttributeStorageResult RegisterResult = AttributePtr->RegisterAttribute<FString>(NewDepIndexKey, Name);
-							if (!IsAttributeStorageResultSuccess(RegisterResult))
-							{
-								LogAttributeStorageErrors(RegisterResult, TEXT("FNameAttributeArrayHelper.RemoveName"), NewDepIndexKey);
-							}
-						}
-						else
-						{
-							LogAttributeStorageErrors(UnregisterResult, TEXT("FNameAttributeArrayHelper.RemoveName"), DepIndexKey);
-						}
-
-						//Avoid doing more code in the for since the HandleName is now invalid
-						continue;
-					}
-				}
-				return true;
-			}
-
-			bool RemoveAllNames()
-			{
-				//The Class must be initialise properly before we can use it
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributePtr = Attributes.Pin();
-				if (!ensure(AttributePtr.IsValid()))
-				{
-					return false;
-				}
-
-				int32 NameCount = 0;
-				if (!AttributePtr->ContainAttribute(GetKeyCount()))
-				{
-					return false;
-				}
-				FAttributeStorage::TAttributeHandle<int32> HandleCount = AttributePtr->GetAttributeHandle<int32>(GetKeyCount());
-				if (!HandleCount.IsValid())
-				{
-					return false;
-				}
-				HandleCount.Get(NameCount);
-				//Remove all attribute one by one
-				for (int32 NameIndex = 0; NameIndex < NameCount; ++NameIndex)
-				{
-					FAttributeKey DepIndexKey = GetIndexKey(NameIndex);
-					AttributePtr->UnregisterAttribute(DepIndexKey);
-				}
-				//Make sure Count is zero
-				NameCount = 0;
-				HandleCount.Set(NameCount);
-				return true;
-			}
-
-		private:
-			TWeakPtr<FAttributeStorage, ESPMode::ThreadSafe> Attributes = nullptr;
-
-			FAttributeKey KeyCount; //Assign in Initialize function, it will ensure if its the default value (NAME_None) when using the class
-			FAttributeKey GetKeyCount() const { ensure(!KeyCount.Key.IsEmpty()); return KeyCount; }
-
-			FAttributeKey GetIndexKey(int32 Index) const
-			{
-				FString DepIndexKeyString = GetKeyCount().ToString() + IndexKey() + FString::FromInt(Index);
-				return FAttributeKey(*DepIndexKeyString);
-			}
-		};
-
-		template<typename KeyType, typename ValueType>
-		class TMapAttributeHelper
-		{
-			static_assert(TAttributeTypeTraits<KeyType>::GetType() != EAttributeTypes::None, "The key type must be supported by the attribute storage");
-			static_assert(TAttributeTypeTraits<ValueType>::GetType() != EAttributeTypes::None, "The value type must be supported by the attribute storage");
-
-			template<typename T>
-			using TAttributeHandle = FAttributeStorage::TAttributeHandle<T>;
-
-		public:
-			void Initialize(const TSharedRef<FAttributeStorage, ESPMode::ThreadSafe>& InAttributes, const FString& BaseKeyName)
-			{
-				Attributes = InAttributes;
-				FString BaseTryName = BaseKeyName;
-				FAttributeKey KeyCountKey(MoveTemp(BaseTryName));
-				if (!InAttributes->ContainAttribute(KeyCountKey))
-				{ 
-					EAttributeStorageResult Result = InAttributes->RegisterAttribute<int32>(KeyCountKey, 0);
-					check (Result == EAttributeStorageResult::Operation_Success);
-					KeyCountHandle = InAttributes->GetAttributeHandle<int32>(KeyCountKey);
-				}
-				else
-				{
-					KeyCountHandle = InAttributes->GetAttributeHandle<int32>(KeyCountKey);
-
-					//Init map
-					int32 KeyCount;
-					KeyCountHandle.Get(KeyCount);
-
-					CachedKeysAndValues.Reserve(KeyCount);
-
-					for (int32 Index = 0; Index < KeyCount; Index++)
-					{
-						TAttributeHandle<KeyType> KeyAttribute = InAttributes->GetAttributeHandle<KeyType>(GetKeyAttribute(Index));
-						KeyType Key;
-						KeyAttribute.Get(Key);
-						TAttributeHandle<ValueType> ValueAttribute = InAttributes->GetAttributeHandle<ValueType>(GetValueAttribute(Key));
-						CachedKeysAndValues.Add(Key, TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>(KeyAttribute, ValueAttribute));
-					}
-				}
-			}
-
-			TMapAttributeHelper() = default;
-			TMapAttributeHelper(const TMapAttributeHelper&) = default;
-			TMapAttributeHelper(TMapAttributeHelper&&) = default;
-			TMapAttributeHelper& operator=(const TMapAttributeHelper&) = default;
-			TMapAttributeHelper& operator=(TMapAttributeHelper&&) = default;
-
-			~TMapAttributeHelper()
-			{
-				Attributes.Reset();
-			}
-
-			void SetKeyValue(const KeyType& InKey, const ValueType& InValue)
-			{
-				const uint32 Hash = GetTypeHash(InKey);
-				SetKeyValueByHash(Hash, InKey, InValue);
-			}
-
-			bool GetValue(const KeyType& InKey, ValueType& OutValue) const
-			{
-				const uint32 Hash = GetTypeHash(InKey);
-				return GetValueByHash(Hash, InKey, OutValue);
-			}
-
-			bool RemoveKey(const KeyType& InKey)
-			{
-				const uint32 Hash = GetTypeHash(InKey);
-				return RemoveKeyByHash(Hash, InKey);
-			}
-
-			bool RemoveKeyAndGetValue(const KeyType& InKey, ValueType& OutValue)
-			{
-				const uint32 Hash = GetTypeHash(InKey);
-				return RemoveKeyAndGetValueByHash(Hash, InKey, OutValue);
-			}
-
-			void SetKeyValueByHash(uint32 Hash, const KeyType& InKey, const ValueType& InValue)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return;
-				}
-
-				if (TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>* Pair = CachedKeysAndValues.FindByHash(Hash, InKey))
-				{
-					Pair->Value.Set(InValue);
-				}
-				else
-				{
-					FAttributeKey IndexKey = GetKeyAttribute(CachedKeysAndValues.Num());
-					FAttributeKey AttributeKey = GetValueAttribute(InKey);
-					check(AttributesPtr->RegisterAttribute<KeyType>(IndexKey, InKey) == EAttributeStorageResult::Operation_Success);
-					check(AttributesPtr->RegisterAttribute<ValueType>(AttributeKey, InValue) == EAttributeStorageResult::Operation_Success);
-					CachedKeysAndValues.AddByHash(
-						Hash
-						, InKey
-						, TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>(
-							AttributesPtr->GetAttributeHandle<KeyType>(IndexKey)
-							, AttributesPtr->GetAttributeHandle<ValueType>(AttributeKey)
-						));
-					KeyCountHandle.Set(CachedKeysAndValues.Num());
-				}
-			}
-
-		
-			bool GetValueByHash(uint32 Hash, const KeyType& InKey, ValueType& OutValue) const
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return false;
-				}
-
-				if (const TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>* Pair = CachedKeysAndValues.FindByHash(Hash, InKey))
-				{
-					return Pair->Value.Get(OutValue) == EAttributeStorageResult::Operation_Success;
-				}
-			}
-
-	
-			bool RemoveKeyByHash(uint32 Hash, const KeyType& InKey)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return false;
-				}
-
-				if (TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>* Pair = CachedKeysAndValues.FindByHash(Hash, InKey))
-				{
-					return RemoveBySwap(Hash, InKey, *Pair);
-				}
-
-				return false;
-			}
-
-			bool RemoveKeyAndGetValueByHash(uint32 Hash, const KeyType& InKey, ValueType& OutValue)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return false;
-				}
-
-				if (TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>* Pair = CachedKeysAndValues.FindByHash(Hash, InKey))
-				{
-					if (Pair->Value.Get(OutValue) == EAttributeStorageResult::Operation_Success)
-					{
-						return RemoveBySwap(Hash, InKey, *Pair);
-					}
-				}
-
-				return false;
-			}
-
-			void Reserve(int32 Number)
-			{
-				CachedKeysAndValues.Reserve(Number);
-			}
-
-			void Empty(int32 NumOfExpectedElements = 0)
-			{
-				EmptyInternal(NumOfExpectedElements);
-			}
-
-			TMapAttributeHelper& operator=(const TMap<KeyType, ValueType>& InMap)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return *this;
-				}
-
-				// Empty
-				EmptyInternal(InMap.Num());
-
-				KeyCountHandle.Set(InMap.Num());
-
-				for (const TPair<KeyType, ValueType>& Pair : InMap)
-				{
-					SetKeyValue(Pair.Key, Pair.Value);
-				}
-
-				return *this;
-			}
-
-			TMap<KeyType, ValueType> ToMap() const
-			{
-				TMap<KeyType, ValueType> Map;
-				Map.Reserve(CachedKeysAndValues.Num());
-				
-				for (const TPair<KeyType, TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>>& Pair: CachedKeysAndValues)
-				{
-					KeyType Key;
-					Pair.Value.Key.Get(Key);
-					ValueType Value;
-					Pair.Value.Value.Get(Value);
-
-					Map.Add(MoveTemp(Key), MoveTemp(Value));
-				}
-
-				return Map;
-			}
-
-		private:
-			FAttributeKey GetKeyAttribute(int32 Index) const
-			{
-				static const FString KeyIndex = TEXT("_KeyIndex_");
-				FString IndexedKey =  KeyCountHandle.GetKey().ToString();
-				IndexedKey.Reserve(KeyIndex.Len() + 16 /*Max size for a int32*/);
-				IndexedKey.Append(KeyIndex);
-				IndexedKey.AppendInt(Index);
-				return FAttributeKey(MoveTemp(IndexedKey));
-			}
-
-			FAttributeKey GetValueAttribute(const KeyType& InKey) const
-			{
-				static const FString KeyChars = TEXT("_Key_");
-				FString ValueAttribute =  KeyCountHandle.GetKey().ToString();
-				FString Key = TTypeToString<KeyType>::ToString(InKey);
-				ValueAttribute.Reserve(KeyChars.Len() + Key.Len());
-				ValueAttribute.Append(KeyChars);
-				ValueAttribute.Append(Key);
-				return FAttributeKey(MoveTemp(ValueAttribute));
-			}
-
-			TAttributeHandle<KeyType> GetLastKeyAttributeHandle() const
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return {};
-				}
-				return AttributesPtr->GetAttributeHandle<KeyType>(GetKeyAttribute(CachedKeysAndValues.Num() - 1));
-			}
-
-			bool RemoveBySwap(uint32 Hash, const KeyType& InKey, TPair<TAttributeHandle<FString>, TAttributeHandle<ValueType>>& CachedPair)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return false;
-				}
-
-				TAttributeHandle<KeyType> LastKeyIndex = GetLastKeyAttributeHandle();
-				KeyType LastKey;
-				LastKeyIndex.Get(LastKey);
-				CachedKeysAndValues[LastKey].Key = CachedPair.Key;
-				CachedPair->Key.Set(MoveTemp(LastKey));
-
-				AttributesPtr->UnregisterAttribute(LastKeyIndex.GetKey());
-				AttributesPtr->UnregisterAttribute(CachedPair.Value.GetKey());
-				CachedKeysAndValues.RemoveByHash(Hash, InKey);
-				KeyCountHandle.Set(CachedKeysAndValues.Num());
-			}
-
-			void EmptyInternal(int32 NumOfExpectedElements)
-			{
-				TSharedPtr<FAttributeStorage, ESPMode::ThreadSafe> AttributesPtr = Attributes.Pin();
-				if (!ensure(AttributesPtr.IsValid()))
-				{
-					return;
-				}
-
-				for (const TPair<KeyType, TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>>& Pair : CachedKeysAndValues)
-				{
-					const FAttributeKey& KeyAttribute = Pair.Value.Key.GetKey();
-					AttributesPtr->UnregisterAttribute(KeyAttribute);
-
-					const FAttributeKey& ValueAttribute = Pair.Value.Value.GetKey();
-					AttributesPtr->UnregisterAttribute(ValueAttribute);
-				}
-
-				CachedKeysAndValues.Empty(NumOfExpectedElements);
-			}
-
-			TMap<KeyType, TPair<TAttributeHandle<KeyType>, TAttributeHandle<ValueType>>> CachedKeysAndValues;
-			TAttributeHandle<int32> KeyCountHandle; //Assign in Initialize function, it will ensure if its the default value (NAME_None) when using the class
-			TWeakPtr<FAttributeStorage, ESPMode::ThreadSafe> Attributes = nullptr;
-		};
 
 		/**
 		 * Helper struct use to declare static const data we use in the UInterchangeBaseNode
 		 * Node that derive from UInterchangeBaseNode can also add a struct that derive from this one to add there static data
 		 * @note: The static data are mainly for holding Attribute keys. All attributes that are always available for a node should be in this class or a derived class.
 		 */
-		struct FBaseNodeStaticData
+		struct INTERCHANGECORE_API FBaseNodeStaticData
 		{
-			static const FAttributeKey& UniqueIDKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__UNQ_ID_"));
-				return AttributeKey;
-			}
-
-			static const FAttributeKey& DisplayLabelKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__DSPL_LBL_"));
-				return AttributeKey;
-			}
-
-			static const FAttributeKey& ParentIDKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__PARENT_UID_"));
-				return AttributeKey;
-			}
-
-			static const FAttributeKey& IsEnabledKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__IS_NBLD_"));
-				return AttributeKey;
-			}
-
-			static const FString& TargetAssetIDsKey()
-			{
-				static FString Key(TEXT("__TARGET_ASSET_IDS_"));
-				return Key;
-			}
-
-			static const FString& GetFactoryDependenciesBaseKey()
-			{
-				static FString BaseNodeFactoryDependencies_BaseKey = TEXT("__BaseNodeFactoryDependencies__");
-				return BaseNodeFactoryDependencies_BaseKey;
-			}
-
-			static const FAttributeKey& ClassTypeAttributeKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__ClassTypeAttribute__"));
-				return AttributeKey;
-			}
-
-			static const FAttributeKey& AssetNameKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__Asset_Name_Key__"));
-				return AttributeKey;
-			}
-
-			static const FAttributeKey& NodeContainerTypeKey()
-			{
-				static FAttributeKey AttributeKey(TEXT("__Node_Container_Type_Key__"));
-				return AttributeKey;
-			}
+			static const FAttributeKey& UniqueIDKey();
+			static const FAttributeKey& DisplayLabelKey();
+			static const FAttributeKey& ParentIDKey();
+			static const FAttributeKey& IsEnabledKey();
+			static const FString& TargetAssetIDsKey();
+			static const FString& GetFactoryDependenciesBaseKey();
+			static const FAttributeKey& ClassTypeAttributeKey();
+			static const FAttributeKey& AssetNameKey();
+			static const FAttributeKey& NodeContainerTypeKey();
+			static const FAttributeKey& ReimportStrategyFlagsKey();
 		};
 
 	} //ns Interchange
@@ -839,10 +207,18 @@ namespace UE
 UENUM(BlueprintType)
 enum class EInterchangeNodeContainerType : uint8
 {
-	NodeContainerType_None,
-	NodeContainerType_TranslatedScene,
-	NodeContainerType_TranslatedAsset,
-	NodeContainerType_FactoryData
+	None,
+	TranslatedScene,
+	TranslatedAsset,
+	FactoryData
+};
+
+UENUM()
+enum class EReimportStrategyFlags : uint8
+{
+	ApplyNoProperties, //Do not apply any property when re-importing, simply change the source data
+	ApplyPipelineProperties, //Always apply all pipeline specified properties
+	ApplyEditorChangedProperties //Always apply all pipeline properties, but leave the properties modified in editor since the last import
 };
 
 /**
@@ -857,8 +233,6 @@ class INTERCHANGECORE_API UInterchangeBaseNode : public UObject
 
 public:
 	UInterchangeBaseNode();
-
-	virtual ~UInterchangeBaseNode() = default;
 
 	/**
 	 * Initialize the base data of the node
@@ -875,89 +249,24 @@ public:
 	virtual FString GetTypeName() const;
 
 	/**
-	 * Icon name are simply create by adding "InterchangeIcon_" in front of the specialized type. If there is no special type the function will return NAME_None which will use the default icon.
+	 * Icon name, use to retrieve the brush when we display the node in any UI
 	 */
-	virtual FName GetIconName() const
-	{
-		return NAME_None;
-	}
+	virtual FName GetIconName() const;
 
-	virtual FString GetKeyDisplayName(const UE::Interchange::FAttributeKey& NodeAttributeKey) const
-	{
-		FString KeyDisplayName = NodeAttributeKey.ToString();
-		if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::ParentIDKey())
-		{
-			KeyDisplayName = TEXT("Parent Unique ID");
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::DisplayLabelKey())
-		{
-			KeyDisplayName = TEXT("Name");
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::IsEnabledKey())
-		{
-			KeyDisplayName = TEXT("Enabled");
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::UniqueIDKey())
-		{
-			KeyDisplayName = TEXT("Unique ID");
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::ClassTypeAttributeKey())
-		{
-			KeyDisplayName = TEXT("Node Class Type");
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::AssetNameKey())
-		{
-			KeyDisplayName = TEXT("Imported Asset Name");
-		}
-		else if (NodeAttributeKey.Key.Equals(UE::Interchange::FBaseNodeStaticData::GetFactoryDependenciesBaseKey()))
-		{
-			KeyDisplayName = TEXT("Factory Dependencies Count");
-		}
-		else if (NodeAttributeKey.Key.StartsWith(UE::Interchange::FBaseNodeStaticData::GetFactoryDependenciesBaseKey()))
-		{
-			KeyDisplayName = TEXT("Factory Dependencies Index ");
-			const FString IndexKey = UE::Interchange::FNameAttributeArrayHelper::IndexKey();
-			int32 IndexPosition = NodeAttributeKey.Key.Find(IndexKey) + IndexKey.Len();
-			if (IndexPosition < NodeAttributeKey.Key.Len())
-			{
-				KeyDisplayName += NodeAttributeKey.Key.RightChop(IndexPosition);
-			}
-		}
-		else if (NodeAttributeKey.Key.Equals(UE::Interchange::FBaseNodeStaticData::TargetAssetIDsKey()))
-		{
-			KeyDisplayName = TEXT("Target Asset Count");
-		}
-		else if (NodeAttributeKey.Key.StartsWith(UE::Interchange::FBaseNodeStaticData::TargetAssetIDsKey()))
-		{
-			KeyDisplayName = TEXT("Target Asset Index ");
-			const FString IndexKey = UE::Interchange::FNameAttributeArrayHelper::IndexKey();
-			int32 IndexPosition = NodeAttributeKey.Key.Find(IndexKey) + IndexKey.Len();
-			if (IndexPosition < NodeAttributeKey.Key.Len())
-			{
-				KeyDisplayName += NodeAttributeKey.Key.RightChop(IndexPosition);
-			}
-		}
-		else if (NodeAttributeKey == UE::Interchange::FBaseNodeStaticData::NodeContainerTypeKey())
-		{
-			KeyDisplayName = TEXT("Node Container Type");
-		}
-		return KeyDisplayName;
-	}
+	/**
+	 * UI that inspect node attribute call this to give a readable name to attribute key
+	 */
+	virtual FString GetKeyDisplayName(const UE::Interchange::FAttributeKey& NodeAttributeKey) const;
 
-	virtual bool ShouldHideAttribute(const UE::Interchange::FAttributeKey& NodeAttributeKey) const
-	{
-		return false;
-	}
+	/**
+	 * UI that inspect node attribute call this to display or hide an attribute
+	 */
+	virtual bool ShouldHideAttribute(const UE::Interchange::FAttributeKey& NodeAttributeKey) const;
 
-	virtual FString GetAttributeCategory(const UE::Interchange::FAttributeKey& NodeAttributeKey) const
-	{
-		FString CategoryName = TEXT("Attributes");
-		if (NodeAttributeKey.Key.StartsWith(UE::Interchange::FBaseNodeStaticData::GetFactoryDependenciesBaseKey()))
-		{
-			CategoryName = TEXT("FactoryDependencies");
-		}
-		return CategoryName;
-	}
+	/**
+	 * UI that inspect node attribute call this to display the attribute under the returned category
+	 */
+	virtual FString GetAttributeCategory(const UE::Interchange::FAttributeKey& NodeAttributeKey) const;
 
 	/**
 	 * Add an attribute to the node
@@ -990,10 +299,7 @@ public:
 	 *
 	 * @param NodeAttributeKey - The key of the attribute
 	 */
-	virtual UE::Interchange::EAttributeTypes GetAttributeType(const UE::Interchange::FAttributeKey& NodeAttributeKey) const
-	{
-		return Attributes->GetAttributeType(NodeAttributeKey);
-	}
+	virtual UE::Interchange::EAttributeTypes GetAttributeType(const UE::Interchange::FAttributeKey& NodeAttributeKey) const;
 
 	/**
 	 * This function return an  attribute handle for the specified Key.
@@ -1007,113 +313,148 @@ public:
 		return Attributes->GetAttributeHandle<T>(NodeAttributeKey);
 	}
 
-	void GetAttributeKeys(TArray<UE::Interchange::FAttributeKey>& AttributeKeys)
-	{
-		Attributes->GetAttributeKeys(AttributeKeys);
-	}
+	/**
+	 * Use this function to query all the node attribute keys
+	 */
+	void GetAttributeKeys(TArray<UE::Interchange::FAttributeKey>& AttributeKeys) const;
 
 	/**
 	 * Remove any attribute from this node. Return false if we cannot remove it. If the attribute do not exist it will return true.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool RemoveAttribute(const FString& NodeAttributeKey)
-	{
-		Attributes->UnregisterAttribute(UE::Interchange::FAttributeKey(NodeAttributeKey));
-		return !HasAttribute(UE::Interchange::FAttributeKey(NodeAttributeKey));
-	}
+	bool RemoveAttribute(const FString& NodeAttributeKey);
 
 	/**
 	 * Add a boolean attribute to this node. Return false if the attribute do not exist or if we cannot add it
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool AddBooleanAttribute(const FString& NodeAttributeKey, const bool& Value)
-	{
-		INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(bool);
-	}
+	bool AddBooleanAttribute(const FString& NodeAttributeKey, const bool& Value);
 	
 	/**
 	 * Get a boolean attribute from this node. Return false if the attribute do not exist
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool GetBooleanAttribute(const FString& NodeAttributeKey, bool& OutValue)
-	{
-		INTERCHANGE_BASE_NODE_GET_ATTRIBUTE(bool);
-	}
+	bool GetBooleanAttribute(const FString& NodeAttributeKey, bool& OutValue) const;
 
 	/**
 	 * Add a int32 attribute to this node. Return false if the attribute do not exist or if we cannot add it
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool AddInt32Attribute(const FString& NodeAttributeKey, const int32& Value)
-	{
-		INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(int32);
-	}
+	bool AddInt32Attribute(const FString& NodeAttributeKey, const int32& Value);
 	
 	/**
 	 * Get a int32 attribute from this node. Return false if the attribute do not exist
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool GetInt32Attribute(const FString& NodeAttributeKey, int32& OutValue)
-	{
-		INTERCHANGE_BASE_NODE_GET_ATTRIBUTE(int32);
-	}
+	bool GetInt32Attribute(const FString& NodeAttributeKey, int32& OutValue) const;
 
 	/**
 	 * Add a float attribute to this node. Return false if the attribute do not exist or if we cannot add it
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool AddFloatAttribute(const FString& NodeAttributeKey, const float& Value)
-	{
-		INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(float);
-	}
+	bool AddFloatAttribute(const FString& NodeAttributeKey, const float& Value);
 	
 	/**
 	 * Get a float attribute from this node. Return false if the attribute do not exist
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool GetFloatAttribute(const FString& NodeAttributeKey, float& OutValue)
-	{
-		INTERCHANGE_BASE_NODE_GET_ATTRIBUTE(float);
-	}
+	bool GetFloatAttribute(const FString& NodeAttributeKey, float& OutValue) const;
 
 	/**
 	 * Add a string attribute to this node. Return false if the attribute do not exist or if we cannot add it
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool AddStringAttribute(const FString& NodeAttributeKey, const FString& Value)
-	{
-		INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(FString);
-	}
+	bool AddStringAttribute(const FString& NodeAttributeKey, const FString& Value);
 	
 	/**
 	 * Get a string attribute from this node. Return false if the attribute do not exist
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
-	bool GetStringAttribute(const FString& NodeAttributeKey, FString& OutValue)
+	bool GetStringAttribute(const FString& NodeAttributeKey, FString& OutValue) const;
+
+	/**
+	 * Add a FLinearColor attribute to this node. Return false if the attribute do not exist or if we cannot add it
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
+	bool AddLinearColorAttribute(const FString& NodeAttributeKey, const FLinearColor& Value);
+	
+	/**
+	 * Get a FLinearColor attribute from this node. Return false if the attribute do not exist
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
+	bool GetLinearColorAttribute(const FString& NodeAttributeKey, FLinearColor& OutValue) const;
+
+	template<typename AttributeType>
+	bool GetAttribute(const FString& NodeAttributeKey, AttributeType& OutValue) const
 	{
-		INTERCHANGE_BASE_NODE_GET_ATTRIBUTE(FString);
+		INTERCHANGE_BASE_NODE_GET_ATTRIBUTE(AttributeType);
+	}
+	template<typename AttributeType>
+	bool SetAttribute(const FString& NodeAttributeKey, const AttributeType& Value)
+	{
+		INTERCHANGE_BASE_NODE_ADD_ATTRIBUTE(AttributeType);
 	}
 
 	/**
+	 * Adds the delegates that will read and write the attribute value to a UObject.
+	 * @param NodeAttributeKey	The key of the attribute for which we are adding the delegates.
+	 * @param ObjectClass		The class of the object that we will apply and fill on.
+	 * @param PropertyName		The name of the property of the ObjectClass that we will read and write to.
+	 */
+	template<typename AttributeType>
+	inline void AddApplyAndFillDelegates(const FString& NodeAttributeKey, UClass* ObjectClass, const FName PropertyName);
+
+	/**
+	 * Writes an attribute value to a UObject.
+	 * @param NodeAttributeKey	The key for the attribute to write.
+	 * @param Object			The object to write to.
+	 * @param PropertyName		The name of the property to write to on the Object.
+	 * @result					True if we succeeded.
+	 */
+	template<typename AttributeType>
+	inline bool ApplyAttributeToObject(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName) const;
+
+	/**
+	 * Reads an attribute value from a UObject.
+	 * @param NodeAttributeKey	The key for the attribute to update.
+	 * @param Object			The object to read from.
+	 * @param PropertyName		The name of the property to read from on the Object.
+	 * @result					True if we succeeded.
+	 */
+	template<typename AttributeType>
+	inline bool FillAttributeFromObject(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName);
+
+	/**
 	 * Return the unique id pass in the constructor.
-	 *
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	FString GetUniqueID() const;
 
 	/**
 	 * Return the display label.
-	 *
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	FString GetDisplayLabel() const;
 
 	/**
 	 * Change the display label.
-	 *
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	bool SetDisplayLabel(const FString& DisplayName);
+
+	/**
+	 * Return the reimport strategy flags.
+	 *
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
+	EReimportStrategyFlags GetReimportStrategyFlags() const;
+
+	/**
+	 * Change the reimport strategy flags.
+	 *
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
+	bool SetReimportStrategyFlags(const EReimportStrategyFlags& ReimportStrategyFlags);
 
 	/**
 	 * Return the parent unique id. In case the attribute does not exist it will return InvalidNodeUid()
@@ -1129,21 +470,18 @@ public:
 
 	/**
 	 * This function allow to retrieve the number of factory dependencies for this object.
-	 *
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	int32 GetFactoryDependenciesCount() const;
 
 	/**
 	 * This function allow to retrieve the dependency for this object.
-	 * 
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	void GetFactoryDependencies(TArray<FString>& OutDependencies ) const;
 
 	/**
 	 * This function allow to retrieve one dependency for this object.
-	 *
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Interchange | Node")
 	void GetFactoryDependency(const int32 Index, FString& OutDependency) const;
@@ -1239,28 +577,21 @@ public:
 	 * Each Attribute that was set and have a delegate set for the specified UObject->UClass will
 	 * get the delegate execute so it apply the attribute to the UObject property.
 	 * See the macros IMPLEMENT_NODE_ATTRIBUTE_SETTER at the top of the file to know how delegates are setup for property.
-	 *
 	 */
 	void ApplyAllCustomAttributeToObject(UObject* Object) const;
 
 	void FillAllCustomAttributeFromObject(UObject* Object) const;
 
+	/**
+	 * Serialize the node, by default only the attribute storage is serialize for a node
+	 */
 	virtual void Serialize(FArchive& Ar) override;
 
-	static void CompareNodeStorage(UInterchangeBaseNode* NodeA, const UInterchangeBaseNode* NodeB, TArray<UE::Interchange::FAttributeKey>& RemovedAttributes, TArray<UE::Interchange::FAttributeKey>& AddedAttributes, TArray<UE::Interchange::FAttributeKey>& ModifiedAttributes)
-	{
-		UE::Interchange::FAttributeStorage::CompareStorage(*(NodeA->Attributes), *(NodeB->Attributes), RemovedAttributes, AddedAttributes, ModifiedAttributes);
-	}
+	static void CompareNodeStorage(UInterchangeBaseNode* NodeA, const UInterchangeBaseNode* NodeB, TArray<UE::Interchange::FAttributeKey>& RemovedAttributes, TArray<UE::Interchange::FAttributeKey>& AddedAttributes, TArray<UE::Interchange::FAttributeKey>& ModifiedAttributes);
 	
-	static void CopyStorageAttributes(const UInterchangeBaseNode* SourceNode, UInterchangeBaseNode* DestinationNode, TArray<UE::Interchange::FAttributeKey>& AttributeKeys)
-	{
-		UE::Interchange::FAttributeStorage::CopyStorageAttributes(*(SourceNode->Attributes), *(DestinationNode->Attributes), AttributeKeys);
-	}
+	static void CopyStorageAttributes(const UInterchangeBaseNode* SourceNode, UInterchangeBaseNode* DestinationNode, TArray<UE::Interchange::FAttributeKey>& AttributeKeys);
 
-	static void CopyStorage(const UInterchangeBaseNode* SourceNode, UInterchangeBaseNode* DestinationNode)
-	{
-		*(DestinationNode->Attributes) = *(SourceNode->Attributes);
-	}
+	static void CopyStorage(const UInterchangeBaseNode* SourceNode, UInterchangeBaseNode* DestinationNode);
 	
 	UPROPERTY()
 	mutable FSoftObjectPath ReferenceObject;
@@ -1280,10 +611,254 @@ protected:
 	 * Example: Mesh factory node will have dependencies on material factory node
 	 *          Material factory node will have dependencies on texture factory node
 	 */
-	UE::Interchange::FNameAttributeArrayHelper FactoryDependencies;
+	UE::Interchange::TArrayAttributeHelper<FString> FactoryDependencies;
 
 	/**
 	 * This tracks the IDs of asset nodes which are the target of factories
 	 */
-	mutable UE::Interchange::FNameAttributeArrayHelper TargetNodes;
+	mutable UE::Interchange::TArrayAttributeHelper<FString> TargetNodes;
 };
+
+template<typename AttributeType>
+inline void UInterchangeBaseNode::AddApplyAndFillDelegates(const FString& NodeAttributeKey, UClass* ObjectClass, const FName PropertyName)
+{
+	TArray<UE::Interchange::FApplyAttributeToAsset>& ApplyDelegates = ApplyCustomAttributeDelegates.FindOrAdd(ObjectClass);
+	ApplyDelegates.Add(
+		UE::Interchange::FApplyAttributeToAsset::CreateLambda(
+		[NodeAttributeKey, PropertyName, this](UObject* Asset)
+		{
+			return ApplyAttributeToObject<AttributeType>(NodeAttributeKey, Asset, PropertyName);
+		})
+	);
+
+	TArray<UE::Interchange::FFillAttributeToAsset>& FillDelegates = FillCustomAttributeDelegates.FindOrAdd(ObjectClass);
+	FillDelegates.Add(
+		UE::Interchange::FApplyAttributeToAsset::CreateLambda(
+		[NodeAttributeKey, PropertyName, this](UObject* Asset)
+		{
+			return FillAttributeFromObject<AttributeType>(NodeAttributeKey, Asset, PropertyName);
+		})
+	);
+}
+
+template<typename AttributeType>
+inline bool UInterchangeBaseNode::ApplyAttributeToObject(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName) const
+{
+	if (!Object)
+	{
+		return false;
+	}
+
+	AttributeType ValueData;
+	if (GetAttribute<AttributeType>(NodeAttributeKey, ValueData))
+	{
+		TVariant<UObject*, uint8*> Container;
+		Container.Set<UObject*>(Object);
+		if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+		{
+			AttributeType* PropertyValueAddress;
+			if (Container.IsType<UObject*>())
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<UObject*>());
+			}
+			else
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<uint8*>());
+			}
+
+			*PropertyValueAddress = ValueData;
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Specialized version of ApplyAttributeToObject for strings.
+ * If the target property is a FObjectPropertyBase, treat the string as an object path.
+ */
+template<>
+inline bool UInterchangeBaseNode::ApplyAttributeToObject<FString>(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName) const
+{
+	if (!Object)
+	{
+		return false;
+	}
+
+	FString ValueData;
+	if (GetAttribute<FString>(NodeAttributeKey, ValueData))
+	{
+		TVariant<UObject*, uint8*> Container;
+		Container.Set<UObject*>(Object);
+		if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+		{
+			FString* PropertyValueAddress;
+			if (Container.IsType<UObject*>())
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<FString>(Container.Get<UObject*>());
+			}
+			else
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<FString>(Container.Get<uint8*>());
+			}
+
+			if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
+			{
+				ObjectProperty->SetObjectPropertyValue(PropertyValueAddress, FSoftObjectPath(ValueData).TryLoad());
+			}
+			else
+			{
+				*PropertyValueAddress = ValueData;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Specialized version of ApplyAttributeToObject for bools.
+ * If the target property is a FBoolProperty, treat the propertyg as a bitfield.
+ */
+template<>
+inline bool UInterchangeBaseNode::ApplyAttributeToObject<bool>(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName) const
+{
+	if (!Object)
+	{
+		return false;
+	}
+
+	bool bValueData;
+	if (GetAttribute<bool>(NodeAttributeKey, bValueData))
+	{
+		TVariant<UObject*, uint8*> Container;
+		Container.Set<UObject*>(Object);
+		if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+		{
+			bool* PropertyValueAddress;
+			if (Container.IsType<UObject*>())
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<bool>(Container.Get<UObject*>());
+			}
+			else
+			{
+				PropertyValueAddress = Property->ContainerPtrToValuePtr<bool>(Container.Get<uint8*>());
+			}
+
+			// Support for bitfields
+			if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
+			{
+				BoolProperty->SetPropertyValue(PropertyValueAddress, bValueData);
+			}
+			else
+			{
+				*PropertyValueAddress = bValueData;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+template<typename AttributeType>
+inline bool UInterchangeBaseNode::FillAttributeFromObject(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName)
+{
+	TVariant<UObject*, uint8*> Container;
+	Container.Set<UObject*>(Object);
+	if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+	{
+		AttributeType* PropertyValueAddress;
+		if (Container.IsType<UObject*>())
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<UObject*>());
+		}
+		else
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<AttributeType>(Container.Get<uint8*>());
+		}
+
+		// Support for bitfields
+		if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
+		{
+			const bool bPropertyValue = BoolProperty->GetPropertyValue(PropertyValueAddress);
+			return SetAttribute(NodeAttributeKey, bPropertyValue);
+		}
+		else
+		{
+			return SetAttribute(NodeAttributeKey, *PropertyValueAddress);
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Specialized version of FillAttributeFromObject for strings.
+ * If the target property is a FObjectPropertyBase, treat the string as an object path.
+ */
+template<>
+inline bool UInterchangeBaseNode::FillAttributeFromObject<FString>(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName)
+{
+	TVariant<UObject*, uint8*> Container;
+	Container.Set<UObject*>(Object);
+	if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+	{
+		FString* PropertyValueAddress;
+		if (Container.IsType<UObject*>())
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<FString>(Container.Get<UObject*>());
+		}
+		else
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<FString>(Container.Get<uint8*>());
+		}
+
+		if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
+		{
+			UObject* ObjectValue = ObjectProperty->GetObjectPropertyValue(PropertyValueAddress);
+			return SetAttribute(NodeAttributeKey, ObjectValue->GetPathName());
+		}
+		else
+		{
+			return SetAttribute(NodeAttributeKey, *PropertyValueAddress);
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Specialized version of FillAttributeFromObject for bools.
+ * If the target property is a FBoolProperty, treat the property as a bitfield.
+ */
+template<>
+inline bool UInterchangeBaseNode::FillAttributeFromObject<bool>(const FString& NodeAttributeKey, UObject* Object, const FName PropertyName)
+{
+	TVariant<UObject*, uint8*> Container;
+	Container.Set<UObject*>(Object);
+	if(FProperty* Property = InterchangePrivateNodeBase::FindPropertyByPathChecked(Container, Object->GetClass(), PropertyName.ToString()))
+	{
+		bool* PropertyValueAddress;
+		if (Container.IsType<UObject*>())
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<bool>(Container.Get<UObject*>());
+		}
+		else
+		{
+			PropertyValueAddress = Property->ContainerPtrToValuePtr<bool>(Container.Get<uint8*>());
+		}
+
+		// Support for bitfields
+		if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
+		{
+			const bool bPropertyValue = BoolProperty->GetPropertyValue(PropertyValueAddress);
+			return SetAttribute(NodeAttributeKey, bPropertyValue);
+		}
+		else
+		{
+			return SetAttribute(NodeAttributeKey, *PropertyValueAddress);
+		}
+	}
+
+	return false;
+}

@@ -48,7 +48,7 @@ namespace HordeServer.Services.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task ExpandPool(IPool Pool, IReadOnlyList<IAgent> Agents, int Count)
+		public async Task ExpandPoolAsync(IPool Pool, IReadOnlyList<IAgent> Agents, int Count)
 		{
 			// Find stopped instances in the correct pool
 			DescribeInstancesRequest DescribeRequest = new DescribeInstancesRequest();
@@ -75,7 +75,7 @@ namespace HordeServer.Services.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task ShrinkPool(IPool Pool, IReadOnlyList<IAgent> Agents, int Count)
+		public async Task ShrinkPoolAsync(IPool Pool, IReadOnlyList<IAgent> Agents, int Count)
 		{
 			string AwsTagProperty = $"{AwsTagPropertyName}={PoolTagName}:{Pool.Name}";
 
@@ -90,15 +90,28 @@ namespace HordeServer.Services.Impl
 				{
 					for (IAgent? NewAgent = Agent; NewAgent != null; NewAgent = await AgentCollection.GetAsync(Agent.Id))
 					{
-						if (await AgentCollection.TryUpdateSettingsAsync(NewAgent, bRequestShutdown: true) != null)
+						if (await AgentCollection.TryUpdateSettingsAsync(NewAgent, bRequestShutdown: true, ShutdownReason: "Autoscaler") != null)
 						{
-							AgentCollection.GetLogger(Agent.Id).LogInformation("Shutting down due to autoscaler");
+							AgentCollection.GetLogger(Agent.Id).LogInformation("Marked for shutdown due to autoscalar (currently {NumLeases} leases outstanding)", NewAgent.Leases.Count);
 							Count--;
 							break;
 						}
 					}
 				}
 			}
+		}
+
+		/// <inheritdoc/>
+		public async Task<int> GetNumStoppedInstancesAsync(IPool Pool)
+		{
+			// Find all instances in the pool
+			DescribeInstancesRequest DescribeRequest = new DescribeInstancesRequest();
+			DescribeRequest.Filters = new List<Filter>();
+			DescribeRequest.Filters.Add(new Filter("instance-state-name", new List<string> { InstanceStateName.Stopped.Value }));
+			DescribeRequest.Filters.Add(new Filter("tag:" + PoolTagName, new List<string> { Pool.Name }));
+
+			DescribeInstancesResponse DescribeResponse = await Client.DescribeInstancesAsync(DescribeRequest);
+			return DescribeResponse.Reservations.SelectMany(x => x.Instances).Select(x => x.InstanceId).Distinct().Count();
 		}
 	}
 }

@@ -630,7 +630,7 @@ TArray<FString> URigVMController::GetAddNodePythonCommands(URigVMNode* Node) con
 		// add_comment_node(comment_text, position=[0.0, 0.0], size=[400.0, 300.0], color=[0.0, 0.0, 0.0, 0.0], node_name='', undo=True)
 		Commands.Add(FString::Printf(TEXT("blueprint.get_controller_by_name('%s').add_comment_node('%s', %s, %s, %s, '%s')"),
 					*GraphName,
-					*CommentNode->GetCommentText(),
+					*CommentNode->GetCommentText().ReplaceCharWithEscapedChar(),
 					*RigVMPythonUtils::Vector2DToPythonString(CommentNode->GetPosition()),
 					*RigVMPythonUtils::Vector2DToPythonString(CommentNode->GetSize()),
 					*RigVMPythonUtils::LinearColorToPythonString(CommentNode->GetNodeColor()),
@@ -2597,7 +2597,6 @@ bool URigVMController::Undo()
 		return false;
 	}
 
-	TGuardValue<bool> GuardCompactness(bIgnoreRerouteCompactnessChanges, true);
 	return ActionStack->Undo(this);
 }
 
@@ -2608,7 +2607,6 @@ bool URigVMController::Redo()
 		return false;
 	}
 
-	TGuardValue<bool> GuardCompactness(bIgnoreRerouteCompactnessChanges, true);
 	return ActionStack->Redo(this);
 }
 
@@ -7711,8 +7709,11 @@ bool URigVMController::AddLink(URigVMPin* OutputPin, URigVMPin* InputPin, bool b
 	}
 	Notify(ERigVMGraphNotifType::LinkAdded, Link);
 
-	UpdateRerouteNodeAfterChangingLinks(OutputPin, bSetupUndoRedo);
-	UpdateRerouteNodeAfterChangingLinks(InputPin, bSetupUndoRedo);
+	if (bSetupUndoRedo)
+	{
+		UpdateRerouteNodeAfterChangingLinks(OutputPin, bSetupUndoRedo);
+		UpdateRerouteNodeAfterChangingLinks(InputPin, bSetupUndoRedo);
+	}
 
 	//TArray<URigVMNode*> NodesVisited;
 	//PotentiallyResolvePrototypeNode(Cast<URigVMPrototypeNode>(InputPin->GetNode()), bSetupUndoRedo, NodesVisited);
@@ -7871,8 +7872,11 @@ bool URigVMController::BreakLink(URigVMPin* OutputPin, URigVMPin* InputPin, bool
 
 			DestroyObject(Link);
 
-			UpdateRerouteNodeAfterChangingLinks(OutputPin, bSetupUndoRedo);
-			UpdateRerouteNodeAfterChangingLinks(InputPin, bSetupUndoRedo);
+			if (bSetupUndoRedo)
+			{
+				UpdateRerouteNodeAfterChangingLinks(OutputPin, bSetupUndoRedo);
+				UpdateRerouteNodeAfterChangingLinks(InputPin, bSetupUndoRedo);
+			}
 
 			if (bSetupUndoRedo)
 			{
@@ -10312,13 +10316,6 @@ URigVMArrayNode* URigVMController::AddArrayNode(ERigVMOpCode InOpCode, const FSt
 		return nullptr;
 	}
 
-#if UE_RIGVM_UCLASS_BASED_STORAGE_DISABLED
-
-	ReportError(TEXT("This build of Control Rig doesn't support Array Nodes."));
-	return nullptr;
-	
-#endif
-
 	// validate the op code
 	bool bIsMutable = false;
 	switch(InOpCode)
@@ -11930,32 +11927,59 @@ void URigVMController::RepopulatePinsOnNode(URigVMNode* InNode, bool bFollowCore
 			const FRigVMGraphVariableDescription VariableDescription = VariableNode->GetVariableDescription();
 			const FRigVMExternalVariable CurrentExternalVariable = VariableDescription.ToExternalVariable();
 
-			for(const FRigVMExternalVariable& ExternalVariable : ExternalVariables)
+			FRigVMExternalVariable Variable;
+			if (VariableNode->IsInputArgument())
 			{
-				if(ExternalVariable.Name == CurrentExternalVariable.Name)
+				if (URigVMFunctionEntryNode* GraphEntryNode = Graph->GetEntryNode())
 				{
-					if(ExternalVariable.TypeName != CurrentExternalVariable.TypeName ||
-						ExternalVariable.TypeObject != CurrentExternalVariable.TypeObject ||
-						ExternalVariable.bIsArray != CurrentExternalVariable.bIsArray)
+					if (URigVMPin* EntryPin = GraphEntryNode->FindPin(VariableDescription.Name.ToString()))
 					{
-						FString CPPType;
-						UObject* CPPTypeObject;
-						
-						if(RigVMTypeUtils::CPPTypeFromExternalVariable(ExternalVariable, CPPType, &CPPTypeObject))
-						{
-							RefreshVariableNode(VariableNode->GetFName(), ExternalVariable.Name, CPPType, ExternalVariable.TypeObject, false, bSetupOrphanedPins);
-						}
-						else
-						{
-							ReportErrorf(
-								TEXT("Control Rig '%s', Type of Variable '%s' cannot be resolved."),
-								*InNode->GetOutermost()->GetPathName(),
-								*ExternalVariable.Name.ToString()
-							);
-						}
+						Variable = RigVMTypeUtils::ExternalVariableFromCPPType(VariableDescription.Name, EntryPin->GetCPPType(), EntryPin->GetCPPTypeObject());
 					}
-					break;
 				}
+			}
+			else
+			{				
+				for(const FRigVMExternalVariable& ExternalVariable : ExternalVariables)
+				{
+					if(ExternalVariable.Name == CurrentExternalVariable.Name)
+					{
+						Variable = ExternalVariable;
+						break;
+					}
+				}
+			}
+
+			if (Variable.IsValid(true))
+			{
+				if(Variable.TypeName != CurrentExternalVariable.TypeName ||
+				   Variable.TypeObject != CurrentExternalVariable.TypeObject ||
+				   Variable.bIsArray != CurrentExternalVariable.bIsArray)
+				{
+					FString CPPType;
+					UObject* CPPTypeObject;
+				
+					if(RigVMTypeUtils::CPPTypeFromExternalVariable(Variable, CPPType, &CPPTypeObject))
+					{
+						RefreshVariableNode(VariableNode->GetFName(), Variable.Name, CPPType, Variable.TypeObject, false, bSetupOrphanedPins);
+					}
+					else
+					{
+						ReportErrorf(
+							TEXT("Control Rig '%s', Type of Variable '%s' cannot be resolved."),
+							*InNode->GetOutermost()->GetPathName(),
+							*Variable.Name.ToString()
+						);
+					}
+				}
+			}
+			else
+			{
+				ReportErrorf(
+					TEXT("Control Rig '%s', Variable '%s' not found."),
+					*InNode->GetOutermost()->GetPathName(),
+					*CurrentExternalVariable.Name.ToString()
+				);
 			}
 		}
 		

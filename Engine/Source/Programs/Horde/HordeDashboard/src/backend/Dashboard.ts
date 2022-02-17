@@ -65,6 +65,21 @@ export class Dashboard {
         this.setUpdated();
     }
 
+    clearPinnedJobs() {
+
+        if (!this.data.pinnedJobIds?.length) {
+            return;
+        }
+
+        const jobs = this.data.pinnedJobIds;
+
+        this.data.pinnedJobIds = [];
+
+        backend.updateUser({ removePinnedJobIds:jobs });
+
+        this.setUpdated();
+    }
+
     get username(): string {
         return this.data.name;
     }
@@ -133,22 +148,6 @@ export class Dashboard {
         return this.data.pinnedJobIds ?? [];
     }
 
-    get issueNotifications(): boolean {
-
-        return this.data.enableIssueNotifications!;
-    }
-
-    set issueNotifications(value: boolean) {
-
-        backend.updateUser({ enableIssueNotifications: value }).then(() => {
-
-            this.data.enableIssueNotifications = value;
-            this.setUpdated();
-
-        });
-
-    }
-
     get experimentalFeatures(): boolean {
 
         return this.data.enableExperimentalFeatures!;
@@ -185,38 +184,29 @@ export class Dashboard {
 
         if (!this.available) {
             // avoid intial flash when loading into site before backend is initialized
-            return localStorage?.getItem("horde_darktheme") === "true";
+            return localStorage?.getItem("horde_darktheme") !== "false";
         }
 
         const pref = this.preferences.get(DashboardPreference.Darktheme);
 
         if (pref !== "true" && pref !== "false") {
-            console.log("setting dark theme");            
-            this.setDarkTheme(true, false, true);            
+            console.error("No theme preference set, should be defaulted in getCurrentUser");
+            return localStorage?.getItem("horde_darktheme") !== "false";
         }
 
-        return this.preferences.get(DashboardPreference.Darktheme) === 'true';
+        return this.preferences.get(DashboardPreference.Darktheme) !== 'false';
 
     }
 
-    setDarkTheme(value: boolean | undefined, update: boolean = true, resetColors: boolean = false) {
+    setDarkTheme(value: boolean | undefined) {
 
         this.setPreference(DashboardPreference.Darktheme, value ? "true" : "false");
 
         if (value) {
             localStorage?.setItem("horde_darktheme", "true");
         } else {
-            localStorage?.removeItem("horde_darktheme");
+            localStorage?.setItem("horde_darktheme", "false");
         }
-
-        if (resetColors) {
-            this.resetStatusColors();
-        }
-
-        if (update) {
-            this.setUpdated();
-        }
-
     }
 
     setDisplayUTC(value: boolean | undefined) {
@@ -436,7 +426,7 @@ export class Dashboard {
             this.preferences.set(pref, value);
         }
 
-        this.postPreferences();
+        this.postPreferences(pref === DashboardPreference.Darktheme);
 
     }
 
@@ -458,7 +448,7 @@ export class Dashboard {
     }
 
 
-    private async postPreferences(): Promise<boolean> {
+    private async postPreferences(reload?:boolean): Promise<boolean> {
 
         // cancel any pending        
         for (let i = 0; i < this.cancelId; i++) {
@@ -477,6 +467,11 @@ export class Dashboard {
         } catch (reason) {
             success = false;
             console.error("Error posting user preferences", reason)
+        } finally {
+            if (reload) {
+                window.location.reload();
+            }
+                
         }
 
         return success;
@@ -488,7 +483,7 @@ export class Dashboard {
 
     serverSettingsChanged: boolean = false;
 
-    private data: GetUserResponse = { id: "", name: "", enableIssueNotifications: false, enableExperimentalFeatures: false, claims: [], pinnedJobIds: [], dashboardSettings: { preferences: new Map() } };
+    private data: GetUserResponse = { id: "", name: "", enableExperimentalFeatures: false, claims: [], pinnedJobIds: [], dashboardSettings: { preferences: new Map() } };
 
     private updateTimeoutId: any = undefined;
 

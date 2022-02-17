@@ -151,7 +151,19 @@ public:
 	 * @param	ReferenceSkeleton		The ReferenceSkeleton to compute the mirror index against
 	 * @param	OutMirrorBoneIndexes	An array that provides the bone index of the mirror bone, or INDEX_NONE if the bone is not mirrored
 	 */
-	ENGINE_API void FillMirrorBoneIndexes(const FReferenceSkeleton& ReferenceSkeleton, TCustomBoneIndexArray<FSkeletonPoseBoneIndex, FSkeletonPoseBoneIndex>& OutMirrorBoneIndexes) const;
+	ENGINE_API void FillMirrorBoneIndexes(const USkeleton* Skeleton, TCustomBoneIndexArray<FSkeletonPoseBoneIndex, FSkeletonPoseBoneIndex>& OutMirrorBoneIndexes) const;
+
+	/**
+	 * Populates two arrays with a mapping of compact pose mirror bones and reference rotations
+	 *
+	 * @param	BoneContainer					Structure which holds the required bones
+	 * @param	OutCompactPoseMirrorBones		Output array mapping compact pose mirror bones
+	 * @param	OutComponentSpaceRefRotations	Output array mapping reference rotations
+	 */
+	ENGINE_API void FillCompactPoseAndComponentRefRotations(
+		const FBoneContainer& BoneContainer,
+		TCustomBoneIndexArray<FCompactPoseBoneIndex, FCompactPoseBoneIndex>& OutCompactPoseMirrorBones,
+		TCustomBoneIndexArray<FQuat, FCompactPoseBoneIndex>& OutComponentSpaceRefRotations) const;
 
 #if WITH_EDITOR  
 	/**

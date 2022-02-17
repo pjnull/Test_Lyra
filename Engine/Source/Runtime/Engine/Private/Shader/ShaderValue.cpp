@@ -1,15 +1,133 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "Shader/ShaderTypes.h"
 #include "Misc/StringBuilder.h"
+#include "Hash/xxhash.h"
+#include "Misc/MemStackUtility.h"
 #include "Misc/LargeWorldRenderPosition.h"
 
 namespace UE
 {
 namespace Shader
 {
+
+const TCHAR* FType::GetName() const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->Name;
+	}
+
+	check(ValueType != EValueType::Struct);
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(ValueType);
+	return TypeDesc.Name;
+}
+
+FType FType::GetDerivativeType() const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->DerivativeType; // will convert to 'Void' if DerivativeType is nullptr
+	}
+
+	check(ValueType != EValueType::Struct);
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(ValueType);
+	return MakeValueType(EValueComponentType::Float, TypeDesc.NumComponents);
+}
+
+int32 FType::GetNumComponents() const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->ComponentTypes.Num();
+	}
+
+	check(ValueType != EValueType::Struct);
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(ValueType);
+	return TypeDesc.NumComponents;
+}
+
+int32 FType::GetNumFlatFields() const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->FlatFieldTypes.Num();
+	}
+
+	check(ValueType != EValueType::Struct);
+	return 1;
+}
+
+EValueComponentType FType::GetComponentType(int32 Index) const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->ComponentTypes.IsValidIndex(Index) ? StructType->ComponentTypes[Index] : EValueComponentType::Void;
+	}
+	else
+	{
+		const FValueTypeDescription TypeDesc = GetValueTypeDescription(ValueType);
+		return (Index >= 0 && Index < TypeDesc.NumComponents) ? TypeDesc.ComponentType : EValueComponentType::Void;
+	}
+}
+
+EValueType FType::GetFlatFieldType(int32 Index) const
+{
+	if (StructType)
+	{
+		check(ValueType == EValueType::Struct);
+		return StructType->FlatFieldTypes.IsValidIndex(Index) ? StructType->FlatFieldTypes[Index] : EValueType::Void;
+	}
+	else
+	{
+		return (Index == 0) ? ValueType : EValueType::Void;
+	}
+}
+
+bool FType::Merge(const FType& OtherType)
+{
+	if (ValueType == EValueType::Void)
+	{
+		ValueType = OtherType.ValueType;
+		StructType = OtherType.StructType;
+		return true;
+	}
+
+	if (IsStruct() || OtherType.IsStruct())
+	{
+		return StructType == OtherType.StructType;
+	}
+
+	if (ValueType != OtherType.ValueType)
+	{
+		const FValueTypeDescription TypeDesc = GetValueTypeDescription(ValueType);
+		const FValueTypeDescription OtherTypeDesc = GetValueTypeDescription(OtherType);
+		const EValueComponentType ComponentType = CombineComponentTypes(TypeDesc.ComponentType, OtherTypeDesc.ComponentType);
+		const int8 NumComponents = FMath::Max(TypeDesc.NumComponents, OtherTypeDesc.NumComponents);
+		ValueType = MakeValueType(ComponentType, NumComponents);
+	}
+	return true;
+}
+
+const FStructField* FStructType::FindFieldByName(const TCHAR* InName) const
+{
+	for (const FStructField& Field : Fields)
+	{
+		if (FCString::Strcmp(Field.Name, InName) == 0)
+		{
+			return &Field;
+		}
+	}
+
+	return nullptr;
+}
+
 namespace Private
 {
-
 struct FCastFloat
 {
 	using FComponentType = float;
@@ -78,11 +196,10 @@ template<typename Operation, typename ResultType>
 void AsType(const Operation& Op, const FValue& Value, ResultType& OutResult)
 {
 	using FComponentType = typename Operation::FComponentType;
-	const EValueComponentType ComponentType = Value.ComponentType;
-	const int32 NumComponents = Value.NumComponents;
-	if (NumComponents == 1)
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(Value.Type);
+	if (TypeDesc.NumComponents == 1)
 	{
-		const FComponentType Component = Op(ComponentType, Value.Component[0]);
+		const FComponentType Component = Op(TypeDesc.ComponentType, Value.Component[0]);
 		for (int32 i = 0; i < 4; ++i)
 		{
 			OutResult[i] = Component;
@@ -90,9 +207,10 @@ void AsType(const Operation& Op, const FValue& Value, ResultType& OutResult)
 	}
 	else
 	{
+		const int32 NumComponents = FMath::Min<int32>(TypeDesc.NumComponents, 4);
 		for (int32 i = 0; i < NumComponents; ++i)
 		{
-			OutResult[i] = Op(ComponentType, Value.Component[i]);
+			OutResult[i] = Op(TypeDesc.ComponentType, Value.Component[i]);
 		}
 		for (int32 i = NumComponents; i < 4; ++i)
 		{
@@ -105,19 +223,30 @@ template<typename Operation>
 void Cast(const Operation& Op, const FValue& Value, FValue& OutResult)
 {
 	using FComponentType = typename Operation::FComponentType;
-	const EValueComponentType ComponentType = Value.ComponentType;
-	const int32 NumResultComponents = OutResult.NumComponents;
-	const int32 NumCopyComponents = FMath::Min<int32>(Value.NumComponents, NumResultComponents);
+	const FValueTypeDescription ValueTypeDesc = GetValueTypeDescription(Value.Type);
+	const FValueTypeDescription ResultTypeDesc = GetValueTypeDescription(OutResult.Type);
+	const int32 NumCopyComponents = FMath::Min<int32>(ValueTypeDesc.NumComponents, ResultTypeDesc.NumComponents);
 	for (int32 i = 0; i < NumCopyComponents; ++i)
 	{
-		OutResult.Component[i] = Op(ComponentType, Value.Component[i]);
+		OutResult.Component.Add(Op(ValueTypeDesc.ComponentType, Value.Component[i]));
 	}
 
-	if (NumCopyComponents == 1 && NumResultComponents > 1)
+	if (NumCopyComponents < ResultTypeDesc.NumComponents)
 	{
-		for (int32 i = 1; i < NumResultComponents; ++i)
+		if (NumCopyComponents == 1)
 		{
-			OutResult.Component[i] = OutResult.Component[0];
+			const FValueComponent Component = OutResult.Component[0];
+			for (int32 i = 1; i < ResultTypeDesc.NumComponents; ++i)
+			{
+				OutResult.Component.Add(Component);
+			}
+		}
+		else
+		{
+			for (int32 i = NumCopyComponents; i < ResultTypeDesc.NumComponents; ++i)
+			{
+				OutResult.Component.AddDefaulted();
+			}
 		}
 	}
 }
@@ -133,26 +262,26 @@ void FormatComponent_Double(double Value, int32 NumComponents, EValueStringForma
 		// Shorter format for more components
 		switch (NumComponents)
 		{
-		case 4: OutResult.Appendf(TEXT("%.2g"), Value); break;
+		default: OutResult.Appendf(TEXT("%.2g"), Value); break;
 		case 3: OutResult.Appendf(TEXT("%.3g"), Value); break;
 		case 2: OutResult.Appendf(TEXT("%.3g"), Value); break;
-		default: OutResult.Appendf(TEXT("%.4g"), Value); break;
+		case 1: OutResult.Appendf(TEXT("%.4g"), Value); break;
 		}
 	}
 }
 
 } // namespace Private
-} // namespace Shader
-} // namespace UE
 
-UE::Shader::FValue UE::Shader::FValue::FromMemoryImage(EValueType Type, const void* Data, uint32* OutSizeInBytes)
+FValue FValue::FromMemoryImage(EValueType Type, const void* Data, uint32* OutSizeInBytes)
 {
-	FValue Result(Type);
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(Type);
+
+	FValue Result(TypeDesc.ComponentType, TypeDesc.NumComponents);
 	const uint8* Bytes = static_cast<const uint8*>(Data);
-	const uint32 ComponentSizeInBytes = GetComponentTypeSizeInBytes(Result.ComponentType);
+	const uint32 ComponentSizeInBytes = GetComponentTypeSizeInBytes(TypeDesc.ComponentType);
 	if (ComponentSizeInBytes > 0u)
 	{
-		for (int32 i = 0u; i < Result.NumComponents; ++i)
+		for (int32 i = 0u; i < TypeDesc.NumComponents; ++i)
 		{
 			FMemory::Memcpy(&Result.Component[i].Packed, Bytes, ComponentSizeInBytes);
 			Bytes += ComponentSizeInBytes;
@@ -165,14 +294,17 @@ UE::Shader::FValue UE::Shader::FValue::FromMemoryImage(EValueType Type, const vo
 	return Result;
 }
 
-UE::Shader::FMemoryImageValue UE::Shader::FValue::AsMemoryImage() const
+FMemoryImageValue FValue::AsMemoryImage() const
 {
+	check(!Type.IsStruct());
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(Type);
+
 	FMemoryImageValue Result;
 	uint8* Bytes = Result.Bytes;
-	const uint32 ComponentSizeInBytes = GetComponentTypeSizeInBytes(ComponentType);
+	const uint32 ComponentSizeInBytes = GetComponentTypeSizeInBytes(TypeDesc.ComponentType);
 	if (ComponentSizeInBytes > 0u)
 	{
-		for (int32 i = 0u; i < NumComponents; ++i)
+		for (int32 i = 0u; i < TypeDesc.NumComponents; ++i)
 		{
 			FMemory::Memcpy(Bytes, &Component[i].Packed, ComponentSizeInBytes);
 			Bytes += ComponentSizeInBytes;
@@ -183,57 +315,57 @@ UE::Shader::FMemoryImageValue UE::Shader::FValue::AsMemoryImage() const
 	return Result;
 }
 
-UE::Shader::FFloatValue UE::Shader::FValue::AsFloat() const
+FFloatValue FValue::AsFloat() const
 {
 	FFloatValue Result;
 	Private::AsType(Private::FCastFloat(), *this, Result);
 	return Result;
 }
 
-UE::Shader::FDoubleValue UE::Shader::FValue::AsDouble() const
+FDoubleValue FValue::AsDouble() const
 {
 	FDoubleValue Result;
 	Private::AsType(Private::FCastDouble(), *this, Result);
 	return Result;
 }
 
-FLinearColor UE::Shader::FValue::AsLinearColor() const
+FLinearColor FValue::AsLinearColor() const
 {
 	const FFloatValue Result = AsFloat();
 	return FLinearColor(Result.Component[0], Result.Component[1], Result.Component[2], Result.Component[3]);
 }
 
-FVector4d UE::Shader::FValue::AsVector4d() const
+FVector4d FValue::AsVector4d() const
 {
 	const FDoubleValue Result = AsDouble();
 	return FVector4d(Result.Component[0], Result.Component[1], Result.Component[2], Result.Component[3]);
 }
 
-UE::Shader::FIntValue UE::Shader::FValue::AsInt() const
+FIntValue FValue::AsInt() const
 {
 	FIntValue Result;
 	Private::AsType(Private::FCastInt(), *this, Result);
 	return Result;
 }
 
-UE::Shader::FBoolValue UE::Shader::FValue::AsBool() const
+FBoolValue FValue::AsBool() const
 {
 	FBoolValue Result;
 	Private::AsType(Private::FCastBool(), *this, Result);
 	return Result;
 }
 
-float UE::Shader::FValue::AsFloatScalar() const
+float FValue::AsFloatScalar() const
 {
 	FFloatValue Result;
 	Private::AsType(Private::FCastFloat(), *this, Result);
 	return Result[0];
 }
 
-bool UE::Shader::FValue::AsBoolScalar() const
+bool FValue::AsBoolScalar() const
 {
 	const FBoolValue Result = AsBool();
-	for (int32 i = 0; i < NumComponents; ++i)
+	for (int32 i = 0; i < 4; ++i)
 	{
 		if (Result.Component[i])
 		{
@@ -243,23 +375,109 @@ bool UE::Shader::FValue::AsBoolScalar() const
 	return false;
 }
 
-uint32 UE::Shader::GetComponentTypeSizeInBytes(EValueComponentType Type)
+FValueComponentTypeDescription GetValueComponentTypeDescription(EValueComponentType Type)
 {
 	switch (Type)
 	{
-	case EValueComponentType::Void: return 0u;
-	case EValueComponentType::Float: return sizeof(float);
-	case EValueComponentType::Double: return sizeof(double);
-	case EValueComponentType::Int: return sizeof(int32);
-	case EValueComponentType::Bool: return 1u;
-	case EValueComponentType::MaterialAttributes: return 0u;
-	default: checkNoEntry(); return 0u;
+	case EValueComponentType::Void: return FValueComponentTypeDescription(TEXT("void"), 0u, EComponentBound::Zero, EComponentBound::Zero);
+	case EValueComponentType::Float: return FValueComponentTypeDescription(TEXT("float"), 4u, EComponentBound::NegFloatMax, EComponentBound::FloatMax);
+	case EValueComponentType::Double: return FValueComponentTypeDescription(TEXT("double"), 8u, EComponentBound::NegDoubleMax, EComponentBound::DoubleMax);
+	case EValueComponentType::Int: return FValueComponentTypeDescription(TEXT("int"), 4u, EComponentBound::IntMin, EComponentBound::IntMax);
+	case EValueComponentType::Bool: return FValueComponentTypeDescription(TEXT("bool"), 1u, EComponentBound::Zero, EComponentBound::One);
+	default: checkNoEntry() return FValueComponentTypeDescription();
 	}
 }
 
-const TCHAR* UE::Shader::FValue::ToString(EValueStringFormat Format, FStringBuilderBase& OutString) const
+EValueComponentType CombineComponentTypes(EValueComponentType Lhs, EValueComponentType Rhs)
 {
-	if (Format == EValueStringFormat::HLSL && ComponentType == EValueComponentType::Double)
+	if (Lhs == Rhs)
+	{
+		return Lhs;
+	}
+	else if (Lhs == EValueComponentType::Void)
+	{
+		return Rhs;
+	}
+	else if (Rhs == EValueComponentType::Void)
+	{
+		return Lhs;
+	}
+	else if (Lhs == EValueComponentType::Double || Rhs == EValueComponentType::Double)
+	{
+		return EValueComponentType::Double;
+	}
+	else if (Lhs == EValueComponentType::Float || Rhs == EValueComponentType::Float)
+	{
+		return EValueComponentType::Float;
+	}
+	else
+	{
+		return EValueComponentType::Int;
+	}
+}
+
+const TCHAR* FValueComponent::ToString(EValueComponentType Type, FStringBuilderBase& OutString) const
+{
+	switch (Type)
+	{
+	case EValueComponentType::Int: OutString.Appendf(TEXT("%d"), Int); break;
+	case EValueComponentType::Bool: OutString.Append(AsBool() ? TEXT("true") : TEXT("false")); break;
+	case EValueComponentType::Float: OutString.Appendf(TEXT("%#.9gf"), Float); break;
+	default: checkNoEntry(); break; // TODO - double
+	}
+	return OutString.ToString();
+}
+
+const TCHAR* FValue::ToString(EValueStringFormat Format, FStringBuilderBase& OutString) const
+{
+	const int32 NumComponents = Type.GetNumComponents();
+	const TCHAR* TypeName = Type.GetName();
+	const TCHAR* ClosingSuffix = nullptr;
+
+	if (Format == EValueStringFormat::HLSL)
+	{
+		if (Type.IsStruct())
+		{
+			OutString.Append(TEXT("{ "));
+			ClosingSuffix = TEXT(" }");
+		}
+		else
+		{
+			const FValueTypeDescription TypeDesc = GetValueTypeDescription(Type.ValueType);
+			if (TypeDesc.ComponentType != EValueComponentType::Double)
+			{
+				OutString.Appendf(TEXT("%s("), TypeDesc.Name);
+				ClosingSuffix = TEXT(")");
+			}
+		}
+	}
+
+	for (int32 Index = 0; Index < NumComponents; ++Index)
+	{
+		if (Index > 0)
+		{
+			OutString.Append(TEXT(", "));
+		}
+		const EValueComponentType ComponentType = Type.GetComponentType(Index);
+		switch (ComponentType)
+		{
+		case EValueComponentType::Int: OutString.Appendf(TEXT("%d"), Component[Index].Int); break;
+		case EValueComponentType::Bool: OutString.Append(Component[Index].Bool ? TEXT("true") : TEXT("false")); break;
+		case EValueComponentType::Float: Private::FormatComponent_Double((double)Component[Index].Float, NumComponents, Format, OutString); break;
+		case EValueComponentType::Double: Private::FormatComponent_Double(Component[Index].Double, NumComponents, Format, OutString); break;
+		default: checkNoEntry(); break;
+		}
+	}
+
+	if (ClosingSuffix)
+	{
+		OutString.Append(ClosingSuffix);
+	}
+
+
+
+
+	/*if (Format == EValueStringFormat::HLSL && ComponentType == EValueComponentType::Double)
 	{
 		// Construct an HLSL LWC Vector
 		TStringBuilder<256> TileValue;
@@ -329,12 +547,12 @@ const TCHAR* UE::Shader::FValue::ToString(EValueStringFormat Format, FStringBuil
 		{
 			OutString.Append(TEXT(")"));
 		}
-	}
+	}*/
 
 	return OutString.ToString();
 }
 
-UE::Shader::FValueTypeDescription UE::Shader::GetValueTypeDescription(EValueType Type)
+FValueTypeDescription GetValueTypeDescription(EValueType Type)
 {
 	switch (Type)
 	{
@@ -355,21 +573,23 @@ UE::Shader::FValueTypeDescription UE::Shader::GetValueTypeDescription(EValueType
 	case EValueType::Bool2: return FValueTypeDescription(TEXT("bool2"), EValueComponentType::Bool, 2);
 	case EValueType::Bool3: return FValueTypeDescription(TEXT("bool3"), EValueComponentType::Bool, 3);
 	case EValueType::Bool4: return FValueTypeDescription(TEXT("bool4"), EValueComponentType::Bool, 4);
-	case EValueType::MaterialAttributes: return FValueTypeDescription(TEXT("FMaterialAttributes"), EValueComponentType::MaterialAttributes, 0);
-	default: checkNoEntry(); return FValueTypeDescription();
+	case EValueType::Float4x4: return FValueTypeDescription(TEXT("float4x4"), EValueComponentType::Float, 16);
+	case EValueType::Double4x4: return FValueTypeDescription(TEXT("FLWCMatrix"), EValueComponentType::Double, 16);
+	case EValueType::DoubleInverse4x4: return FValueTypeDescription(TEXT("FLWCInverseMatrix"), EValueComponentType::Double, 16);
+	case EValueType::Struct: return FValueTypeDescription(TEXT("struct"), EValueComponentType::Void, 0);
+	default: checkNoEntry(); return FValueTypeDescription(TEXT("<INVALID>"), EValueComponentType::Void, 0);
 	}
 }
 
-UE::Shader::EValueType UE::Shader::MakeValueType(EValueComponentType ComponentType, int32 NumComponents)
+EValueType MakeValueType(EValueComponentType ComponentType, int32 NumComponents)
 {
+	if (ComponentType == EValueComponentType::Void || NumComponents == 0)
+	{
+		return EValueType::Void;
+	}
+
 	switch (ComponentType)
 	{
-	case EValueComponentType::Void:
-		check(NumComponents == 0);
-		return EValueType::Void;
-	case EValueComponentType::MaterialAttributes:
-		check(NumComponents == 0);
-		return EValueType::MaterialAttributes;
 	case EValueComponentType::Float:
 		switch (NumComponents)
 		{
@@ -377,6 +597,7 @@ UE::Shader::EValueType UE::Shader::MakeValueType(EValueComponentType ComponentTy
 		case 2: return EValueType::Float2;
 		case 3: return EValueType::Float3;
 		case 4: return EValueType::Float4;
+		case 16: return EValueType::Float4x4;
 		default: break;
 		}
 	case EValueComponentType::Double:
@@ -386,6 +607,7 @@ UE::Shader::EValueType UE::Shader::MakeValueType(EValueComponentType ComponentTy
 		case 2: return EValueType::Double2;
 		case 3: return EValueType::Double3;
 		case 4: return EValueType::Double4;
+		case 16: return EValueType::Double4x4;
 		default: break;
 		}
 	case EValueComponentType::Int:
@@ -414,18 +636,24 @@ UE::Shader::EValueType UE::Shader::MakeValueType(EValueComponentType ComponentTy
 	return EValueType::Void;
 }
 
-UE::Shader::EValueType UE::Shader::MakeValueType(EValueType BaseType, int32 NumComponents)
+EValueType MakeValueType(EValueType BaseType, int32 NumComponents)
 {
 	return MakeValueType(GetValueTypeDescription(BaseType).ComponentType, NumComponents);
 }
 
-UE::Shader::EValueType UE::Shader::MakeValueTypeWithRequestedNumComponents(EValueType BaseType, int8 RequestedNumComponents)
+EValueType MakeValueTypeWithRequestedNumComponents(EValueType BaseType, int8 RequestedNumComponents)
 {
 	const FValueTypeDescription TypeDesc = GetValueTypeDescription(BaseType);
 	return MakeValueType(TypeDesc.ComponentType, FMath::Min(TypeDesc.NumComponents, RequestedNumComponents));
 }
 
-UE::Shader::EValueType UE::Shader::MakeArithmeticResultType(EValueType Lhs, EValueType Rhs, FString& OutErrorMessage)
+EValueType MakeNonLWCType(EValueType Type)
+{
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(Type);
+	return MakeValueType(MakeNonLWCType(TypeDesc.ComponentType), TypeDesc.NumComponents);
+}
+
+EValueType MakeArithmeticResultType(EValueType Lhs, EValueType Rhs, FString& OutErrorMessage)
 {
 	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs);
 	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs);
@@ -478,7 +706,7 @@ UE::Shader::EValueType UE::Shader::MakeArithmeticResultType(EValueType Lhs, EVal
 	return EValueType::Void;
 }
 
-UE::Shader::EValueType UE::Shader::MakeComparisonResultType(EValueType Lhs, EValueType Rhs, FString& OutErrorMessage)
+EValueType MakeComparisonResultType(EValueType Lhs, EValueType Rhs, FString& OutErrorMessage)
 {
 	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs);
 	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs);
@@ -502,10 +730,147 @@ UE::Shader::EValueType UE::Shader::MakeComparisonResultType(EValueType Lhs, EVal
 	return EValueType::Void;
 }
 
-namespace UE
+FStructTypeRegistry::FStructTypeRegistry(FMemStackBase& InAllocator)
+	: Allocator(&InAllocator)
 {
-namespace Shader
+}
+
+void FStructTypeRegistry::EmitDeclarationsCode(FStringBuilderBase& OutCode) const
 {
+	for (const auto& It : Types)
+	{
+		const FStructType* StructType = It.Value;
+
+		OutCode.Appendf(TEXT("struct %s\n"), StructType->Name);
+		OutCode.Append(TEXT("{\n"));
+		for (const FStructField& Field : StructType->Fields)
+		{
+			OutCode.Appendf(TEXT("\t%s %s;\n"), Field.Type.GetName(), Field.Name);
+		}
+		OutCode.Append(TEXT("};\n"));
+
+		for (const FStructField& Field : StructType->Fields)
+		{
+			OutCode.Appendf(TEXT("%s %s_Set%s(%s Self, %s Value) { Self.%s = Value; return Self; }\n"),
+				StructType->Name, StructType->Name, Field.Name, StructType->Name, Field.Type.GetName(), Field.Name);
+		}
+		OutCode.Append(TEXT("\n"));
+	}
+}
+
+namespace Private
+{
+void SetFieldType(EValueType* FieldTypes, EValueComponentType* ComponentTypes, int32 FieldIndex, int32 ComponentIndex, const FType& Type)
+{
+	if (Type.IsStruct())
+	{
+		for (const FStructField& Field : Type.StructType->Fields)
+		{
+			SetFieldType(FieldTypes, ComponentTypes, FieldIndex + Field.FlatFieldIndex, ComponentIndex + Field.ComponentIndex, Field.Type);
+		}
+	}
+	else
+	{
+		FieldTypes[FieldIndex] = Type.ValueType;
+		const FValueTypeDescription TypeDesc = GetValueTypeDescription(Type.ValueType);
+		for (int32 i = 0; i < TypeDesc.NumComponents; ++i)
+		{
+			ComponentTypes[ComponentIndex + i] = TypeDesc.ComponentType;
+		}
+	}
+}
+} // namespace Private
+
+const FStructType* FStructTypeRegistry::NewType(const FStructTypeInitializer& Initializer)
+{
+	TArray<FStructFieldInitializer, TInlineAllocator<16>> DerivativeFields;
+
+	const int32 NumFields = Initializer.Fields.Num();
+	FStructField* Fields = new(*Allocator) FStructField[NumFields];
+	int32 ComponentIndex = 0;
+	int32 FlatFieldIndex = 0;
+	uint64 Hash = 0u;
+	{
+		FXxHash64Builder Hasher;
+		Hasher.Update(Initializer.Name.GetData(), Initializer.Name.Len() * sizeof(TCHAR));
+
+		for (int32 FieldIndex = 0; FieldIndex < NumFields; ++FieldIndex)
+		{
+			const FStructFieldInitializer& FieldInitializer = Initializer.Fields[FieldIndex];
+			const FType& FieldType = FieldInitializer.Type;
+
+			Hasher.Update(FieldInitializer.Name.GetData(), FieldInitializer.Name.Len() * sizeof(TCHAR));
+			if (FieldType.IsStruct())
+			{
+				Hasher.Update(&FieldType.StructType->Hash, sizeof(FieldType.StructType->Hash));
+			}
+			else
+			{
+				Hasher.Update(&FieldType.ValueType, sizeof(FieldType.ValueType));
+			}
+
+			FStructField& Field = Fields[FieldIndex];
+			Field.Name = MemStack::AllocateString(*Allocator, FieldInitializer.Name);
+			Field.Type = FieldType;
+			Field.ComponentIndex = ComponentIndex;
+			Field.FlatFieldIndex = FlatFieldIndex;
+			ComponentIndex += FieldType.GetNumComponents();
+			FlatFieldIndex += FieldType.GetNumFlatFields();
+
+			if (!Initializer.bIsDerivativeType)
+			{
+				const FType FieldDerivativeType = FieldType.GetDerivativeType();
+				if (!FieldDerivativeType.IsVoid())
+				{
+					DerivativeFields.Emplace(FieldInitializer.Name, FieldDerivativeType);
+				}
+			}
+		}
+		Hash = Hasher.Finalize().Hash;
+	}
+
+	FStructType const* const* PrevStructType = Types.Find(Hash);
+	if (PrevStructType)
+	{
+		return *PrevStructType;
+	}
+
+	EValueComponentType* ComponentTypes = new(*Allocator) EValueComponentType[ComponentIndex];
+	EValueType* FlatFieldTypes = new(*Allocator) EValueType[FlatFieldIndex];
+	for (int32 FieldIndex = 0; FieldIndex < NumFields; ++FieldIndex)
+	{
+		const FStructField& Field = Fields[FieldIndex];
+		Private::SetFieldType(FlatFieldTypes, ComponentTypes, Field.FlatFieldIndex, Field.ComponentIndex, Field.Type);
+	}
+
+	FStructType* StructType = new(*Allocator) FStructType();
+	StructType->Name = MemStack::AllocateString(*Allocator, Initializer.Name);
+	StructType->Hash = Hash;
+	StructType->Fields = MakeArrayView(Fields, NumFields);
+	StructType->ComponentTypes = MakeArrayView(ComponentTypes, ComponentIndex);
+	StructType->FlatFieldTypes = MakeArrayView(FlatFieldTypes, FlatFieldIndex);
+
+	Types.Add(Hash, StructType);
+
+	if (DerivativeFields.Num() > 0)
+	{
+		const FString DerivativeTypeName = FString(Initializer.Name) + TEXT("_Deriv");
+		FStructTypeInitializer DerivativeTypeInitializer;
+		DerivativeTypeInitializer.Name = DerivativeTypeName;
+		DerivativeTypeInitializer.Fields = DerivativeFields;
+		DerivativeTypeInitializer.bIsDerivativeType = true;
+		StructType->DerivativeType = NewType(DerivativeTypeInitializer);
+	}
+
+	return StructType;
+}
+
+const FStructType* FStructTypeRegistry::FindType(uint64 Hash) const
+{
+	FStructType const* const* PrevType = Types.Find(Hash);
+	return PrevType ? *PrevType : nullptr;
+}
+
 namespace Private
 {
 
@@ -552,6 +917,7 @@ struct FOpBaseNoInt : public FOpBase
 	static constexpr bool SupportsInt = false;
 };
 
+struct FOpNeg : public FOpBase { template<typename T> T operator()(T Value) const { return -Value; } };
 struct FOpAbs : public FOpBase { template<typename T> T operator()(T Value) const { return FMath::Abs(Value); } };
 struct FOpSign : public FOpBase { template<typename T> T operator()(T Value) const { return FMath::Sign(Value); } };
 struct FOpSaturate : public FOpBaseNoInt { template<typename T> T operator()(T Value) const { return FMath::Clamp(Value, (T)0, (T)1); } };
@@ -586,24 +952,31 @@ struct FOpMin : public FOpBase { template<typename T> T operator()(T Lhs, T Rhs)
 struct FOpMax : public FOpBase { template<typename T> T operator()(T Lhs, T Rhs) const { return FMath::Max(Lhs, Rhs); } };
 struct FOpFmod : public FOpBaseNoInt { template<typename T> T operator()(T Lhs, T Rhs) const { return FMath::Fmod(Lhs, Rhs); } };
 struct FOpAtan2 : public FOpBaseNoInt { template<typename T> T operator()(T Lhs, T Rhs) const { return FMath::Atan2(Lhs, Rhs); } };
+struct FOpLess : public FOpBase { template<typename T> bool operator()(T Lhs, T Rhs) const { return Lhs < Rhs; } };
+struct FOpGreater : public FOpBase { template<typename T> bool operator()(T Lhs, T Rhs) const { return Lhs > Rhs; } };
+struct FOpLessEqual : public FOpBase { template<typename T> bool operator()(T Lhs, T Rhs) const { return Lhs <= Rhs; } };
+struct FOpGreaterEqual : public FOpBase { template<typename T> bool operator()(T Lhs, T Rhs) const { return Lhs >= Rhs; } };
 
 template<typename Operation>
 inline FValue UnaryOp(const Operation& Op, const FValue& Value)
 {
-	const int8 NumComponents = Value.NumComponents;
+	if (Value.Type.IsStruct())
+	{
+		return FValue();
+	}
+	const FValueTypeDescription TypeDesc = GetValueTypeDescription(Value.Type);
+	const int8 NumComponents = TypeDesc.NumComponents;
 	
 	FValue Result;
-	Result.NumComponents = NumComponents;
-
 	if constexpr (Operation::SupportsDouble)
 	{
-		if (Value.ComponentType == UE::Shader::EValueComponentType::Double)
+		if (TypeDesc.ComponentType == EValueComponentType::Double)
 		{
-			Result.ComponentType = UE::Shader::EValueComponentType::Double;
+			Result.Type = MakeValueType(EValueComponentType::Double, NumComponents);
 			const FDoubleValue Cast = Value.AsDouble();
 			for (int32 i = 0; i < NumComponents; ++i)
 			{
-				Result.Component[i].Double = Op(Cast.Component[i]);
+				Result.Component.Add(Op(Cast.Component[i]));
 			}
 			return Result;
 		}
@@ -611,23 +984,23 @@ inline FValue UnaryOp(const Operation& Op, const FValue& Value)
 
 	if constexpr (Operation::SupportsInt)
 	{
-		if (Value.ComponentType != UE::Shader::EValueComponentType::Float)
+		if (TypeDesc.ComponentType != EValueComponentType::Float)
 		{
-			Result.ComponentType = UE::Shader::EValueComponentType::Int;
+			Result.Type = MakeValueType(EValueComponentType::Int, NumComponents);
 			const FIntValue Cast = Value.AsInt();
 			for (int32 i = 0; i < NumComponents; ++i)
 			{
-				Result.Component[i].Int = Op(Cast.Component[i]);
+				Result.Component.Add(Op(Cast.Component[i]));
 			}
 			return Result;
 		}
 	}
 
-	Result.ComponentType = UE::Shader::EValueComponentType::Float;
+	Result.Type = MakeValueType(EValueComponentType::Float, NumComponents);
 	const FFloatValue Cast = Value.AsFloat();
 	for (int32 i = 0; i < NumComponents; ++i)
 	{
-		Result.Component[i].Float = Op(Cast.Component[i]);
+		Result.Component.Add(Op(Cast.Component[i]));
 	}
 	return Result;
 }
@@ -642,21 +1015,25 @@ inline int8 GetNumComponentsResult(int8 Lhs, int8 Rhs)
 template<typename Operation>
 inline FValue BinaryOp(const Operation& Op, const FValue& Lhs, const FValue& Rhs)
 {
-	const int8 NumComponents = GetNumComponentsResult(Lhs.NumComponents, Rhs.NumComponents);
+	if (Lhs.Type.IsStruct() || Rhs.Type.IsStruct())
+	{
+		return FValue();
+	}
+	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs.Type);
+	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs.Type);
+	const int8 NumComponents = GetNumComponentsResult(LhsDesc.NumComponents, RhsDesc.NumComponents);
 	
 	FValue Result;
-	Result.NumComponents = NumComponents;
-
 	if constexpr (Operation::SupportsDouble)
 	{
-		if (Lhs.ComponentType == UE::Shader::EValueComponentType::Double || Rhs.ComponentType == UE::Shader::EValueComponentType::Double)
+		if (LhsDesc.ComponentType == EValueComponentType::Double || RhsDesc.ComponentType == EValueComponentType::Double)
 		{
-			Result.ComponentType = UE::Shader::EValueComponentType::Double;
+			Result.Type = MakeValueType(EValueComponentType::Double, NumComponents);
 			const FDoubleValue LhsCast = Lhs.AsDouble();
 			const FDoubleValue RhsCast = Rhs.AsDouble();
 			for (int32 i = 0; i < NumComponents; ++i)
 			{
-				Result.Component[i].Double = Op(LhsCast.Component[i], RhsCast.Component[i]);
+				Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
 			}
 			return Result;
 		}
@@ -664,40 +1041,90 @@ inline FValue BinaryOp(const Operation& Op, const FValue& Lhs, const FValue& Rhs
 
 	if constexpr (Operation::SupportsInt)
 	{
-		if (Lhs.ComponentType != UE::Shader::EValueComponentType::Float && Rhs.ComponentType != UE::Shader::EValueComponentType::Float)
+		if (LhsDesc.ComponentType != EValueComponentType::Float && RhsDesc.ComponentType != EValueComponentType::Float)
 		{
-			Result.ComponentType = UE::Shader::EValueComponentType::Int;
+			Result.Type = MakeValueType(EValueComponentType::Int, NumComponents);
 			const FIntValue LhsCast = Lhs.AsInt();
 			const FIntValue RhsCast = Rhs.AsInt();
 			for (int32 i = 0; i < NumComponents; ++i)
 			{
-				Result.Component[i].Int = Op(LhsCast.Component[i], RhsCast.Component[i]);
+				Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
 			}
 			return Result;
 		}
 	}
 
-	Result.ComponentType = UE::Shader::EValueComponentType::Float;
+	Result.Type = MakeValueType(EValueComponentType::Float, NumComponents);
 	const FFloatValue LhsCast = Lhs.AsFloat();
 	const FFloatValue RhsCast = Rhs.AsFloat();
 	for (int32 i = 0; i < NumComponents; ++i)
 	{
-		Result.Component[i].Float = Op(LhsCast.Component[i], RhsCast.Component[i]);
+		Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
+	}
+	return Result;
+}
+
+template<typename Operation>
+inline FValue CompareOp(const Operation& Op, const FValue& Lhs, const FValue& Rhs)
+{
+	if (Lhs.Type.IsStruct() || Rhs.Type.IsStruct())
+	{
+		return FValue();
+	}
+	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs.Type);
+	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs.Type);
+	const int8 NumComponents = GetNumComponentsResult(LhsDesc.NumComponents, RhsDesc.NumComponents);
+
+	FValue Result;
+	Result.Type = MakeValueType(EValueComponentType::Bool, NumComponents);
+	if constexpr (Operation::SupportsDouble)
+	{
+		if (LhsDesc.ComponentType == EValueComponentType::Double || RhsDesc.ComponentType == EValueComponentType::Double)
+		{
+			const FDoubleValue LhsCast = Lhs.AsDouble();
+			const FDoubleValue RhsCast = Rhs.AsDouble();
+			for (int32 i = 0; i < NumComponents; ++i)
+			{
+				Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
+			}
+			return Result;
+		}
+	}
+
+	if constexpr (Operation::SupportsInt)
+	{
+		if (LhsDesc.ComponentType != EValueComponentType::Float && RhsDesc.ComponentType != EValueComponentType::Float)
+		{
+			const FIntValue LhsCast = Lhs.AsInt();
+			const FIntValue RhsCast = Rhs.AsInt();
+			for (int32 i = 0; i < NumComponents; ++i)
+			{
+				Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
+			}
+			return Result;
+		}
+	}
+
+	const FFloatValue LhsCast = Lhs.AsFloat();
+	const FFloatValue RhsCast = Rhs.AsFloat();
+	for (int32 i = 0; i < NumComponents; ++i)
+	{
+		Result.Component.Add(Op(LhsCast.Component[i], RhsCast.Component[i]));
 	}
 	return Result;
 }
 
 } // namespace Private
-} // namespace Shader
-} // namespace UE
 
-bool UE::Shader::operator==(const FValue& Lhs, const FValue& Rhs)
+bool operator==(const FValue& Lhs, const FValue& Rhs)
 {
-	if (Lhs.ComponentType != Rhs.ComponentType || Lhs.NumComponents != Rhs.NumComponents)
+	if (Lhs.Type != Rhs.Type)
 	{
 		return false;
 	}
-	for (int32 i = 0u; i < Lhs.NumComponents; ++i)
+
+	check(Lhs.Component.Num() == Rhs.Component.Num());
+	for (int32 i = 0u; i < Lhs.Component.Num(); ++i)
 	{
 		if (Lhs.Component[i].Packed != Rhs.Component[i].Packed)
 		{
@@ -707,20 +1134,29 @@ bool UE::Shader::operator==(const FValue& Lhs, const FValue& Rhs)
 	return true;
 }
 
-uint32 UE::Shader::GetTypeHash(const FValue& Value)
+uint32 GetTypeHash(const FType& Type)
 {
-	uint32 Result = ::GetTypeHash(Value.ComponentType);
-	Result = HashCombine(Result, ::GetTypeHash(Value.NumComponents));
-	for (int32 i = 0u; i < Value.NumComponents; ++i)
+	uint32 Result = ::GetTypeHash(Type.ValueType);
+	if (Type.IsStruct())
 	{
-		const FValueComponent& Component = Value.Component[i];
+		Result = HashCombine(Result, ::GetTypeHash(Type.StructType));
+	}
+	return Result;
+}
+
+uint32 GetTypeHash(const FValue& Value)
+{
+	uint32 Result = GetTypeHash(Value.Type);
+	const int32 NumComponents = Value.Type.GetNumComponents();
+	for(int32 Index = 0; Index < NumComponents; ++Index)
+	{
 		uint32 ComponentHash = 0u;
-		switch (Value.ComponentType)
+		switch (Value.Type.GetComponentType(Index))
 		{
-		case EValueComponentType::Float: ComponentHash = ::GetTypeHash(Component.Float); break;
-		case EValueComponentType::Double: ComponentHash = ::GetTypeHash(Component.Double); break;
-		case EValueComponentType::Int: ComponentHash = ::GetTypeHash(Component.Int); break;
-		case EValueComponentType::Bool: ComponentHash = ::GetTypeHash(Component.Bool); break;
+		case EValueComponentType::Float: ComponentHash = ::GetTypeHash(Value.Component[Index].Float); break;
+		case EValueComponentType::Double: ComponentHash = ::GetTypeHash(Value.Component[Index].Double); break;
+		case EValueComponentType::Int: ComponentHash = ::GetTypeHash(Value.Component[Index].Int); break;
+		case EValueComponentType::Bool: ComponentHash = ::GetTypeHash(Value.Component[Index].Bool); break;
 		default: checkNoEntry(); break;
 		}
 		Result = HashCombine(Result, ComponentHash);
@@ -728,156 +1164,185 @@ uint32 UE::Shader::GetTypeHash(const FValue& Value)
 	return Result;
 }
 
-UE::Shader::FValue UE::Shader::Abs(const FValue& Value)
+FValue Neg(const FValue& Value)
+{
+	return Private::UnaryOp(Private::FOpNeg(), Value);
+}
+
+FValue Abs(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpAbs(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Saturate(const FValue& Value)
+FValue Saturate(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpSaturate(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Floor(const FValue& Value)
+FValue Floor(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpFloor(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Ceil(const FValue& Value)
+FValue Ceil(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpCeil(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Round(const FValue& Value)
+FValue Round(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpRound(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Trunc(const FValue& Value)
+FValue Trunc(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpTrunc(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Sign(const FValue& Value)
+FValue Sign(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpSign(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Frac(const FValue& Value)
+FValue Frac(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpFrac(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Fractional(const FValue& Value)
+FValue Fractional(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpFractional(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Sqrt(const FValue& Value)
+FValue Sqrt(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpSqrt(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Rcp(const FValue& Value)
+FValue Rcp(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpRcp(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Log2(const FValue& Value)
+FValue Log2(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpLog2(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Log10(const FValue& Value)
+FValue Log10(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpLog10(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Sin(const FValue& Value)
+FValue Sin(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpSin(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Cos(const FValue& Value)
+FValue Cos(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpCos(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Tan(const FValue& Value)
+FValue Tan(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpTan(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Asin(const FValue& Value)
+FValue Asin(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpAsin(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Acos(const FValue& Value)
+FValue Acos(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpAcos(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Atan(const FValue& Value)
+FValue Atan(const FValue& Value)
 {
 	return Private::UnaryOp(Private::FOpAtan(), Value);
 }
 
-UE::Shader::FValue UE::Shader::Add(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Add(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpAdd(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Sub(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Sub(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpSub(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Mul(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Mul(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpMul(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Div(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Div(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpDiv(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Min(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Less(const FValue& Lhs, const FValue& Rhs)
+{
+	return Private::CompareOp(Private::FOpLess(), Lhs, Rhs);
+}
+
+FValue Greater(const FValue& Lhs, const FValue& Rhs)
+{
+	return Private::CompareOp(Private::FOpGreater(), Lhs, Rhs);
+}
+
+FValue LessEqual(const FValue& Lhs, const FValue& Rhs)
+{
+	return Private::CompareOp(Private::FOpLessEqual(), Lhs, Rhs);
+}
+
+FValue GreaterEqual(const FValue& Lhs, const FValue& Rhs)
+{
+	return Private::CompareOp(Private::FOpGreaterEqual(), Lhs, Rhs);
+}
+
+FValue Min(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpMin(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Max(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Max(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpMax(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Fmod(const UE::Shader::FValue& Lhs, const UE::Shader::FValue& Rhs)
+FValue Fmod(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpFmod(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Atan2(const FValue& Lhs, const FValue& Rhs)
+FValue Atan2(const FValue& Lhs, const FValue& Rhs)
 {
 	return Private::BinaryOp(Private::FOpAtan2(), Lhs, Rhs);
 }
 
-UE::Shader::FValue UE::Shader::Clamp(const FValue& Value, const FValue& Low, const FValue& High)
+FValue Clamp(const FValue& Value, const FValue& Low, const FValue& High)
 {
 	return Min(Max(Value, Low), High);
 }
 
-UE::Shader::FValue UE::Shader::Dot(const FValue& Lhs, const FValue& Rhs)
+FValue Dot(const FValue& Lhs, const FValue& Rhs)
 {
-	const int8 NumComponents = Private::GetNumComponentsResult(Lhs.NumComponents, Rhs.NumComponents);
+	if (Lhs.Type.IsStruct() || Rhs.Type.IsStruct())
+	{
+		return FValue();
+	}
+	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs.Type);
+	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs.Type);
+	const int8 NumComponents = Private::GetNumComponentsResult(LhsDesc.NumComponents, RhsDesc.NumComponents);
 
 	FValue Result;
-	Result.NumComponents = 1;
-
-	if (Lhs.ComponentType == UE::Shader::EValueComponentType::Double || Rhs.ComponentType == UE::Shader::EValueComponentType::Double)
+	if (LhsDesc.ComponentType == EValueComponentType::Double || RhsDesc.ComponentType == EValueComponentType::Double)
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Double;
+		Result.Type = EValueType::Double1;
 		const FDoubleValue LhsValue = Lhs.AsDouble();
 		const FDoubleValue RhsValue = Rhs.AsDouble();
 		double ComponentValue = 0.0;
@@ -885,11 +1350,11 @@ UE::Shader::FValue UE::Shader::Dot(const FValue& Lhs, const FValue& Rhs)
 		{
 			ComponentValue += LhsValue.Component[i] * RhsValue.Component[i];
 		}
-		Result.Component[0].Double = ComponentValue;
+		Result.Component.Add(ComponentValue);
 	}
-	else if (Lhs.ComponentType == UE::Shader::EValueComponentType::Float || Rhs.ComponentType == UE::Shader::EValueComponentType::Float)
+	else if (LhsDesc.ComponentType == EValueComponentType::Float || RhsDesc.ComponentType == EValueComponentType::Float)
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Float;
+		Result.Type = EValueType::Float1;
 		const FFloatValue LhsValue = Lhs.AsFloat();
 		const FFloatValue RhsValue = Rhs.AsFloat();
 		float ComponentValue = 0.0f;
@@ -897,11 +1362,11 @@ UE::Shader::FValue UE::Shader::Dot(const FValue& Lhs, const FValue& Rhs)
 		{
 			ComponentValue += LhsValue.Component[i] * RhsValue.Component[i];
 		}
-		Result.Component[0].Float = ComponentValue;
+		Result.Component.Add(ComponentValue);
 	}
 	else
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Int;
+		Result.Type = EValueType::Int1;
 		const FIntValue LhsValue = Lhs.AsInt();
 		const FIntValue RhsValue = Rhs.AsInt();
 		int32 ComponentValue = 0;
@@ -909,114 +1374,126 @@ UE::Shader::FValue UE::Shader::Dot(const FValue& Lhs, const FValue& Rhs)
 		{
 			ComponentValue += LhsValue.Component[i] * RhsValue.Component[i];
 		}
-		Result.Component[0].Int = ComponentValue;
+		Result.Component.Add(ComponentValue);
 	}
 	return Result;
 }
 
-UE::Shader::FValue UE::Shader::Cross(const FValue& Lhs, const FValue& Rhs)
+FValue Cross(const FValue& Lhs, const FValue& Rhs)
 {
-	FValue Result;
-	Result.NumComponents = 3;
-
-	if (Lhs.ComponentType == UE::Shader::EValueComponentType::Double || Rhs.ComponentType == UE::Shader::EValueComponentType::Double)
+	if (Lhs.Type.IsStruct() || Rhs.Type.IsStruct())
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Double;
+		return FValue();
+	}
+	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs.Type);
+	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs.Type);
+
+	FValue Result;
+	if (LhsDesc.ComponentType == EValueComponentType::Double || RhsDesc.ComponentType == EValueComponentType::Double)
+	{
+		Result.Type = EValueType::Double3;
 		const FDoubleValue LhsValue = Lhs.AsDouble();
 		const FDoubleValue RhsValue = Rhs.AsDouble();
 
-		Result.Component[0].Double = LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1];
-		Result.Component[1].Double = LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2];
-		Result.Component[2].Double = LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0];
+		Result.Component.Add(LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1]);
+		Result.Component.Add(LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2]);
+		Result.Component.Add(LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0]);
 	}
-	else if (Lhs.ComponentType == UE::Shader::EValueComponentType::Float || Rhs.ComponentType == UE::Shader::EValueComponentType::Float)
+	else if (LhsDesc.ComponentType == EValueComponentType::Float || RhsDesc.ComponentType == EValueComponentType::Float)
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Float;
+		Result.Type = EValueType::Float3;
 		const FFloatValue LhsValue = Lhs.AsFloat();
 		const FFloatValue RhsValue = Rhs.AsFloat();
 		
-		Result.Component[0].Float = LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1];
-		Result.Component[1].Float = LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2];
-		Result.Component[2].Float = LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0];
+		Result.Component.Add(LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1]);
+		Result.Component.Add(LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2]);
+		Result.Component.Add(LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0]);
 	}
 	else
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Int;
+		Result.Type = EValueType::Int3;
 		const FIntValue LhsValue = Lhs.AsInt();
 		const FIntValue RhsValue = Rhs.AsInt();
 
-		Result.Component[0].Int = LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1];
-		Result.Component[1].Int = LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2];
-		Result.Component[2].Int = LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0];
+		Result.Component.Add(LhsValue.Component[1] * RhsValue.Component[2] - LhsValue.Component[2] * RhsValue.Component[1]);
+		Result.Component.Add(LhsValue.Component[2] * RhsValue.Component[0] - LhsValue.Component[0] * RhsValue.Component[2]);
+		Result.Component.Add(LhsValue.Component[0] * RhsValue.Component[1] - LhsValue.Component[1] * RhsValue.Component[0]);
 	}
 	return Result;
 }
 
-UE::Shader::FValue UE::Shader::Append(const FValue& Lhs, const FValue& Rhs)
+FValue Append(const FValue& Lhs, const FValue& Rhs)
 {
+	if (Lhs.Type.IsStruct() || Rhs.Type.IsStruct())
+	{
+		return FValue();
+	}
+	const FValueTypeDescription LhsDesc = GetValueTypeDescription(Lhs.Type);
+	const FValueTypeDescription RhsDesc = GetValueTypeDescription(Rhs.Type);
+
 	FValue Result;
-	int32 NumComponents = 0;
-	if (Lhs.ComponentType == Rhs.ComponentType)
+	const int32 NumComponents = FMath::Min<int32>(LhsDesc.NumComponents + RhsDesc.NumComponents, 4);
+	if (LhsDesc.ComponentType == RhsDesc.ComponentType)
 	{
 		// If both values have the same component type, use as-is
 		// (otherwise will need to convert)
-		Result.ComponentType = Lhs.ComponentType;
-		for (int32 i = 0; i < Lhs.NumComponents; ++i)
+		
+		Result.Type = MakeValueType(LhsDesc.ComponentType, NumComponents);
+		for (int32 i = 0; i < LhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++] = Lhs.Component[i];
+			Result.Component.Add(Lhs.Component[i]);
 		}
-		for (int32 i = 0; i < Rhs.NumComponents && NumComponents < 4; ++i)
+		for (int32 i = 0; i < RhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++] = Rhs.Component[i];
+			Result.Component.Add(Rhs.Component[i]);
 		}
 	}
-	else if (Lhs.ComponentType == UE::Shader::EValueComponentType::Double || Rhs.ComponentType == UE::Shader::EValueComponentType::Double)
+	else if (LhsDesc.ComponentType == EValueComponentType::Double || RhsDesc.ComponentType == EValueComponentType::Double)
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Double;
+		Result.Type = MakeValueType(EValueComponentType::Double, NumComponents);
 		const FDoubleValue LhsValue = Lhs.AsDouble();
 		const FDoubleValue RhsValue = Rhs.AsDouble();
-		for (int32 i = 0; i < Lhs.NumComponents; ++i)
+		for (int32 i = 0; i < LhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Double = LhsValue.Component[i];
+			Result.Component.Add(LhsValue.Component[i]);
 		}
-		for (int32 i = 0; i < Rhs.NumComponents && NumComponents < 4; ++i)
+		for (int32 i = 0; i < RhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Double = RhsValue.Component[i];
+			Result.Component.Add(RhsValue.Component[i]);
 		}
 	}
-	else if (Lhs.ComponentType == UE::Shader::EValueComponentType::Float || Rhs.ComponentType == UE::Shader::EValueComponentType::Float)
+	else if (LhsDesc.ComponentType == EValueComponentType::Float || RhsDesc.ComponentType == EValueComponentType::Float)
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Float;
+		Result.Type = MakeValueType(EValueComponentType::Float, NumComponents);
 		const FFloatValue LhsValue = Lhs.AsFloat();
 		const FFloatValue RhsValue = Rhs.AsFloat();
-		for (int32 i = 0; i < Lhs.NumComponents; ++i)
+		for (int32 i = 0; i < LhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Float = LhsValue.Component[i];
+			Result.Component.Add(LhsValue.Component[i]);
 		}
-		for (int32 i = 0; i < Rhs.NumComponents && NumComponents < 4; ++i)
+		for (int32 i = 0; i < RhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Float = RhsValue.Component[i];
+			Result.Component.Add(RhsValue.Component[i]);
 		}
 	}
 	else
 	{
-		Result.ComponentType = UE::Shader::EValueComponentType::Int;
+		Result.Type = MakeValueType(EValueComponentType::Int, NumComponents);
 		const FIntValue LhsValue = Lhs.AsInt();
 		const FIntValue RhsValue = Rhs.AsInt();
-		for (int32 i = 0; i < Lhs.NumComponents; ++i)
+		for (int32 i = 0; i < LhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Int = LhsValue.Component[i];
+			Result.Component.Add(LhsValue.Component[i]);
 		}
-		for (int32 i = 0; i < Rhs.NumComponents && NumComponents < 4; ++i)
+		for (int32 i = 0; i < RhsDesc.NumComponents && Result.Component.Num() < NumComponents; ++i)
 		{
-			Result.Component[NumComponents++].Int = RhsValue.Component[i];
+			Result.Component.Add(RhsValue.Component[i]);
 		}
 	}
-	Result.NumComponents = NumComponents;
 	return Result;
 }
 
-UE::Shader::FValue UE::Shader::Cast(const FValue& Value, EValueType Type)
+FValue Cast(const FValue& Value, EValueType Type)
 {
 	const EValueType SourceType = Value.GetType();
 	if (Type == SourceType)
@@ -1024,8 +1501,10 @@ UE::Shader::FValue UE::Shader::Cast(const FValue& Value, EValueType Type)
 		return Value;
 	}
 
-	FValue Result(Type);
-	switch (Result.ComponentType)
+	FValue Result;
+	Result.Type = Type;
+
+	switch (GetValueTypeDescription(Type).ComponentType)
 	{
 	case EValueComponentType::Float: Private::Cast(Private::FCastFloat(), Value, Result); break;
 	case EValueComponentType::Double: Private::Cast(Private::FCastDouble(), Value, Result); break;
@@ -1037,3 +1516,5 @@ UE::Shader::FValue UE::Shader::Cast(const FValue& Value, EValueType Type)
 	return Result;
 }
 
+} // namespace Shader
+} // namespace UE

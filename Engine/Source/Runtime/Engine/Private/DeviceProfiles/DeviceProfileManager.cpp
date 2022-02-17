@@ -1400,10 +1400,8 @@ public:
 				}));
 
 			// clear some cached cvars in other-platform expansions
-			UDeviceProfileManager& DPM = UDeviceProfileManager::Get();
-			for (int32 Idx = 0; Idx < DPM.Profiles.Num(); Idx++)
+			for (TObjectPtr<UDeviceProfile> DeviceProfile : UDeviceProfileManager::Get().Profiles)
 			{
-				UDeviceProfile* DeviceProfile = CastChecked<UDeviceProfile>(DPM.Profiles[Idx]);
 				DeviceProfile->ClearAllExpandedCVars();
 			}
 

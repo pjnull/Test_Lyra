@@ -6,6 +6,7 @@
 #include "SUSDPrimInfo.h"
 #include "SUSDStageTreeView.h"
 #include "UnrealUSDWrapper.h"
+#include "USDConversionUtils.h"
 #include "USDErrorUtils.h"
 #include "USDLayerUtils.h"
 #include "USDSchemasModule.h"
@@ -24,6 +25,7 @@
 
 #include "ActorTreeItem.h"
 #include "Async/Async.h"
+#include "DesktopPlatformModule.h"
 #include "Dialogs/DlgPickPath.h"
 #include "EditorStyleSet.h"
 #include "Engine/Selection.h"
@@ -48,6 +50,69 @@ namespace SUSDStageConstants
 
 namespace SUSDStageImpl
 {
+#if PLATFORM_LINUX
+	struct FCaseSensitiveStringSetFuncs : BaseKeyFuncs<FString, FString>
+	{
+		static FORCEINLINE const FString& GetSetKey( const FString& Element )
+		{
+			return Element;
+		}
+		static FORCEINLINE bool Matches( const FString& A, const FString& B )
+		{
+			return A.Equals( B, ESearchCase::CaseSensitive );
+		}
+		static FORCEINLINE uint32 GetKeyHash( const FString& Key )
+		{
+			return FCrc::StrCrc32<TCHAR>( *Key );
+		}
+	};
+#endif
+
+	/**
+	 * Makes sure that AllLayers includes all the external references of any of its members.
+	 * Example: Receives AllLayers [a.usda], that references b.usda and c.usda, while c.usda also references d.usda -> Modifies AllLayers to be [a.usda, b.usda, c.usda, d.usda]
+	 */
+	void AppendAllExternalReferences( TArray<UE::FSdfLayer>& AllLayers )
+	{
+		// Consider paths in a case-sensitive way for linux
+#if PLATFORM_LINUX
+		TSet<FString, FCaseSensitiveStringSetFuncs> LoadedLayers;
+#else
+		TSet<FString> LoadedLayers;
+#endif
+
+		LoadedLayers.Reserve( AllLayers.Num() );
+		for ( const UE::FSdfLayer& Layer : AllLayers )
+		{
+			FString LayerPath = Layer.GetRealPath();
+			FPaths::NormalizeFilename( LayerPath );
+			LoadedLayers.Add( LayerPath );
+		}
+
+		for ( int32 Index = 0; Index < AllLayers.Num(); ++Index )
+		{
+			UE::FSdfLayer& Layer = AllLayers[ Index ];
+
+			TArray< UE::FSdfLayer > NewLayers;
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+			for ( const FString& AssetDependency : Layer.GetCompositionAssetDependencies() )
+#else
+			for ( const FString& AssetDependency : Layer.GetExternalReferences() )
+#endif
+			{
+				FString AbsoluteReference = Layer.ComputeAbsolutePath( AssetDependency );
+				FPaths::NormalizeFilename( AbsoluteReference );
+
+				if ( !LoadedLayers.Contains( AbsoluteReference ) )
+				{
+					NewLayers.Add( UE::FSdfLayer::FindOrOpen( *AbsoluteReference ) );
+					LoadedLayers.Add( AbsoluteReference );
+				}
+			}
+			AllLayers.Append( NewLayers );
+		}
+	}
+
 	void SelectGeneratedComponentsAndActors( AUsdStageActor* StageActor, const TArray<FString>& PrimPaths )
 	{
 		if ( !StageActor )
@@ -65,9 +130,9 @@ namespace SUSDStageImpl
 		}
 
 		TSet<AActor*> ActorsToSelect;
-		for ( TSet<USceneComponent*>::TIterator It(ComponentsToSelect); It; ++It )
+		for ( TSet<USceneComponent*>::TIterator It( ComponentsToSelect ); It; ++It )
 		{
-			if ( AActor* Owner = (*It)->GetOwner() )
+			if ( AActor* Owner = ( *It )->GetOwner() )
 			{
 				// We always need the parent actor selected to select a component
 				ActorsToSelect.Add( Owner );
@@ -89,11 +154,19 @@ namespace SUSDStageImpl
 			return;
 		}
 
+		// Don't use GEditor->SelectNone() as that will affect *every type of selection in the editor*,
+		// including even some UI menus, brushes, etc.
+		if ( USelection* SelectedActors = GEditor->GetSelectedActors() )
+		{
+			SelectedActors->DeselectAll( AActor::StaticClass() );
+		}
+		if ( USelection* SelectedComponents = GEditor->GetSelectedComponents() )
+		{
+			SelectedComponents->DeselectAll( UActorComponent::StaticClass() );
+		}
+
 		const bool bSelected = true;
 		const bool bNotifySelectionChanged = true;
-		const bool bDeselectBSPSurfs = true;
-		GEditor->SelectNone( bNotifySelectionChanged, bDeselectBSPSurfs );
-
 		for ( AActor* Actor : ActorsToSelect )
 		{
 			GEditor->SelectActor( Actor, bSelected, bNotifySelectionChanged );
@@ -236,6 +309,13 @@ void SUsdStage::SetupStageActorDelegates()
 						 ( bViewingTheUpdatedPrim || ( bViewingStageProperties && bStageUpdated ) ) )
 					{
 						this->UsdPrimInfoWidget->SetPrimPath( ViewModel.UsdStageActor->GetOrLoadUsdStage(), *PrimPath );
+					}
+
+					// If we resynced our selected prim or our ancestor and have selection sync enabled, try to refresh it so that we're
+					// still selecting the same actor/component that corresponds to the prim we have currently selected
+					if ( bResync && SelectedPrimPath.StartsWith( PrimPath ) )
+					{
+						OnPrimSelectionChanged( { SelectedPrimPath } );
 					}
 				});
 			}
@@ -431,7 +511,7 @@ TSharedRef< SWidget > SUsdStage::MakeActorPickerMenuContent()
 
 		return SNew(SBox)
 			.Padding( FMargin( 1 ) )    // Add a small margin or else we'll get dark gray on dark gray which can look a bit confusing
-			.MinDesiredWidth( 300.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
+			.MinDesiredWidth( 400.0f )  // Force a min width or else the tree view item text will run up right to the very edge pixel of the menu
 			.HAlign( HAlign_Fill )
 			[
 				ActorPickerMenu.ToSharedRef()
@@ -492,8 +572,16 @@ void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
 			EUserInterfaceActionType::Button
 		);
 
-		MenuBuilder.AddSeparator();
+		MenuBuilder.AddSubMenu(
+			LOCTEXT( "Export", "Export" ),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateSP( this, &SUsdStage::FillExportSubMenu )
+		);
+	}
+	MenuBuilder.EndSection();
 
+	MenuBuilder.BeginSection( "Reload", LOCTEXT( "Reload", "Reload" ) );
+	{
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("Reload", "Reload"),
 			LOCTEXT("Reload_ToolTip", "Reloads the stage from disk, keeping aspects of the session intact"),
@@ -542,9 +630,11 @@ void SUsdStage::FillFileMenu( FMenuBuilder& MenuBuilder )
 			NAME_None,
 			EUserInterfaceActionType::Button
 		);
+	}
+	MenuBuilder.EndSection();
 
-		MenuBuilder.AddSeparator();
-
+	MenuBuilder.BeginSection( "Close", LOCTEXT( "Close", "Close" ) );
+	{
 		MenuBuilder.AddMenuEntry(
 			LOCTEXT("Close", "Close"),
 			LOCTEXT("Close_ToolTip", "Closes the opened stage"),
@@ -650,6 +740,55 @@ void SUsdStage::FillOptionsMenu(FMenuBuilder& MenuBuilder)
 	MenuBuilder.EndSection();
 }
 
+void SUsdStage::FillExportSubMenu( FMenuBuilder& MenuBuilder )
+{
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT( "ExportAll", "Export all layers..." ),
+		LOCTEXT( "ExportAll_ToolTip", "Exports copies of all file-based layers in the stage's layer stack to a new folder" ),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP( this, &SUsdStage::OnExportAll ),
+			FCanExecuteAction::CreateLambda( [this]()
+			{
+				if ( const AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+				{
+					if ( UE::FUsdStage Stage = StageActor->GetUsdStage() )
+					{
+						return true;
+					}
+				}
+
+				return false;
+			})
+		),
+		NAME_None,
+		EUserInterfaceActionType::Button
+	);
+
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT( "ExportFlattened", "Export flattened stage..." ),
+		LOCTEXT( "ExportFlattened_ToolTip", "Flattens the current stage to a single USD layer and exports it as a new USD file" ),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP( this, &SUsdStage::OnExportFlattened ),
+			FCanExecuteAction::CreateLambda( [this]()
+			{
+				if ( const AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get() )
+				{
+					if ( UE::FUsdStage Stage = StageActor->GetUsdStage() )
+					{
+						return true;
+					}
+				}
+
+				return false;
+			})
+		),
+		NAME_None,
+		EUserInterfaceActionType::Button
+	);
+}
+
 void SUsdStage::FillPayloadsSubMenu(FMenuBuilder& MenuBuilder)
 {
 	MenuBuilder.AddMenuEntry(
@@ -741,6 +880,9 @@ void SUsdStage::FillPurposesToLoadSubMenu(FMenuBuilder& MenuBuilder)
 							FText::FromString(StageActor->GetActorLabel())
 						));
 
+						// c.f. comment in SUsdStage::FillCollapsingSubMenu
+						TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
+
 						StageActor->Modify();
 						StageActor->PurposesToLoad = (int32)((EUsdPurpose)StageActor->PurposesToLoad ^ Purpose);
 
@@ -797,6 +939,9 @@ void SUsdStage::FillRenderContextSubMenu( FMenuBuilder& MenuBuilder )
 							FText::FromString(StageActor->GetActorLabel())
 						));
 
+						// c.f. comment in SUsdStage::FillCollapsingSubMenu
+						TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
+
 						StageActor->Modify();
 						StageActor->RenderContext = RenderContext;
 
@@ -850,6 +995,14 @@ void SUsdStage::FillCollapsingSubMenu( FMenuBuilder& MenuBuilder )
 							Text,
 							FText::FromString( StageActor->GetActorLabel() )
 						) );
+
+						// When we change our kinds to collapse, we'll end up loading the stage again and refreshing our selection.
+						// We'll take care to try to re-select the same prims within SUsdStage::Refresh after the refresh is complete,
+						// but if selection sync is on we'll also later on try updating our prim selection to match our component selection.
+						// Not only is this "selection spam" is very visible on the USD Stage Editor, if our originally selected component
+						// was just collapsed away, we'd end up updating our prim selection to point to the parent prim instead
+						// (the collapsing root), which is not ideal.
+						TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
 
 						int32 NewKindsToCollapse = ( int32 ) ( ( EUsdDefaultKind ) StageActor->KindsToCollapse ^ Kind );
 						StageActor->SetKindsToCollapse( NewKindsToCollapse );
@@ -957,6 +1110,9 @@ void SUsdStage::FillInterpolationTypeSubMenu(FMenuBuilder& MenuBuilder)
 						FText::FromString(StageActor->GetActorLabel())
 					));
 
+					// c.f. comment in SUsdStage::FillCollapsingSubMenu
+					TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
+
 					StageActor->SetInterpolationType( EUsdInterpolationType::Linear );
 				}
 			}),
@@ -990,6 +1146,9 @@ void SUsdStage::FillInterpolationTypeSubMenu(FMenuBuilder& MenuBuilder)
 						LOCTEXT("SetHeldInterpolationType", "Set USD stage actor '{0}' to held interpolation"),
 						FText::FromString(StageActor->GetActorLabel())
 					));
+
+					// c.f. comment in SUsdStage::FillCollapsingSubMenu
+					TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
 
 					StageActor->SetInterpolationType( EUsdInterpolationType::Held );
 				}
@@ -1131,6 +1290,160 @@ void SUsdStage::OnSave()
 	}
 }
 
+void SUsdStage::OnExportAll()
+{
+	const AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get();
+	if ( !StageActor )
+	{
+		return;
+	}
+
+	UE::FUsdStage UsdStage = StageActor->GetUsdStage();
+	if ( !UsdStage )
+	{
+		return;
+	}
+
+	const bool bIncludeClipLayers = false;
+	TArray<UE::FSdfLayer> LayerStack = UsdStage.GetUsedLayers( bIncludeClipLayers );
+	if ( LayerStack.Num() < 1 )
+	{
+		return;
+	}
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if ( !DesktopPlatform )
+	{
+		return;
+	}
+
+	TSharedPtr< SWindow > ParentWindow = FSlateApplication::Get().FindWidgetWindow( AsShared() );
+	void* ParentWindowHandle = ( ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid() )
+		? ParentWindow->GetNativeWindow()->GetOSWindowHandle()
+		: nullptr;
+
+	FString TargetFolderPath;
+	if ( !DesktopPlatform->OpenDirectoryDialog( ParentWindowHandle, LOCTEXT( "ChooseFolder", "Choose output folder" ).ToString(), TEXT( "" ), TargetFolderPath ) )
+	{
+		return;
+	}
+	TargetFolderPath = FPaths::ConvertRelativePathToFull( TargetFolderPath );
+
+	// Manually load any layer that is referenced by any of the stage's layers, but not currently loaded.
+	// This can happen if e.g. an unselected variant appends a reference or has a payload.
+	// We will need to actually load these as opposed to just copy-paste the files as we may need to update references/paths
+	SUSDStageImpl::AppendAllExternalReferences( LayerStack );
+
+	// Discard session layers
+	for ( int32 Index = LayerStack.Num() - 1; Index >= 0; --Index )
+	{
+		UE::FSdfLayer& Layer = LayerStack[ Index ];
+		if ( Layer.IsAnonymous() )
+		{
+			const int32 Count = 1;
+			const bool bAllowShrinking = false;
+			LayerStack.RemoveAt( Index, Count, bAllowShrinking );
+		}
+	}
+
+#if PLATFORM_LINUX
+	TMap<FString, FString, FDefaultSetAllocator, UsdUtils::FCaseSensitiveStringMapFuncs< FString > > OldPathToSavedPath;
+#else
+	TMap<FString, FString> OldPathToSavedPath;
+#endif
+
+	// If the stage has layers referencing each other, we will need to remap those to point exclusively at the newly saved files
+	TSet<FString> SavedPaths;
+	for ( const UE::FSdfLayer& Layer : LayerStack )
+	{
+		FString LayerPath = Layer.GetRealPath();
+		FPaths::NormalizeFilename( LayerPath );
+
+		FString TargetPath = FPaths::Combine( TargetFolderPath, Layer.GetDisplayName() );
+		FPaths::NormalizeFilename( TargetPath );
+
+		// Filename collision (should be rare, but possible given that we're discarding the folder structure)
+		if ( SavedPaths.Contains( TargetPath ) )
+		{
+			FString TargetPathNoExt = FPaths::SetExtension( TargetPath, TEXT( "" ) );
+			FString Ext = FPaths::GetExtension( TargetPath );
+			int32 Suffix = 0;
+
+			do
+			{
+				TargetPath = FString::Printf( TEXT( "%s_%d.%s" ), *TargetPathNoExt, Suffix++, *Ext );
+			} while ( SavedPaths.Contains( TargetPath ) );
+		}
+
+		OldPathToSavedPath.Add( LayerPath, TargetPath );
+		SavedPaths.Add( TargetPath );
+	}
+
+	// Actually save the output layers
+	for ( UE::FSdfLayer& Layer : LayerStack )
+	{
+		FString LayerPath = Layer.GetRealPath();
+		FPaths::NormalizeFilename( LayerPath );
+
+		if ( FString* TargetLayerPath = OldPathToSavedPath.Find( LayerPath ) )
+		{
+			// Clone the layer so that we don't modify the currently opened stage
+			UE::FSdfLayer OutputLayer = UE::FSdfLayer::CreateNew( **TargetLayerPath );
+			OutputLayer.TransferContent( Layer );
+
+			// Update references to assets (e.g. textures) so that they're absolute and also work from the new file
+			UsdUtils::ConvertAssetRelativePathsToAbsolute( OutputLayer, Layer );
+
+			// Remap references to layers so that they point at the other newly saved files. Note that SUSDStageImpl::AppendAllExternalReferences
+			// will have collected all external references already, so OldPathToSavedPath should have entries for all references we'll find
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+			for ( const FString& AssetDependency : OutputLayer.GetCompositionAssetDependencies() )
+#else
+			for ( const FString& AssetDependency : OutputLayer.GetExternalReferences() )
+#endif
+			{
+				FString AbsRef = FPaths::ConvertRelativePathToFull( FPaths::GetPath( LayerPath ), AssetDependency ); // Relative to the original file
+				FPaths::NormalizeFilename( AbsRef );
+
+				if ( FString* SavedReference = OldPathToSavedPath.Find( AbsRef ) )
+				{
+#if defined(PXR_VERSION) && PXR_VERSION >= 2111
+					OutputLayer.UpdateCompositionAssetDependency( *AssetDependency, **SavedReference );
+#else
+					OutputLayer.UpdateExternalReference( *AssetDependency, **SavedReference );
+#endif
+				}
+			}
+
+			bool bForce = true;
+			OutputLayer.Save( bForce );
+		}
+	}
+}
+
+void SUsdStage::OnExportFlattened()
+{
+	const AUsdStageActor* StageActor = ViewModel.UsdStageActor.Get();
+	if ( !StageActor )
+	{
+		return;
+	}
+
+	UE::FUsdStage UsdStage = StageActor->GetUsdStage();
+	if ( !UsdStage )
+	{
+		return;
+	}
+
+	TOptional< FString > UsdFilePath = UsdUtils::BrowseUsdFile( UsdUtils::EBrowseFileMode::Save, AsShared() );
+	if ( !UsdFilePath.IsSet() )
+	{
+		return;
+	}
+
+	UsdStage.Export( *( UsdFilePath.GetValue() ) );
+}
+
 void SUsdStage::OnReloadStage()
 {
 	FScopedTransaction Transaction( LOCTEXT( "ReloadTransaction", "Reload USD stage" ) );
@@ -1245,6 +1558,11 @@ void SUsdStage::Refresh()
 	if (UsdStageTreeView)
 	{
 		UsdStageTreeView->Refresh( StageActor );
+
+		// Refresh will generate brand new RootItems, so let's immediately select the new item
+		// that corresponds to the prim we're supposed to be selecting
+		UsdStageTreeView->SelectPrims( { SelectedPrimPath } );
+
 		UsdStageTreeView->RequestTreeRefresh();
 	}
 }
@@ -1342,6 +1660,9 @@ void SUsdStage::OnNaniteTriangleThresholdValueCommitted( int32 InValue, ETextCom
 		LOCTEXT( "NaniteTriangleThresholdCommittedTransaction", "Change Nanite triangle threshold for USD stage actor '{0}'" ),
 		FText::FromString( StageActor->GetActorLabel() )
 	) );
+
+	// c.f. comment in SUsdStage::FillCollapsingSubMenu
+	TGuardValue<bool> MaintainSelectionGuard( bUpdatingViewportSelection, true );
 
 	StageActor->SetNaniteTriangleThreshold( InValue );
 	CurrentNaniteThreshold = InValue;

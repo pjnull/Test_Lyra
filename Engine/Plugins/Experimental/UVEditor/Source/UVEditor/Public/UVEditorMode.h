@@ -7,6 +7,7 @@
 #include "Tools/UEdMode.h"
 #include "ToolTargets/ToolTarget.h"
 #include "GeometryBase.h"
+#include "InteractiveTool.h"
 
 #include "UVEditorMode.generated.h"
 
@@ -27,7 +28,107 @@ class UUVToolStateObjectStore;
 class UUVEditorToolMeshInput;
 class UUVEditorBackgroundPreview;
 class UUVToolViewportButtonsAPI;
+class UUVTool2DViewportAPI;
+class UUVEditorMode;
 
+/**
+ * Visualization settings for the UUVEditorMode's Grid
+ */
+UCLASS()
+class UVEDITOR_API UUVEditorGridProperties : public UInteractiveToolPropertySet
+{
+	GENERATED_BODY()
+public:
+	/** Should the grid be shown?*/
+	UPROPERTY(EditAnywhere, Category = Grid, meta = (DisplayName = "Display Grid"))
+	bool bDrawGrid = true;
+
+	/** Should the grid rulers be shown?*/
+	UPROPERTY(EditAnywhere, Category = Grid, meta = (DisplayName = "Display Rulers"))
+	bool bDrawRulers = true;
+};
+
+USTRUCT()
+struct FUDIMSpecifier
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY(EditAnywhere, Transient, Category = UDIM, meta = (ClampMin = "1001", UIMin = "1001"))
+	int32 UDIM = 1001;
+
+	UPROPERTY(VisibleAnywhere, Transient, Category = UDIM, meta = (DisplayName = "Block U Offset"))
+	int32 UCoord = 0;
+
+	UPROPERTY(VisibleAnywhere, Transient, Category = UDIM, meta = (DisplayName = "Block V Offset"))
+	int32 VCoord = 0;
+
+	friend bool operator==(const FUDIMSpecifier& A, const FUDIMSpecifier& B )
+	{
+		return A.UDIM == B.UDIM;
+	}
+
+	friend uint32 GetTypeHash(const FUDIMSpecifier& UDIMSpecifier)
+	{
+		uint32 HashCode = GetTypeHash(UDIMSpecifier.UDIM);
+		return HashCode;
+	}
+};
+
+UENUM()
+enum class EUVEditorModeActions
+{
+	NoAction,
+
+	ConfigureUDIMsFromAsset,
+	ConfigureUDIMsFromTexture
+};
+
+/**
+ * Settings for UDIMs in the UVEditor
+ */
+UCLASS()
+class UVEDITOR_API UUVEditorUDIMProperties : public UInteractiveToolPropertySet
+{
+	GENERATED_BODY()
+public:
+	void Initialize(UUVEditorMode* ParentModeIn) { ParentMode = ParentModeIn; }
+	void PostAction(EUVEditorModeActions Action);
+
+	UPROPERTY(EditAnywhere, Transient, Category = "UDIM", meta = (DisplayName = "UDIM Source Mesh", GetOptions = GetAssetNames))
+	FString UDIMSourceAsset;
+
+	UFUNCTION()
+	const TArray<FString>& GetAssetNames();
+
+	UFUNCTION()
+	int32 AssetByIndex() const;
+
+	/** Set UDIM Layout from selected asset's UVs */
+	UFUNCTION(CallInEditor, Category = UDIM)
+	void SetUDIMsFromAsset() { PostAction(EUVEditorModeActions::ConfigureUDIMsFromAsset); }
+
+	/** Texture asset to source UDIM information from */
+	UPROPERTY(EditAnywhere, Transient, Category = UDIM)
+	TObjectPtr<UTexture2D> UDIMSourceTexture;
+
+	/** Set UDIM Layout from selected texture asset */
+	UFUNCTION(CallInEditor, Category = UDIM)
+	void SetUDIMsFromTexture() { PostAction(EUVEditorModeActions::ConfigureUDIMsFromTexture); };
+
+	/** Currently active UDIM set */
+	UPROPERTY(EditAnywhere, Transient, Category = UDIM, meta = (TitleProperty = "UDIM"))
+	TArray<FUDIMSpecifier> ActiveUDIMs;
+
+public:
+	void InitializeAssets(const TArray<TObjectPtr<UUVEditorToolMeshInput>>& TargetsIn);
+
+private:
+	void UpdateActiveUDIMsFromTexture();
+	void UpdateActiveUDIMsFromAsset();
+
+	TWeakObjectPtr<UUVEditorMode> ParentMode;
+	TArray<FString> UVAssetNames;
+};
 
 /**
  * The UV editor mode is the mode used in the UV asset editor. It holds most of the inter-tool state.
@@ -54,12 +155,12 @@ public:
 	/**
 	 * Gets the factor by which UV layer unwraps get scaled (scaling makes certain things easier, like zooming in, etc).
 	 */
-	static double GetUVMeshScalingFactor() { return 1000; }
+	static double GetUVMeshScalingFactor();
 
 	// Both initialization functions must be called for things to function properly. InitializeContexts should
 	// be done first so that the 3d preview world is ready for creating meshes in InitializeTargets.
 	void InitializeContexts(FEditorViewportClient& LivePreviewViewportClient, FAssetEditorModeManager& LivePreviewModeManager,
-		UUVToolViewportButtonsAPI& ViewportButtonsAPI);
+		UUVToolViewportButtonsAPI& ViewportButtonsAPI, UUVTool2DViewportAPI& UVTool2DViewportAPI);
 	void InitializeTargets(const TArray<TObjectPtr<UObject>>& AssetsIn, const TArray<FTransform>& TransformsIn);
 
 	// Public for use by undo/redo. Otherwise should use RequestUVChannelChange
@@ -101,6 +202,12 @@ public:
 	/** @return A settings object suitable for display in a details panel to control the background visualization. */
 	UObject* GetBackgroundSettingsObject();
 
+	/** @return A settings object suitable for display in a details panel to control the grid. */
+	UObject* GetGridSettingsObject();
+
+	/** @return A settings object suitable for display in a details panel to control UDIM configuration. */
+	UObject* GetUDIMSettingsObject();
+
 	// UEdMode overrides
 	virtual void Enter() override;
 	virtual bool ShouldToolStartBeAllowed(const FString& ToolIdentifier) const override;
@@ -122,6 +229,16 @@ public:
 	UPROPERTY()
 	TObjectPtr<UUVEditorBackgroundPreview> BackgroundVisualization;
 
+	// Hold a settings object to configure the grid
+	UPROPERTY()
+	TObjectPtr<UUVEditorGridProperties> UVEditorGridProperties = nullptr;
+
+	// Hold a settings object to configure the UDIMs
+	UPROPERTY()
+	TObjectPtr<UUVEditorUDIMProperties> UVEditorUDIMProperties = nullptr;
+
+	void PopulateUDIMsByAsset(int32 AssetId, TArray<FUDIMSpecifier>& UDIMsOut) const;
+
 protected:
 
 	// UEdMode overrides
@@ -133,6 +250,9 @@ protected:
 	
 	void UpdateTriangleMaterialBasedOnBackground(bool IsBackgroundVisible);
 	void UpdatePreviewMaterialBasedOnBackground();
+
+	void UpdateActiveUDIMs();
+	int32 UDIMsChangedWatcherId;
 
 	/**
 	 * Stores original input objects, for instance UStaticMesh pointers. AssetIDs on tool input 

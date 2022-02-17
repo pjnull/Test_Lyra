@@ -26,7 +26,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MongoDB.Bson;
 using AgentCapabilities = HordeCommon.Rpc.Messages.AgentCapabilities;
-using GlobalPermissions = HordeServer.Models.GlobalPermissions;
 using ISession = Microsoft.AspNetCore.Http.ISession;
 using PoolId = HordeServer.Utilities.StringId<HordeServer.Models.IPool>;
 
@@ -407,7 +406,7 @@ namespace HordeServerTests
 
 			// Set the session ID on the job batch to pass auth later
 			Deref(await JobCollection.TryAssignLeaseAsync(Fixture.Job1, 0, new PoolId("foo"),
-				new AgentId("test"), SessionId,
+				new AgentId("test"), new ObjectId<HordeServer.Models.ISession>(SessionId),
 				LeaseId.GenerateNewId(), LogId.GenerateNewId()));
 /*
 			TestAsyncStreamReader<UploadArtifactRequest> RequestStream = new TestAsyncStreamReader<UploadArtifactRequest>(Context);

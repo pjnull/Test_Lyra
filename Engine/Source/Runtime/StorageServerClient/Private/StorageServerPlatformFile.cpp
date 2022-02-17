@@ -282,6 +282,29 @@ void FStorageServerPlatformFile::InitializeAfterProjectFilePath()
 	Connection.Reset(new FStorageServerConnection());
 	const TCHAR* ProjectOverride = ServerProject.IsEmpty() ? nullptr : *ServerProject;
 	const TCHAR* PlatformOverride = ServerPlatform.IsEmpty() ? nullptr : *ServerPlatform;
+#if WITH_COTF
+	if (FParse::Param(FCommandLine::Get(), TEXT("CookOnTheFly")))
+	{
+		UE::Cook::FCookOnTheFlyHostOptions CookOnTheFlyHostOptions;
+		// Cook-on-the-fly expects the same host as the Zen storage server
+		CookOnTheFlyHostOptions.Hosts = HostAddrs;
+		double ServerWaitTimeInSeconds;
+		if (FParse::Value(FCommandLine::Get(), TEXT("-CookOnTheFlyServerWaitTime="), ServerWaitTimeInSeconds))
+		{
+			CookOnTheFlyHostOptions.ServerStartupWaitTime = FTimespan::FromSeconds(ServerWaitTimeInSeconds);
+		}
+		UE::Cook::ICookOnTheFlyModule& CookOnTheFlyModule = FModuleManager::LoadModuleChecked<UE::Cook::ICookOnTheFlyModule>(TEXT("CookOnTheFly"));
+		CookOnTheFlyServerConnection = CookOnTheFlyModule.ConnectToServer(CookOnTheFlyHostOptions);
+		if (CookOnTheFlyServerConnection)
+		{
+			CookOnTheFlyServerConnection->OnMessage().AddRaw(this, &FStorageServerPlatformFile::OnCookOnTheFlyMessage);
+		}
+		else
+		{
+			UE_LOG(LogStorageServerPlatformFile, Fatal, TEXT("Failed to connect to cook on the fly server"));
+		}
+	}
+#endif
 	if (Connection->Initialize(HostAddrs, 1337, ProjectOverride, PlatformOverride))
 	{
 		if (SendGetFileListMessage())
@@ -290,36 +313,12 @@ void FStorageServerPlatformFile::InitializeAfterProjectFilePath()
 			TSharedRef<FStorageServerIoDispatcherBackend> IoDispatcherBackend = MakeShared<FStorageServerIoDispatcherBackend>(*Connection.Get());
 			IoDispatcher.Mount(IoDispatcherBackend);
 
-#if WITH_COTF
-			if (FParse::Param(FCommandLine::Get(), TEXT("CookOnTheFly")))
-			{
-				UE::Cook::FCookOnTheFlyHostOptions CookOnTheFlyHostOptions;
-				// Cook-on-the-fly expects the same host as the Zen storage server
-				CookOnTheFlyHostOptions.Hosts = HostAddrs;
-				double ServerWaitTimeInSeconds;
-				if (FParse::Value(FCommandLine::Get(), TEXT("-CookOnTheFlyServerWaitTime="), ServerWaitTimeInSeconds))
-				{
-					CookOnTheFlyHostOptions.ServerStartupWaitTime = FTimespan::FromSeconds(ServerWaitTimeInSeconds);
-				}
-				UE::Cook::ICookOnTheFlyModule& CookOnTheFlyModule = FModuleManager::LoadModuleChecked<UE::Cook::ICookOnTheFlyModule>(TEXT("CookOnTheFly"));
-				CookOnTheFlyServerConnection = CookOnTheFlyModule.ConnectToServer(CookOnTheFlyHostOptions);
-				if (CookOnTheFlyServerConnection)
-				{
-					CookOnTheFlyServerConnection->OnMessage().AddRaw(this, &FStorageServerPlatformFile::OnCookOnTheFlyMessage);
-				}
-				else
-				{
-					UE_LOG(LogStorageServerPlatformFile, Fatal, TEXT("Failed to connect to cook on the fly server"));
-				}
-			}
-#endif
-
 			FCoreDelegates::CreatePackageStore.BindLambda([this]() -> TSharedPtr<IPackageStore>
 			{
 #if WITH_COTF
 				if (CookOnTheFlyServerConnection)
 				{
-					return MakeCookOnTheFlyPackageStore(*CookOnTheFlyServerConnection.Get());
+					return MakeShared<FCookOnTheFlyPackageStore>(*CookOnTheFlyServerConnection.Get());
 				}
 				else
 #endif
@@ -629,6 +628,52 @@ bool FStorageServerPlatformFile::DeleteDirectory(const TCHAR* Directory)
 		return false;
 	}
 	return LowerLevel->DeleteDirectory(Directory);
+}
+
+FString FStorageServerPlatformFile::ConvertToAbsolutePathForExternalAppForRead(const TCHAR* Filename)
+{
+#if PLATFORM_DESKTOP && (UE_GAME || UE_SERVER)
+	TStringBuilder<1024> Result;
+
+	// New code should not end up in here and should instead be written in such a
+	// way that data can be served from a (remote) server.
+
+	// Some data must exist in files on disk such that it can be accessed by external
+	// APIs. Any such data required by a title should have been written to Saved/Cooked
+	// at cook time. If a file prefix with UE's canonical ../../../ is requested we
+	// look inside Saved/Cooked. A read-only filesystem overlay if you will.
+
+	static FString* CookedDir = nullptr;
+	if (CookedDir == nullptr)
+	{
+		static FString Inner;
+		CookedDir = &Inner;
+
+		Result << *FPaths::ProjectDir();
+		Result << TEXT("Saved/Cooked/");
+		Result << FPlatformProperties::PlatformName();
+		Result << TEXT("/");
+		Inner = Result.ToString();
+	}
+	else
+	{
+		Result << *(*CookedDir);
+	}
+
+	const TCHAR* DotSlashSkip = Filename;
+	for (; *DotSlashSkip == '.' || *DotSlashSkip == '/'; ++DotSlashSkip);
+
+	if (PTRINT(DotSlashSkip - Filename) == 9) // 9 == ../../../
+	{
+		Result << DotSlashSkip;
+		if (LowerLevel->FileExists(Result.ToString()))
+		{
+			return FString(Result.GetData(), Result.Len());
+		}
+	}
+#endif
+
+	return LowerLevel->ConvertToAbsolutePathForExternalAppForRead(Filename);
 }
 
 bool FStorageServerPlatformFile::MakeStorageServerPath(const TCHAR* LocalFilenameOrDirectory, FStringBuilderBase& OutPath) const

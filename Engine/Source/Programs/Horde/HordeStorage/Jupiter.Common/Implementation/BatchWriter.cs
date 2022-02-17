@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Datadog.Trace;
+using EpicGames.Horde.Storage;
 using Serilog;
 
 namespace Jupiter.Implementation
@@ -35,7 +36,7 @@ namespace Jupiter.Implementation
             foreach ((OpVerb opVerb, BucketId bucket, KeyId key) in ops)
             {
                 string opTypeName = opVerb.ToString();
-                using Scope scope = Tracer.Instance.StartActive($"batch.{opTypeName}");
+                using IScope scope = Tracer.Instance.StartActive($"batch.{opTypeName}");
                 scope.Span.ResourceName = $"{ns}.{bucket}.{key}";
 
                 (ContentHash? contentHash, BlobContents? blob, OpState opState) = await fetchAction(opVerb, ns, bucket, key, new [] {"blob", "contentHash"});
@@ -64,11 +65,6 @@ namespace Jupiter.Implementation
                     // also for head checks we do not write anything more
                     if (opState != OpState.OK || opState == OpState.Exists || contentHash == null || blob == null)
                         continue;
-
-                    if (blob.Length == 0)
-                    {
-                        _logger.Error("0 byte blob encountered for hash {ContentHash} state was {OpState}. Skipping", contentHash.ToString(), opState);
-                    }
 
                     await outStream.WriteAsync(contentHash.HashData);
                     await outStream.WriteAsync(BitConverter.GetBytes((ulong) blob.Length));

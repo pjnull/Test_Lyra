@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
 using System.Collections.Generic;
@@ -11,11 +11,11 @@ namespace UnrealGameSync
 {
 	class ActivationListener : IDisposable
 	{
-		Thread BackgroundThread;
+		Thread? BackgroundThread;
 		EventWaitHandle ActivateEventHandle;
 		EventWaitHandle QuitEventHandle;
 
-		public event Action OnActivate;
+		public event Action? OnActivate;
 
 		public ActivationListener(EventWaitHandle InActivateEventHandle)
 		{
@@ -47,16 +47,8 @@ namespace UnrealGameSync
 		{
 			Stop();
 
-			if(QuitEventHandle != null)
-			{
-				QuitEventHandle.Dispose();
-				QuitEventHandle = null;
-			}
-			if(ActivateEventHandle != null)
-			{
-				ActivateEventHandle.Dispose();
-				ActivateEventHandle = null;
-			}
+			QuitEventHandle.Dispose();
+			ActivateEventHandle.Dispose();
 		}
 
 		void ThreadProc()
@@ -66,7 +58,7 @@ namespace UnrealGameSync
 				int Index = EventWaitHandle.WaitAny(new WaitHandle[]{ ActivateEventHandle, QuitEventHandle }, Timeout.Infinite);
 				if(Index == 0)
 				{
-					OnActivate();
+					OnActivate?.Invoke();
 				}
 				else
 				{

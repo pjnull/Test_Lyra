@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Permissions;
 using System.Threading.Tasks;
+using Horde.Build.Fleet.Autoscale;
 
 namespace HordeServer.Models
 {
@@ -41,6 +42,11 @@ namespace HordeServer.Models
 		public IReadOnlyList<AgentWorkspace> Workspaces { get; }
 
 		/// <summary>
+		/// Whether to sync autosdk alongside the workspaces for this pool
+		/// </summary>
+		public bool UseAutoSdk { get; }
+
+		/// <summary>
 		/// Arbitrary properties related to this pool
 		/// </summary>
 		public IReadOnlyDictionary<string, string> Properties { get; }
@@ -69,6 +75,11 @@ namespace HordeServer.Models
 		/// Last time the pool was (auto) scaled down
 		/// </summary>
 		public DateTime? LastScaleDownTime { get; }
+		
+		/// <summary>
+		/// Pool sizing strategy to be used for this pool
+		/// </summary>
+		public PoolSizeStrategy? SizeStrategy { get; }
 
 		/// <summary>
 		/// Update index for this document

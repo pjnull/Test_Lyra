@@ -683,6 +683,11 @@ public:
 	void SetShadingModelFromExpression(bool bIn) { bHasShadingModelFromExpression = bIn ? 1u : 0u; }
 	bool HasShadingModelFromExpression() const { return bHasShadingModelFromExpression > 0u; }
 
+	uint32 GetPropertyConnected() const { return ConnectedProperties; }
+	void AddPropertyConnected(uint32 In) { ConnectedProperties |= (1 << In); }
+	bool HasPropertyConnected(uint32 In) const { return !!(ConnectedProperties & (1 << In)); }
+	static bool HasPropertyConnected(uint32 InConnectedProperties, uint32 In) { return !!(InConnectedProperties & (1 << In)); }
+
 	bool IsValid() const { return (ShadingModelField > 0) && (ShadingModelField < (1 << SSM_NUM)); }
 
 	bool operator==(const FStrataMaterialInfo& Other) const { return ShadingModelField == Other.GetShadingModelField(); }
@@ -696,6 +701,10 @@ private:
 	UPROPERTY()
 	uint8 bHasShadingModelFromExpression = 0;
 
+	/* Indicates which (legacy) inputs are connected */
+	UPROPERTY()
+	uint32 ConnectedProperties = 0;
+	
 	UPROPERTY()
 	TArray<TObjectPtr<USubsurfaceProfile>> SubsurfaceProfiles;
 };
@@ -3534,6 +3543,14 @@ struct ENGINE_API FRepMovement
 	UPROPERTY(Transient)
 	uint8 bRepPhysics : 1;
 
+	/** Server physics step */
+	UPROPERTY(Transient)
+	int32 ServerFrame;
+
+	/** ID assigned by server used to ensure determinism by physics. */
+	UPROPERTY(Transient)
+	int32 ServerPhysicsHandle = INDEX_NONE;
+
 	/** Allows tuning the compression level for the replicated location vector. You should only need to change this from the default if you see visual artifacts. */
 	UPROPERTY(EditDefaultsOnly, Category=Replication, AdvancedDisplay)
 	EVectorQuantization LocationQuantizationLevel;
@@ -3575,46 +3592,9 @@ struct ENGINE_API FRepMovement
 		}
 	}
 
-	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
-	{
-		// pack bitfield with flags
-		uint8 Flags = (bSimulatedPhysicSleep << 0) | (bRepPhysics << 1);
-		Ar.SerializeBits(&Flags, 2);
-		bSimulatedPhysicSleep = ( Flags & ( 1 << 0 ) ) ? 1 : 0;
-		bRepPhysics = ( Flags & ( 1 << 1 ) ) ? 1 : 0;
+	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess);
 
-		bOutSuccess = true;
-
-		// update location, rotation, linear velocity
-		bOutSuccess &= SerializeQuantizedVector( Ar, Location, LocationQuantizationLevel );
-		
-		switch(RotationQuantizationLevel)
-		{
-			case ERotatorQuantization::ByteComponents:
-			{
-				Rotation.SerializeCompressed( Ar );
-				break;
-			}
-
-			case ERotatorQuantization::ShortComponents:
-			{
-				Rotation.SerializeCompressedShort( Ar );
-				break;
-			}
-		}
-		
-		bOutSuccess &= SerializeQuantizedVector( Ar, LinearVelocity, VelocityQuantizationLevel );
-
-		// update angular velocity if required
-		if ( bRepPhysics )
-		{
-			bOutSuccess &= SerializeQuantizedVector( Ar, AngularVelocity, VelocityQuantizationLevel );
-		}
-
-		return true;
-	}
-
-	void FillFrom(const struct FRigidBodyState& RBState, const AActor* const Actor = nullptr)
+	void FillFrom(const struct FRigidBodyState& RBState, const AActor* const Actor = nullptr, int32 InServerFrame = 0)
 	{
 		Location = RebaseOntoZeroOrigin(RBState.Position, Actor);
 		Rotation = RBState.Quaternion.Rotator();
@@ -3622,6 +3602,7 @@ struct ENGINE_API FRepMovement
 		AngularVelocity = RBState.AngVel;
 		bSimulatedPhysicSleep = (RBState.Flags & ERigidBodyFlags::Sleeping) != 0;
 		bRepPhysics = true;
+		ServerFrame = InServerFrame;
 	}
 
 	void CopyTo(struct FRigidBodyState& RBState, const AActor* const Actor = nullptr) const

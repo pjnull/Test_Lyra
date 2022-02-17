@@ -173,7 +173,7 @@ public:
 				Thread.Wait();
 				Thread.Reset();
 				Socket.Reset();
-				ClientId  = -1;
+				ClientId  = 0;
 			}
 		}
 	}
@@ -212,10 +212,14 @@ public:
 
 		FCookOnTheFlyMessage HandshakeRequest(ECookOnTheFlyMessage::Handshake | ECookOnTheFlyMessage::Request);
 		{
-			TArray<FString> TargetPlatformNames;
-			FPlatformMisc::GetValidTargetPlatforms(TargetPlatformNames);
-			check(TargetPlatformNames.Num() > 0);
-			FString PlatformName(MoveTemp(TargetPlatformNames[0]));
+			FString PlatformName;
+			if (FPlatformProperties::RequiresCookedData())
+			{
+				TArray<FString> TargetPlatformNames;
+				FPlatformMisc::GetValidTargetPlatforms(TargetPlatformNames);
+				check(TargetPlatformNames.Num() > 0);
+				PlatformName = MoveTemp(TargetPlatformNames[0]);
+			}
 			FString ProjectName(FApp::GetProjectName());
 
 			TUniquePtr<FArchive> Ar = HandshakeRequest.WriteBody();
@@ -327,6 +331,7 @@ public:
 		}
 
 		UE_LOG(LogCotfServerConnection, Display, TEXT("Terminating connection to server '%s'"), *ServerAddr->ToString(true));
+		ClientId = 0;
 	}
 
 	struct FPendingRequest

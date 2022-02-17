@@ -13,8 +13,6 @@ class ITargetPlatform;
 namespace UE { namespace Cook
 {
 
-using FCookRequestCompletedCallback = TFunction<void(const ECookResult)>;
-
 using FRecompileShaderCompletedCallback = TFunction<void()>;
 
 using FPrecookedFileList = TMap<FString, FDateTime>;
@@ -29,7 +27,7 @@ struct FCookPackageRequest
 	/* Asset filename to cook. */
 	FString Filename;
 	/** Completion callback. */
-	FCookRequestCompletedCallback CompletionCallback;
+	FCompletionCallback CompletionCallback;
 };
 
 /**
@@ -89,6 +87,8 @@ public:
 	 */
 	virtual bool EnqueueCookRequest(FCookPackageRequest CookPackageRequest) = 0;
 
+	virtual void MarkPackageDirty(const FName& PackageName) = 0;
+
 	/**
 	 * Enqueue a new shader compile request.
 	 *
@@ -100,13 +100,6 @@ public:
 	 * Returns the package store writer for the specified platform.
 	 */
 	virtual ICookedPackageWriter& GetPackageWriter(const ITargetPlatform* TargetPlatform) = 0;
-
-	/**
-	 * Wait until any pending flush request is completed.
-	 *
-	 * @return Duration in seconds.
-	 */
-	virtual double WaitForPendingFlush() = 0;
 };
 
 /**
@@ -122,8 +115,13 @@ public:
 	/** Initialze the request manager. */
 	virtual bool Initialize() = 0;
 
+	virtual void Tick() = 0;
+
 	/** Shutdown the reques tmanager. */
 	virtual void Shutdown() = 0;
+
+	/** Called when a new package is generated */
+	virtual void OnPackageGenerated(const FName& PackageName) = 0;
 };
 
 }} // namespace UE::Cook

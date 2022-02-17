@@ -309,7 +309,7 @@ FRasterizerStateRHIRef FD3D12DynamicRHI::RHICreateRasterizerState(const FRasteri
 	RasterizerDesc.SlopeScaledDepthBias = Initializer.SlopeScaleDepthBias;
 	RasterizerDesc.FrontCounterClockwise = true;
 	RasterizerDesc.DepthBias = FMath::FloorToInt(Initializer.DepthBias * (float)(1 << 24));
-	RasterizerDesc.DepthClipEnable = true;
+	RasterizerDesc.DepthClipEnable = Initializer.DepthClipMode == ERasterizerDepthClipMode::DepthClip;
 	RasterizerDesc.MultisampleEnable = Initializer.bAllowMSAA;
 
 	return RasterizerState;
@@ -545,12 +545,11 @@ FD3D12SamplerState::FD3D12SamplerState(FD3D12Device* InParent, const D3D12_SAMPL
 	GetParentDevice()->CreateSamplerInternal(Desc, OfflineHandle);
 
 	FD3D12BindlessDescriptorManager& BindlessDescriptorManager = GetParentDevice()->GetBindlessDescriptorManager();
-	BindlessHandle = BindlessDescriptorManager.AllocateDescriptor(ERHIDescriptorHeapType::Sampler);
+	BindlessHandle = BindlessDescriptorManager.Allocate(ERHIDescriptorHeapType::Sampler);
 
 	if (BindlessHandle.IsValid())
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE OnlineHandle = BindlessDescriptorManager.GetCpuDescriptorHandle(BindlessHandle);
-		GetParentDevice()->GetDevice()->CopyDescriptorsSimple(1, OnlineHandle, OfflineHandle, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+		GetParentDevice()->GetBindlessDescriptorManager().UpdateImmediately(BindlessHandle, OfflineHandle);
 	}
 }
 
@@ -563,7 +562,7 @@ FD3D12SamplerState::~FD3D12SamplerState()
 
 		if (BindlessHandle.IsValid())
 		{
-			GetParentDevice()->GetBindlessDescriptorManager().FreeDescriptor(BindlessHandle);
+			GetParentDevice()->GetBindlessDescriptorManager().DeferredFreeFromDestructor(BindlessHandle);
 		}
 	}
 }

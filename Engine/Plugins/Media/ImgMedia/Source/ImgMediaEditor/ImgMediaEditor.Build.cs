@@ -14,11 +14,14 @@ namespace UnrealBuildTool.Rules
 					"DesktopWidgets",
 					"EditorFramework",
 					"EditorStyle",
+					"ImageWrapper",
 					"ImgMedia",
+					"InputCore",
 					"MediaAssets",
 					"Slate",
 					"SlateCore",
 					"UnrealEd",
+					"WorkspaceMenuStructure",
 				});
 
 			PrivateIncludePaths.AddRange(

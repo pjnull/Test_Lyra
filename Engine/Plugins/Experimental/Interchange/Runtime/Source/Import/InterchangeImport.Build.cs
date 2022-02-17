@@ -15,6 +15,7 @@ namespace UnrealBuildTool.Rules
 					"InterchangeCore",
 					"InterchangeDispatcher",
 					"InterchangeEngine",
+					"InterchangeFactoryNodes",
 					"InterchangeNodes",
 					"MeshDescription",
 					"StaticMeshDescription",
@@ -26,6 +27,7 @@ namespace UnrealBuildTool.Rules
 				{
 					"AssetRegistry",
 					"CinematicCamera",
+					"GLTFCore",
 					"IESFile",
 					"ImageWrapper",
 					"InterchangeDispatcher",
@@ -41,6 +43,7 @@ namespace UnrealBuildTool.Rules
 				PrivateDependencyModuleNames.AddRange(
 					new string[]
 					{
+						"MaterialEditor",
 						"UnrealEd",
 					}
 				);

@@ -198,6 +198,11 @@ namespace HordeServer.Models
 		public bool Incremental { get; set; }
 
 		/// <summary>
+		/// Whether to use the AutoSDK
+		/// </summary>
+		public bool UseAutoSdk { get; set; } = true;
+
+		/// <summary>
 		/// Default constructor
 		/// </summary>
 		public WorkspaceType()
@@ -218,6 +223,7 @@ namespace HordeServer.Models
 			Stream = Request.Stream;
 			View = Request.View;
 			Incremental = Request.Incremental;
+			UseAutoSdk = Request.UseAutoSdk;
 		}
 
 		/// <summary>
@@ -237,7 +243,7 @@ namespace HordeServer.Models
 		/// <returns>The response object</returns>
 		public Api.GetWorkspaceTypeResponse ToApiResponse()
 		{
-			return new Api.GetWorkspaceTypeResponse(Cluster, ServerAndPort, UserName, Identifier, Stream, View, Incremental);
+			return new Api.GetWorkspaceTypeResponse(Cluster, ServerAndPort, UserName, Identifier, Stream, View, Incremental, UseAutoSdk);
 		}
 	}
 
@@ -453,7 +459,7 @@ namespace HordeServer.Models
 			}
 			else if (ChangeTemplateRefId != null)
 			{
-				ChangeRequest = new ChangeQueryRequest { TemplateId = ChangeTemplateRefId?.ToString() };
+				ChangeRequest = new ChangeQueryRequest { TemplateId = ChangeTemplateRefId.ToString() };
 			}
 
 			return new DefaultPreflightRequest { TemplateId = TemplateRefId?.ToString(), Change = ChangeRequest, ChangeTemplateId = ChangeRequest?.TemplateId };
@@ -585,13 +591,13 @@ namespace HordeServer.Models
 		/// <param name="AgentType">The agent type</param>
 		/// <param name="Workspace">Receives the agent workspace definition</param>
 		/// <returns>True if the agent type was valid, and an agent workspace could be created</returns>
-		public static bool TryGetAgentWorkspace(this IStream Stream, AgentType AgentType, [NotNullWhen(true)] out AgentWorkspace? Workspace)
+		public static bool TryGetAgentWorkspace(this IStream Stream, AgentType AgentType, [NotNullWhen(true)] out (AgentWorkspace, bool)? Workspace)
 		{
 			// Get the workspace settings
 			if (AgentType.Workspace == null)
 			{
 				// Use the default settings (fast switching workspace, clean 
-				Workspace = new AgentWorkspace(null, null, GetDefaultWorkspaceIdentifier(Stream), Stream.Name, null, false);
+				Workspace = (new AgentWorkspace(null, null, GetDefaultWorkspaceIdentifier(Stream), Stream.Name, null, false), true);
 				return true;
 			}
 			else
@@ -606,7 +612,7 @@ namespace HordeServer.Models
 
 				// Get the workspace identifier
 				string Identifier;
-				if (WorkspaceType.Identifier != null && !String.IsNullOrEmpty(WorkspaceType.Identifier))
+				if (WorkspaceType.Identifier != null)
 				{
 					Identifier = WorkspaceType.Identifier;
 				}
@@ -620,7 +626,7 @@ namespace HordeServer.Models
 				}
 
 				// Create the new workspace
-				Workspace = new AgentWorkspace(WorkspaceType.Cluster, WorkspaceType.UserName, Identifier, WorkspaceType.Stream ?? Stream.Name, WorkspaceType.View, WorkspaceType.Incremental);
+				Workspace = (new AgentWorkspace(WorkspaceType.Cluster, WorkspaceType.UserName, Identifier, WorkspaceType.Stream ?? Stream.Name, WorkspaceType.View, WorkspaceType.Incremental), WorkspaceType.UseAutoSdk);
 				return true;
 			}
 		}

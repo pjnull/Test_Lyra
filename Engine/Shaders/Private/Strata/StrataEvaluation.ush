@@ -19,10 +19,6 @@
 #define STRATA_FASTPATH 0
 #endif
 
-#ifndef STRATA_USE_ENV_BRDF_APPROX
-#define STRATA_USE_ENV_BRDF_APPROX 0
-#endif
-
 #ifndef STRATA_TRANSLUCENT_ENABLED
 #define STRATA_TRANSLUCENT_ENABLED 0
 #endif
@@ -76,31 +72,6 @@ struct FStrataBSDFContext
 	float3 TangentV;
 	float3 TangentH;
 };
-
-float StrataGetBSDFRoughness(in FStrataBSDF BSDF)
-{
-	float R = 0;
-	const uint BSDFType = BSDF_GETTYPE(BSDF);
-	switch (BSDFType)
-	{
-	case STRATA_BSDF_TYPE_SLAB:
-	{
-		R = SLAB_ROUGHNESS(BSDF);
-		break;
-	}
-	case STRATA_BSDF_TYPE_HAIR:
-	{
-		R = HAIR_ROUGHNESS(BSDF);
-		break;
-	}
-	case STRATA_BSDF_TYPE_SINGLELAYERWATER:
-	{
-		R = SLW_ROUGHNESS(BSDF);
-		break;
-	}
-	}
-	return R;
-}
 
 FStrataBSDFContext StrataCreateBSDFContext(float3x3 TangentBasis, FStrataBSDF BSDF, float3 V, float3 L, bool bHasValidL=true)
 {
@@ -218,8 +189,8 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			float HazeSafeRoughness		= SafeRoughness;
 		#endif
 			const bool bHasSubsurface	= BSDF_GETHASSSS(BSDFContext.BSDF) > 0;
-			const bool bHasAnisotropy = BSDF_GETHASANISOTROPY(BSDFContext.BSDF);
-			const bool bHaziness = BSDF_GETHASHAZINESS(BSDFContext.BSDF);
+			const bool bHasAnisotropy	= BSDF_GETHASANISOTROPY(BSDFContext.BSDF);
+			const bool bHaziness		= BSDF_GETHASHAZINESS(BSDFContext.BSDF);
 
 			if (bForceFullyRough)
 			{
@@ -249,7 +220,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 
 				SphereMaxNoH(BSDFContext.Context, AreaLightContext.AreaLight.SphereSinAlpha, true);
 			}
-			BSDFContext.Context.NoV = saturate(abs(BSDFContext.Context.NoV) + 1e-5);
+			BSDFContext.Context.NoV = saturate(max(abs(BSDFContext.Context.NoV), STRATA_EPSILON));
 
 			////
 			//// Evaluate the diffuse component.
@@ -277,6 +248,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			float3 MSScale = 1;
 			float3 HazeMSScale = 1;
 			float3 DirectionalAlbedo_SpecularTransmission = 1.0f;
+			float HazeWeight = 0.f;
 			{
 				{
 					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughness, BSDFContext.Context.NoV, F0, F90);
@@ -287,7 +259,9 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 			#if STRATA_FASTPATH==0
 				if (bHaziness)
 				{
-					HazeSafeRoughness = ComputeHazyLobeRoughness(SafeRoughness, SLAB_HAZINESS(BSDFContext.BSDF));
+					HazeWeight = SLAB_HAZINESS(BSDFContext.BSDF);
+					HazeSafeRoughness = MakeRoughnessSafe(StrataComputeHazeRoughness(SafeRoughness));
+
 					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(HazeSafeRoughness, BSDFContext.Context.NoV, F0, F90);
 					HazeMSScale = ComputeEnergyConservation(EnergyTerms);
 				}
@@ -302,7 +276,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 				{
 					const float ChanF0 = 0.04;
 					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughness, BSDFContext.Context.NoV, ChanF0, 1.0f);
-					const float3 SpecularTransmitionChanF0ToMaterialF0 = DirectionalAlbedo_SpecularTransmission / max(1e-8f, ComputeEnergyPreservation(EnergyTerms));
+					const float3 SpecularTransmitionChanF0ToMaterialF0 = DirectionalAlbedo_SpecularTransmission / max(STRATA_EPSILON, ComputeEnergyPreservation(EnergyTerms));
 					Sample.DiffusePathValue *= SpecularTransmitionChanF0ToMaterialF0;
 					Sample.IntegratedDiffuseValue *= SpecularTransmitionChanF0ToMaterialF0;
 				}
@@ -392,7 +366,7 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 						}
 						else
 						{
-							float Energy = EnergyNormalization(Alpha2Spec, BSDFContext.Context.VoH, AreaLightContext.AreaLight);
+							const float Energy = EnergyNormalization(Alpha2Spec, BSDFContext.Context.VoH, AreaLightContext.AreaLight);
 							D = D_GGX(Alpha2Spec, BSDFContext.Context.NoH) * Energy;
 						}
 						// STRATA_TODO Should we use Vis_SmithJointApprox here?
@@ -407,12 +381,12 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 						float Alpha2SpecHaze = Pow4(HazeSafeRoughness);
 						if (IntegrationType == INTEGRATION_PUNCTUAL_LIGHT)
 						{
-							D = D_GGX(Alpha2SpecHaze, BSDFContext.Context.NoH);
+							HazeD = D_GGX(Alpha2SpecHaze, BSDFContext.Context.NoH);
 						}
 						else
 						{
-							float Energy = EnergyNormalization(Alpha2SpecHaze, BSDFContext.Context.VoH, AreaLightContext.AreaLight);
-							D = D_GGX(Alpha2SpecHaze, BSDFContext.Context.NoH) * Energy;
+							const float Energy = EnergyNormalization(Alpha2SpecHaze, BSDFContext.Context.VoH, AreaLightContext.AreaLight);
+							HazeD = D_GGX(Alpha2SpecHaze, BSDFContext.Context.NoH) * Energy;
 						}
 						// STRATA_TODO Should we use Vis_SmithJointApprox here?
 						HazeVis = Vis_SmithJoint(Alpha2SpecHaze, BSDFContext.Context.NoV, AreaLightContext.NoL);
@@ -441,8 +415,8 @@ FStrataEvaluateResult StrataEvaluateBSDFCommon(FStrataBSDFContext BSDFContext, F
 				FresnelTerm = SpecularMicroOcclusion * F_Schlick(F0, F90, BSDFContext.Context.VoH);
 			}
 
-			Sample.SpecularPathProbability		= bHaziness	? (1.0f - SPECULAR_HAZINESS_WEIGHT) : 1.0f;
-			Sample.SpecularHazePathProbability	= bHaziness	? SPECULAR_HAZINESS_WEIGHT			: 0.0f;
+			Sample.SpecularPathProbability		= bHaziness	? (1.0f - HazeWeight) : 1.0f;
+			Sample.SpecularHazePathProbability	= bHaziness	? HazeWeight : 0.0f;
 
 			Sample.SpecularPDF				= PDF * Sample.SpecularPathProbability;
 			Sample.SpecularHazePDF			= HazePDF * Sample.SpecularHazePathProbability;
@@ -892,21 +866,20 @@ FStrataEnvLightResult StrataEvaluateForEnvLight(FStrataBSDFContext BSDFContext, 
 				const bool bHasHaziness = BSDF_GETHASHAZINESS(BSDFContext.BSDF);
 				if (bHasHaziness)
 				{
+					const float SafeRoughnessHaze = MakeRoughnessSafe(StrataComputeHazeRoughness(SafeRoughness));
+					const float HazeWeight = SLAB_HAZINESS(BSDFContext.BSDF);
+
 					// Smoothly fade in haziness while fading out SSR to make sure we do not add energy and avoid popping.
-					const float Haziness = SLAB_HAZINESS(BSDFContext.BSDF);
-					const float HazinessFadeIn = saturate(Haziness / 0.1f);
-					StrataEnvLightResult.SSRReduction = lerp(0.0f, SPECULAR_HAZINESS_WEIGHT, HazinessFadeIn);
+					const float HazinessFadeIn = saturate(HazeWeight / 0.1f);
+					StrataEnvLightResult.SSRReduction = lerp(0.0f, HazeWeight, HazinessFadeIn);
 
 					// Apply blend factor on the sharp specular contribution
-					StrataEnvLightResult.SpecularWeight *= lerp(1.0f, (1.0f - SPECULAR_HAZINESS_WEIGHT), HazinessFadeIn);
-
-					// Compute the second specular weight and roughness
-					float SafeRoughnessHaze = ComputeHazyLobeRoughness(SafeRoughness, Haziness);
+					StrataEnvLightResult.SpecularWeight *= lerp(1.0f, (1.0f - HazeWeight), HazinessFadeIn);
 
 					// Compute the directional albedo for hazy specular
 					FBxDFEnergyTerms EnergyTerms = ComputeGGXSpecEnergyTerms(SafeRoughnessHaze, BSDFContext.Context.NoV, F0, F90);
 					const float3 EvalEnvBRDFHaze = ThinFilmFresnelWeight * EnergyTerms.E;
-					StrataEnvLightResult.SpecularHazeWeight = lerp(0.0f, SPECULAR_HAZINESS_WEIGHT, HazinessFadeIn) * EvalEnvBRDFHaze * SpecularMicroOcclusion;
+					StrataEnvLightResult.SpecularHazeWeight = lerp(0.0f, HazeWeight, HazinessFadeIn) * EvalEnvBRDFHaze * SpecularMicroOcclusion;
 					StrataEnvLightResult.SpecularHazeSafeRoughness = SafeRoughnessHaze;
 				}
 				#endif
