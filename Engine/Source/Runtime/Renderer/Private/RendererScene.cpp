@@ -72,7 +72,6 @@
 #include "RayTracing/RayTracingScene.h"
 #endif
 #include "RHIGPUReadback.h"
-#include "GpuDebugRendering.h" 
 #include "ShaderPrint.h"
 
 #include "VirtualShadowMaps/VirtualShadowMapCacheManager.h"
@@ -420,7 +419,6 @@ FSceneViewState::~FSceneViewState()
 	}
 
 	HairStrandsViewStateData.Release();
-	ShaderDrawDebugStateData.Release();
 	ShaderPrintStateData.Release();
 }
 
@@ -2164,11 +2162,7 @@ void FScene::ShowPhysicsField()
 			ShaderPrint::SetEnabled(true);
 			ShaderPrint::SetFontSize(8);
 		}
-		if (!ShaderDrawDebug::IsEnabled())
-		{
-			ShaderDrawDebug::SetEnabled(true);
-		}
-		ShaderDrawDebug::RequestSpaceForElements(128000);
+		ShaderPrint::RequestSpaceForLines(128000);
 	}
 }
 
