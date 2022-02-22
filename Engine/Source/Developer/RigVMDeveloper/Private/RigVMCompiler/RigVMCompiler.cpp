@@ -1926,7 +1926,7 @@ void URigVMCompiler::InitializeLocalVariables(const FRigVMExprAST* InExpr, FRigV
 	}
 }
 
-FString URigVMCompiler::GetPinHash(const URigVMPin* InPin, const FRigVMVarExprAST* InVarExpr, bool bIsDebugValue)
+FString URigVMCompiler::GetPinHash(const URigVMPin* InPin, const FRigVMVarExprAST* InVarExpr, bool bIsDebugValue, const FRigVMASTProxy& InPinProxy)
 {
 	FString Prefix = bIsDebugValue ? TEXT("DebugWatch:") : TEXT("");
 	FString Suffix;
@@ -1999,7 +1999,7 @@ FString URigVMCompiler::GetPinHash(const URigVMPin* InPin, const FRigVMVarExprAS
 				if (bIsLiteral)
 				{
 					// Literal values will be reused for all instance of local variables
-					if (InVarExpr->NumParents() == 0 && InVarExpr->NumChildren() == 0)
+					if (InVarExpr && InVarExpr->NumParents() == 0 && InVarExpr->NumChildren() == 0)
 					{
 						return FString::Printf(TEXT("%sLocalVariableDefault::%s|%s%s"), *Prefix, *Node->GetGraph()->GetGraphName(), *VariableName.ToString(), *Suffix);
 					}
@@ -2028,6 +2028,20 @@ FString URigVMCompiler::GetPinHash(const URigVMPin* InPin, const FRigVMVarExprAS
 						return FString::Printf(TEXT("%sLocalVariable::%s%s"), *Prefix, *VariableName.ToString(), *Suffix);
 					}
 				}
+			}
+			else if(VariableNode->IsInputArgument())
+			{
+				FString FullPath;
+				if (InPinProxy.IsValid())
+				{
+					FullPath = InPinProxy.GetCallstack().GetCallPath(true);
+				}
+				else if(InVarExpr)
+				{						
+					const FRigVMASTProxy NodeProxy = InVarExpr->GetProxy().GetSibling(Node);
+					FullPath = InPinProxy.GetCallstack().GetCallPath(true);
+				}
+				return FString::Printf(TEXT("%s%s%s"), *Prefix, *FullPath, *Suffix);
 			}
 
 			if (!bIsLiteral)
@@ -2070,10 +2084,29 @@ FString URigVMCompiler::GetPinHash(const URigVMPin* InPin, const FRigVMVarExprAS
 					bUseFullNodePath = false;
 				}
 			}
+			else if(Node->IsA<URigVMFunctionEntryNode>() || Node->IsA<URigVMFunctionReturnNode>())
+			{
+				const FString FullPath = InPinProxy.GetCallstack().GetCallPath(true);
+				return FString::Printf(TEXT("%s%s%s"), *Prefix, *FullPath, *Suffix);
+			}
 		}
 	}
 
-	return FString::Printf(TEXT("%s%s%s"), *Prefix, *InPin->GetPinPath(bUseFullNodePath), *Suffix);
+	if (InPinProxy.IsValid())
+	{
+		const FString FullPath = InPinProxy.GetCallstack().GetCallPath(true);
+		return FString::Printf(TEXT("%s%s%s"), *Prefix, *FullPath, *Suffix);
+	}
+
+	if (InVarExpr)
+	{
+		FString FullPath = InVarExpr->GetProxy().GetCallstack().GetCallPath(true);
+		return FString::Printf(TEXT("%s%s%s"), *Prefix, *FullPath, *Suffix);
+	}
+
+	FString PinPath = InPin->GetPinPath(bUseFullNodePath);
+	ensureMsgf(!PinPath.StartsWith(TEXT("FunctionLibrary::")), TEXT("A library path should never be part of a pin hash %s."), *PinPath);
+	return FString::Printf(TEXT("%s%s%s"), *Prefix, *PinPath, *Suffix);
 }
 
 const FRigVMVarExprAST* URigVMCompiler::GetSourceVarExpr(const FRigVMExprAST* InExpr)
@@ -2516,7 +2549,7 @@ FRigVMOperand URigVMCompiler::FindOrAddRegister(const FRigVMVarExprAST* InVarExp
 			{
 				if (URigVMPin* VirtualPin = Cast<URigVMPin>(Proxy.GetSubject()))
 				{
-					FString VirtualPinHash = GetPinHash(VirtualPin, InVarExpr, bIsDebugValue);
+					FString VirtualPinHash = GetPinHash(VirtualPin, InVarExpr, bIsDebugValue, Proxy);
 					WorkData.PinPathToOperand->Add(VirtualPinHash, Operand);
 				}	
 			}
@@ -2553,6 +2586,8 @@ const FRigVMCompilerWorkData::FRigVMASTProxyArray& URigVMCompiler::FindProxiesWi
 
 	PinProxiesToProcess.Add(InProxy);
 
+	const FString CPPType = InProxy.GetSubjectChecked<URigVMPin>()->GetCPPType();
+
 	for(int32 ProxyIndex = 0; ProxyIndex < PinProxiesToProcess.Num(); ProxyIndex++)
 	{
 		const FRigVMASTProxy& CurrentProxy = PinProxiesToProcess[ProxyIndex];
@@ -2567,6 +2602,12 @@ const FRigVMCompilerWorkData::FRigVMASTProxyArray& URigVMCompiler::FindProxiesWi
 					{
 						continue;
 					}
+				}
+				// due to LWC we may have two pins that don't
+				// actually share the same CPP type (float vs double)
+				if(Pin->GetCPPType() != CPPType)
+				{
+					continue;
 				}
 			}
 			PinProxies.Add(CurrentProxy);

@@ -3,8 +3,8 @@
 #include "PCGComponent.h"
 #include "PCGGraph.h"
 #include "PCGHelpers.h"
-#include "PCGSubsystem.h"
 #include "PCGVolume.h"
+#include "Data/PCGDifferenceData.h"
 #include "Data/PCGIntersectionData.h"
 #include "Data/PCGLandscapeData.h"
 #include "Data/PCGLandscapeSplineData.h"
@@ -586,6 +586,7 @@ void UPCGComponent::PostEditUndo()
 	SetupTrackingCallbacks();
 	RefreshTrackingData();
 	DirtyGenerated(/*bDirtyCachedInput=*/true);
+	DirtyCacheForAllTrackedTags();
 	
 	if (bWasGeneratedPriorToUndo && !bGenerated)
 	{
@@ -613,13 +614,13 @@ void UPCGComponent::TeardownActorCallbacks()
 
 void UPCGComponent::SetupTrackingCallbacks()
 {
-	CachedTrackedActorTags.Reset();
+	CachedTrackedTagsToSettings.Reset();
 	if (Graph)
 	{
-		CachedTrackedActorTags.Append(Graph->GetTrackedActorTags());
+		CachedTrackedTagsToSettings = Graph->GetTrackedTagsToSettings();
 	}
 
-	if(!ExcludedTags.IsEmpty() || !CachedTrackedActorTags.IsEmpty())
+	if(!ExcludedTags.IsEmpty() || !CachedTrackedTagsToSettings.IsEmpty())
 	{
 		GEngine->OnLevelActorAdded().AddUObject(this, &UPCGComponent::OnActorAdded);
 		GEngine->OnLevelActorDeleted().AddUObject(this, &UPCGComponent::OnActorDeleted);
@@ -629,7 +630,11 @@ void UPCGComponent::SetupTrackingCallbacks()
 void UPCGComponent::RefreshTrackingData()
 {
 	GetActorsFromTags(ExcludedTags, CachedExcludedActors);
-	GetActorsFromTags(CachedTrackedActorTags, CachedTrackedActors);
+
+	TSet<FName> TrackedTags;
+	CachedTrackedTagsToSettings.GetKeys(TrackedTags);
+	GetActorsFromTags(TrackedTags, CachedTrackedActors);
+	PopulateTrackedActorToTagsMap(/*bForce=*/true);
 }
 
 void UPCGComponent::TeardownTrackingCallbacks()
@@ -664,6 +669,7 @@ void UPCGComponent::DirtyExclusionData(AActor* InActor)
 	if (UPCGData** ExclusionData = CachedExclusionData.Find(InActor))
 	{
 		*ExclusionData = nullptr;
+		CachedPCGData = nullptr;
 	}
 }
 
@@ -677,7 +683,7 @@ bool UPCGComponent::ActorIsTracked(AActor* InActor) const
 	bool bIsTracked = false;
 	for (const FName& Tag : InActor->Tags)
 	{
-		if (CachedTrackedActorTags.Contains(Tag))
+		if (CachedTrackedTagsToSettings.Contains(Tag))
 		{
 			bIsTracked = true;
 			break;
@@ -690,12 +696,7 @@ bool UPCGComponent::ActorIsTracked(AActor* InActor) const
 void UPCGComponent::OnActorAdded(AActor* InActor)
 {
 	const bool bHasExcludedTag = ActorHasExcludedTag(InActor);
-	const bool bIsTracked = ActorIsTracked(InActor);
-
-	if (bIsTracked)
-	{
-		CachedTrackedActors.Add(InActor);
-	}
+	const bool bIsTracked = AddTrackedActor(InActor);
 
 	if (bHasExcludedTag || bIsTracked)
 	{
@@ -707,15 +708,9 @@ void UPCGComponent::OnActorAdded(AActor* InActor)
 void UPCGComponent::OnActorDeleted(AActor* InActor)
 {
 	const bool bHasExcludedTag = ActorHasExcludedTag(InActor);
-	const bool bIsTracked = ActorIsTracked(InActor);
+	const bool bWasTracked = RemoveTrackedActor(InActor);
 
-	if (bIsTracked)
-	{
-		CachedTrackedActors.Remove(InActor);
-		GetSubsystem()->CleanFromCache(InActor);
-	}
-
-	if (bHasExcludedTag || bIsTracked)
+	if (bHasExcludedTag || bWasTracked)
 	{
 		DirtyGenerated();
 		Refresh();
@@ -736,20 +731,20 @@ void UPCGComponent::OnActorMoved(AActor* InActor)
 	}
 	else
 	{
-		const bool bHasExcludedTag = ActorHasExcludedTag(InActor);
-		const bool bActorIsTracked = ActorIsTracked(InActor);
-		if (bHasExcludedTag || bActorIsTracked)
+		bool bDirtyAndRefresh = false;
+
+		if (ActorHasExcludedTag(InActor))
 		{
-			if (bHasExcludedTag)
-			{
-				DirtyExclusionData(InActor);
-			}
+			bDirtyAndRefresh = true;
+		}
 
-			if (bActorIsTracked)
-			{
-				GetSubsystem()->CleanFromCache(InActor);
-			}
+		if (DirtyTrackedActor(InActor))
+		{
+			bDirtyAndRefresh = true;
+		}
 
+		if (bDirtyAndRefresh)
+		{
 			DirtyGenerated();
 			Refresh();
 		}
@@ -790,45 +785,40 @@ void UPCGComponent::OnObjectPropertyChanged(UObject* InObject, FPropertyChangedE
 
 		Refresh();
 	}
-	else
+	else if(Actor)
 	{
-		const bool bActorHasExcludedTag = ActorHasExcludedTag(Actor);
-		const bool bActorIsTracked = ActorIsTracked(Actor);
+		bool bDirtyAndRefresh = false;
 
-		if(bActorHasExcludedTag || bActorIsTracked)
+		if (bActorTagChange && Actor == InObject)
 		{
-			if (bActorHasExcludedTag)
+			// We don't really need to remove the actor here, but it's a good metric on whether the exclusion is dirty
+			if(CachedExcludedActors.Remove(Actor))
+			{
+				bDirtyAndRefresh = true;
+			}
+
+			if (UpdateTrackedActor(Actor))
+			{
+				bDirtyAndRefresh = true;
+			}
+		}
+		else
+		{
+			if (ActorHasExcludedTag(Actor))
 			{
 				DirtyExclusionData(Actor);
 			}
 
-			if (bActorIsTracked)
+			if (DirtyTrackedActor(Actor))
 			{
-				GetSubsystem()->CleanFromCache(Actor);
+				bDirtyAndRefresh = true;
 			}
-			
+		}
+
+		if (bDirtyAndRefresh)
+		{
 			DirtyGenerated();
 			Refresh();
-		}
-		else if (bActorTagChange && Actor == InObject)
-		{
-			bool bDirtyAndRefresh = false;
-			if (CachedExcludedActors.Remove(Actor))
-			{
-				bDirtyAndRefresh = true;
-			}
-
-			if (CachedTrackedActors.Remove(Actor))
-			{
-				GetSubsystem()->CleanFromCache(Actor);
-				bDirtyAndRefresh = true;
-			}
-
-			if (bDirtyAndRefresh)
-			{
-				DirtyGenerated();
-				Refresh();
-			}
 		}
 	}
 }
@@ -846,6 +836,7 @@ void UPCGComponent::OnGraphChanged(UPCGGraph* InGraph, bool bIsStructural, bool 
 		TeardownTrackingCallbacks();
 		SetupTrackingCallbacks();
 		RefreshTrackingData();
+		DirtyCacheForAllTrackedTags();
 
 		DirtyGenerated();
 		if (bShouldRefresh)
@@ -863,6 +854,7 @@ void UPCGComponent::DirtyGenerated(bool bInDirtyCachedInput)
 	{
 		CachedInputData = nullptr;
 		CachedActorData = nullptr;
+		CachedPCGData = nullptr;
 	}
 
 	// For partitioned graph, we must forward the call to the partition actor
@@ -913,9 +905,19 @@ void UPCGComponent::Refresh()
 
 UPCGData* UPCGComponent::GetPCGData()
 {
+	if (!CachedPCGData)
+	{
+		CachedPCGData = CreatePCGData();
+	}
+
+	return CachedPCGData;
+}
+
+UPCGData* UPCGComponent::GetInputPCGData()
+{
 	if (!CachedInputData)
 	{
-		CachedInputData = CreatePCGData();
+		CachedInputData = CreateInputPCGData();
 	}
 
 	return CachedInputData;
@@ -943,7 +945,7 @@ TArray<UPCGData*> UPCGComponent::GetPCGExclusionData()
 
 void UPCGComponent::UpdatePCGExclusionData()
 {
-	const UPCGData* InputData = GetPCGData();
+	const UPCGData* InputData = GetInputPCGData();
 	const UPCGSpatialData* InputSpatialData = Cast<const UPCGSpatialData>(InputData);
 
 	// Update the list of cached excluded actors here, since we might not have picked up everything on map load (due to WP)
@@ -1098,7 +1100,40 @@ UPCGData* UPCGComponent::CreateActorPCGData(AActor* Actor)
 
 UPCGData* UPCGComponent::CreatePCGData()
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UPCGComponent::CreatePCGData)
+	TRACE_CPUPROFILER_EVENT_SCOPE(UPCGComponent::CreatePCGData);
+	UPCGData* InputData = GetInputPCGData();
+	UPCGSpatialData* SpatialInput = Cast<UPCGSpatialData>(InputData);
+	
+	// Early out: incompatible data
+	if (!SpatialInput)
+	{
+		return InputData;
+	}
+
+	UPCGDifferenceData* Difference = nullptr;
+	TArray<UPCGData*> ExclusionData = GetPCGExclusionData();
+
+	for (UPCGData* Exclusion : ExclusionData)
+	{
+		if (UPCGSpatialData* SpatialExclusion = Cast<UPCGSpatialData>(Exclusion))
+		{
+			if (!Difference)
+			{
+				Difference = SpatialInput->Subtract(SpatialExclusion);
+			}
+			else
+			{
+				Difference->AddDifference(SpatialExclusion);
+			}
+		}
+	}
+
+	return Difference ? Difference : InputData;
+}
+
+UPCGData* UPCGComponent::CreateInputPCGData()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(UPCGComponent::CreateInputPCGData);
 	AActor* Actor = GetOwner();
 	check(Actor);
 
@@ -1213,5 +1248,177 @@ UPCGSubsystem* UPCGComponent::GetSubsystem() const
 {
 	return GetOwner() && GetOwner()->GetWorld() ? GetOwner()->GetWorld()->GetSubsystem<UPCGSubsystem>() : nullptr;
 }
+
+#if WITH_EDITOR
+bool UPCGComponent::PopulateTrackedActorToTagsMap(bool bForce)
+{
+	if (bActorToTagsMapPopulated && !bForce)
+	{
+		return false;
+	}
+
+	CachedTrackedActorToTags.Reset();
+	for (TWeakObjectPtr<AActor> Actor : CachedTrackedActors)
+	{
+		if (Actor.IsValid())
+		{
+			AddTrackedActor(Actor.Get(), /*bForce=*/true);
+		}
+	}
+
+	bActorToTagsMapPopulated = true;
+	return true;
+}
+
+bool UPCGComponent::AddTrackedActor(AActor* InActor, bool bForce)
+{
+	if (!bForce)
+	{
+		PopulateTrackedActorToTagsMap();
+	}	
+
+	check(InActor);
+	bool bAppliedChange = false;
+
+	for (const FName& Tag : InActor->Tags)
+	{
+		if (!CachedTrackedTagsToSettings.Contains(Tag))
+		{
+			continue;
+		}
+
+		bAppliedChange = true;
+		CachedTrackedActorToTags.FindOrAdd(InActor).Add(Tag);
+
+		if (!bForce)
+		{
+			DirtyCacheFromTag(Tag);
+		}
+	}
+
+	return bAppliedChange;
+}
+
+bool UPCGComponent::RemoveTrackedActor(AActor* InActor)
+{
+	PopulateTrackedActorToTagsMap();
+
+	check(InActor);
+	bool bAppliedChange = false;
+
+	if(CachedTrackedActorToTags.Contains(InActor))
+	{
+		for (const FName& Tag : CachedTrackedActorToTags[InActor])
+		{
+			DirtyCacheFromTag(Tag);
+		}
+
+		CachedTrackedActorToTags.Remove(InActor);
+		bAppliedChange = true;
+	}
+
+	return bAppliedChange;
+}
+
+bool UPCGComponent::UpdateTrackedActor(AActor* InActor)
+{
+	check(InActor);
+	// If the tracked data wasn't initialized before, then it is not possible to know if we need to update or not - take no chances
+	bool bAppliedChange = PopulateTrackedActorToTagsMap();
+
+	// Update the contents of the tracked actor vs. its current tags, and dirty accordingly
+	if (CachedTrackedActorToTags.Contains(InActor))
+	{
+		// Any tags that aren't on the actor and were in the cached actor to tags -> remove & dirty
+		TSet<FName> CachedTags = CachedTrackedActorToTags[InActor];
+		for (const FName& CachedTag : CachedTags)
+		{
+			if (!InActor->Tags.Contains(CachedTag))
+			{
+				CachedTrackedActorToTags[InActor].Remove(CachedTag);
+				DirtyCacheFromTag(CachedTag);
+				bAppliedChange = true;
+			}
+		}
+	}
+		
+	// Any tags that are new on the actor and not in the cached actor to tags -> add & dirty
+	for (const FName& Tag : InActor->Tags)
+	{
+		if (!CachedTrackedTagsToSettings.Contains(Tag))
+		{
+			continue;
+		}
+
+		if (!CachedTrackedActorToTags.FindOrAdd(InActor).Find(Tag))
+		{
+			CachedTrackedActorToTags[InActor].Add(Tag);
+			DirtyCacheFromTag(Tag);
+			bAppliedChange = true;
+		}
+	}
+
+	// Finally, if the current has no tag anymore, we can remove it from the map
+	if (CachedTrackedActorToTags.Contains(InActor) && CachedTrackedActorToTags[InActor].IsEmpty())
+	{
+		CachedTrackedActorToTags.Remove(InActor);
+	}
+
+	return bAppliedChange;
+}
+
+bool UPCGComponent::DirtyTrackedActor(AActor* InActor)
+{
+	PopulateTrackedActorToTagsMap();
+
+	check(InActor);
+	bool bAppliedChange = false;
+
+	if (CachedTrackedActorToTags.Contains(InActor))
+	{
+		for (const FName& Tag : CachedTrackedActorToTags[InActor])
+		{
+			DirtyCacheFromTag(Tag);
+		}
+
+		bAppliedChange = true;
+	}
+	else if (AddTrackedActor(InActor))
+	{
+		bAppliedChange = true;
+	}
+
+	return bAppliedChange;
+}
+
+void UPCGComponent::DirtyCacheFromTag(const FName& InTag)
+{
+	if (CachedTrackedTagsToSettings.Contains(InTag))
+	{
+		for (TWeakObjectPtr<const UPCGSettings> Settings : CachedTrackedTagsToSettings[InTag])
+		{
+			if (Settings.IsValid())
+			{
+				GetSubsystem()->CleanFromCache(Settings->GetElement().Get());
+			}
+		}
+	}
+}
+
+void UPCGComponent::DirtyCacheForAllTrackedTags()
+{
+	for (const auto& TagToSettings : CachedTrackedTagsToSettings)
+	{
+		for (TWeakObjectPtr<const UPCGSettings> Settings : TagToSettings.Value)
+		{
+			if (Settings.IsValid())
+			{
+				GetSubsystem()->CleanFromCache(Settings->GetElement().Get());
+			}
+		}
+	}
+}
+
+#endif // WITH_EDITOR
 
 #undef LOCTEXT_NAMESPACE

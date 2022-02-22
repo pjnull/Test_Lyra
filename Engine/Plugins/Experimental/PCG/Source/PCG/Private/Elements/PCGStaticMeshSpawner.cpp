@@ -58,7 +58,7 @@ bool FPCGStaticMeshSpawnerElement::ExecuteInternal(FPCGContextPtr Context) const
 
 		if (!SpatialData)
 		{
-			// Data type mismatch
+			PCGE_LOG(Error, "Invalid input data");
 			continue;
 		}
 
@@ -66,7 +66,7 @@ bool FPCGStaticMeshSpawnerElement::ExecuteInternal(FPCGContextPtr Context) const
 
 		if (!TargetActor)
 		{
-			// No target actor
+			PCGE_LOG(Error, "Invalid target actor");
 			continue;
 		}
 
@@ -75,6 +75,7 @@ bool FPCGStaticMeshSpawnerElement::ExecuteInternal(FPCGContextPtr Context) const
 
 		if (!PointData)
 		{
+			PCGE_LOG(Error, "Unable to get point data from input");
 			continue;
 		}
 
@@ -85,6 +86,11 @@ bool FPCGStaticMeshSpawnerElement::ExecuteInternal(FPCGContextPtr Context) const
 
 			for (const FPCGPoint& Point : Points)
 			{
+				if (Point.Density <= 0.0f)
+				{
+					continue;
+				}
+
 				FRandomStream RandomSource(PCGHelpers::ComputeSeed(Point.Seed, Settings->Seed));
 				int RandomWeightedPick = RandomSource.RandRange(0, TotalWeight - 1);
 
@@ -120,6 +126,8 @@ bool FPCGStaticMeshSpawnerElement::ExecuteInternal(FPCGContextPtr Context) const
 				ISMC->NumCustomDataFloats = 0;
 				ISMC->AddInstances(Instances.Instances, false, true);
 				ISMC->UpdateBounds();
+
+				PCGE_LOG(Verbose, "Added %d instances of %s on actor %s", Instances.Instances.Num(), *Instances.Mesh->GetFName().ToString(), *TargetActor->GetFName().ToString());
 			}
 		}
 	}

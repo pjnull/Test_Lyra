@@ -21,6 +21,7 @@ class UMaterialFunctionInterface;
 class UMaterialExpression;
 class UMaterialExpressionFunctionInput;
 class UMaterialExpressionFunctionOutput;
+class UMaterialExpressionCustomOutput;
 struct FFunctionExpressionInput;
 class ITargetPlatform;
 
@@ -82,6 +83,10 @@ public:
 	UE::HLSLTree::FExpression* GetResultExpression() { return ResultExpression; }
 	UE::HLSLTree::FStatement* GetResultStatement() { return ResultStatement; }
 
+	void SetRequestedFields(EShaderFrequency ShaderFrequency, UE::HLSLTree::FRequestedType& OutRequestedType);
+
+	void EmitSharedCode(FStringBuilderBase& OutCode) const;
+
 	bool GenerateResult(UE::HLSLTree::FScope& Scope);
 
 	UE::HLSLTree::FScope* NewScope(UE::HLSLTree::FScope& Scope, EMaterialNewScopeFlag Flags = EMaterialNewScopeFlag::None);
@@ -93,11 +98,7 @@ public:
 	UE::HLSLTree::FExpression* NewTexCoord(int32 Index);
 	UE::HLSLTree::FExpression* NewSwizzle(const UE::HLSLTree::FSwizzleParameters& Params, UE::HLSLTree::FExpression* Input);
 
-	/** Returns a declaration to access the given texture, with no parameter */
-	UE::HLSLTree::FTextureParameterDeclaration* AcquireTextureDeclaration(const UE::HLSLTree::FTextureDescription& Value);
-
-	/** Returns a declaration to access the given texture parameter */
-	UE::HLSLTree::FTextureParameterDeclaration* AcquireTextureParameterDeclaration(const FName& Name, const UE::HLSLTree::FTextureDescription& DefaultValue);
+	const UE::Shader::FTextureValue* AcquireTextureValue(const UE::Shader::FTextureValue& Value);
 
 	/**
 	 * Returns the appropriate HLSLNode representing the given UMaterialExpression.
@@ -107,7 +108,6 @@ public:
 	UE::HLSLTree::FExpression* AcquireExpression(UE::HLSLTree::FScope& Scope, UMaterialExpression* MaterialExpression, int32 OutputIndex);
 	UE::HLSLTree::FExpression* AcquireFunctionInputExpression(UE::HLSLTree::FScope& Scope, const UMaterialExpressionFunctionInput* MaterialExpression);
 
-	UE::HLSLTree::FTextureParameterDeclaration* AcquireTextureDeclaration(UE::HLSLTree::FScope& Scope, UMaterialExpression* MaterialExpression, int32 OutputIndex);
 	bool GenerateStatements(UE::HLSLTree::FScope& Scope, UMaterialExpression* MaterialExpression);
 
 	UE::HLSLTree::FExpression* GenerateFunctionCall(UE::HLSLTree::FScope& Scope, UMaterialFunctionInterface* Function, TArrayView<const FFunctionExpressionInput> ConnectedInputs, int32 OutputIndex);
@@ -189,6 +189,7 @@ private:
 	UMaterial* TargetMaterial = nullptr;
 	FMaterialHLSLErrorHandler Errors;
 
+	TArray<UMaterialExpressionCustomOutput*> MaterialCustomOutputs;
 	const UE::Shader::FStructType* MaterialAttributesType = nullptr;
 	UE::Shader::FValue MaterialAttributesDefaultValue;
 
@@ -199,8 +200,7 @@ private:
 
 	TArray<FFunctionCallEntry*, TInlineAllocator<8>> FunctionCallStack;
 	TArray<UE::HLSLTree::FScope*> JoinedScopeStack;
-	TMap<UE::HLSLTree::FTextureDescription, UE::HLSLTree::FTextureParameterDeclaration*> TextureDeclarationMap;
-	TMap<FName, UE::HLSLTree::FTextureParameterDeclaration*> TextureParameterDeclarationMap;
+	TMap<FXxHash64, const UE::Shader::FTextureValue*> TextureValueMap;
 	TMap<FSHAHash, FFunctionCallEntry*> FunctionCallMap;
 	TMap<UMaterialFunctionInterface*, UE::HLSLTree::FFunction*> FunctionMap;
 	TMap<UMaterialExpression*, FStatementEntry> StatementMap;

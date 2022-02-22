@@ -185,6 +185,9 @@ void UPCGBlueprintSettings::OnDependencyChanged(UObject* Object, FPropertyChange
 		return;
 	}
 
+	// When a data dependency is changed, this means we have to dirty the cache, otherwise it will not register as a change.
+	DirtyCache();
+
 	BlueprintElementInstance->OnBlueprintChangedDelegate.Broadcast(BlueprintElementInstance);
 }
 #endif
@@ -290,15 +293,16 @@ void UPCGBlueprintSettings::RefreshBlueprintElement()
 }
 
 #if WITH_EDITOR
-TArray<FName> UPCGBlueprintSettings::GetTrackedActorTags() const
+void UPCGBlueprintSettings::GetTrackedActorTags(FPCGTagToSettingsMap& OutTagToSettings) const
 {
 #if WITH_EDITORONLY_DATA
-	return TrackedActorTags;
-#else
-	return Super::GetTrackedActorTags();
-#endif
+	for (const FName& Tag : TrackedActorTags)
+	{
+		OutTagToSettings.FindOrAdd(Tag).Add(this);
+	}
+#endif // WITH_EDITORONLY_DATA
 }
-#endif
+#endif // WITH_EDITOR
 
 FPCGElementPtr UPCGBlueprintSettings::CreateElement() const
 {
@@ -307,6 +311,7 @@ FPCGElementPtr UPCGBlueprintSettings::CreateElement() const
 
 bool FPCGExecuteBlueprintElement::ExecuteInternal(FPCGContextPtr Context) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExecuteBlueprintElement::Execute);
 	const UPCGBlueprintSettings* Settings = Context->GetInputSettings<UPCGBlueprintSettings>();
 
 	if (Settings && Settings->BlueprintElementInstance)

@@ -1783,6 +1783,7 @@ public:
 	virtual bool IsDitherMasked() const { return false; }
 	virtual bool AllowNegativeEmissiveColor() const { return false; }
 	virtual enum EBlendMode GetBlendMode() const = 0;
+	virtual enum EStrataBlendMode GetStrataBlendMode() const = 0;
 	ENGINE_API virtual enum ERefractionMode GetRefractionMode() const;
 	virtual FMaterialShadingModelField GetShadingModels() const = 0;
 	virtual bool IsShadingModelFromMaterialExpression() const = 0;
@@ -2099,6 +2100,14 @@ public:
 	FORCEINLINE bool IsOwnerBeginDestroyed() const { return false; }
 #endif
 
+#if WITH_EDITORONLY_DATA
+	/* Gather any UMaterialExpressionCustomOutput expressions they can be compiled in turn */
+	virtual void GatherCustomOutputExpressions(TArray<class UMaterialExpressionCustomOutput*>& OutCustomOutputs) const {}
+
+	/* Gather any UMaterialExpressionCustomOutput expressions in the material and referenced function calls */
+	virtual void GatherExpressionsForCustomInterpolators(TArray<class UMaterialExpression*>& OutExpressions) const {}
+#endif // WITH_EDITORONLY_DATA
+
 protected:
 	// shared code needed for GetUniformScalarParameterExpressions, GetUniformVectorParameterExpressions, GetUniformCubeTextureExpressions..
 	// @return can be 0
@@ -2124,14 +2133,6 @@ protected:
 	/** Used to translate code for custom output attributes such as ClearCoatBottomNormal  */
 	virtual int32 CompileCustomAttribute(const FGuid& AttributeID, class FMaterialCompiler* Compiler) const {return INDEX_NONE;}
 #endif
-
-#if WITH_EDITORONLY_DATA
-	/* Gather any UMaterialExpressionCustomOutput expressions they can be compiled in turn */
-	virtual void GatherCustomOutputExpressions(TArray<class UMaterialExpressionCustomOutput*>& OutCustomOutputs) const {}
-
-	/* Gather any UMaterialExpressionCustomOutput expressions in the material and referenced function calls */
-	virtual void GatherExpressionsForCustomInterpolators(TArray<class UMaterialExpression*>& OutExpressions) const {}
-#endif // WITH_EDITORONLY_DATA
 
 	/** Useful for debugging. */
 	virtual FString GetBaseMaterialPathName() const { return TEXT(""); }
@@ -2712,6 +2713,7 @@ public:
 	ENGINE_API virtual bool UseLmDirectionality() const override;
 	ENGINE_API virtual bool IsMobileHighQualityBRDFEnabled() const override;
 	ENGINE_API virtual enum EBlendMode GetBlendMode() const override;
+	ENGINE_API virtual enum EStrataBlendMode GetStrataBlendMode() const override;
 	ENGINE_API virtual enum ERefractionMode GetRefractionMode() const override;
 	ENGINE_API virtual uint32 GetMaterialDecalResponse() const override;
 	ENGINE_API virtual bool HasBaseColorConnected() const override;

@@ -9,8 +9,6 @@
 
 #include "PCGPointSampler.generated.h"
 
-class FPCGPointSamplerElement;
-
 UCLASS(BlueprintType, ClassGroup = (Procedural))
 class UPCGPointSamplerSettings : public UPCGSettings
 {
@@ -29,6 +27,11 @@ protected:
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(ClampMin="0", ClampMax="1"))
 	float Ratio = 0.1f;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(Transient, BlueprintReadWrite, EditAnywhere, Category = Debug)
+	bool bKeepZeroDensityPoints = false;
+#endif
 };
 
 class FPCGPointSamplerElement : public FSimpleTypedPCGElement<UPCGPointSamplerSettings>

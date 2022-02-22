@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "PCGSettings.h"
 #include "PCGSubsystem.h"
 
 #include "PCGComponent.generated.h"
@@ -48,7 +49,6 @@ public:
 	//~End UActorComponent Interface
 
 	UPCGData* GetPCGData();
-	TArray<UPCGData*> GetPCGExclusionData();
 
 	bool CanPartition() const;
 	bool HasSplineComponent() const;
@@ -124,10 +124,13 @@ protected:
 
 private:
 	UPCGData* CreatePCGData();
+	UPCGData* CreateInputPCGData();
+	UPCGData* GetInputPCGData();
 	UPCGData* GetActorPCGData();
 	UPCGData* CreateActorPCGData();
 	UPCGData* CreateActorPCGData(AActor* Actor);
 	void UpdatePCGExclusionData();
+	TArray<UPCGData*> GetPCGExclusionData();
 
 	bool ShouldGenerate(bool bForce = false) const;
 	FPCGTaskId GenerateInternal(bool bForce, const TArray<FPCGTaskId>& Dependencies);
@@ -159,10 +162,21 @@ private:
 	bool ActorHasExcludedTag(AActor* InActor) const;
 	bool ActorIsTracked(AActor* InActor) const;
 	void DirtyExclusionData(AActor* InActor);
+
+	bool PopulateTrackedActorToTagsMap(bool bForce = false);
+	bool AddTrackedActor(AActor* InActor, bool bForce = false);
+	bool RemoveTrackedActor(AActor* InActor);
+	bool UpdateTrackedActor(AActor* InActor);
+	bool DirtyTrackedActor(AActor* InActor);
+	void DirtyCacheFromTag(const FName& InTag);
+	void DirtyCacheForAllTrackedTags();
 #endif
 
 	FBox GetGridBounds() const;
 	FBox GetGridBounds(AActor* InActor) const;
+
+	UPROPERTY(Transient, NonPIEDuplicateTransient)
+	UPCGData* CachedPCGData = nullptr;
 
 	UPROPERTY(Transient, NonPIEDuplicateTransient)
 	UPCGData* CachedInputData = nullptr;
@@ -173,6 +187,7 @@ private:
 	UPROPERTY(Transient, NonPIEDuplicateTransient)
 	TMap<AActor*, UPCGData*> CachedExclusionData;
 
+	// Cached excluded actors list is serialized because we can't get it at postload time
 	UPROPERTY()
 	TSet<TWeakObjectPtr<AActor>> CachedExcludedActors; 
 
@@ -186,11 +201,15 @@ private:
 	bool bIsGenerating = false;
 	bool bWasGeneratedPriorToUndo = false;
 	FBox LastGeneratedBoundsPriorToUndo = FBox(EForceInit::ForceInit);
-	TSet<FName> CachedTrackedActorTags;
+	FPCGTagToSettingsMap CachedTrackedTagsToSettings;
 #endif
 
 #if WITH_EDITORONLY_DATA
+	// Cached tracked actors list is serialized because we can't get it at postload time
 	UPROPERTY()
 	TSet<TWeakObjectPtr<AActor>> CachedTrackedActors;
+
+	TMap<TWeakObjectPtr<AActor>, TSet<FName>> CachedTrackedActorToTags;
+	bool bActorToTagsMapPopulated = false;
 #endif
 };

@@ -57,7 +57,7 @@ namespace Horde.Storage.Implementation
             DirectoryInfo stateRoot = new DirectoryInfo(replicationSettings.CurrentValue.GetStateRoot());
             _stateFile = new FileInfo(Path.Combine(stateRoot.FullName, stateFileName));
 
-            ReplicatorState? replicatorState = replicationLog.GetReplicatorState(replicatorSettings.NamespaceToReplicate, _name).Result;
+            ReplicatorState? replicatorState = _replicationLog.GetReplicatorState(_replicatorSettings.NamespaceToReplicate, _name).Result;
             if (replicatorState == null)
             {
                 if (_stateFile.Exists)
@@ -121,15 +121,28 @@ namespace Horde.Storage.Implementation
             }
 
             // read the state again to allow it to be modified by the admin controller / other instances of horde-storage connected to the same filesystem
-            _stateFile.Refresh();
-            if (_stateFile.Exists)
+            ReplicatorState? replicatorState = await _replicationLog.GetReplicatorState(_replicatorSettings.NamespaceToReplicate, _name);
+            if (replicatorState == null)
             {
-                _refsState = ReadState(_stateFile) ?? new RefsState();
+                _stateFile.Refresh();
+                if (_stateFile.Exists)
+                {
+                    _refsState = ReadState(_stateFile) ?? new RefsState();
+                }
+                else
+                {
+                    _refsState = new RefsState();
+                }
             }
             else
             {
-                _refsState = new RefsState();
+                _refsState = new RefsState()
+                {
+                    LastBucket = replicatorState.LastBucket,
+                    LastEvent = replicatorState.LastEvent,
+                };
             }
+
 
             LogReplicationHeartbeat(0);
 
@@ -283,8 +296,7 @@ namespace Horde.Storage.Implementation
                 HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 response.EnsureSuccessStatusCode();
                 await using Stream blobStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using FilesystemBufferedPayload payload = await FilesystemBufferedPayload.Create(blobStream);
-                snapshot = await ReplicationLogSnapshot.DeserializeSnapshot(payload.GetStream());
+                snapshot = ReplicationLogFactory.DeserializeSnapshotFromStream(blobStream);
             }
 
             if (!snapshot.LastEvent.HasValue)
@@ -297,7 +309,7 @@ namespace Horde.Storage.Implementation
 
             // if MaxParallelReplications is set to not limit we use the default behavior of ParallelForEachAsync which is to limit based on CPUs 
             int maxParallelism = _replicatorSettings.MaxParallelReplications != -1 ? _replicatorSettings.MaxParallelReplications : 0;
-            await snapshot.LiveObjects.ParallelForEachAsync(async snapshotLiveObject =>
+            await snapshot.GetLiveObjects().ParallelForEachAsync(async snapshotLiveObject =>
             {
                 try
                 {
@@ -326,6 +338,8 @@ namespace Horde.Storage.Implementation
                 }
 
             }, maxParallelism, cancellationToken);
+
+            snapshot.Dispose();
 
             // snapshot processed, we proceed to reading the incremental state
             return (snapshotBucket, snapshotEvent, countOfObjectsReplicated);
@@ -567,7 +581,7 @@ namespace Horde.Storage.Implementation
             _logger.Information("{Name} starting replication. Last transaction was {TransactionId} {Generation}", _name, State.ReplicatorOffset.GetValueOrDefault(0L), State.ReplicatingGeneration.GetValueOrDefault(Guid.Empty) );
         }
 
-        public void SetReplicationOffset(long state)
+        public void SetReplicationOffset(long? state)
         {
             throw new NotImplementedException();
         }

@@ -1004,6 +1004,11 @@ bool UCookOnTheFlyServer::IsCookOnTheFlyMode() const
 	return CurrentCookMode == ECookMode::CookOnTheFly || CurrentCookMode == ECookMode::CookOnTheFlyFromTheEditor; 
 }
 
+bool UCookOnTheFlyServer::IsUsingLegacyCookOnTheFlyScheduling() const
+{
+	return CookOnTheFlyRequestManager && CookOnTheFlyRequestManager->ShouldUseLegacyScheduling();
+}
+
 bool UCookOnTheFlyServer::IsCreatingReleaseVersion()
 {
 	if (CookByTheBookOptions)
@@ -1229,12 +1234,18 @@ uint32 UCookOnTheFlyServer::TickCookOnTheSide(const float TimeSlice, uint32 &Coo
 				PumpSaves(StackData, DesiredSaveQueueLength, NumPushed, bBusy);
 				SetSaveBusy(bBusy && NumPushed == 0); // Mark as busy if pump was blocked and we did not make any progress
 				break;
-			case ECookAction::Done:
-				bContinueTick = false;
-				bCookComplete = true;
+			case ECookAction::Poll:
+				PumpPollables(StackData, false /* bIsIdle */);
+				break;
+			case ECookAction::PollIdle:
+				PumpPollables(StackData, true /* bIsIdle */);
 				break;
 			case ECookAction::YieldTick:
 				bContinueTick = false;
+				break;
+			case ECookAction::Done:
+				bContinueTick = false;
+				bCookComplete = true;
 				break;
 			case ECookAction::Cancel:
 				CancelCookByTheBook();
@@ -1528,6 +1539,103 @@ void UCookOnTheFlyServer::UpdateDisplay(ECookTickFlags TickFlags, bool bForceDis
 	}
 }
 
+UCookOnTheFlyServer::FPollable::FPollable(float InPeriodSeconds, float InPeriodIdleSeconds, UCookOnTheFlyServer::FPollFunction&& InFunction)
+	: PollFunction(MoveTemp(InFunction))
+	, NextTimeSeconds(0)
+	, NextTimeIdleSeconds(0)
+	, PeriodSeconds(InPeriodSeconds)
+	, PeriodIdleSeconds(InPeriodIdleSeconds)
+{
+}
+
+void UCookOnTheFlyServer::InitializePollables()
+{
+	Pollables.Reset();
+
+	if (IsCookByTheBookMode() && !IsCookingInEditor())
+	{
+		if (Pollables.IsEmpty())
+		{
+			Pollables.Add(FPollable(60.f, 5.f, [this] { PollFlushRenderingCommands(); }));
+		}
+
+		for (FPollable& Pollable : Pollables)
+		{
+			Pollable.NextTimeSeconds = Pollable.NextTimeIdleSeconds = 0.0;
+		}
+	}
+
+	PollStartIndex = 0;
+	if (Pollables.Num())
+	{
+		PollNextTimeSeconds = 0.;
+		PollNextTimeIdleSeconds = 0.;
+	}
+	else
+	{
+		PollNextTimeSeconds = MAX_flt;
+		PollNextTimeIdleSeconds = MAX_flt;
+	}
+}
+
+void UCookOnTheFlyServer::PumpPollables(UE::Cook::FTickStackData& StackData, bool bIsIdle)
+{
+	UE_SCOPED_HIERARCHICAL_COOKTIMER(PumpPollables);
+	PollNextTimeSeconds = MAX_flt;
+	PollNextTimeIdleSeconds = MAX_flt;
+	int32 NumPollables = Pollables.Num();
+	if (NumPollables == 0)
+	{
+		return;
+	}
+
+	double CurrentTime = FPlatformTime::Seconds();
+	double MaxTime = CurrentTime + PumpPollablesTimeSlice;
+
+	PollStartIndex = PollStartIndex % NumPollables;
+	int32 PollEndIndex = PollStartIndex;
+	do
+	{
+		FPollable& Pollable = Pollables[PollStartIndex++];
+		PollStartIndex = PollStartIndex >= NumPollables ? 0 : PollStartIndex;
+
+		double NextTimeSeconds = bIsIdle ? Pollable.NextTimeIdleSeconds : Pollable.NextTimeSeconds;
+		if (NextTimeSeconds <= CurrentTime)
+		{
+			Pollable.PollFunction();
+			double NewCurrentTime = FPlatformTime::Seconds();
+			Pollable.NextTimeSeconds = NewCurrentTime + Pollable.PeriodSeconds;
+			Pollable.NextTimeIdleSeconds = NewCurrentTime + Pollable.PeriodIdleSeconds;
+			CurrentTime = NewCurrentTime;
+		}
+		PollNextTimeSeconds = FMath::Min(Pollable.NextTimeSeconds, PollNextTimeSeconds);
+		PollNextTimeIdleSeconds = FMath::Min(Pollable.NextTimeIdleSeconds, PollNextTimeIdleSeconds);
+		if (CurrentTime >= MaxTime)
+		{
+			break;
+		}
+	} while (PollStartIndex != PollEndIndex);
+
+	// If we early exited, finish calculating PollNextTimeSeconds from the remaining members we didn't reach
+	for (int32 Index = PollStartIndex; Index != PollEndIndex; Index = (Index+1) % NumPollables)
+	{
+		FPollable& Pollable = Pollables[Index++];
+		PollNextTimeSeconds = FMath::Min(Pollable.NextTimeSeconds, PollNextTimeSeconds);
+		PollNextTimeIdleSeconds = FMath::Min(Pollable.NextTimeIdleSeconds, PollNextTimeIdleSeconds);
+	}
+	PollNextTimeSeconds = FMath::Max(PollNextTimeSeconds, CurrentTime + PumpPollablesMinPeriod);
+	// PollNextTimeIdleSeconds does not have a min period
+}
+
+void UCookOnTheFlyServer::PollFlushRenderingCommands()
+{
+	UE_SCOPED_COOKTIMER_AND_DURATION(CookByTheBook_TickCommandletStats, DetailedCookStats::TickLoopFlushRenderingCommandsTimeSec);
+
+	// Flush rendering commands to release any RHI resources (shaders and shader maps).
+	// Delete any FPendingCleanupObjects (shader maps).
+	FlushRenderingCommands();
+}
+
 UCookOnTheFlyServer::ECookAction UCookOnTheFlyServer::DecideNextCookAction(UE::Cook::FTickStackData& StackData)
 {
 	if (IsCookByTheBookMode() && CookByTheBookOptions->bCancel)
@@ -1540,9 +1648,15 @@ UCookOnTheFlyServer::ECookAction UCookOnTheFlyServer::DecideNextCookAction(UE::C
 		// if we just cooked a map then don't process anything the rest of this tick
 		return ECookAction::YieldTick;
 	}
-	else if (StackData.Timer.IsTimeUp())
+
+	double CurrentTime = FPlatformTime::Seconds();
+	if (StackData.Timer.IsTimeUp(CurrentTime))
 	{
 		return ECookAction::YieldTick;
+	}
+	else if (CurrentTime >= PollNextTimeSeconds)
+	{
+		return ECookAction::Poll;
 	}
 
 	UE::Cook::FRequestQueue& RequestQueue = PackageDatas->GetRequestQueue();
@@ -1605,27 +1719,51 @@ UCookOnTheFlyServer::ECookAction UCookOnTheFlyServer::DecideNextCookAction(UE::C
 		return ECookAction::Load;
 	}
 
-	if (bSaveBusy & (NumSaves > 0))
+	if (IsCookOnTheFlyMode() && !IsRealtimeMode())
 	{
-		const float CurrentTime = FPlatformTime::Seconds();
-		if (CurrentTime - SaveBusyTimeLastRetry > GCookProgressRetryBusyTime)
+		if (NumSaves > 0 && bLoadBusy)
 		{
-			SaveBusyTimeLastRetry = CurrentTime;
 			return ECookAction::Save;
 		}
-	}
-	if (bLoadBusy & (NumLoads > 0))
-	{
-		const float CurrentTime = FPlatformTime::Seconds();
-		if (CurrentTime - LoadBusyTimeLastRetry > GCookProgressRetryBusyTime)
+		if (NumLoads > 0 && bSaveBusy)
 		{
-			LoadBusyTimeLastRetry = CurrentTime;
 			return ECookAction::Load;
+		}
+		if (NumSaves > 0)
+		{
+			return ECookAction::Save;
+		}
+		if (NumLoads > 0)
+		{
+			return ECookAction::Load;
+		}
+	}
+	else
+	{
+		if (bSaveBusy & (NumSaves > 0))
+		{
+			if (CurrentTime - SaveBusyTimeLastRetry > GCookProgressRetryBusyTime)
+			{
+				SaveBusyTimeLastRetry = CurrentTime;
+				return ECookAction::Save;
+			}
+		}
+		if (bLoadBusy & (NumLoads > 0))
+		{
+			if (CurrentTime - LoadBusyTimeLastRetry > GCookProgressRetryBusyTime)
+			{
+				LoadBusyTimeLastRetry = CurrentTime;
+				return ECookAction::Load;
+			}
 		}
 	}
 
 	if (PackageDatas->GetMonitor().GetNumInProgress() > 0)
 	{
+		if (CurrentTime >= PollNextTimeIdleSeconds)
+		{
+			return ECookAction::PollIdle;
+		}
 		return ECookAction::YieldTick;
 	}
 
@@ -1670,7 +1808,7 @@ void UCookOnTheFlyServer::PumpExternalRequests(const UE::Cook::FCookerTimer& Coo
 				NetworkRequestEvent->Trigger();
 			}
 #endif
-			bool bRequestsAreUrgent = IsCookOnTheFlyMode();
+			bool bRequestsAreUrgent = IsCookOnTheFlyMode() && IsUsingLegacyCookOnTheFlyScheduling();
 			TRingBuffer<UE::Cook::FRequestCluster>& RequestClusters = PackageDatas->GetRequestQueue().GetRequestClusters();
 			UE::Cook::FRequestCluster::AddClusters(*this, MoveTemp(BuildRequests), bRequestsAreUrgent, RequestClusters);
 		}
@@ -2045,9 +2183,16 @@ void UCookOnTheFlyServer::QueueDiscoveredPackageData(UE::Cook::FPackageData& Pac
 		return;
 	}
 
-	if (CookOnTheFlyRequestManager && PackageData.IsGenerated())
+	if (CookOnTheFlyRequestManager)
 	{
-		CookOnTheFlyRequestManager->OnPackageGenerated(PackageData.GetPackageName());
+		if (PackageData.IsGenerated())
+		{
+			CookOnTheFlyRequestManager->OnPackageGenerated(PackageData.GetPackageName());
+		}
+		if (!CookOnTheFlyRequestManager->ShouldUseLegacyScheduling())
+		{
+			return;
+		}
 	}
 	
 	if (!PackageData.IsInProgress() &&
@@ -2730,7 +2875,7 @@ void UCookOnTheFlyServer::ReleaseCookedPlatformData(UE::Cook::FPackageData& Pack
 
 void UCookOnTheFlyServer::TickCancels()
 {
-	PackageDatas->PollPendingCookedPlatformDatas();
+	PackageDatas->PollPendingCookedPlatformDatas(false);
 }
 
 bool UCookOnTheFlyServer::LoadPackageForCooking(UE::Cook::FPackageData& PackageData, UPackage*& OutPackage, FString* LoadFromFilename,
@@ -2983,7 +3128,7 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 		bool bShouldFinishTick = false;
 		if (IsCookOnTheFlyMode())
 		{
-			if (!PackageData.GetIsUrgent())
+			if (IsUsingLegacyCookOnTheFlyScheduling() && !PackageData.GetIsUrgent())
 			{
 				if (ExternalRequests->HasRequests() || PackageDatas->GetMonitor().GetNumUrgent() > 0)
 				{
@@ -3028,7 +3173,8 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 		}
 
 		// Release any completed pending CookedPlatformDatas, so that slots in the per-class limits on calls to BeginCacheForCookedPlatformData are freed up for new objects to use
-		PackageDatas->PollPendingCookedPlatformDatas();
+		bool bForce = IsCookOnTheFlyMode() && !IsRealtimeMode();
+		PackageDatas->PollPendingCookedPlatformDatas(bForce);
 
 		// Always wait for FinishPrepareSave before attempting to save the package
 		bool AllObjectsCookedDataCached = FinishPrepareSave(PackageData, StackData.Timer);
@@ -3075,7 +3221,7 @@ void UCookOnTheFlyServer::PumpSaves(UE::Cook::FTickStackData& StackData, uint32 
 					// sleep for a bit
 					FPlatformProcess::Sleep(0.0f);
 					// Poll the results again and check whether we are now done
-					PackageDatas->PollPendingCookedPlatformDatas();
+					PackageDatas->PollPendingCookedPlatformDatas(true);
 					AllObjectsCookedDataCached = FinishPrepareSave(PackageData, StackData.Timer);
 				} while (!StackData.Timer.IsTimeUp() && !AllObjectsCookedDataCached);
 			}
@@ -4427,6 +4573,11 @@ void UCookOnTheFlyServer::Initialize( ECookMode::Type DesiredCookMode, ECookInit
 		FLinkerLoad::SetPreloadingEnabled(true);
 	}
 	GConfig->GetBool(TEXT("CookSettings"), TEXT("PreexploreDependenciesEnabled"), bPreexploreDependenciesEnabled, GEditorIni);
+
+	PumpPollablesTimeSlice = 1.0f;
+	PumpPollablesMinPeriod = 0.1f;
+	PollNextTimeSeconds = MAX_flt;
+	PollNextTimeIdleSeconds = MAX_flt;
 
 	{
 		const FConfigSection* CacheSettings = GConfig->GetSectionPrivate(TEXT("CookPlatformDataCacheSettings"), false, true, GEditorIni);
@@ -7936,6 +8087,8 @@ void UCookOnTheFlyServer::StartCookByTheBook( const FCookByTheBookStartupOptions
 	{
 		FindOrCreatePackageWriter(TargetPlatform).BeginCook();
 	}
+
+	InitializePollables();
 }
 
 TArray<FName> UCookOnTheFlyServer::GetNeverCookPackageFileNames(TArrayView<const FString> ExtraNeverCookDirectories)

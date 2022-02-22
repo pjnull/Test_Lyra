@@ -11,9 +11,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MongoDB.Bson.Serialization.Attributes;
+using EpicGames.Horde.Storage;
 
 namespace HordeServer.Commits.Impl
 {
+	using CommitId = ObjectId<ICommit>;
 	using StreamId = StringId<IStream>;
 	using UserId = ObjectId<IUser>;
 
@@ -25,7 +27,7 @@ namespace HordeServer.Commits.Impl
 		class Commit : ICommit
 		{
 			[BsonIgnoreIfDefault]
-			public ObjectId Id { get; set; }
+			public CommitId Id { get; set; }
 
 			[BsonElement("s")]
 			public StreamId StreamId { get; set; }
@@ -48,8 +50,8 @@ namespace HordeServer.Commits.Impl
 			[BsonElement("p")]
 			public string BasePath { get; set; } = String.Empty;
 
-			[BsonElement("tr")]
-			public string? TreeRef { get; set; }
+			[BsonElement("r")]
+			public RefId? TreeRefId { get; set; }
 
 			[BsonElement("t")]
 			public DateTime DateUtc { get; set; }
@@ -76,7 +78,7 @@ namespace HordeServer.Commits.Impl
 				}
 				this.Description = NewCommit.Description;
 				this.BasePath = NewCommit.BasePath;
-				this.TreeRef = NewCommit.TreeRef;
+				this.TreeRefId = NewCommit.TreeRefId;
 				this.DateUtc = NewCommit.DateUtc;
 			}
 		}
@@ -105,7 +107,7 @@ namespace HordeServer.Commits.Impl
 		}
 
 		/// <inheritdoc/>
-		public async Task<ICommit?> GetCommitAsync(ObjectId Id)
+		public async Task<ICommit?> GetCommitAsync(CommitId Id)
 		{
 			return await Commits.Find(x => x.Id == Id).FirstOrDefaultAsync();
 		}

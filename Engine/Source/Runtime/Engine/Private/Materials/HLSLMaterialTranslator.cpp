@@ -146,6 +146,39 @@ static inline const TCHAR * GetFloatZeroVector(uint32 NumComponents)
 	}
 }
 
+static inline const TCHAR* GetStrataOperatorStr(int32 OperatorType)
+{
+	switch (OperatorType)
+	{
+	case STRATA_OPERATOR_WEIGHT:
+	{
+		return TEXT("WEIGHT    ");
+	}
+	case STRATA_OPERATOR_VERTICAL:
+	{
+		return TEXT("VERTICAL  ");
+	}
+	case STRATA_OPERATOR_HORIZONTAL:
+	{
+		return TEXT("HORIZONTAL");
+	}
+	case STRATA_OPERATOR_ADD:
+	{
+		return TEXT("ADD       ");
+	}
+	case STRATA_OPERATOR_BSDF:
+	{
+		return TEXT("BSDF      ");
+	}
+	case STRATA_OPERATOR_BSDF_LEGACY:
+	{
+		return TEXT("BSDFLEGACY");
+	}
+	}
+	return TEXT("UNKNOWN   ");
+};
+
+
 FHLSLMaterialTranslator::FHLSLMaterialTranslator(FMaterial* InMaterial,
 	FMaterialCompilationOutput& InMaterialCompilationOutput,
 	const FStaticParameterSet& InStaticParameters,
@@ -666,7 +699,10 @@ bool FHLSLMaterialTranslator::Translate()
 		if (bStrataEnabled && FrontMaterialExpr)
 		{
 			FrontMaterialExpr->StrataGenerateMaterialTopologyTree(this, nullptr, 0);
-			StrataGenerateDerivedMaterialOperatorData();
+			if (!StrataGenerateDerivedMaterialOperatorData())
+			{
+				Errorf(TEXT("Strata material errors encountered."));
+			}
 		}
 
 		// Generate code:
@@ -1111,14 +1147,6 @@ bool FHLSLMaterialTranslator::Translate()
 			}
 		}
 
-		if (Material->IsStrataMaterial())
-		{
-			if (Domain!= MD_Volume && !(BlendMode == BLEND_Translucent || BlendMode == BLEND_Opaque || BlendMode == BLEND_Masked))
-		{
-				Errorf(TEXT("Strata materials must be an opaque or translucent surface, or a volume."));
-			}
-		}
-
 		if (Domain == MD_DeferredDecal && !(BlendMode == BLEND_Translucent || BlendMode == BLEND_AlphaComposite || BlendMode == BLEND_Modulate))
 		{
 			// We could make the change for the user but it would be confusing when going to DeferredDecal and back
@@ -1409,18 +1437,18 @@ bool FHLSLMaterialTranslator::Translate()
 									{
 									case STRATA_OPERATOR_VERTICAL:
 									{
-										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/); // VERTICAL\n"), BSDFIndex, CurrentOperator.Index, CurrentOperator.LeftIndex == PreviousOperatorIndex ? 1 : 0);
+										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterVerticalOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/);\n"), BSDFIndex, CurrentOperator.Index, CurrentOperator.LeftIndex == PreviousOperatorIndex ? 1 : 0);
 										break;
 									}
 									case STRATA_OPERATOR_HORIZONTAL:
 									{
-										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/); // HORIZONTAL\n"), BSDFIndex, CurrentOperator.Index, CurrentOperator.LeftIndex == PreviousOperatorIndex ? 1 : 0);
+										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterHorizontalOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/);\n"), BSDFIndex, CurrentOperator.Index, CurrentOperator.LeftIndex == PreviousOperatorIndex ? 1 : 0);
 										break;
 									}
 
 									case STRATA_OPERATOR_WEIGHT:
 									{
-										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/); // WEIGHT\n"), BSDFIndex, CurrentOperator.Index, 1);
+										ResourcesString += FString::Printf(TEXT("\t UpdateBSDFWeightAfterWeightOperatorVisit(StrataTree, StrataTree.BSDFs[%d], %d /*Op index*/, %d /*PreviousIsInputA*/);\n"), BSDFIndex, CurrentOperator.Index, 1);
 										break;
 									}
 
@@ -1829,9 +1857,8 @@ void FHLSLMaterialTranslator::GetMaterialEnvironment(EShaderPlatform InPlatform,
 
 	OutEnvironment.SetDefine(TEXT("MATERIAL_IS_STRATA"), bMaterialIsStrata ? TEXT("1") : TEXT("0"));
 
-	// STRATA_TODO do not request DualSourceBlending if gray scale transmittance is selected.
-	// bMaterialRequestsDualSourceBlending this base on limited set of blend mode: Opaque, Masked, TransmittanceCoverage, TransmittanceColored;
-	bMaterialRequestsDualSourceBlending |= bMaterialIsStrata;
+	// Strata requests dual source blending only for SBM_TranslucentColoredTransmittance
+	bMaterialRequestsDualSourceBlending |= bMaterialIsStrata && Material->GetStrataBlendMode() == EStrataBlendMode::SBM_TranslucentColoredTransmittance;
 
 	// if duals source blending (colored transmittance) is not supported on a platform, it will fall back to standard alpha blending (grey scale transmittance)
 	OutEnvironment.SetDefine(TEXT("DUAL_SOURCE_COLOR_BLENDING_ENABLED"), bMaterialRequestsDualSourceBlending && Material->IsDualBlendingEnabled(Platform) ? TEXT("1") : TEXT("0"));
@@ -1989,45 +2016,6 @@ void FHLSLMaterialTranslator::GetMaterialEnvironment(EShaderPlatform InPlatform,
 			StrataMaterialDescription += FString::Printf(TEXT("Graph maximum distance to leaves %u\r\n"), RootMaximumDistanceToLeaves);
 			// Debug print operators according to depth from root.
 			{
-				auto OperatorTypeToStr = [&](int32 OperatorType)
-				{
-					switch (OperatorType)
-					{
-					case STRATA_OPERATOR_WEIGHT:
-					{
-						static const FString Name = TEXT("WEIGHT ");
-						return Name;
-					}
-					case STRATA_OPERATOR_VERTICAL:
-					{
-						static const FString Name = TEXT("VERTICA");
-						return Name;
-					}
-					case STRATA_OPERATOR_HORIZONTAL:
-					{
-						static const FString Name = TEXT("HORIZON");
-						return Name;
-					}
-					case STRATA_OPERATOR_ADD:
-					{
-						static const FString Name = TEXT("ADD    ");
-						return Name;
-					}
-					case STRATA_OPERATOR_BSDF:
-					{
-						static const FString Name = TEXT("BSDF   ");
-						return Name;
-					}
-					case STRATA_OPERATOR_BSDF_LEGACY:
-					{
-						static const FString Name = TEXT("BSDFLEG");
-						return Name;
-					}
-					}
-					static const FString Name = TEXT("UNKNOWN");
-					return Name;
-				};
-
 				check(StrataMaterialRootOperator);
 				for (int32 DistanceToLeaves = RootMaximumDistanceToLeaves; DistanceToLeaves >= 0; --DistanceToLeaves)
 				{
@@ -2037,7 +2025,7 @@ void FHLSLMaterialTranslator::GetMaterialEnvironment(EShaderPlatform InPlatform,
 						if (!It.IsDiscarded() && It.MaxDistanceFromLeaves == DistanceToLeaves)
 						{
 							StrataMaterialDescription += FString::Printf(TEXT("\tIdx=%d Op=%s ParentIdx=%d LeftIndex=%d RightIndex=%d BSDFIdx=%d LayerDepth=%d IsTop=%d IsBot=%d\r\n"),
-								It.Index, *OperatorTypeToStr(It.OperatorType), It.ParentIndex, It.LeftIndex, It.RightIndex, It.BSDFIndex, It.LayerDepth, It.bIsTop, It.bIsBottom);
+								It.Index, GetStrataOperatorStr(It.OperatorType), It.ParentIndex, It.LeftIndex, It.RightIndex, It.BSDFIndex, It.LayerDepth, It.bIsTop, It.bIsBottom);
 						}
 					}
 				}
@@ -2323,7 +2311,7 @@ FString FHLSLMaterialTranslator::GetMaterialShaderCode()
 
 	LazyPrintf.PushParam(*FString::Printf(TEXT("return %.5f"), Material->GetOpacityMaskClipValue()));
 
-	LazyPrintf.PushParam(!bEnableExecutionFlow ? *GenerateFunctionCode(MP_WorldPositionOffset, BaseDerivativeVariation) : TEXT("return Parameters.MaterialVertexAttributes.WorldPositionOffset"));
+	LazyPrintf.PushParam(!bEnableExecutionFlow ? *GenerateFunctionCode(MP_WorldPositionOffset, BaseDerivativeVariation) : TEXT("return Parameters.MaterialAttributes.WorldPositionOffset"));
 	LazyPrintf.PushParam(!bEnableExecutionFlow ? *GenerateFunctionCode(CompiledMP_PrevWorldPositionOffset, BaseDerivativeVariation) : TEXT("return 0.0f"));
 	LazyPrintf.PushParam(!bEnableExecutionFlow ? *GenerateFunctionCode(MP_CustomData0, BaseDerivativeVariation) : TEXT("return 0.0f"));
 	LazyPrintf.PushParam(!bEnableExecutionFlow ? *GenerateFunctionCode(MP_CustomData1, BaseDerivativeVariation) : TEXT("return 0.0f"));
@@ -2337,7 +2325,7 @@ FString FHLSLMaterialTranslator::GetMaterialShaderCode()
 		if (bEnableExecutionFlow)
 		{
 			const FString AttributeName = FMaterialAttributeDefinitionMap::GetAttributeName((EMaterialProperty)(MP_CustomizedUVs0 + CustomUVIndex));
-			CustomUVAssignments += FString::Printf(TEXT("\tOutTexCoords[%u] = Parameters.MaterialVertexAttributes.%s;") LINE_TERMINATOR, CustomUVIndex, *AttributeName);
+			CustomUVAssignments += FString::Printf(TEXT("\tOutTexCoords[%u] = Parameters.MaterialAttributes.%s;") LINE_TERMINATOR, CustomUVIndex, *AttributeName);
 		}
 		else
 		{
@@ -9648,7 +9636,7 @@ FStrataOperator& FHLSLMaterialTranslator::StrataCompilationGetOperator(UMaterial
 	return StrataMaterialExpressionRegisteredOperators[*OperatorIndex];
 }
 
-void FHLSLMaterialTranslator::StrataGenerateDerivedMaterialOperatorData()
+bool FHLSLMaterialTranslator::StrataGenerateDerivedMaterialOperatorData()
 {
 	//
 	// Evaluate the one and only root node
@@ -9663,7 +9651,59 @@ void FHLSLMaterialTranslator::StrataGenerateDerivedMaterialOperatorData()
 		}
 	}
 	StrataMaterialRootOperator = &StrataMaterialExpressionRegisteredOperators[RootIndex];
-	check(StrataMaterialRootOperator);
+	if (!StrataMaterialRootOperator)
+	{
+		UE_LOG(LogMaterial, Error, TEXT("Cannot find the root of the Strata Tree for Material %s (asset: %s).\r\n"), *Material->GetDebugName(), *Material->GetAssetPath().ToString());
+		return false;
+	}
+
+	//
+	// Make sure each and every path of the strata tree ends up on a valid BSDF.
+	//
+	for (auto& It : StrataMaterialExpressionRegisteredOperators)
+	{
+		if (It.IsDiscarded())
+		{
+			continue; // ignore discarded operations in sub tree using parameter blending
+		}
+
+		bool bMustHaveLeftChild = false;
+		bool bMustHaveRightChild = false;
+		switch (It.OperatorType)
+		{
+		// Operators without any child
+		case STRATA_OPERATOR_BSDF:
+		break;
+
+		// Operators with two children
+		case STRATA_OPERATOR_HORIZONTAL:
+		case STRATA_OPERATOR_VERTICAL:
+		case STRATA_OPERATOR_ADD:
+		{
+			bMustHaveLeftChild = true;
+			bMustHaveRightChild = true;
+		}
+		break;
+
+		// Operators with a single child
+		case STRATA_OPERATOR_WEIGHT:
+		{
+			bMustHaveLeftChild = true;
+		}
+		break;
+		}
+
+		if (bMustHaveLeftChild && It.LeftIndex == INDEX_NONE)
+		{
+			UE_LOG(LogMaterial, Error, TEXT("A Strata Operator %s node is missing its first input from material %s (asset: %s).\r\n"), GetStrataOperatorStr(It.OperatorType), *Material->GetDebugName(), *Material->GetAssetPath().ToString());
+			return false;
+		}
+		if (bMustHaveRightChild && It.RightIndex == INDEX_NONE)
+		{
+			UE_LOG(LogMaterial, Error, TEXT("A Strata Operator %s node is missing its second input from material %s (asset: %s).\r\n"), GetStrataOperatorStr(It.OperatorType), *Material->GetDebugName(), *Material->GetAssetPath().ToString());
+			return false;
+		}
+	}
 
 	//
 	// Parse the tree and mark nodes that are the root of a subtree using parameter blending, while other nodes in that tree are forced to use parameter blending.
@@ -9865,6 +9905,8 @@ void FHLSLMaterialTranslator::StrataGenerateDerivedMaterialOperatorData()
 
 		WalkOperators(*StrataMaterialRootOperator);
 	}
+
+	return true; // Success
 }
 
 void FHLSLMaterialTranslator::StrataCompilationInfoRegisterCodeChunk(int32 CodeChunk, FStrataMaterialCompilationInfo& StrataMaterialCompilationInfo)

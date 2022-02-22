@@ -24,6 +24,7 @@
 #include "Engine/Blueprint.h"
 #include "EdGraphSchema_K2.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "RigVMDeveloperTypeUtils.h"
 #endif// WITH_EDITOR
 
 #define LOCTEXT_NAMESPACE "ControlRig"
@@ -775,7 +776,10 @@ void UControlRig::Execute(const EControlRigState InState, const FName& InEventNa
 					
 					if (bResetInitialTransformsBeforeSetup && !bSetupModeEnabled)
 					{
-						GetHierarchy()->CopyPose(CDO->GetHierarchy(), false, true);
+						// when copying the pose from the default we don't copy the weights over,
+						// since we don't want to reset the topology in case it has diverged from the
+						// CDO.
+						GetHierarchy()->CopyPose(CDO->GetHierarchy(), false, true, false);
 					}
 				}
 
@@ -2693,6 +2697,7 @@ void UControlRig::SetBoneInitialTransformsFromRefSkeleton(const FReferenceSkelet
 			{
 				const FTransform LocalInitialTransform = InReferenceSkeleton.GetRefBonePose()[BoneIndex];
 				DynamicHierarchy->SetTransform(BoneElement, LocalInitialTransform, ERigTransformType::InitialLocal, true, false);
+				DynamicHierarchy->SetTransform(BoneElement, LocalInitialTransform, ERigTransformType::CurrentLocal, true, false);
 			}
 		}
 		return true;

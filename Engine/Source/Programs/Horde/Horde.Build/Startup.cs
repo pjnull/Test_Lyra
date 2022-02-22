@@ -255,7 +255,9 @@ namespace HordeServer
 			// Settings used for configuring services
 			IConfigurationSection ConfigSection = Configuration.GetSection("Horde");
 			ServerSettings Settings = new ServerSettings();
-			ConfigSection.Bind(Settings);			
+			ConfigSection.Bind(Settings);
+
+			Services.Configure<CommitServiceOptions>(ConfigSection.GetSection("Replication"));
 
 			if (Settings.GlobalThreadPoolMinSize != null)
 			{
@@ -373,6 +375,7 @@ namespace HordeServer
 				return new NoOpDogStatsd();
 			});
 			Services.AddSingleton<CommitService>();
+			Services.AddSingleton<ICommitService>(SP => SP.GetRequiredService<CommitService>());
 			Services.AddSingleton<IClock, Clock>();
 			Services.AddSingleton<IDowntimeService, DowntimeService>();
 			Services.AddSingleton<IIssueService, IssueService>();
@@ -556,7 +559,7 @@ namespace HordeServer
 						.Build();
 				});
 
-			if (Settings.EnableBackgroundServices)
+			if (Settings.IsRunModeActive(RunMode.Worker))
 			{
 				if (Settings.FeatureFlags.AutoscaleServiceV1Enabled)
 				{
@@ -945,13 +948,16 @@ namespace HordeServer
 			return LogEventLevel.Information;
 		}
 
+		public static void AddServices(IServiceCollection ServiceCollection, IConfiguration Configuration)
+		{
+			Startup Startup = new Startup(Configuration);
+			Startup.ConfigureServices(ServiceCollection);
+		}
+
 		public static IServiceProvider CreateServiceProvider(IConfiguration Configuration)
 		{
 			IServiceCollection ServiceCollection = new ServiceCollection();
-
-			Startup Startup = new Startup(Configuration);
-			Startup.ConfigureServices(ServiceCollection);
-
+			AddServices(ServiceCollection, Configuration);
 			return ServiceCollection.BuildServiceProvider();
 		}
 	}

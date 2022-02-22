@@ -458,10 +458,14 @@ FStrataData StrataConvertLegacyMaterialDynamic(
 	FStrataData Out		 = StrataVerticalLayering(WTop_Slab, WBot_Slab, StrataTree,	/*OperatorIndex*/4, /*MaxDistanceFromLeaves*/2);
 
 	// Take in account the legacy opacity weighting for translucent material
-	#if !MATERIALBLENDING_MASKED && !MATERIALBLENDING_SOLID
+	#if STRATA_LEGACY_MATERIAL_APPLIES_FINAL_WEIGHT
 	{
 		Out = StrataWeight(Out, FinalWeight, StrataTree,	/*OperatorIndex*/5, /*MaxDistanceFromLeaves*/3);
 	}
+	#endif
+
+	#if STRATA_LEGACY_PREMULT_ALPHA_OVERRIDE
+	Out.PreMultipliedAlphaOverrideCoverage = Opacity;
 	#endif
 
 	return Out;
@@ -495,8 +499,34 @@ FStrataData StrataConvertLegacyMaterialStatic(
 
 	if (ShadingModel == SHADINGMODELID_UNLIT)
 	{
-		Out = GetStrataUnlitBSDF(Emissive, Zeros);
-//		Out = StrataWeight(Out, Opacity);				// STRATA_TODO
+		const float GreyTransmittance = saturate(1.0f - Opacity);
+	#if MATERIALBLENDING_OPAQUE || MATERIALBLENDING_MASKED
+		// Opaque materials only write emissive.
+		Out = GetStrataUnlitBSDF(Emissive, 0.0f);
+	#elif MATERIALBLENDING_ALPHACOMPOSITE
+		// Uses (Luminance, black transmittance) for premultiplied alpha blending. Opacity is controled using coverage
+		Out = GetStrataUnlitBSDF(Emissive, 0.0f);
+		#if STRATA_INLINE_SHADING
+			Out.InlinedBSDF.Coverage = Opacity;
+		#endif
+	#elif MATERIALBLENDING_TRANSLUCENT
+		// Uses (Luminance, black transmittance) for translucency blending. Opacity is controled using coverage
+		Out = GetStrataUnlitBSDF(Emissive * Opacity, 0.0f);
+		#if STRATA_INLINE_SHADING
+			Out.InlinedBSDF.Coverage = Opacity;
+		#endif
+	#elif MATERIALBLENDING_ALPHAHOLDOUT
+		Out = GetStrataUnlitBSDF(0.0f, 1.0f);
+	#elif MATERIALBLENDING_ADDITIVE
+		// Emissive is weighted by opacity in the legacy material.
+		Out = GetStrataUnlitBSDF(Emissive * Opacity, 1.0f);
+	#elif MATERIALBLENDING_MODULATE
+		// Setting up emissive as the transmittance color. It is not clamped in case brightening is required.
+		Out = GetStrataUnlitBSDF(0.0f, Emissive);
+	#else
+		// Required default for some materials such as Editor UI
+		Out = GetStrataUnlitBSDF(Emissive, 0.0f);
+	#endif
 	}
 	else if (ShadingModel == SHADINGMODELID_HAIR)
 	{

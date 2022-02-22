@@ -9,6 +9,9 @@
 #include "PCGSettings.generated.h"
 
 class UPCGNode;
+class UPCGSettings;
+
+typedef TMap<FName, TSet<TWeakObjectPtr<const UPCGSettings>>> FPCGTagToSettingsMap;
 
 UENUM()
 enum class EPCGSettingsExecutionMode : uint8
@@ -41,7 +44,7 @@ public:
 #if WITH_EDITOR
 	virtual FName GetDefaultNodeName() const { return NAME_None; }
 	/** Derived classes must implement this to communicate dependencies on external actors */
-	virtual TArray<FName> GetTrackedActorTags() const { return TArray<FName>(); }
+	virtual void GetTrackedActorTags(FPCGTagToSettingsMap& OutTagToSettings) const {}
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
@@ -63,7 +66,7 @@ public:
 	EPCGSettingsExecutionMode ExecutionMode = EPCGSettingsExecutionMode::Enabled;
 
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(Transient, EditAnywhere, BlueprintReadWrite, Category = Debug, meta = (ShowOnlyInnerProperties))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug, meta = (ShowOnlyInnerProperties))
 	FPCGDebugVisualizationSettings DebugSettings;
 #endif
 
@@ -76,7 +79,10 @@ protected:
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
+
+	/** Method that can be called to dirty the cache data from this settings objects if the operator== does not allow to detect changes */
+	void DirtyCache();
+#endif 
 
 private:
 	mutable FPCGElementPtr CachedElement;

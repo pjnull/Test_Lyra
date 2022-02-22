@@ -389,6 +389,10 @@ class UMaterial : public UMaterialInterface
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category=Material, AssetRegistrySearchable)
 	TEnumAsByte<enum EBlendMode> BlendMode;
 
+	/** Determines how the material's color is blended with background colors. */
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Material, AssetRegistrySearchable)
+	TEnumAsByte<enum EStrataBlendMode> StrataBlendMode;
+
 	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "No longer used."))
 	TEnumAsByte<enum EDecalBlendMode> DecalBlendMode;
 
@@ -1065,6 +1069,7 @@ public:
 	ENGINE_API virtual float GetOpacityMaskClipValue() const override;
 	ENGINE_API virtual bool GetCastDynamicShadowAsMasked() const override;
 	ENGINE_API virtual EBlendMode GetBlendMode() const override;
+	ENGINE_API virtual EStrataBlendMode GetStrataBlendMode() const override;
 	ENGINE_API virtual FMaterialShadingModelField GetShadingModels() const override;
 	ENGINE_API virtual bool IsShadingModelFromMaterialExpression() const override;
 	ENGINE_API virtual bool IsTwoSided() const override;
@@ -1252,6 +1257,9 @@ public:
 	 * @return bool - true if we need to call SetMaterialUsage
 	 */
 	ENGINE_API bool NeedsSetMaterialUsage_Concurrent(bool &bOutHasUsage, const EMaterialUsage Usage) const;
+
+	ENGINE_API virtual void CacheShaders(EMaterialShaderPrecompileMode CompileMode) override;
+	ENGINE_API virtual bool IsComplete() const override;
 
 #if WITH_EDITORONLY_DATA
 	/**
@@ -1489,8 +1497,6 @@ private:
 
 	/** Caches shader maps for an array of material resources. */
 	void CacheShadersForResources(EShaderPlatform ShaderPlatform, const TArray<FMaterialResource*>& ResourcesToCache, EMaterialShaderPrecompileMode PrecompileMode = EMaterialShaderPrecompileMode::Default, const ITargetPlatform* TargetPlatform = nullptr);
-
-	ENGINE_API virtual void CacheShaders(EMaterialShaderPrecompileMode CompileMode) override;
 
 #if WITH_EDITOR
 	/**

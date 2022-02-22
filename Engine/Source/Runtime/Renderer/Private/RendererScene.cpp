@@ -421,6 +421,7 @@ FSceneViewState::~FSceneViewState()
 
 	HairStrandsViewStateData.Release();
 	ShaderDrawDebugStateData.Release();
+	ShaderPrintStateData.Release();
 }
 
 #if WITH_EDITOR
