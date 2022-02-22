@@ -268,6 +268,7 @@ struct CORE_API FWindowsPlatformMisc
 
 	static uint64 GetFileVersion(const FString &FileName);
 
+	static int32 GetMaxRefreshRate();
 };
 
 
