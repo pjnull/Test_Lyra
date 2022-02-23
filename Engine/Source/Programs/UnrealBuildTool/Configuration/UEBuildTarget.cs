@@ -1187,10 +1187,6 @@ namespace UnrealBuildTool
 				else
 				{
 					AppName = GetAppNameForTargetType(Rules.Type);
-					if (!string.IsNullOrEmpty(Rules.NameSuffix))
-					{
-						AppName = $"{AppName}-{Rules.NameSuffix}";
-					}
 				}
 			}
 
