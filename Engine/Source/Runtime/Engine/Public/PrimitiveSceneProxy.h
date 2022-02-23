@@ -357,7 +357,7 @@ public:
 		SelfShadowBias = 0;
 	}
 
-	virtual void GetDistanceFieldInstanceData(TArray<FRenderTransform>& ObjectLocalToWorldTransforms) const
+	virtual void GetDistanceFieldInstanceData(TArray<FRenderTransform>& InstanceLocalToPrimitiveTransforms) const
 	{
 	}
 
