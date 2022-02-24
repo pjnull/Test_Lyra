@@ -5,6 +5,12 @@
 #include "CoreMinimal.h"
 #include "HAL/PlatformAffinity.h"
 
+enum class EForkProcessRole : uint8
+{
+	Parent,
+	Child,
+};
+
 /**
  * Helper functions for processes that fork in order to share memory pages.
  *
