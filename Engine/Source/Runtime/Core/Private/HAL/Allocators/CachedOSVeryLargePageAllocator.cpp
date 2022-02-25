@@ -28,12 +28,12 @@ void FCachedOSVeryLargePageAllocator::Init()
 		UsedLargePagesHead[i] = nullptr;
 	}
 #if UE_VERYLARGEPAGEALLOCATOR_TAKEONALL64KBALLOCATIONS
-	for (int i = 0; i < NumberOfLargePages/2; i++)
+	for (int i = 0; i < NumberOfLargePages / 2; i++)
 #else
 	for (int i = 0; i < NumberOfLargePages; i++)
 #endif
 	{
-		LargePagesArray[i].Init((void*)((uintptr_t)AddressSpaceReserved + (i*SizeOfLargePage)));
+		LargePagesArray[i].Init((void*)((uintptr_t)AddressSpaceReserved + (i * SizeOfLargePage)));
 		LargePagesArray[i].LinkHead(FreeLargePagesHead[FMemory::AllocationHints::SmallPool]);
 	}
 
