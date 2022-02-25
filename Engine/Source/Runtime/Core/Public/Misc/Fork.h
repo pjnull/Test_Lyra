@@ -2,8 +2,15 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "CoreTypes.h"
 #include "HAL/PlatformAffinity.h"
+
+#ifndef DEFAULT_SERVER_FAKE_FORKS
+	#define DEFAULT_SERVER_FAKE_FORKS 0
+#endif
+
+class CORE_API FRunnable;
+class CORE_API FRunnableThread;
 
 enum class EForkProcessRole : uint8
 {
