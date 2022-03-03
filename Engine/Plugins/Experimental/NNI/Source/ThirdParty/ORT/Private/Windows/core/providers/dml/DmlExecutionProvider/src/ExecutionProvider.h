@@ -135,6 +135,8 @@ namespace Dml
         // Waits for flushed work, discards unflushed work, and discards associated references to 
         // prevent circular references.  Must be the last call on the object before destruction.
         void Close() override;   
+
+        void WaitForOutstandingWork();
             
         // Allocate a resource from pools.  Releasing pooledResource returns it to the pool.
         STDMETHOD(AllocatePooledResource)(
@@ -254,9 +256,26 @@ namespace Dml
             return m_impl->OnSessionInitializationEnd();
         }
 
-        onnxruntime::common::Status OnRunEnd(bool /*sync_stream*/) override // WITH_UE: Function added to make sure that command lists are flushed when there's no copy from GPU
+        // Check with Neb
+        //onnxruntime::common::Status OnRunEnd(bool /*sync_stream*/) override // WITH_UE: Function added to make sure that command lists are flushed when there's no copy from GPU
+        //{
+        //   return m_impl->OnSessionInitializationEnd();
+        //}
+
+        virtual onnxruntime::Status Sync() const final override
         {
-            return m_impl->OnSessionInitializationEnd();
+            // Completely wait until the device has completed all preceding tasks.
+            // The application could have called SynchronizeBoundOutputs().
+            m_impl->WaitForOutstandingWork();
+            return Status::OK();
+        }
+
+        virtual onnxruntime::Status OnRunEnd(bool /*sync_stream*/) final override
+        {
+            // Flush any pending work to the GPU, but don't block for completion, permitting it
+            // to overlap other work.
+            m_impl->Flush();
+            return Status::OK();
         }
 
         void Flush()

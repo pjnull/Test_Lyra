@@ -69,7 +69,8 @@ public class ONNXRuntime : ModuleRules
 				"FlatBuffers",
 				"ONNX_1_10_1",
 				"ONNXRuntimeProto_1_10_1",
-				"ONNXRuntimeMLAS_2021_11_30",
+				"ONNXRuntimeMLAS_2022_2_2",
+				"AbseilCpp",
 				"ThirdPartyHelperAndDLLLoader"
 			}
 		);

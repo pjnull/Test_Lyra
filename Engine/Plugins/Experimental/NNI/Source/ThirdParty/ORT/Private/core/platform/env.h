@@ -81,8 +81,8 @@ struct ThreadOptions {
   OrtCustomCreateThreadFn custom_create_thread_fn = nullptr;
   void* custom_thread_creation_options = nullptr;
   OrtCustomJoinThreadFn custom_join_thread_fn = nullptr;
-
   EThreadPriority ThreadPri = EThreadPriority::TPri_Normal; // WITH_UE: Unreal Engine thread priority level
+  int dynamic_block_base_ = 0;
 };
 /// \brief An interface used by the onnxruntime implementation to
 /// access operating system functionality like the filesystem etc.

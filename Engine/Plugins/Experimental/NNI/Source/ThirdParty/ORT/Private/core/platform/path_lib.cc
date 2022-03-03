@@ -32,6 +32,7 @@
 #include <libgen.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <string.h>
 #endif
 
 #if defined(_WIN32) && !defined(PLATFORM_SCARLET) // WITH_UE: Added PLATFORM_SCARLET
@@ -98,7 +99,7 @@ common::Status GetDirNameFromFilePath(const std::basic_string<ORTCHAR_T>& s, std
   auto st = onnxruntime::RemoveFileSpec(const_cast<wchar_t*>(ret.data()), ret.length() + 1);
   if (!st.IsOK()) {
     std::ostringstream oss;
-    oss << "illegal input path:" << ToMBString(s) << ". " << st.ErrorMessage();
+    oss << "illegal input path:" << ToUTF8String(s) << ". " << st.ErrorMessage();
     return Status(st.Category(), st.Code(), oss.str());
   }
   ret.resize(wcslen(ret.c_str()));
@@ -111,12 +112,16 @@ namespace onnxruntime {
 
 namespace {
 
-template <typename T>
-struct Freer {
-  void operator()(T* p) { ::free(p); }
-};
-
-using MallocdStringPtr = std::unique_ptr<char, Freer<char> >;
+inline std::unique_ptr<char[]> StrDup(const std::string& input) {
+  auto buf = std::make_unique<char[]>(input.size() + 1);
+#if !defined(PLATFORM_SCARLET) // WITH_UE: Code not for PLATFORM_SCARLET
+  strncpy(buf.get(), input.c_str(), input.size());
+#else // WITH_UE
+  strncpy_s(buf.get(), input.size() + 1, input.c_str(), input.size());
+#endif // WITH_UE
+  buf[input.size()] = 0;
+  return buf;
+}
 
 }  // namespace
 
@@ -147,20 +152,20 @@ common::Status GetDirNameFromFilePath(const std::basic_string<ORTCHAR_T>& input,
 #endif //PLATFORM_SCARLET
 
 #else // WITH_UE
-  MallocdStringPtr s{strdup(input.c_str())};
+  auto s = StrDup(input);
   output = dirname(s.get());
 #endif // WITH_UE
   return Status::OK();
 }
 
 std::string GetLastComponent(const std::string& input) {
+
 #if defined(__PROSPERO__) || defined(PLATFORM_SCARLET) // WITH_UE
   FString IntputFString = FString(input.c_str());
   FString BaseName = FPaths::GetCleanFilename(IntputFString);
   std::string ret = std::string(TCHAR_TO_UTF8(*BaseName));
-
 #else // WITH_UE
-  MallocdStringPtr s{strdup(input.c_str())};
+  auto s = StrDup(input);
   std::string ret = basename(s.get());
 #endif // WITH_UE
   return ret;

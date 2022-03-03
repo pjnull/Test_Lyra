@@ -348,12 +348,12 @@ class UnrealEngineEnv : public Env {
 #endif
     if (file_handle.get() == INVALID_HANDLE_VALUE) {
       const int err = GetLastError();
-      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToMBString(file_path), " fail, errcode = ", err);
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToUTF8String(file_path), " fail, errcode = ", err);
     }
     LARGE_INTEGER filesize;
     if (!GetFileSizeEx(file_handle.get(), &filesize)) {
       const int err = GetLastError();
-      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "GetFileSizeEx ", ToMBString(file_path), " fail, errcode = ", err);
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "GetFileSizeEx ", ToUTF8String(file_path), " fail, errcode = ", err);
     }
     if (static_cast<ULONGLONG>(filesize.QuadPart) > std::numeric_limits<size_t>::max()) {
       return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "GetFileLength: File is too large");
@@ -421,7 +421,7 @@ class UnrealEngineEnv : public Env {
 #endif
     if (file_handle.get() == INVALID_HANDLE_VALUE) {
       const int err = GetLastError();
-      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToMBString(file_path), " fail, errcode = ", err);
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToUTF8String(file_path), " fail, errcode = ", err);
     }
 
     if (length == 0)
@@ -432,7 +432,7 @@ class UnrealEngineEnv : public Env {
       current_position.QuadPart = offset;
       if (!SetFilePointerEx(file_handle.get(), current_position, &current_position, FILE_BEGIN)) {
         const int err = GetLastError();
-        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "SetFilePointerEx ", ToMBString(file_path), " fail, errcode = ", err);
+        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "SetFilePointerEx ", ToUTF8String(file_path), " fail, errcode = ", err);
       }
     }
 
@@ -445,11 +445,11 @@ class UnrealEngineEnv : public Env {
 
       if (!ReadFile(file_handle.get(), buffer.data() + total_bytes_read, bytes_to_read, &bytes_read, nullptr)) {
         const int err = GetLastError();
-        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail, errcode = ", err);
+        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToUTF8String(file_path), " fail, errcode = ", err);
       }
 
       if (bytes_read != bytes_to_read) {
-        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail: unexpected end");
+        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToUTF8String(file_path), " fail: unexpected end");
       }
 
       total_bytes_read += bytes_read;
@@ -584,7 +584,7 @@ class UnrealEngineEnv : public Env {
     FString FilePathUE(path.c_str());
     IPlatformFile& FileManager = FPlatformFileManager::Get().GetPlatformFile();
     bool bIsSuccess = FileManager.CreateDirectory(*FilePathUE);
-    common::Status RetVal = (bIsSuccess) ? common::Status::OK() : ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Creating Folder: ", ToMBString(path));
+    common::Status RetVal = (bIsSuccess) ? common::Status::OK() : ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Creating Folder: ", ToUTF8String(path));
 
     return RetVal;
   }
@@ -593,7 +593,7 @@ class UnrealEngineEnv : public Env {
     FString FilePathUE(path.c_str());
     IPlatformFile& FileManager = FPlatformFileManager::Get().GetPlatformFile();
     bool bIsSuccess = FileManager.DeleteDirectoryRecursively(*FilePathUE);
-    common::Status RetVal = (bIsSuccess) ? common::Status::OK() : ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Deleting Folder: ", ToMBString(path));
+    common::Status RetVal = (bIsSuccess) ? common::Status::OK() : ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Deleting Folder: ", ToUTF8String(path));
 
     return RetVal;
   }
@@ -697,7 +697,7 @@ class UnrealEngineEnv : public Env {
 
     if (file_handle.get() == INVALID_HANDLE_VALUE) {
       const int err = GetLastError();
-      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToMBString(path), " fail, errcode = ", err);
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToUTF8String(path), " fail, errcode = ", err);
     }
 
     constexpr DWORD initial_buffer_size = MAX_PATH;
