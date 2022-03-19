@@ -6051,12 +6051,22 @@ void ProcessCookOnTheFlyShaders(bool bReloadGlobalShaders, const TArray<uint8>& 
 {
 	check(IsInGameThread());
 
-	// now we need to refresh the RHI resources
-	FlushRenderingCommands();
+	bool bHasFlushed = false;
+
+	auto DoFlushIfNecessary = [&bHasFlushed]() {
+		if (!bHasFlushed )
+		{
+			// now we need to refresh the RHI resources
+			FlushRenderingCommands();
+			bHasFlushed = true;
+		}
+	};
 
 	// reload the global shaders
 	if (bReloadGlobalShaders)
 	{
+		DoFlushIfNecessary();
+
 		// Some platforms rely on global shaders to be created to implement basic RHI functionality
 		TGuardValue<int32> Guard(GCreateShadersOnLoad, 1);
 		CompileGlobalShaderMap(true);
@@ -6065,6 +6075,8 @@ void ProcessCookOnTheFlyShaders(bool bReloadGlobalShaders, const TArray<uint8>& 
 	// load all the mesh material shaders if any were sent back
 	if (MeshMaterialMaps.Num() > 0)
 	{
+		DoFlushIfNecessary();
+
 		// parse the shaders
 		FMemoryReader MemoryReader(MeshMaterialMaps, true);
 		FNameAsStringProxyArchive Ar(MemoryReader);
@@ -6090,6 +6102,8 @@ void ProcessCookOnTheFlyShaders(bool bReloadGlobalShaders, const TArray<uint8>& 
 	// load all the global shaders if any were sent back
 	if (GlobalShaderMap.Num() > 0)
 	{
+		DoFlushIfNecessary();
+
 		// parse the shaders
 		FMemoryReader MemoryReader(GlobalShaderMap, true);
 		FNameAsStringProxyArchive Ar(MemoryReader);
