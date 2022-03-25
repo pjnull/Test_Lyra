@@ -121,7 +121,6 @@ static TAutoConsoleVariable<int32> CVarMobileEarlyZPass(
 	ECVF_Scalability
 );
 
-
 static TAutoConsoleVariable<int32> CVarBasePassWriteDepthEvenWithFullPrepass(
 	TEXT("r.BasePassWriteDepthEvenWithFullPrepass"),
 	0,
