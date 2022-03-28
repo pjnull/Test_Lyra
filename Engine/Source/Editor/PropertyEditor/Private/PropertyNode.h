@@ -146,7 +146,7 @@ public:
 		bAllValuesTheSame = false;
 		bRequiresCache = true;
 	}
-	
+
 	bool bAllValuesTheSame;
 	bool bRequiresCache;
 private:
@@ -277,7 +277,7 @@ enum EPropertyDataValidationResult : uint8
 };
 
 /**
- * The base class for all property nodes                                                              
+ * The base class for all property nodes
  */
 class FPropertyNode : public TSharedFromThis<FPropertyNode>
 {
@@ -882,14 +882,14 @@ public:
 
 	/**
 	 * Get metadata value for 'Key' for this property instance (as opposed to the class)
-	 * 
+	 *
 	 * @return Pointer to metadata value; nullptr if Key not found
 	 */
 	const FString* GetInstanceMetaData(const FName& Key) const;
 
 	/**
 	 * Get metadata map for this property instance (as opposed to the class)
-	 * 
+	 *
 	 * @return Map ptr containing metadata pairs
 	 */
 	const TMap<FName, FString>* GetInstanceMetaDataMap() const;
@@ -922,7 +922,7 @@ public:
 	 * Broadcasts reset to default property changes
 	 */
 	void BroadcastPropertyResetToDefault();
-	
+
 	/** @return Whether this property should have an edit condition toggle. */
 	bool SupportsEditConditionToggle() const;
 
@@ -970,12 +970,12 @@ protected:
 	/**
 	 * Interface function for Custom Setup of Node (prior to node flags being set)
 	 */
-	virtual void InitBeforeNodeFlags () {};
+	virtual void InitBeforeNodeFlags() {};
 
 	/**
 	 * Interface function for Custom expansion Flags.  Default is objects and categories which always expand
 	 */
-	virtual void InitExpansionFlags (){ SetNodeFlags(EPropertyNodeFlags::CanBeExpanded, true); };
+	virtual void InitExpansionFlags() { SetNodeFlags(EPropertyNodeFlags::CanBeExpanded, true); };
 
 	/**
 	 * Interface function for Creating Child Nodes
@@ -1007,10 +1007,10 @@ protected:
 	 *
 	 * @return	true if the DisplayName has been changed
 	 */
-	bool AdjustEnumPropDisplayName( UEnum *InEnum, FString& DisplayName ) const;
+	bool AdjustEnumPropDisplayName(UEnum* InEnum, FString& DisplayName) const;
 
 	/**
-	 * Helper function for derived members to be able to 
+	 * Helper function for derived members to be able to
 	 * broadcast property changed notifications
 	 */
 	void BroadcastPropertyChangedDelegates();
@@ -1076,7 +1076,7 @@ protected:
 
 	/** Called when this node's property value has changed (called during NotifyPostChange) */
 	FPropertyValueChangedEvent PropertyValueChangedEvent;
-	
+
 	/** Called when a child's property value has changed */
 	FPropertyValueChangedEvent ChildPropertyValueChangedEvent;
 
