@@ -992,7 +992,7 @@ UDirectionalLightComponent::UDirectionalLightComponent(const FObjectInitializer&
 	LightSourceSoftAngle = 0.0f;
 	ShadowSourceAngleFactor = 1.0f;
 
-	ForwardShadingPriority = 0;
+
 	CascadeDistributionExponent = 3.0f;
 	CascadeTransitionFraction = 0.1f;
 	ShadowDistanceFadeoutFraction = 0.1f;
