@@ -1276,6 +1276,12 @@ void URigVMController::OnExternalVariableRemoved(const FName& InVarName, bool bS
 	URigVMGraph* Graph = GetGraph();
 	check(Graph);
 
+	// When transacting, the action stack will deal with the deletion of variable nodes
+	if(GIsTransacting)
+	{
+		return;
+	}
+
 	for (const FRigVMGraphVariableDescription& LocalVariable : Graph->GetLocalVariables(true))
 	{
 		if (InVarName == LocalVariable.Name)
