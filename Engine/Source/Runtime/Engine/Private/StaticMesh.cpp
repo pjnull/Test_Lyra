@@ -4632,8 +4632,6 @@ void UStaticMesh::ClearAllCachedCookedPlatformData()
 
 void UStaticMesh::BeginCacheForCookedPlatformData(const ITargetPlatform* TargetPlatform)
 {
-	FStaticMeshRenderData& PlatformRenderData = GetPlatformStaticMeshRenderData(this, TargetPlatform);
-	PlatformRenderData.NaniteResources.RebuildBulkDataFromDDC(this);
 }
 
 bool UStaticMesh::IsCachedCookedPlatformDataLoaded(const ITargetPlatform* TargetPlatform)
@@ -4642,8 +4640,21 @@ bool UStaticMesh::IsCachedCookedPlatformDataLoaded(const ITargetPlatform* Target
 	{
 		return false;
 	}
-	
-	GetPlatformStaticMeshRenderData(this, TargetPlatform);
+
+	Nanite::FResources& NaniteResources = GetPlatformStaticMeshRenderData(this, TargetPlatform).NaniteResources;
+	if (NaniteResources.HasStreamingData())
+	{
+		if (!NaniteResources.IsRebuildingBulkDataFromCache() && !NaniteResources.StreamablePages.IsBulkDataLoaded())
+		{
+			NaniteResources.BeginRebuildBulkDataFromCache(this);
+		}
+		if (!NaniteResources.PollRebuildBulkDataFromCache())
+		{
+			return false;
+		}
+		NaniteResources.EndRebuildBulkDataFromCache();
+	}
+
 	return true;
 }
 
