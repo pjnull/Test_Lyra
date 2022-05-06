@@ -393,7 +393,7 @@ TSharedRef<SWidget> FLiveLinkComponentDetailCustomization::BuildControllerValueW
 		.HAlign(EHorizontalAlignment::HAlign_Left)
 		[
 			SNew(STextBlock)
-			.Font(FEditorStyle::Get().GetFontStyle("FontAwesome.11"))
+			.Font(FAppStyle::Get().GetFontStyle("FontAwesome.11"))
 			.Text(this, &FLiveLinkComponentDetailCustomization::HandleControllerStatusText, RoleClass)
 			.ColorAndOpacity(this, &FLiveLinkComponentDetailCustomization::HandleControllerStatusColorAndOpacity, RoleClass)
 			.ToolTipText(this, &FLiveLinkComponentDetailCustomization::HandleControllerStatusToolTipText, RoleClass)

@@ -8,7 +8,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/SToolTip.h"
 #include "Widgets/Input/SComboButton.h"
-#include "EditorStyleSet.h"
+#include "Styling/AppStyle.h"
 #include "Engine/Blueprint.h"
 #include "Editor/EditorPerProjectUserSettings.h"
 #include "EdGraphSchema_K2.h"
@@ -148,7 +148,7 @@ public:
 		( "BlueprintLibraryPalette"
 		, LOCTEXT("LibraryPaletteContext", "Library Palette")
 		, NAME_None
-		, FEditorStyle::GetStyleSetName() )
+		, FAppStyle::GetAppStyleSetName() )
 	{
 	}
 
@@ -196,7 +196,7 @@ void SBlueprintLibraryPalette::Construct(FArguments const& InArgs, TWeakPtr<FBlu
 {
 	SBlueprintSubPalette::FArguments SuperArgs;
 	SuperArgs._Title       = LOCTEXT("PaletteTitle", "Find a Node");
-	SuperArgs._Icon        = FEditorStyle::GetBrush("Icons.Search");
+	SuperArgs._Icon        = FAppStyle::GetBrush("Icons.Search");
 	SuperArgs._ToolTipText = LOCTEXT("PaletteToolTip", "An all encompassing list of every node that is available for this blueprint.");
 	SuperArgs._ShowFavoriteToggles = true;
 
@@ -374,7 +374,7 @@ TSharedRef<SWidget> SBlueprintLibraryPalette::ConstructClassFilterDropdownConten
 	SAssignNew(ClearFilterToolTip, SToolTip).Text(LOCTEXT("ClearFilter", "Clears the class filter so you can see all available nodes for placement."));
 
 	return SNew(SBorder)
-		.BorderImage(FEditorStyle::GetBrush("Menu.Background"))
+		.BorderImage(FAppStyle::GetBrush("Menu.Background"))
 		[
 			// achieving fixed width by nesting items within a fixed width box.
 			SNew(SBox)
