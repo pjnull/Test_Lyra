@@ -31,7 +31,7 @@ fi
 if [ $IS_DOTNET_INSTALLED -eq 0 ]; then
 	echo Setting up bundled DotNet SDK
 	CUR_DIR=`pwd`
-	export UE_DOTNET_DIR="$CUR_DIR/../../../Binaries/ThirdParty/DotNet/6.0.200/linux"
+	export UE_DOTNET_DIR="$CUR_DIR/../../../Binaries/ThirdParty/DotNet/Linux"
 	export PATH="$UE_DOTNET_DIR:$PATH"
 	export DOTNET_ROOT="$UE_DOTNET_DIR"
 
@@ -40,10 +40,6 @@ if [ $IS_DOTNET_INSTALLED -eq 0 ]; then
 	# Currently broken, need to fix!
 	export CLR_OPENSSL_VERSION_OVERRIDE=1.1
 	export LD_LIBRARY_PATH="$CUR_DIR/../../../Binaries/ThirdParty/OpenSSL/Unix/lib/x86_64-unknown-linux-gnu:$LD_LIBRARY_PATH"
-
-	# Depend on our bundled ICU vs the system. This causes issues on system that dont have the few hard coded ICU versions dotnet looks for
-	export DOTNET_SYSTEM_GLOBALIZATION_APPLOCALICU=":64.1"
-	export LD_LIBRARY_PATH="$CUR_DIR/../../../Binaries/ThirdParty/ICU/icu4c-64_1/lib/Unix/x86_64-unknown-linux-gnu:$LD_LIBRARY_PATH"
 else
 	export IS_DOTNET_INSTALLED=$IS_DOTNET_INSTALLED
 fi

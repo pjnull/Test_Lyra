@@ -15,20 +15,20 @@ cd "$(dirname "$SCRIPT_PATH")" && SCRIPT_PATH="`pwd`/$(basename "$SCRIPT_PATH")"
 
 BASE_PATH="`dirname "$SCRIPT_PATH"`"
 
-$BASE_PATH/SetupDotnet.sh
-
 # cd to Engine root
 cd ../../../..
 RESULT=0
 
+source "$BASE_PATH/SetupMono.sh" "$BASE_PATH"
+
 while : ; do
-        dotnet Engine/Binaries/DotNET/GitDependencies.dll $ARGS
+        mono Engine/Binaries/DotNET/GitDependencies.exe $ARGS
         RESULT=$?
 
         echo "Result: $RESULT"
         # quit if not crashed
         [[ $RESULT -lt 129 ]] && break
-        echo "mono GitDependencies $ARGS crashed with return code $RESULT" >> GitDependencies.crash.log
+        echo "mono GitDependencies.exe $ARGS crashed with return code $RESULT" >> GitDependencies.crash.log
 done
 
 exit $RESULT

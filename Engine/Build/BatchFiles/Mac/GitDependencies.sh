@@ -10,16 +10,16 @@ fi
 
 cd "$(dirname "$SCRIPT_PATH")" && SCRIPT_PATH="`pwd`/$(basename "$SCRIPT_PATH")"
 
-if [ ! -f ../../../Binaries/DotNET/GitDependencies.dll ]; then
-	echo "Cannot find GitDependencies. This script should be placed in Engine/Build/BatchFiles/Mac."
+if [ ! -f ../../../Binaries/DotNET/GitDependencies.exe ]; then
+	echo "Cannot find GitDependencies.exe. This script should be placed in Engine/Build/BatchFiles/Mac."
 	exit 1
 fi 
 
-$(dirname "$SCRIPT_PATH")/SetupDotnet.sh
+source SetupEnvironment.sh -mono "`pwd`"
 
 cd ../../../..
 
-dotnet Engine/Binaries/DotNET/GitDependencies.dll "$@"
+mono Engine/Binaries/DotNET/GitDependencies.exe "$@"
 
 pushd "$(dirname "$SCRIPT_PATH")" > /dev/null
 sh FixDependencyFiles.sh

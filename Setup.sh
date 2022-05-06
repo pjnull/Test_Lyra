@@ -7,36 +7,9 @@ cd "`dirname "$0"`"
 
 if [ ! -f Engine/Binaries/DotNET/GitDependencies.exe ]; then
 	echo "GitSetup ERROR: This script does not appear to be located \
-       in the root UE directory and must be run from there."
+       in the root UE4 directory and must be run from there."
 	exit 1
 fi 
-
-function FindPromptOrForceArg()
-{
-	read -r -a Args <<< "$@"
-	for Arg in "${Args[@]}"
-	do
-		case $Arg in
-				--prompt)
-					echo "${Arg}"
-					return
-				;;
-				--force)
-					echo "${Arg}"
-					return
-				;;
-		esac
-	done
-}
-
-declare -a GitDepsArgs
-PromptOrForce=$(FindPromptOrForceArg "$@")
-if [ -z "${PromptOrForce}" ];
-then
-	# Use --prompt by default, whenever caller hasn't supplied a --prompt or --force arg
-  GitDepsArgs=(--prompt)
-fi
-GitDepsArgs+=("$@")
 
 if [ "$(uname)" = "Darwin" ]; then
 	# Setup the git hooks
@@ -49,7 +22,7 @@ if [ "$(uname)" = "Darwin" ]; then
 	fi
 
 	# Get the dependencies for the first time
-	Engine/Build/BatchFiles/Mac/GitDependencies.sh "${GitDepsArgs[@]}"
+	Engine/Build/BatchFiles/Mac/GitDependencies.sh --prompt $@
 else
 	# Setup the git hooks
 	if [ -d .git/hooks ]; then
@@ -64,7 +37,7 @@ else
 	fi
 
 	# Get the dependencies for the first time
-	Engine/Build/BatchFiles/Linux/GitDependencies.sh "${GitDepsArgs[@]}"
+	Engine/Build/BatchFiles/Linux/GitDependencies.sh --prompt $@
 
 	echo Register the engine installation...
 	if [ -f Engine/Binaries/Linux/UnrealVersionSelector-Linux-Shipping ]; then
