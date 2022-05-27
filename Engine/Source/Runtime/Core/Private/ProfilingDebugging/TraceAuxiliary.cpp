@@ -1257,10 +1257,6 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 	}
 #endif
 
-#if UE_MEMORY_TRACE_ENABLED
-	MemoryTrace_InitializeLate();
-#endif
-
 	// Trace out information about this session. This is done before initialisation,
 	// so that it is always sent (all channels are enabled prior to initialisation).
 	const TCHAR* BranchName = BuildSettings::GetBranchName();
@@ -1306,6 +1302,10 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 	}
 	UE::Trace::Initialize(Desc);
 
+	// Workaround for the fact that even if StartFromCommandlineArguments will enable channels
+	// specified by the commandline, UE::Trace::Initialize will reset all channels.
+	GTraceAuxiliary.EnableCommandlineChannelsPostInitialize();
+	
 	// Always register end frame updates. This path is short circuited if a worker thread exists.
 	GTraceAuxiliary.StartEndFramePump();
 	if (!FForkProcessHelper::IsForkRequested())
@@ -1335,10 +1335,6 @@ void FTraceAuxiliary::Initialize(const TCHAR* CommandLine)
 	});
 
 	UE::Trace::ThreadRegister(TEXT("GameThread"), FPlatformTLS::GetCurrentThreadId(), -1);
-	
-	// Workaround for the fact that even if StartFromCommandlineArguments will enable channels
-	// specified by the commandline, UE::Trace::Initialize will reset all channels.
-	GTraceAuxiliary.EnableCommandlineChannelsPostInitialize();
 #endif
 }
 
