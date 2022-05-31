@@ -4044,6 +4044,16 @@ bool UMaterial::CanEditChange(const FProperty* InProperty) const
 	return true;
 }
 
+bool UMaterial::Modify(bool bAlwaysMarkDirty)
+{
+	UMaterialEditorOnlyData* EditorOnly = GetEditorOnlyData();
+	if (EditorOnly)
+	{
+		EditorOnly->Modify(bAlwaysMarkDirty);
+	}
+	return Super::Modify(bAlwaysMarkDirty);
+}
+
 void UMaterial::CreateExecutionFlowExpressions()
 {
 	if (IsUsingControlFlow())
