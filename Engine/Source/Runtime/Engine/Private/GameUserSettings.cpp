@@ -476,7 +476,7 @@ void UGameUserSettings::ApplyNonResolutionSettings()
 
 	bool bEnableHDR = (IsHDRAllowed() && bUseHDRDisplayOutput && !bWithEditor);
 
-	EnableHDRDisplayOutput(bEnableHDR, HDRDisplayOutputNits);
+	EnableHDRDisplayOutputInternal(bEnableHDR, HDRDisplayOutputNits, true);
 
 }
 
@@ -937,6 +937,11 @@ bool UGameUserSettings::SupportsHDRDisplayOutput() const
 
 void UGameUserSettings::EnableHDRDisplayOutput(bool bEnable, int32 DisplayNits /*= 1000*/)
 {
+	EnableHDRDisplayOutputInternal(bEnable, DisplayNits, false);
+}
+
+void UGameUserSettings::EnableHDRDisplayOutputInternal(bool bEnable, int32 DisplayNits, bool FromUserSettings)
+{
 	static IConsoleVariable* CVarHDROutputEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("r.HDR.EnableHDROutput"));
 
 	if (CVarHDROutputEnabled)
@@ -963,13 +968,13 @@ void UGameUserSettings::EnableHDRDisplayOutput(bool bEnable, int32 DisplayNits /
 				RequestUIUpdate();
 			}
 #endif
-			CVarHDROutputEnabled->Set(1, ECVF_SetByGameSetting);
+			CVarHDROutputEnabled->Set(1, FromUserSettings ? ECVF_SetByGameSetting : ECVF_SetByCode);
 		}
 
 		// Always test this branch as can be used to flush errors
 		if (!bEnable)
 		{
-			CVarHDROutputEnabled->Set(0, ECVF_SetByGameSetting);
+			CVarHDROutputEnabled->Set(0, FromUserSettings ? ECVF_SetByGameSetting : ECVF_SetByCode);
 		}
 
 		// Update final requested state for saved config
