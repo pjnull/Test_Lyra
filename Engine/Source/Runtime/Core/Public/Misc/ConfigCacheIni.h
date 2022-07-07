@@ -20,10 +20,9 @@
 #include "Math/Vector.h"
 #include "Math/Vector2D.h"
 #include "Misc/AccessDetection.h"
+#include "Misc/ConfigTypes.h"
 #include "Misc/Paths.h"
 #include "Serialization/StructuredArchive.h"
->>>> ORIGINAL //UE5/Main/Engine/Source/Runtime/Core/Public/Misc/ConfigCacheIni.h#37
-==== THEIRS //UE5/Main/Engine/Source/Runtime/Core/Public/Misc/ConfigCacheIni.h#38
 #include "Serialization/StructuredArchiveAdapters.h"
 #include "Serialization/StructuredArchiveSlots.h"
 #include "UObject/NameTypes.h"
@@ -31,9 +30,6 @@
 class FConfigCacheIni;
 class FConfigFile;
 class IConsoleVariable;
-==== YOURS //bryan.sefcik_CDW-SV5HTO4I9D4_UE_Release_Staging/Engine/Source/Runtime/Core/Public/Misc/ConfigCacheIni.h
-#include "Misc/ConfigTypes.h"
-<<<<
 
 CORE_API DECLARE_LOG_CATEGORY_EXTERN(LogConfig, Log, All);
 
