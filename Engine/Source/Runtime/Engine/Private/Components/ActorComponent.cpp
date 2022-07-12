@@ -711,6 +711,8 @@ void UActorComponent::BeginDestroy()
 		UninitializeComponent();
 	}
 
+	bIsReadyForReplication = false;
+
 	ExecuteUnregisterEvents();
 
 	// Ensure that we call OnComponentDestroyed before we destroy this component
@@ -1053,6 +1055,11 @@ void UActorComponent::UninitializeComponent()
 	bHasBeenInitialized = false;
 }
 
+void UActorComponent::ReadyForReplication()
+{
+	bIsReadyForReplication = true;
+}
+
 void UActorComponent::BeginPlay()
 {
 	TRACE_OBJECT_LIFETIME_BEGIN(this);
@@ -1081,6 +1088,7 @@ void UActorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		ReceiveEndPlay(EndPlayReason);
 	}
 
+	bIsReadyForReplication = false;
 	bHasBegunPlay = false;
 }
 
@@ -1351,20 +1359,7 @@ void UActorComponent::RegisterComponentWithWorld(UWorld* InWorld, FRegisterCompo
 	}
 	else
 	{
-		if (!bHasBeenInitialized && bWantsInitializeComponent && MyOwner->IsActorInitialized())
-		{
-			InitializeComponent();
-		}
-
-		if (MyOwner->HasActorBegunPlay() || MyOwner->IsActorBeginningPlay())
-		{
-			RegisterAllComponentTickFunctions(true);
-			if (!bHasBegunPlay)
-			{
-				BeginPlay();
-				ensureMsgf(bHasBegunPlay, TEXT("Failed to route BeginPlay (%s)"), *GetFullName());
-			}
-		}
+		MyOwner->HandleRegisterComponentWithWorld(this);
 	}
 
 	// If this is a blueprint created component and it has component children they can miss getting registered in some scenarios
@@ -1441,6 +1436,8 @@ void UActorComponent::DestroyComponent(bool bPromoteChildren/*= false*/)
 	{
 		UninitializeComponent();
 	}
+
+	bIsReadyForReplication = false;
 
 	// Unregister if registered
 	if(IsRegistered())
