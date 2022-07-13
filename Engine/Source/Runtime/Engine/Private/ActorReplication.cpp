@@ -572,7 +572,10 @@ void AActor::AddComponentForReplication(UActorComponent* Component)
 	}
 
 #if UE_WITH_IRIS
-	Component->BeginReplication();
+    if (NetCondition != COND_Never)
+    {
+		Component->BeginReplication();
+    }
 #endif
 }
 
