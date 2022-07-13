@@ -3343,7 +3343,6 @@ void AActor::UpdateAllReplicatedComponents()
 				// Begin replication and set NetCondition, if component already is replicated the NetCondition will be updated
 				Component->BeginReplication();
 #endif
-				}
 			}
 		}
 	}
@@ -5431,9 +5430,9 @@ void AActor::HandleRegisterComponentWithWorld(UActorComponent* Component)
 		if (!Component->HasBegunPlay())
 		{
 #if UE_WITH_IRIS
-			if (bReplicates)
+			if (Component->GetIsReplicated())
 			{
-				UpdateReplicatedComponent(this);
+				UpdateReplicatedComponent(Component);
 			}
 #endif // UE_WITH_IRIS
 
