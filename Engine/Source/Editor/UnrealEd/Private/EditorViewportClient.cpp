@@ -2848,7 +2848,7 @@ bool FEditorViewportClient::Internal_InputKey(const FInputKeyEventArgs& EventArg
 	{
 		return true;
 	}
-
+	
 	FKey Key = EventArgs.Key;
 	EInputEvent Event = EventArgs.Event;
 	FViewport* InViewport = EventArgs.Viewport;
@@ -2867,7 +2867,7 @@ bool FEditorViewportClient::Internal_InputKey(const FInputKeyEventArgs& EventArg
 	}
 
 	FInputEventState InputState(EventArgs.Viewport, EventArgs.Key, EventArgs.Event);
-
+	
 	bool bHandled = false;
 
 	if ((IsOrtho() || InputState.IsAltButtonPressed()) && (Key == EKeys::Left || Key == EKeys::Right || Key == EKeys::Up || Key == EKeys::Down))
