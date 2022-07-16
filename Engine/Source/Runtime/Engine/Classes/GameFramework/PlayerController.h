@@ -1669,6 +1669,9 @@ public:
 	/** Removes given inputcomponent from the input stack (regardless of if it's the top, actually). */
 	virtual bool PopInputComponent(UInputComponent* Input);
 
+	/** Returns true if the given input component is in this PlayerController's CurrentInputStack */
+	virtual bool IsInputComponentInStack(const UInputComponent* Input) const;
+
 	/** Flushes the current key state. */
 	virtual void FlushPressedKeys();
 
