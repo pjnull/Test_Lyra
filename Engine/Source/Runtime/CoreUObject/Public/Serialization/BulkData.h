@@ -1299,6 +1299,10 @@ public:
 	{
 		return Formats.Contains(Format);
 	}
+	void GetContainedFormats(TArray<FName>& OutFormats) const
+	{
+		Formats.GenerateKeyArray(OutFormats);
+	}
 	FByteBulkData& GetFormat(FName Format)
 	{
 		FByteBulkData* Result = Formats.FindRef(Format);
