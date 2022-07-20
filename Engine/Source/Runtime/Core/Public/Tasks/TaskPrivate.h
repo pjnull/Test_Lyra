@@ -20,7 +20,6 @@
 #include "Math/NumericLimits.h"
 #include "Math/UnrealMathUtility.h"
 #include "Misc/AssertionMacros.h"
-#include "Misc/ScopeLock.h"
 #include "Misc/Timeout.h"
 #include "Misc/Timespan.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -31,7 +30,6 @@
 #include "Templates/TypeCompatibleBytes.h"
 #include "Templates/UnrealTemplate.h"
 #include "Templates/UnrealTypeTraits.h"
-#include "Trace/Detail/Channel.h"
 
 #include <atomic>
 #include <type_traits>
