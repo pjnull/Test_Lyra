@@ -254,6 +254,7 @@ void FNiagaraSystemToolkit::InitializeWithEmitter(const EToolkitMode::Type Mode,
 	// emitter has been changed.
 	LastSyncedEmitterChangeId = SystemViewModel->GetEmitterHandleViewModels()[0]->GetEmitterViewModel()->GetEmitter().Emitter->GetChangeId();
 
+	// Mirror the system setup above so that the parameter panel updates appropriately
 	SystemViewModel->SetParameterPanelViewModel(ParameterPanelViewModel);
 	SystemToolkitMode = ESystemToolkitMode::Emitter;
 
