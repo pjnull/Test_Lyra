@@ -6112,6 +6112,13 @@ bool URigVMController::RenameNode(URigVMNode* InNode, const FName& InNewName, bo
 		ActionStack->BeginAction(Action);
 	}
 
+	if (URigVMCollapseNode* CollapseNode = Cast<URigVMCollapseNode>(InNode))
+	{
+		const FString& OldNotation = CollapseNode->Template.Notation.ToString();
+		const FString NewNotation = ValidNewName.ToString() + OldNotation.RightChop(OldNotation.Find(TEXT("(")));
+		CollapseNode->Template.Notation = *NewNotation;
+	}
+
 	// loop over all links and remove them
 	TArray<URigVMLink*> Links = InNode->GetLinks();
 	for (URigVMLink* Link : Links)
