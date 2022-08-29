@@ -8809,7 +8809,7 @@ bool UEngine::HandleObjCommand( const TCHAR* Cmd, FOutputDevice& Ar )
 				{
 					FArchiveCountMem Count(*It);
 					NumBytes = Count.GetNum();
-					MaxBytes = Count.GetNum();
+					MaxBytes = Count.GetMax();
 					It->GetResourceSizeEx(TrueResourceSize);
 				}
 
