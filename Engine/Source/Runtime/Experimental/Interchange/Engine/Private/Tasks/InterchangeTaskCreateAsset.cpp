@@ -47,11 +47,11 @@ namespace UE
 				OutPackageName = FPaths::Combine(*SanitizedPackageBasePath, *SubPath, *OutAssetName);
 			}
 
-			UObject* GetExistingObjectFromAssetImportData(TSharedPtr<UE::Interchange::FImportAsyncHelper, ESPMode::ThreadSafe> AsyncHelper, UInterchangeFactoryBaseNode* FactoryNode)
+			UObject* GetExistingObjectFromAssetImportData(UObject* ReimportObject, UInterchangeFactoryBaseNode* FactoryNode, FString& OutPackageName, FString& OutAssetName)
 			{
 				UInterchangeAssetImportData* OriginalAssetImportData = nullptr;
 				TArray<UObject*> SubObjects;
-				GetObjectsWithOuter(AsyncHelper->TaskData.ReimportObject, SubObjects);
+				GetObjectsWithOuter(ReimportObject, SubObjects);
 				for (UObject* SubObject : SubObjects)
 				{
 					OriginalAssetImportData = Cast<UInterchangeAssetImportData>(SubObject);
@@ -63,28 +63,26 @@ namespace UE
 
 				if (OriginalAssetImportData)
 				{
-					if (UInterchangeBaseNodeContainer* NodeContainer = OriginalAssetImportData->NodeContainer)
+					if (UInterchangeBaseNodeContainer* OriginalNodeContainer = OriginalAssetImportData->NodeContainer)
 					{
-						UClass* FactoryNodeClass = FactoryNode->GetClass();
-						UInterchangeBaseNode* SelectedOriginalNode = nullptr;
-						NodeContainer->BreakableIterateNodes([FactoryNodeClass, &SelectedOriginalNode](const FString&, UInterchangeBaseNode* OriginalNode)
-							{
-								if (OriginalNode->GetClass() == FactoryNodeClass && OriginalNode->GetParentUid() == UInterchangeBaseNode::InvalidNodeUid())
-								{
-									SelectedOriginalNode = OriginalNode;
-									return true;
-								}
-								return false;
-							});
-
-						// Hack for the reimport with a new file. (to revisited for MVP as this not a future proof solution. Should there be some sort of adapter that tell us how to do the mapping? Or should the pipeline do the mapping on a reimport? After all it is the pipeline that chose the name of the asset.
-						if (SelectedOriginalNode)
+						if (UInterchangeFactoryBaseNode* OriginalFactoryNode = OriginalNodeContainer->GetFactoryNode(OriginalAssetImportData->NodeUniqueID))
 						{
-							return AsyncHelper->TaskData.ReimportObject;
+							FSoftObjectPath ReferenceObject;
+							OriginalFactoryNode->GetCustomReferenceObject(ReferenceObject);
+							if (ReferenceObject.TryLoad() == ReimportObject)
+							{
+								OutPackageName = ReimportObject->GetPackage()->GetPathName();
+								OutAssetName = ReimportObject->GetName();
+
+								FactoryNode->SetDisplayLabel(OutAssetName);
+								FactoryNode->SetAssetName(OutAssetName);
+								// Hack for the texture reimport with a new file. (to revisited for MVP as this not a future proof solution. Should there be some sort of adapter that tell us
+								// how to do the mapping? Or should the pipeline do the mapping on a reimport? After all it is the pipeline that chose the name of the asset.
+								return ReimportObject;
+							}
 						}
 					}
 				}
-
 				return nullptr;
 			}
 
@@ -121,8 +119,9 @@ void UE::Interchange::FTaskCreatePackage::DoTask(ENamedThreads::Type CurrentThre
 	UPackage* Pkg = nullptr;
 	FString PackageName;
 	FString AssetName;
+	UObject* ReimportObject = AsyncHelper->TaskData.ReimportObject;
 	//If we do a reimport no need to create a package
-	if (AsyncHelper->TaskData.ReimportObject)
+	if (ReimportObject)
 	{
 		Private::InternalGetPackageName(*AsyncHelper, SourceIndex, PackageBasePath, FactoryNode, PackageName, AssetName);
 		UPackage* ResultFindPackage = FindPackage(nullptr, *PackageName);
@@ -136,10 +135,17 @@ void UE::Interchange::FTaskCreatePackage::DoTask(ENamedThreads::Type CurrentThre
 			ExistingObject = FindFirstObject<UObject>(*AssetName, EFindFirstObjectOptions::NativeFirst | EFindFirstObjectOptions::EnsureIfAmbiguous);
 		}
 
-		if (ExistingObject != AsyncHelper->TaskData.ReimportObject)
+		if (!ExistingObject)
 		{
-			// Try to see if we can do a mapping from the source data (we should revisit this for the MVP)
-			ExistingObject = UE::Interchange::Private::GetExistingObjectFromAssetImportData(AsyncHelper, FactoryNode);
+			ExistingObject = Private::GetExistingObjectFromAssetImportData(ReimportObject, FactoryNode, PackageName, AssetName);
+		}
+
+		if (ExistingObject != ReimportObject)
+		{
+			//Set the existing object so other factory can link UObject correctly (i.e. mesh link to existing material)
+			FactoryNode->SetCustomReferenceObject(FSoftObjectPath(ExistingObject));
+			//Skip this asset, the re-import is not for this asset
+			return;
 		}
 		
 
@@ -158,7 +164,8 @@ void UE::Interchange::FTaskCreatePackage::DoTask(ENamedThreads::Type CurrentThre
 			{
 				CreateAssetParams.NodeContainer = AsyncHelper->BaseNodeContainers[SourceIndex].Get();
 			}
-			CreateAssetParams.ReimportObject = AsyncHelper->TaskData.ReimportObject;
+			CreateAssetParams.ReimportObject = ReimportObject;
+			FactoryNode->SetCustomReferenceObject(FSoftObjectPath(ReimportObject));
 			//We call CreateEmptyAsset to ensure any resource use by an existing UObject is release on the game thread
 			Factory->CreateEmptyAsset(CreateAssetParams);
 		}
@@ -214,7 +221,7 @@ void UE::Interchange::FTaskCreatePackage::DoTask(ENamedThreads::Type CurrentThre
 		{
 			CreateAssetParams.NodeContainer = AsyncHelper->BaseNodeContainers[SourceIndex].Get();
 		}
-		CreateAssetParams.ReimportObject = AsyncHelper->TaskData.ReimportObject;
+		CreateAssetParams.ReimportObject = ReimportObject;
 		//Make sure the asset UObject is created with the correct type on the main thread
 		UObject* NodeAsset = Factory->CreateEmptyAsset(CreateAssetParams);
 		if (NodeAsset)
@@ -231,8 +238,8 @@ void UE::Interchange::FTaskCreatePackage::DoTask(ENamedThreads::Type CurrentThre
 			AssetInfo.ImportedObject = NodeAsset;
 			AssetInfo.Factory = Factory;
 			AssetInfo.FactoryNode = FactoryNode;
-			AssetInfo.bIsReimport = bool(AsyncHelper->TaskData.ReimportObject);
-			FactoryNode->ReferenceObject = FSoftObjectPath(NodeAsset);
+			AssetInfo.bIsReimport = bool(ReimportObject != nullptr);
+			FactoryNode->SetCustomReferenceObject(FSoftObjectPath(NodeAsset));
 		}
 	}
 
@@ -271,7 +278,8 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 	Private::InternalGetPackageName(*AsyncHelper, SourceIndex, PackageBasePath, FactoryNode, PackageName, AssetName);
 	bool bSkipAsset = false;
 	UObject* ExistingObject = nullptr;
-	if (AsyncHelper->TaskData.ReimportObject)
+	UObject* ReimportObject = AsyncHelper->TaskData.ReimportObject;
+	if (ReimportObject)
 	{
 		//When we re-import one particular asset, if the source file contain other assets, we want to set the node= reference UObject for those asset to the existing asset
 		//The way to discover this case is to compare the re-import asset with the node asset.
@@ -284,17 +292,16 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 		{
 			ExistingObject = FindFirstObject<UObject>(*AssetName, EFindFirstObjectOptions::NativeFirst | EFindFirstObjectOptions::EnsureIfAmbiguous);
 		}
-
-		if(ExistingObject != AsyncHelper->TaskData.ReimportObject)
+		
+		if (!ExistingObject)
 		{
-			// Try to see if we can do a mapping from the source data (we should revisit this for the MVP)
-			ExistingObject = UE::Interchange::Private::GetExistingObjectFromAssetImportData(AsyncHelper, FactoryNode);
+			ExistingObject = UE::Interchange::Private::GetExistingObjectFromAssetImportData(ReimportObject, FactoryNode, PackageName, AssetName);
 		}
 
-		bSkipAsset = !ExistingObject || ExistingObject != AsyncHelper->TaskData.ReimportObject;
+		bSkipAsset = !ExistingObject || ExistingObject != ReimportObject;
 		if (!bSkipAsset)
 		{
-			Pkg = AsyncHelper->TaskData.ReimportObject->GetPackage();
+			Pkg = ReimportObject->GetPackage();
 			PackageName = Pkg->GetPathName();
 			AssetName = ExistingObject->GetName();
 		}
@@ -352,7 +359,7 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 		{
 			CreateAssetParams.NodeContainer = AsyncHelper->BaseNodeContainers[SourceIndex].Get();
 		}
-		CreateAssetParams.ReimportObject = AsyncHelper->TaskData.ReimportObject;
+		CreateAssetParams.ReimportObject = ReimportObject;
 
 		NodeAsset = Factory->CreateAsset(CreateAssetParams);
 	}
@@ -373,7 +380,7 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 				AssetInfo.ImportedObject = NodeAsset;
 				AssetInfo.Factory = Factory;
 				AssetInfo.FactoryNode = FactoryNode;
-				AssetInfo.bIsReimport = bool(AsyncHelper->TaskData.ReimportObject);
+				AssetInfo.bIsReimport = bool(ReimportObject != nullptr);
 			}
 
 			// Fill in destination asset and type in any results which have been added previously by a translator or pipeline, now that we have a corresponding factory.
@@ -393,6 +400,6 @@ void UE::Interchange::FTaskCreateAsset::DoTask(ENamedThreads::Type CurrentThread
 			}
 		}
 
-		FactoryNode->ReferenceObject = FSoftObjectPath(NodeAsset);
+		FactoryNode->SetCustomReferenceObject(FSoftObjectPath(NodeAsset));
 	}
 }

@@ -92,7 +92,7 @@ void UE::Interchange::FTaskCreateSceneObjects::DoTask(ENamedThreads::Type Curren
 				ObjectInfo.FactoryNode = FactoryNode;
 			}
 
-			FactoryNode->ReferenceObject = FSoftObjectPath(SceneObject);
+			FactoryNode->SetCustomReferenceObject(FSoftObjectPath(SceneObject));
 		}
 	}
 }
