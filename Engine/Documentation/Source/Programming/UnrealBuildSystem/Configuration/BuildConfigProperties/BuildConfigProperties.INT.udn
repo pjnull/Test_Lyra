@@ -12,6 +12,8 @@ $ bPrintDebugInfo : Whether debug info should be written to the console.
 
 $ bAllowHybridExecutor : Whether the hybrid executor will be used (a remote executor and local executor).
 
+$ bAllowHordeCompute : Whether Horde remote compute may be used. Highly experimental, disabled by default.
+
 $ bAllowXGE : Whether XGE may be used.
 
 $ bAllowFASTBuild : Whether FASTBuild may be used.
@@ -30,6 +32,8 @@ $ bUseUBTMakefiles : Enables support for very fast iterative builds by caching t
 
 $ MaxParallelActions : Number of actions that can be executed in parallel. If 0 then code will pick a default based on the number of cores and memory available. Applies to the ParallelExecutor, HybridExecutor, and LocalExecutor
 
+$ bCompactOutput : Instruct the executor to write compact output e.g. only errors, if supported by the executor. This field is used to hold the value when specified from the command line or XML
+
 $ bDebugBuildsActuallyUseDebugCRT : Enables the debug C++ runtime (CRT) for debug builds. By default we always use the release runtime, since the debug version isn't particularly useful when debugging Unreal Engine projects, and linking against the debug CRT libraries forces our third party library dependencies to also be compiled using the debug CRT (and often perform more slowly). Often it can be inconvenient to require a separate copy of the debug versions of third party static libraries simply so that you can debug your program's code.
 
 $ bLegalToDistributeBinary : Whether the output from this target can be publicly distributed, even if it has dependencies on modules that are in folders with special restrictions (eg. CarefullyRedist, NotForLicensees, NoRedist).
@@ -45,6 +49,8 @@ $ bUseXGEController : Whether the XGE controller worker and modules should be in
 $ bUseUnityBuild : Whether to unify C++ code into larger files for faster compilation.
 
 $ bForceUnityBuild : Whether to force C++ source files to be combined into larger files for faster compilation.
+
+$ bMergeModuleAndGeneratedUnityFiles : Whether to merge module and generated unity files for faster compilation.
 
 $ bUseAdaptiveUnityBuild : Use a heuristic to determine which files are currently being iterated on and exclude them from unity blobs, result in faster incremental compile times. The current implementation uses the read-only flag to distinguish the working set, assuming that files will be made writable by the source control system if they are being modified. This is true for Perforce, but not for Git.
 
@@ -80,6 +86,8 @@ $ NumIncludedBytesPerUnityCPP : An approximate number of bytes of C++ code to ta
 
 $ bStressTestUnity : Whether to stress test the C++ unity build robustness by including all C++ files files in a project from a single unified file.
 
+$ bDetailedUnityFiles : Whether to add additional information to the unity files, such as '_of_X' in the file name.
+
 $ bDisableDebugInfo : Whether to globally disable debug info generation; see DebugInfoHeuristics.cs for per-config and per-platform options.
 
 $ bDisableDebugInfoForGeneratedCode : Whether to disable debug info generation for generated files. This improves link times for modules that have a lot of generated glue code.
@@ -89,6 +97,20 @@ $ bOmitPCDebugInfoInDevelopment : Whether to disable debug info on PC/Mac in dev
 $ bUsePDBFiles : Whether PDB files should be used for Visual C++ builds.
 
 $ bUsePCHFiles : Whether PCH files should be used.
+
+$ bDeterministic : Set flags require for determinstic linking (experimental, may not be fully supported). Deterministic compiling is controlled via ModuleRules.
+
+$ bForceDeterministic : Force set flags require for determinstic compiling and linking (experimental, may not be fully supported). This setting is only recommended for testing, instead:
+        * Set bDeterministic on a per module basis in ModuleRules to control deterministic compiling.
+        * Set bDeterministic on a per target basis in TargetRules to control deterministic linking.
+
+$ bPreprocessDepends : Generate dependency files by preprocessing. This is only recommended when distributing builds as it adds additional overhead.
+
+$ StaticAnalyzer : Whether static code analysis should be enabled.
+
+$ StaticAnalyzerOutputType : The output type to use for the static analyzer. This is only supported for Clang.
+
+$ StaticAnalyzerMode : The mode to use for the static analyzer. This is only supported for Clang. Shallow mode completes quicker but is generally not recommended.
 
 $ MinFilesUsingPrecompiledHeader : The minimum number of files that must use a pre-compiled header before it will be created and used.
 
@@ -126,6 +148,10 @@ $ bCreateMapFile : Outputs a map file as part of the build.
 
 $ bAllowRuntimeSymbolFiles : True if runtime symbols files should be generated as a post build step for some platforms. These files are used by the engine to resolve symbol names of callstack backtraces in logs.
 
+$ PackagePath : Package full path (directory + filename) where to store input files used at link time Normally used to debug a linker crash for platforms that support it
+
+$ CrashDiagnosticDirectory : Directory where to put crash report files for platforms that support it
+
 $ bCheckSystemHeadersForModification : Whether headers in system paths should be checked for modification when determining outdated actions.
 
 $ bFlushBuildDirOnRemoteMac : Whether to clean Builds directory on a remote Mac before building.
@@ -137,6 +163,10 @@ $ bParseTimingInfoForTracing : Whether to parse timing data into a tracing file 
 $ bPublicSymbolsByDefault : Whether to expose all symbols as public by default on POSIX platforms
 
 $ CppStandard : Which C++ stanard to use for compiling this target
+
+$ CStandard : Which C standard to use for compiling this target
+
+$ bStopSNDBSCompilationAfterErrors : When enabled, SN-DBS will stop compiling targets after a compile error occurs.  Recommended, as it saves computing resources for others.
 
 $ bXGENoWatchdogThread : Whether to use the no_watchdog_thread option to prevent VS2015 toolchain stalls.
 
@@ -162,6 +192,8 @@ $ bUseDSYMFiles : Enables the generation of .dsym files. This can be disabled to
 
 $ bWriteSolutionOptionFile : Whether to write a solution option (suo) file for the sln.
 
+$ bVsConfigFile : Whether to write a .vsconfig file next to the sln to suggest components to install.
+
 $ bAddFastPDBToProjects : Whether to add the -FastPDB option to build command lines by default.
 
 $ bUsePerFileIntellisense : Whether to generate per-file intellisense data.
@@ -179,6 +211,8 @@ $ bFailIfGeneratedCodeChanges : If true, fail if any of the generated header fil
 $ bAllowHotReloadFromIDE : True if hot-reload from IDE is allowed.
 
 $ bForceDebugUnrealHeaderTool : If true, the Debug version of UnrealHeaderTool will be built and run instead of the Development version.
+
+$ bUseBuiltInUnrealHeaderTool : If true, use UHT internal to UBT
 
 ### WindowsPlatform
 
@@ -207,8 +241,6 @@ $ bClangTimeTrace : (Experimental) Appends the -ftime-trace argument to the comm
 $ bCompilerTrace : Outputs compile timing information so that it can be analyzed.
 
 $ bShowIncludes : Print out files that are included by each source file
-
-$ bDeterministic : Set flags require for determinstic compiles (experimental)
 
 ### ModuleConfiguration
 
@@ -240,6 +272,14 @@ $ bStopOnError : Whether to stop on error
 
 $ MsvcCRTRedistVersion : Which MSVC CRT Redist version to use
 
+### HordeExecutor
+
+$ NumRemoteParallelProcesses : How many processes that will be executed in parallel remotely
+
+$ RemoteProcessOnly : Only run work remotely, for testing
+
+$ RetryFailedRemote : Retry actions locally when failed remotely.
+
 ### HybridExecutor
 
 $ MaxLocalActions : Maximum number of actions to execute locally.
@@ -252,6 +292,8 @@ $ ProcessorCountMultiplier : Processor count multiplier for local execution. Can
 
 $ MemoryPerActionBytes : Free memory per action in bytes, used to limit the number of parallel actions if the machine is memory starved. Set to 0 to disable free memory checking.
 
+$ ProcessPriority : The priority to set for spawned processes. Valid Settings: Idle, BelowNormal, Normal, AboveNormal, High Default: BelowNormal
+
 $ bStopCompilationAfterErrors : When enabled, will stop compiling targets after a compile error occurs.
 
 $ bShowCompilationTimes : Whether to show compilation times along with worst offenders or not.
@@ -262,6 +304,12 @@ $ bLogActionCommandLines : Whether to log command lines for actions being execut
 
 $ bPrintActionTargetNames : Add target names for each action executed
 
+### SNDBS
+
+$ bAllowOverVpn : When set to false, SNDBS will not be enabled when running connected to the coordinator over VPN. Configure VPN-assigned subnets via the VpnSubnets parameter.
+
+$ VpnSubnets : List of subnets containing IP addresses assigned by VPN
+
 ### XGE
 
 $ bAllowOverVpn : When set to false, XGE will not be enabled when running connected to the coordinator over VPN. Configure VPN-assigned subnets via the VpnSubnets parameter.
@@ -271,6 +319,10 @@ $ VpnSubnets : List of subnets containing IP addresses assigned by VPN
 $ bAllowRemoteLinking : Whether to allow remote linking
 
 $ bUseVCCompilerMode : Whether to enable the VCCompiler=true setting. This requires an additional license for VC tools.
+
+$ MinActions : Minimum number of actions to use XGE execution.
+
+$ bUnavailableIfInUse : Check for a concurrent XGE build and treat the XGE executor as unavailable if it's in use. This will allow UBT to fall back to another executor such as the parallel executor.
 
 ### BuildMode
 
@@ -302,7 +354,7 @@ $ bIncludeLocalizationFiles : True if we should include localization files in th
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -325,10 +377,6 @@ $ bIncludeTestAndShippingConfigs : Whether we should include configurations for 
 $ bIncludeDebugConfigs : Whether we should include configurations for "Debug" and "DebugGame" in generated projects. Pass "-NoDebugConfigs" to disable this.
 
 $ bIncludeDevelopmentConfigs : Whether we should include configurations for "Development" in generated projects. Pass "-NoDevelopmentConfigs" to disable this.
-
-### HoloLensPlatform
-
-$ Compiler : Version of the compiler toolchain to use on HoloLens. A value of "default" will be changed to a specific version at UBT startup.
 
 ### IOSToolChain
 
@@ -356,7 +404,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -380,7 +428,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -404,7 +452,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -428,7 +476,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -452,7 +500,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -476,7 +524,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -500,7 +548,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -524,7 +572,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -554,7 +602,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -578,7 +626,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -614,7 +662,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -638,7 +686,7 @@ $ bIncludeConfigFiles : True if we should include config (.ini) files in the gen
 
 $ bIncludeTemplateFiles : True if we should include template files in the generated project.
 
-$ IncludeEnginePrograms : True if we should include program projects in the generated solution.
+$ bIncludeEnginePrograms : True if we should include program projects in the generated solution.
 
 $ IncludeCppSource : Whether to include C++ targets
 
@@ -667,6 +715,10 @@ $ SshPrivateKey : If set, instead of looking for RemoteToolChainPrivate.key in t
 $ RsyncAuthentication : The authentication used for Rsync (for the -e rsync flag).
 
 $ SshAuthentication : The authentication used for SSH (probably similar to RsyncAuthentication).
+
+### HoloLensPlatform
+
+$ Compiler : Version of the compiler toolchain to use on HoloLens. A value of "default" will be changed to a specific version at UBT startup.
 
 ### Log
 
