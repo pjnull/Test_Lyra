@@ -2588,6 +2588,8 @@ void FNiagaraSystemToolkitParameterPanelViewModel::AddScriptVariable(const UNiag
 
 	if (bSuccess)
 	{
+		if (SystemViewModel->GetSystemStackViewModel())
+			SystemViewModel->GetSystemStackViewModel()->InvalidateCachedParameterUsage();
 		Refresh();
 		const bool bRequestRename = false;
 		SelectParameterItemByName(NewScriptVar->Variable.GetName(), bRequestRename);
