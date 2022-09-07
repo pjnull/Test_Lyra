@@ -124,7 +124,7 @@ static bool BuildNanite(
 
 	// compute tangents, lightmap UVs, etc
 	FMeshDescriptionHelper MeshDescriptionHelper( &BuildSettings );
-	MeshDescriptionHelper.SetupRenderMeshDescription( StaticMesh, MeshDescription );
+	MeshDescriptionHelper.SetupRenderMeshDescription( StaticMesh, MeshDescription, true );
 
 	//Build new vertex buffers
 	TArray< FStaticMeshBuildVertex > StaticMeshBuildVertices;
@@ -151,7 +151,8 @@ static bool BuildNanite(
 		PerSectionIndices,
 		StaticMeshBuildVertices,
 		MeshDescriptionHelper.GetOverlappingCorners(),
-		RemapVerts
+		RemapVerts,
+		true
 	);
 
 	const uint32 NumTextureCoord = MeshDescription.VertexInstanceAttributes().GetAttributesRef<FVector2f>( MeshAttribute::VertexInstance::TextureCoordinate ).GetNumChannels();
@@ -390,7 +391,7 @@ bool FStaticMeshBuilder::Build(FStaticMeshRenderData& StaticMeshRenderData, USta
 
 		if (bIsMeshDescriptionValid)
 		{
-			MeshDescriptionHelper.SetupRenderMeshDescription(StaticMesh, MeshDescriptions[LodIndex]);
+			MeshDescriptionHelper.SetupRenderMeshDescription(StaticMesh, MeshDescriptions[LodIndex], bAllowNanite);
 		}
 		else
 		{
@@ -563,7 +564,8 @@ bool FStaticMeshBuilder::Build(FStaticMeshRenderData& StaticMeshRenderData, USta
 			PerSectionIndices,
 			StaticMeshBuildVertices,
 			MeshDescriptionHelper.GetOverlappingCorners(),
-			RemapVerts
+			RemapVerts,
+			bAllowNanite
 		);
 
 		const uint32 NumTextureCoord = MeshDescriptions[LodIndex].VertexInstanceAttributes().GetAttributesRef<FVector2f>( MeshAttribute::VertexInstance::TextureCoordinate ).GetNumChannels();
@@ -719,7 +721,8 @@ void BuildVertexBuffer(
 	TArray<TArray<uint32>>& OutPerSectionIndices,
 	TArray< FStaticMeshBuildVertex>& StaticMeshBuildVertices,
 	const FOverlappingCorners& OverlappingCorners,
-	TArray<int32>& RemapVerts
+	TArray<int32>& RemapVerts,
+	bool bAllowNanite
 )
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(BuildVertexBuffer);
@@ -740,7 +743,7 @@ void BuildVertexBuffer(
 	TVertexInstanceAttributesConstRef<FVector2f> VertexInstanceUVs = Attributes.GetVertexInstanceUVs();
 
 	const bool bHasColors = VertexInstanceColors.IsValid();
-	const bool bIgnoreTangents = StaticMesh->NaniteSettings.bEnabled;
+	const bool bIgnoreTangents = bAllowNanite && StaticMesh->NaniteSettings.bEnabled;
 
 	const uint32 NumTextureCoord = VertexInstanceUVs.GetNumChannels();
 	const FMatrix ScaleMatrix = FScaleMatrix(BuildSettings.BuildScale3D).Inverse().GetTransposed();
