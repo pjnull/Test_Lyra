@@ -125,7 +125,7 @@ namespace Chaos
 		CalculateQueryMargins(A, B, ThicknessA, ThicknessB);
 		ThicknessA += InThicknessA;
 
-		FReal EpsilonScale = FMath::Max<FReal>(BBoxMaxExtentsA, BBoxMaxExtentsB);
+		FReal EpsilonScale = FMath::Max<FReal>(A.TGeometryA::BoundingBox().Extents().Max(), B.TGeometryB::BoundingBox().Extents().Max());
 		EpsilonScale = FMath::Min<FReal>(EpsilonScale, 1e5);
 		
 		const FReal InflationReal = ThicknessA + ThicknessB + 1e-6 * EpsilonScale;
