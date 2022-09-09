@@ -74,7 +74,7 @@ void UE::Interchange::FTaskPreCompletion::DoTask(ENamedThreads::Type CurrentThre
 					ObjectInfo.Factory->PreImportPreCompletedCallback(Arguments);
 				}
 
-				if (ImportedObject == nullptr)
+				if (ImportedObject == nullptr || !IsValid(ImportedObject))
 				{
 					continue;
 				}
