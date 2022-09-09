@@ -140,6 +140,8 @@ void FReplicationReader::Init(const FReplicationParameters& InParameters)
 	// Store copy of parameters
 	Parameters = InParameters;
 
+	ResolveContext.ConnectionId = InParameters.ConnectionId;
+
 	// Cache internal systems
 	ReplicationSystemInternal = Parameters.ReplicationSystem->GetReplicationSystemInternal();
 	NetHandleManager = &ReplicationSystemInternal->GetNetHandleManager();
@@ -1158,9 +1160,14 @@ void FReplicationReader::ResolveAndDispatchUnresolvedReferences()
 	IRIS_PROFILER_SCOPE(FReplicationReader_ResolveAndDispatchUnresolvedReferences);
 
 	// Setup context for dispatch
+	FInternalNetSerializationContext InternalContext;
+	FInternalNetSerializationContext::FInitParameters InternalContextInitParams;
+	InternalContextInitParams.ReplicationSystem = Parameters.ReplicationSystem;
+	InternalContextInitParams.ObjectResolveContext = ResolveContext;
+	InternalContext.Init(InternalContextInitParams);
+
 	FNetSerializationContext Context;
-	FInternalNetSerializationContext InternalContext(Parameters.ReplicationSystem, ResolveContext.RemoteNetTokenStoreState);
-	Context.SetLocalConnectionId(Parameters.ConnectionId);
+	Context.SetLocalConnectionId(ResolveContext.ConnectionId);
 	Context.SetInternalContext(&InternalContext);
 
 	// Currently we brute force this by iterating over all handles pending resolve and update all objects pending resolve
@@ -1385,7 +1392,12 @@ void FReplicationReader::Read(FNetSerializationContext& Context)
 	FNetBitStreamReader& Reader = *Context.GetBitStreamReader();
 
 	// Setup internal context
-	FInternalNetSerializationContext InternalContext(Parameters.ReplicationSystem, ResolveContext.RemoteNetTokenStoreState);
+	FInternalNetSerializationContext InternalContext;
+	FInternalNetSerializationContext::FInitParameters InternalContextInitParams;
+	InternalContextInitParams.ReplicationSystem = Parameters.ReplicationSystem;
+	InternalContextInitParams.ObjectResolveContext = ResolveContext;
+	InternalContext.Init(InternalContextInitParams);
+	
 	Context.SetLocalConnectionId(Parameters.ConnectionId);
 	Context.SetInternalContext(&InternalContext);
 	Context.SetNetBlobReceiver(&ReplicationSystemInternal->GetNetBlobHandlerManager());
