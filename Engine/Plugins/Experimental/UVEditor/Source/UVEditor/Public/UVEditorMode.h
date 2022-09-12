@@ -261,6 +261,7 @@ protected:
 	void InitializeTargets();
 	void RegisterTools();
 	void RegisterActions();
+	void SetSimulationWarning(bool bEnabled);
 
 	// UEdMode overrides
 	virtual void CreateToolkit() override;
@@ -360,5 +361,10 @@ protected:
 	FString DefaultToolIdentifier;
 
 	static FDateTime AnalyticsLastStartTimestamp;
+
+	// Holds references to PIE callbacks to handle logic when the PIE session starts & shuts down
+	FDelegateHandle BeginPIEDelegateHandle;
+	FDelegateHandle EndPIEDelegateHandle;
+	FDelegateHandle CancelPIEDelegateHandle;
 };
 
