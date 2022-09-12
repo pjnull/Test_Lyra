@@ -406,10 +406,10 @@ void AssetUtils::SyncFolder(const FString& TargetFolder)
 
 }
 
-void AssetUtils::RegisterAsset(const FString& PackagePath)
+void AssetUtils::RegisterAsset(const FString& PackagePath) // Should this be named AssetPath?
 {
 	IAssetRegistry& AssetRegistry = FModuleManager::GetModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-	FAssetData CharacterAssetData = AssetRegistry.GetAssetByObjectPath(FName(*PackagePath));
+	FAssetData CharacterAssetData = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(PackagePath));
 	UObject* CharacterObject = CharacterAssetData.GetAsset();
 }
 
