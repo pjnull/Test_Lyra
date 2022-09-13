@@ -412,7 +412,7 @@ namespace BlackmagicMediaPlayerHelpers
 			}
 		}
 
-		virtual void OnInterlacedOddFieldEvent() override
+		virtual void OnInterlacedOddFieldEvent(int64 FrameNumber) override
 		{
 			
 		}
