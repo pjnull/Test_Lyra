@@ -155,7 +155,8 @@ static bool BuildNanite(
 		true
 	);
 
-	const uint32 NumTextureCoord = MeshDescription.VertexInstanceAttributes().GetAttributesRef<FVector2f>( MeshAttribute::VertexInstance::TextureCoordinate ).GetNumChannels();
+	TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = MeshDescription.VertexInstanceAttributes().GetAttributesRef<FVector2f>(MeshAttribute::VertexInstance::TextureCoordinate);
+	const uint32 NumTextureCoord = VertexInstanceUVs.IsValid() ? VertexInstanceUVs.GetNumChannels() : 0;
 
 	// Only the render data and vertex buffers will be used from now on unless we have more than one source models
 	// This will help with memory usage for Nanite Mesh by releasing memory before doing the build
@@ -568,7 +569,8 @@ bool FStaticMeshBuilder::Build(FStaticMeshRenderData& StaticMeshRenderData, USta
 			bAllowNanite
 		);
 
-		const uint32 NumTextureCoord = MeshDescriptions[LodIndex].VertexInstanceAttributes().GetAttributesRef<FVector2f>( MeshAttribute::VertexInstance::TextureCoordinate ).GetNumChannels();
+		TVertexInstanceAttributesRef<FVector2f> VertexInstanceUVs = MeshDescriptions[LodIndex].VertexInstanceAttributes().GetAttributesRef<FVector2f>(MeshAttribute::VertexInstance::TextureCoordinate);
+		const uint32 NumTextureCoord = VertexInstanceUVs.IsValid() ? VertexInstanceUVs.GetNumChannels() : 0;
 
 		// Only the render data and vertex buffers will be used from now on unless we have more than one source models
 		// This will help with memory usage for Nanite Mesh by releasing memory before doing the build
@@ -745,7 +747,7 @@ void BuildVertexBuffer(
 	const bool bHasColors = VertexInstanceColors.IsValid();
 	const bool bIgnoreTangents = bAllowNanite && StaticMesh->NaniteSettings.bEnabled;
 
-	const uint32 NumTextureCoord = VertexInstanceUVs.GetNumChannels();
+	const uint32 NumTextureCoord = VertexInstanceUVs.IsValid() ? VertexInstanceUVs.GetNumChannels() : 0;
 	const FMatrix ScaleMatrix = FScaleMatrix(BuildSettings.BuildScale3D).Inverse().GetTransposed();
 
 	TMap<FPolygonGroupID, int32> PolygonGroupToSectionIndex;
