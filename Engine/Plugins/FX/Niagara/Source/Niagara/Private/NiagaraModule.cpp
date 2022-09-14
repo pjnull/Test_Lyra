@@ -1046,7 +1046,7 @@ void FNiagaraTypeDefinition::RecreateUserDefinedTypeRegistry()
 	
 	if (!IsRunningCommandlet())
 	{
-		TArray<FString> DenyList;
+		TArray<FSoftObjectPath> DenyList;
 		DenyList.Emplace(TEXT("/Niagara/Enums/ENiagaraCoordinateSpace.ENiagaraCoordinateSpace"));
 		DenyList.Emplace(TEXT("/Niagara/Enums/ENiagaraOrientationAxis.ENiagaraOrientationAxis"));
 		
@@ -1065,9 +1065,9 @@ void FNiagaraTypeDefinition::RecreateUserDefinedTypeRegistry()
 
 		for (FSoftObjectPath AssetRef : TotalStructAssets)
 		{
-			FName AssetRefPathNamePreResolve = AssetRef.GetAssetPathName();
+			FSoftObjectPath AssetRefPathNamePreResolve = AssetRef;
 
-			if (DenyList.Contains(AssetRefPathNamePreResolve.ToString()))
+			if (DenyList.Contains(AssetRefPathNamePreResolve))
 			{
 				continue;
 			}
@@ -1114,10 +1114,10 @@ void FNiagaraTypeDefinition::RecreateUserDefinedTypeRegistry()
 		
 		for (FSoftObjectPath AssetRef : Settings->AdditionalParameterEnums)
 		{
-			FName AssetRefPathNamePreResolve = AssetRef.GetAssetPathName();
+			FSoftObjectPath AssetRefPathNamePreResolve = AssetRef;
 			UObject* Obj = AssetRef.ResolveObject();
 
-			if (DenyList.Contains(AssetRefPathNamePreResolve.ToString()))
+			if (DenyList.Contains(AssetRefPathNamePreResolve))
 			{
 				continue;
 			}
