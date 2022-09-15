@@ -280,6 +280,9 @@ struct CORE_API FUE5MainStreamObjectVersion
 		// Replace FNames for class/actor paths with FSoftObjectPath
 		WorldPartitionActorDescActorAndClassPaths,
 
+		// Uses RG11B10 format to store the encoded reflection capture data on mobile
+		StoreReflectionCaptureEncodedHDRDataInRG11B10Format,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1
