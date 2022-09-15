@@ -1103,7 +1103,7 @@ void DecompressPose(FCompactPose& OutPose, const FCompressedAnimSequence& Compre
 		CSV_SCOPED_TIMING_STAT(Animation, ExtractPoseFromAnimData);
 		CSV_CUSTOM_STAT(Animation, NumberOfExtractedAnimations, 1, ECsvCustomStatOp::Accumulate);
 
-		FAnimSequenceDecompressionContext EvalDecompContext(SequenceLength, Interpolation, SourceName, *CompressedData.CompressedDataStructure);
+		FAnimSequenceDecompressionContext EvalDecompContext(SequenceLength, Interpolation, SourceName, *CompressedData.CompressedDataStructure, RequiredBones.GetRefPoseArray(), CompressedData.CompressedTrackToSkeletonMapTable);
 		EvalDecompContext.Seek(ExtractionContext.CurrentTime);
 
 		// Handle Root Bone separately

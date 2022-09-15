@@ -1104,9 +1104,9 @@ bool UAnimCompress_RemoveLinearKeys::DoReduction(const FCompressibleAnimData& Co
 	return true;
 }
 
-void UAnimCompress_RemoveLinearKeys::PopulateDDCKey(FArchive& Ar)
+void UAnimCompress_RemoveLinearKeys::PopulateDDCKey(const UAnimSequenceBase& AnimSeq, FArchive& Ar)
 {
-	Super::PopulateDDCKey(Ar);
+	Super::PopulateDDCKey(AnimSeq, Ar);
 	Ar << MaxPosDiff;
 	Ar << MaxAngleDiff;
 	Ar << MaxScaleDiff;
