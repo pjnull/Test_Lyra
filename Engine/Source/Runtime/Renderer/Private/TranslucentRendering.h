@@ -9,6 +9,7 @@
 #include "VolumeRendering.h"
 #include "ScreenPass.h"
 #include "SystemTextures.h"
+#include "RenderGraphDefinitions.h"
 
 struct FSeparateTranslucencyDimensions
 {
@@ -139,6 +140,12 @@ FSeparateTranslucencyDimensions UpdateSeparateTranslucencyDimensions(const FScen
 
 /** Returns whether the view family is requesting to render translucency. */
 bool ShouldRenderTranslucency(const FSceneViewFamily& ViewFamily);
+
+/** Check if separate translucency pass is needed for given pass and downsample scale */
+bool IsSeparateTranslucencyEnabled(ETranslucencyPass::Type TranslucencyPass, float DownsampleScale);
+
+/** Shared function to get the post DOF texture pixel format and creation flags */
+const FRDGTextureDesc GetPostDOFTranslucentTextureDesc(ETranslucencyPass::Type TranslucencyPass, FSeparateTranslucencyDimensions& SeparateTranslucencyDimensions, bool bIsModulate, EShaderPlatform ShaderPlatform);
 
 /** Shared function used to create Post DOF translucent textures */
 FRDGTextureMSAA CreatePostDOFTranslucentTexture(FRDGBuilder& GraphBuilder, ETranslucencyPass::Type TranslucencyPass, FSeparateTranslucencyDimensions& SeparateTranslucencyDimensions, bool bIsModulate, EShaderPlatform ShaderPlatform);

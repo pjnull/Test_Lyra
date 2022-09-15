@@ -50,6 +50,7 @@ namespace EMeshPass
 		MobileBasePassCSM,  /** Mobile base pass with CSM shading enabled */
 		VirtualTexture,
 		LumenCardCapture,
+		LumenCardNanite,
 		LumenTranslucencyRadianceCacheMark,
 		LumenFrontLayerTranslucencyGBuffer,
 		DitheredLODFadingOutMaskPass, /** A mini depth pass used to mark pixels with dithered LOD fading out. Currently only used by ray tracing shadows. */
@@ -92,6 +93,7 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	case EMeshPass::MobileBasePassCSM: return TEXT("MobileBasePassCSM");
 	case EMeshPass::VirtualTexture: return TEXT("VirtualTexture");
 	case EMeshPass::LumenCardCapture: return TEXT("LumenCardCapture");
+	case EMeshPass::LumenCardNanite: return TEXT("LumenCardNanite");
 	case EMeshPass::LumenTranslucencyRadianceCacheMark: return TEXT("LumenTranslucencyRadianceCacheMark");
 	case EMeshPass::LumenFrontLayerTranslucencyGBuffer: return TEXT("LumenFrontLayerTranslucencyGBuffer");
 	case EMeshPass::DitheredLODFadingOutMaskPass: return TEXT("DitheredLODFadingOutMaskPass");
@@ -104,9 +106,9 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	}
 
 #if WITH_EDITOR
-	static_assert(EMeshPass::Num == 24 + 4, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 25 + 4, "Need to update switch(MeshPass) after changing EMeshPass");
 #else
-	static_assert(EMeshPass::Num == 24, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 25, "Need to update switch(MeshPass) after changing EMeshPass");
 #endif
 
 	checkf(0, TEXT("Missing case for EMeshPass %u"), (uint32)MeshPass);
@@ -1963,6 +1965,7 @@ public:
 		EPrimitiveType				MeshPrimitiveType = PT_TriangleList;
 	};
 
+	RENDERER_API static FMeshDrawingPolicyOverrideSettings ComputeMeshOverrideSettings(const FPSOPrecacheParams& PrecachePSOParams);
 	RENDERER_API static FMeshDrawingPolicyOverrideSettings ComputeMeshOverrideSettings(const FMeshBatch& Mesh);
 
 	UE_DEPRECATED(5.1, "ComputeMeshFillMode with FMeshBatch is deprecated.")
