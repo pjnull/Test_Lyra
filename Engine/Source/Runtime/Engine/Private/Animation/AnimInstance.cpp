@@ -3853,18 +3853,17 @@ void UAnimInstance::HandleObjectsReinstanced(const TMap<UObject*, UObject*>& Old
 		
 		if(bThisObjectWasReinstanced)
 		{
-			RecalcRequiredBones();
-			
 			// Minimally reinit proxy (i.e. dont call per-node initialization) unless we are in an editor preview world (i.e. we are in the anim BP editor)
-			FAnimInstanceProxy& Proxy = GetProxyOnGameThread<FAnimInstanceProxy>();
 			UWorld* World = GetWorld();
 			if(World && World->WorldType == EWorldType::EditorPreview)
 			{
-				Proxy.Initialize(this);
-				Proxy.InitializeRootNode();
+				InitializeAnimation(false);
 			}
 			else
 			{
+				RecalcRequiredBones();
+
+				FAnimInstanceProxy& Proxy = GetProxyOnGameThread<FAnimInstanceProxy>();
 				Proxy.Initialize(this);
 				Proxy.InitializeCachedClassData();
 				Proxy.InitializeRootNode_WithRoot(Proxy.RootNode);
