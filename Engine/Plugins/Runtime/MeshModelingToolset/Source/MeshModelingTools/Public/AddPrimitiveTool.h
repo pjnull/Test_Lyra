@@ -574,6 +574,7 @@ class UAddDiscPrimitiveTool : public UAddPrimitiveTool
 	GENERATED_BODY()
 public:
 	explicit UAddDiscPrimitiveTool(const FObjectInitializer& ObjectInitializer);
+	virtual void Setup() override;
 protected:
 	virtual void GenerateMesh(FDynamicMesh3* OutMesh) const override;
 };
