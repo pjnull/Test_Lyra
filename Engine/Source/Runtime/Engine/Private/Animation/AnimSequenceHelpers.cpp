@@ -794,7 +794,7 @@ bool AnimationData::AddLoopingInterpolation(UAnimSequence* InSequence)
 	return false;
 }
 
-bool AnimationData::Trim(UAnimSequence* InSequence, float TrimStart, float TrimEnd)
+bool AnimationData::Trim(UAnimSequence* InSequence, float TrimStart, float TrimEnd, bool bInclusiveEnd /*=false*/ )
 {
 	const UAnimDataModel* DataModel = InSequence->GetDataModel();
 	IAnimationDataController& Controller = InSequence->GetController();
@@ -805,9 +805,6 @@ bool AnimationData::Trim(UAnimSequence* InSequence, float TrimStart, float TrimE
 	if (NumTracks > 0 && NumKeys > 0)
 	{
 		const FFrameRate& FrameRate = DataModel->GetFrameRate();
-				
-		// Save Total Number of Keys before trimming
-		int32 TotalNumOfKeys = NumKeys;
 
 		// if there is only one key, there is nothing to trim away
 		if (NumKeys <= 1)
@@ -819,9 +816,9 @@ bool AnimationData::Trim(UAnimSequence* InSequence, float TrimStart, float TrimE
 		const FFrameNumber EndFrameTrim = FrameRate.AsFrameTime(TrimEnd).RoundToFrame();
 
 		const int32 StartTrimKeyIndex = StartFrameTrim.Value;
-		const int32 NumTrimmedFrames = EndFrameTrim.Value - StartFrameTrim.Value;
+		const int32 NumTrimmedFrames = (EndFrameTrim.Value - StartFrameTrim.Value) + (bInclusiveEnd ? 1 : 0);
 
-		if (StartTrimKeyIndex == 0 && NumTrimmedFrames + 1 == NumKeys)
+		if (StartTrimKeyIndex == 0 && NumTrimmedFrames == NumKeys)
 		{
 			return false;
 		}
@@ -936,7 +933,7 @@ void AnimationData::RemoveKeys(UAnimSequence* InSequence, int32 StartKeyIndex, i
 			Controller.SetBoneTrackKeys(AnimationTrack.Name, TrackData.PosKeys, TrackData.RotKeys, TrackData.ScaleKeys);
 		}
 
-		const int32 NewNumberOfFrames = FMath::Max(NewNumberOfKeys - 1, 0);
+		const int32 NewNumberOfFrames = FMath::Max(NewNumberOfKeys - 1, 1);
 		const float NewSequenceLength = FrameRate.AsSeconds(NewNumberOfFrames);
 
 		const float StartFrameTime = FrameRate.AsSeconds(FMath::Max(StartKeyIndex, 0));
