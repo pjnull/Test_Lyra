@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "CurveDataAbstraction.h"
 #include "Misc/Change.h"
 
 #include "Animation/AnimData/AnimDataModel.h"
@@ -313,6 +314,21 @@ protected:
 protected:
 	FAnimationCurveIdentifier CurveId;
 	TArray<FRichCurveKey> Keys;
+};
+
+class FSetRichCurveAttributesAction : public FAnimDataBaseAction
+{
+public:
+	explicit FSetRichCurveAttributesAction(const FAnimationCurveIdentifier& InCurveId, const FCurveAttributes& InAttributes) : CurveId(InCurveId), Attributes(InAttributes) {}
+	virtual ~FSetRichCurveAttributesAction() {}
+protected:
+	FSetRichCurveAttributesAction() {}
+	virtual TUniquePtr<FChange> ExecuteInternal(UAnimDataModel* Model, UAnimDataController* Controller) override;
+	virtual FString ToStringInternal() const override;
+
+protected:
+	FAnimationCurveIdentifier CurveId;
+	FCurveAttributes Attributes;
 };
 
 class FSetCurveColorAction : public FAnimDataBaseAction
