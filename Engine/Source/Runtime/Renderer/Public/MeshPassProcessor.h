@@ -54,6 +54,7 @@ namespace EMeshPass
 		LumenTranslucencyRadianceCacheMark,
 		LumenFrontLayerTranslucencyGBuffer,
 		DitheredLODFadingOutMaskPass, /** A mini depth pass used to mark pixels with dithered LOD fading out. Currently only used by ray tracing shadows. */
+		NaniteMeshPass,
 
 #if WITH_EDITOR
 		HitProxy,
@@ -97,6 +98,7 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	case EMeshPass::LumenTranslucencyRadianceCacheMark: return TEXT("LumenTranslucencyRadianceCacheMark");
 	case EMeshPass::LumenFrontLayerTranslucencyGBuffer: return TEXT("LumenFrontLayerTranslucencyGBuffer");
 	case EMeshPass::DitheredLODFadingOutMaskPass: return TEXT("DitheredLODFadingOutMaskPass");
+	case EMeshPass::NaniteMeshPass: return TEXT("NaniteMeshPass");
 #if WITH_EDITOR
 	case EMeshPass::HitProxy: return TEXT("HitProxy");
 	case EMeshPass::HitProxyOpaqueOnly: return TEXT("HitProxyOpaqueOnly");
@@ -106,9 +108,9 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	}
 
 #if WITH_EDITOR
-	static_assert(EMeshPass::Num == 25 + 4, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 26 + 4, "Need to update switch(MeshPass) after changing EMeshPass");
 #else
-	static_assert(EMeshPass::Num == 25, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 26, "Need to update switch(MeshPass) after changing EMeshPass");
 #endif
 
 	checkf(0, TEXT("Missing case for EMeshPass %u"), (uint32)MeshPass);
@@ -2033,16 +2035,6 @@ protected:
 
 namespace PSOCollectorStats
 {
-	// Stats for PSO shaders only (no state, only VS/PS/GS usage)
-	static FCriticalSection PSOShadersPrecacheLock;
-	static FPrecacheStats PSOShadersPrecacheStats;
-	static Experimental::TRobinHoodHashMap<FGraphicsMinimalPipelineStateInitializer, FShaderStateUsage> PSOShadersPrecacheMap;
-
-	// Stats for minimal PSO initializer data during MeshDrawCommand building (doesn't contain render target info)
-	static FCriticalSection MinimalPSOPrecacheLock;
-	static FPrecacheStats MinimalPSOPrecacheStats;		
-	static Experimental::TRobinHoodHashMap<uint64, FShaderStateUsage> MinimalPSOPrecacheMap;
-
 	// Add, check & track the minimal PSO initializer during precaching and MeshDrawCommand building
 	RENDERER_API extern void AddMinimalPipelineStateToCache(const FGraphicsMinimalPipelineStateInitializer& PipelineStateInitializer, uint32 MeshPassType, const FVertexFactoryType* VertexFactoryType);
 	RENDERER_API extern void CheckMinimalPipelineStateInCache(const FGraphicsMinimalPipelineStateInitializer& PSOInitialize, uint32 MeshPassType, const FVertexFactoryType* VertexFactoryType);
