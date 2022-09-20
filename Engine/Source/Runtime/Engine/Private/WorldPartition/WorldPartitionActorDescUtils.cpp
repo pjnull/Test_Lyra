@@ -64,7 +64,7 @@ TUniquePtr<FWorldPartitionActorDesc> FWorldPartitionActorDescUtils::GetActorDesc
 			UE_LOG(LogWorldPartition, Warning, TEXT("Invalid class for actor guid `%s` ('%s') from package '%s'"), *NewActorDesc->GetGuid().ToString(), *NewActorDesc->GetActorName().ToString(), *NewActorDesc->GetActorPackage().ToString());
 			return nullptr;
 		}
-		else if (UClass* Class = FindObject<UClass>(InAssetData.AssetClassPath); !Class)
+		/*else if (UClass* Class = FindObject<UClass>(InAssetData.AssetClassPath); !Class)
 		{
 			// We can't detect mising BP classes for inactive plugins, etc.
 			if (InAssetData.AssetClassPath.GetPackageName().ToString().StartsWith(TEXT("/Game/")))
@@ -79,7 +79,7 @@ TUniquePtr<FWorldPartitionActorDesc> FWorldPartitionActorDescUtils::GetActorDesc
 					return nullptr;
 				}
 			}
-		}
+		}*/
 
 		return NewActorDesc;
 	}
