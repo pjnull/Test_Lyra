@@ -118,8 +118,9 @@ bool UActorDescContainer::IsActorDescHandled(const AActor* Actor) const
 {
 	if (Actor->GetContentBundleGuid() == GetContentBundleGuid())
 	{
-		FString ActorPackageName = Actor->GetPackage()->GetName();
-		return ActorPackageName.StartsWith(GetExternalActorPath());
+		const FString ActorPackageName = Actor->GetPackage()->GetName();
+		const FString ExternalActorPath = GetExternalActorPath() / TEXT("");
+		return ActorPackageName.StartsWith(ExternalActorPath);
 	}
 	return false;
 }
