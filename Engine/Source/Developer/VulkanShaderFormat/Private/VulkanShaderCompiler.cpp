@@ -2329,6 +2329,8 @@ void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOut
 		AdditionalDefines.SetDefine(TEXT("PLATFORM_SUPPORTS_SM6_0_WAVE_OPERATIONS"), 1);
 	}
 
+	const double StartPreprocessTime = FPlatformTime::Seconds();
+
 	// Preprocess the shader.
 	FString PreprocessedShaderSource;
 	const bool bDirectCompile = FParse::Param(FCommandLine::Get(), TEXT("directcompile"));
@@ -2364,6 +2366,8 @@ void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOut
 
 	// Process TEXT macro.
 	TransformStringIntoCharacterArray(PreprocessedShaderSource);
+
+	Output.PreprocessTime = FPlatformTime::Seconds() - StartPreprocessTime;
 
 	FCompilerInfo CompilerInfo(Input, WorkingDirectory, HlslFrequency);
 
