@@ -423,10 +423,7 @@ public:
 	ENGINE_API bool IsBranchingPoint() const;
 
 	/** Returns true if this is blueprint derived notifies **/
-	bool IsBlueprintNotify() const
-	{
-		return Notify != NULL || NotifyStateClass != NULL;
-	}
+	bool IsBlueprintNotify() const;
 
 	bool operator ==(const FAnimNotifyEvent& Other) const
 	{
