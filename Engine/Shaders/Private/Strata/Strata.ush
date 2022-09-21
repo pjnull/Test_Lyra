@@ -3093,7 +3093,7 @@ float2 SignNotZero(in float2 v)
 
 float2 StrataUnitVectorToOctahedron(float3 N)
 {
-	N.xy *= rcpFast(dot(1, abs(N)));
+	N.xy *= rcp(dot(1, abs(N)));
 	if (N.z <= 0)
 	{
 		N.xy = (1 - abs(N.yx)) * select(N.xy >= 0, float2(1, 1), float2(-1, -1));
