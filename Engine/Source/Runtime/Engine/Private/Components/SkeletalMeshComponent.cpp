@@ -2724,7 +2724,7 @@ void USkeletalMeshComponent::PostAnimEvaluation(FAnimationEvaluationContext& Eva
 				if(EvaluationContext.bDoEvaluation)
 				{
 					// push newly evaluated bones to physics
-					UpdateKinematicBonesToAnim(EvaluationContext.bDoInterpolation ? CachedBoneSpaceTransforms : GetEditableComponentSpaceTransforms(), ETeleportType::None, true);
+					UpdateKinematicBonesToAnim(EvaluationContext.bDoInterpolation ? CachedComponentSpaceTransforms : GetEditableComponentSpaceTransforms(), ETeleportType::None, true);
 					UpdateRBJointMotors();
 				}
 			}
