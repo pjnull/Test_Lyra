@@ -17,6 +17,7 @@
 #include "Engine/Level.h"
 #include "HAL/FileManager.h"
 #include "UObject/GCObjectScopeGuard.h"
+#include "Algo/Transform.h"
 
 int32 UGenerateNaniteDisplacedMeshCommandlet::Main(const FString& CmdLineParams)
 {
