@@ -1639,6 +1639,20 @@ struct MeshDrawCommandKeyFuncs : TDefaultMapHashableKeyFuncs<FMeshDrawCommand, F
 using FDrawCommandIndices = TArray<int32, TInlineAllocator<5>>;
 using FStateBucketMap = Experimental::TRobinHoodHashMap<FMeshDrawCommand, FMeshDrawCommandCount, MeshDrawCommandKeyFuncs>;
 
+struct FStateBucketAuxData
+{
+	FStateBucketAuxData()
+		: MeshLODIndex(0)
+	{}
+
+	explicit FStateBucketAuxData(const FMeshBatch& MeshBatch)
+		: MeshLODIndex(MeshBatch.LODIndex)
+	{
+	}
+
+	uint8 MeshLODIndex;
+};
+
 class FCachedPassMeshDrawListContext : public FMeshPassDrawListContext
 {
 public:
@@ -1693,6 +1707,7 @@ protected:
 	EMeshPass::Type CurrMeshPass = EMeshPass::Num;
 	bool bUseGPUScene = false;
 	bool bAnyLooseParameterBuffers = false;
+	bool bUseStateBucketsAuxData = false;
 };
 
 class FCachedPassMeshDrawListContextImmediate : public FCachedPassMeshDrawListContext
@@ -1735,6 +1750,7 @@ public:
 private:
 	TArray<FMeshDrawCommand> DeferredCommands;
 	TArray<Experimental::FHashType> DeferredCommandHashes;
+	TArray<FStateBucketAuxData> DeferredStateBucketsAuxData;
 };
 
 template<typename VertexType, typename PixelType, typename GeometryType = FMeshMaterialShader, typename RayTracingType = FMeshMaterialShader, typename ComputeType = FMeshMaterialShader>
