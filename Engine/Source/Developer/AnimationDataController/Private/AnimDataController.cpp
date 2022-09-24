@@ -16,6 +16,8 @@
 #include "Animation/AnimCurveTypes.h"
 #include "Math/UnrealMathUtility.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AnimDataController)
+
 #define LOCTEXT_NAMESPACE "AnimDataController"
 
 #if WITH_EDITOR
@@ -2167,4 +2169,5 @@ bool UAnimDataController::DuplicateAttribute(const FAnimationAttributeIdentifier
 #endif // WITH_EDITOR
 
 #undef LOCTEXT_NAMESPACE // "AnimDataController"
+
 
