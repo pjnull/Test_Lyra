@@ -3694,6 +3694,8 @@ void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* I
 
 #include "GameFramework/SpawnActorTimer.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(Actor)
+
 void AActor::FinishSpawning(const FTransform& UserTransform, bool bIsDefaultTransform, const FComponentInstanceDataCache* InstanceDataCache)
 {
 #if ENABLE_SPAWNACTORTIMER
@@ -6152,3 +6154,4 @@ bool AActor::UseWorldPartitionRuntimeCellDataLayers() const
 //---------------------------------------------------------------------------
 
 #undef LOCTEXT_NAMESPACE
+

@@ -11,6 +11,8 @@
 #include "AI/Navigation/NavAreaBase.h"
 #include "VisualLogger/VisualLogger.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(NavigationData)
+
 // set to NAVMESHVER_LANDSCAPE_HEIGHT at the moment of refactoring navigation
 // code out of the engine module. No point in using RecastNavMesh versioning 
 // for NavigationData
@@ -876,3 +878,4 @@ void ANavigationData::DrawDebugPath(FNavigationPath* Path, FColor PathColor, UCa
 {
 	DrawDebugPath(Path, PathColor, Canvas, bPersistent, -1.f, NextPathPointIndex);
 }
+

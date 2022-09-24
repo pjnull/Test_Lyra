@@ -11,6 +11,8 @@
 #include "UObject/UE5MainStreamObjectVersion.h"
 #include "UObject/FortniteMainBranchObjectVersion.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AnimDataModel)
+
 void UAnimDataModel::PostLoad()
 {
 	UObject::PostLoad();
@@ -515,4 +517,5 @@ FAnimCurveBase* UAnimDataModel::FindMutableCurveById(const FAnimationCurveIdenti
 
 	return nullptr;
 }
+
 
