@@ -1302,6 +1302,7 @@ private:
 			enum class EType
 			{
 				// Commands
+				Initialize,
 				LoadManifest,
 				Pause,
 				Resume,
@@ -1422,6 +1423,12 @@ private:
 			FMessage Msg;
 			Msg.Type = type;
 			Msg.Data.MediaEvent.Event = pEventSignal;
+			TriggerSharedWorkerThread(MoveTemp(Msg));
+		}
+		void SendInitializeMessage()
+		{
+			FMessage Msg;
+			Msg.Type = FMessage::EType::Initialize;
 			TriggerSharedWorkerThread(MoveTemp(Msg));
 		}
 		void SendLoadManifestMessage(const FString& URL, const FString& MimeType)
@@ -1855,6 +1862,7 @@ private:
 	void OnFragmentReachedEOS(EStreamType InStreamType, TSharedPtr<const FBufferSourceInfo, ESPMode::ThreadSafe> InStreamSourceInfo) override;
 	void OnFragmentClose(TSharedPtrTS<IStreamSegment> pRequest) override;
 
+	void InternalInitialize();
 	void InternalHandleOnce();
 	bool InternalHandleThreadMessages();
 	void InternalHandleManifestReader();
