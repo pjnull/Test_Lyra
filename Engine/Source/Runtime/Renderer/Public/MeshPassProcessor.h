@@ -2211,11 +2211,10 @@ class FRayTracingMeshCommand
 {
 public:
 	FMeshDrawShaderBindings ShaderBindings;
-
 	FRHIRayTracingShader* MaterialShader = nullptr;
+
 	uint32 MaterialShaderIndex = UINT_MAX;
 	uint32 GeometrySegmentIndex = UINT_MAX;
-	FShaderUniformBufferParameter ViewUniformBufferParameter;
 	uint8 InstanceMask = 0xFF;
 
 	bool bCastRayTracedShadows = true;
@@ -2228,6 +2227,7 @@ public:
 	RENDERER_API void SetRayTracingShaderBindingsForHitGroup(
 		FRayTracingLocalShaderBindingWriter* BindingWriter,
 		const TUniformBufferRef<FViewUniformShaderParameters>& ViewUniformBuffer,
+		FRHIUniformBuffer* NaniteUniformBuffer,
 		uint32 InstanceIndex,
 		uint32 SegmentIndex,
 		uint32 HitGroupIndexInPipeline,
@@ -2235,6 +2235,10 @@ public:
 
 	/** Sets ray hit group shaders on the mesh command and allocates room for the shader bindings. */
 	RENDERER_API void SetShaders(const FMeshProcessorShaders& Shaders);
+
+private:
+	FShaderUniformBufferParameter ViewUniformBufferParameter;
+	FShaderUniformBufferParameter NaniteUniformBufferParameter;
 };
 
 class FVisibleRayTracingMeshCommand
@@ -2334,18 +2338,22 @@ class FRayTracingShaderCommand
 {
 public:
 	FMeshDrawShaderBindings ShaderBindings;
-
 	FRHIRayTracingShader* Shader = nullptr;
+
 	uint32 ShaderIndex = UINT_MAX;
 	uint32 SlotInScene = UINT_MAX;
-	FShaderUniformBufferParameter ViewUniformBufferParameter;
 
 	RENDERER_API void SetRayTracingShaderBindings(
 		FRayTracingLocalShaderBindingWriter* BindingWriter,
 		const TUniformBufferRef<FViewUniformShaderParameters>& ViewUniformBuffer,
+		FRHIUniformBuffer* NaniteUniformBuffer,
 		uint32 ShaderIndexInPipeline,
 		uint32 ShaderSlot) const;
 
 	/** Sets ray tracing shader on the command and allocates room for the shader bindings. */
 	RENDERER_API void SetShader(const TShaderRef<FShader>& Shader);
+
+private:
+	FShaderUniformBufferParameter ViewUniformBufferParameter;
+	FShaderUniformBufferParameter NaniteUniformBufferParameter;
 };
