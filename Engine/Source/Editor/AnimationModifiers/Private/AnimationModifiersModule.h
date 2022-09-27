@@ -7,6 +7,7 @@
 #include "UObject/NameTypes.h"
 #include "WorkflowOrientedApp/WorkflowCentricApplication.h"
 #include "AssetTypeActions_Base.h"
+#include "AnimationModifier.h"
 
 class FApplicationMode;
 class UAnimSequence;
