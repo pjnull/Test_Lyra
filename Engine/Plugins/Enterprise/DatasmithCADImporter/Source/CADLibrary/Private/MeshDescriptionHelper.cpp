@@ -190,15 +190,15 @@ void GetExistingPatches(FMeshDescription& MeshSource, TSet<int32>& OutExistingPa
 	{
 		int32 PatchId = ElementToGroups[TriangleID];
 		if (PatchId != LastPatchId)
-		{
+	{
 			OutExistingPatchIds.Add(PatchId);
 			LastPatchId = PatchId;
 		}
 	}
-}
+	}
 
 FMeshDescriptionDataCache::FMeshDescriptionDataCache(FMeshDescription& MeshSource)
-{
+	{
 	FStaticMeshAttributes MeshSourceAttributes(MeshSource);
 
 	TPolygonAttributesRef<FPolygonGroupID> PolygoneToPolygoneGroupId = MeshSourceAttributes.GetPolygonPolygonGroupIndices();
@@ -206,7 +206,7 @@ FMeshDescriptionDataCache::FMeshDescriptionDataCache(FMeshDescription& MeshSourc
 
 	int32 LastPatchGroupId = -1;
 	for (int32 PolygoneID = 0; PolygoneID < PolygoneToPolygoneGroupId.GetNumElements(); ++PolygoneID)
-	{
+		{
 		const FPolygonGroupID GroupID = PolygoneToPolygoneGroupId[PolygoneID];
 		int32 PatchGroupID = PatchGroup[PolygoneID];
 
@@ -242,7 +242,7 @@ void FMeshDescriptionDataCache::RestoreMaterialSlotNames(FMeshDescription& Mesh)
 
 				const FPolygonGroupID* GroupIDMeshSource = Find(PatchGroupID);
 				if (GroupIDMeshSource)
-				{
+	{
 					const FName& SlotName = GetSlotName(*GroupIDMeshSource);
 					ensure(GroupID < PolygonGroupMaterialSlotNames.GetNumElements());
 					PolygonGroupMaterialSlotNames[GroupID] = SlotName;
@@ -545,6 +545,9 @@ bool ConvertBodyMeshToMeshDescription(const FMeshConversionContext& MeshConversi
 	{
 		return false;
 	}
+
+	// Workaround SDHE-19725: Compute any null normals.
+	MeshOperator::RecomputeNullNormal(MeshDescription);
 
 	// Orient mesh
 	MeshOperator::OrientMesh(MeshDescription);

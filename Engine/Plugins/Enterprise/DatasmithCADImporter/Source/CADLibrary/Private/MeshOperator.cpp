@@ -16,6 +16,86 @@
 #include "Operations/MeshResolveTJunctions.h"
 #include "StaticMeshAttributes.h"
 
+void MeshOperator::RecomputeNullNormal(FMeshDescription& MeshDescription)
+{
+	//using namespace UE::MeshCategory;
+	constexpr float SquareNormalThreshold = KINDA_SMALL_NUMBER * KINDA_SMALL_NUMBER;
+
+	FStaticMeshAttributes StaticMeshAttributes = FStaticMeshAttributes(MeshDescription);
+	TVertexInstanceAttributesRef<FVector3f> Normals = StaticMeshAttributes.GetVertexInstanceNormals();
+	TVertexInstanceAttributesRef<FVertexID> Indices = StaticMeshAttributes.GetVertexInstanceVertexIndices();
+	TVertexAttributesRef<FVector3f> VertexPositions = StaticMeshAttributes.GetVertexPositions();
+
+	for (FTriangleID Triangle : MeshDescription.Triangles().GetElementIDs())
+	{
+		TArrayView<const FVertexInstanceID> Vertices = MeshDescription.GetTriangleVertexInstances(Triangle);
+		for (int32 VertexIndex = 0; VertexIndex < 3; VertexIndex++)
+		{
+			FVector3f& Normal = Normals[Vertices[VertexIndex]];
+
+			if (Normal.IsNearlyZero(KINDA_SMALL_NUMBER))
+			{
+				Normal = FVector3f::ZeroVector;
+
+				const FVertexInstanceID VertexInstanceID = Vertices[VertexIndex];
+				FVertexID VertexID = MeshDescription.GetVertexInstanceVertex(VertexInstanceID);
+				const TArrayView<const FTriangleID> VertexConnectedTriangles = MeshDescription.GetVertexInstanceConnectedTriangleIDs(VertexInstanceID);
+
+				int32 TriangleCount = 0;
+
+				const int32 TriangleIndex[3][3] = { {0,1,2},{1,2,0},{2,0,1} };
+
+				// compute the weighted sum of normals of the "partition star" according to the corner angle
+				for(const FTriangleID& TriangleID : VertexConnectedTriangles)
+				{
+					// compute face normal at the vertex
+					TArrayView<const FVertexID> TriangleVertices = MeshDescription.GetTriangleVertices(TriangleID);
+
+					int32 ApexIndex = 0;
+					for (; ApexIndex < 3; ++ApexIndex)
+					{
+						if (TriangleVertices[ApexIndex] == VertexID)
+						{
+							break;
+						}
+					}
+
+					const FVector3f Position0 = VertexPositions[TriangleVertices[TriangleIndex[ApexIndex][0]]];
+					FVector3f DPosition1 = VertexPositions[TriangleVertices[TriangleIndex[ApexIndex][1]]] - Position0;
+					FVector3f DPosition2 = VertexPositions[TriangleVertices[TriangleIndex[ApexIndex][2]]] - Position0;
+
+					// to avoid numerical issue due to small vector
+					DPosition1.Normalize();
+					DPosition2.Normalize();
+
+					// We have a left-handed coordinate system, but a counter-clockwise winding order
+					// Hence normal calculation has to take the triangle vectors cross product in reverse.
+					FVector3f TriangleNormal = FVector3f::CrossProduct(DPosition2, DPosition1);
+					double SinOfApexAngle = TriangleNormal.Length();
+					double ApexAngle = FMath::Asin(SinOfApexAngle);
+
+					if (TriangleNormal.Normalize(SquareNormalThreshold))
+					{
+						Normal += (TriangleNormal * ApexAngle);
+						TriangleCount++;
+					}
+				}
+
+				if (TriangleCount)
+				{
+					if (Normal.Normalize(SquareNormalThreshold))
+					{
+						continue;
+					}
+				}
+
+				// the vertex is a vertex of degenerated triangles, the vertex normal doesn't matter as the triangle is flat, but a non null normal is needed.
+				Normal = FVector3f::UpVector;
+			}
+		}
+	}
+}
+
 bool MeshOperator::OrientMesh(FMeshDescription& MeshDescription)
 {
 	using namespace MeshCategory;
