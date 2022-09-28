@@ -1704,7 +1704,7 @@ namespace VulkanRHI
 		ReleasePage(InPage);
 	}
 
-	uint64 FVulkanResourceHeap::EvictOne(FVulkanDevice& Device)
+	uint64 FVulkanResourceHeap::EvictOne(FVulkanDevice& Device, FVulkanCommandListContext& Context)
 	{
 		FScopeLock ScopeLock(&PagesLock);
 		for(int32 Index = MAX_BUCKETS - 2; Index >= 0; Index--)
@@ -1715,7 +1715,7 @@ namespace VulkanRHI
 				FVulkanSubresourceAllocator* Allocator = Pages[Index2];
 				if (!Allocator->bIsEvicting && Allocator->GetSubresourceAllocatorFlags() & VulkanAllocationFlagsCanEvict)
 				{
-					return Allocator->EvictToHost(Device);
+					return Allocator->EvictToHost(Device, Context);
 				}
 			}
 		}
@@ -2363,7 +2363,7 @@ namespace VulkanRHI
 		if(BestEvictHeap && ((GVulkanEvictOnePage || UpdateEvictThreshold(true)) && PrimaryHeapIndex >= 0))
 		{
 			GVulkanEvictOnePage = 0;
-			PendingEvictBytes += BestEvictHeap->EvictOne(*Device);		
+			PendingEvictBytes += BestEvictHeap->EvictOne(*Device, Context);
 		}
 
 #if !PLATFORM_ANDROID
@@ -4118,7 +4118,7 @@ namespace VulkanRHI
 		return DefragCount;
 	}
 
-	uint64 FVulkanSubresourceAllocator::EvictToHost(FVulkanDevice& Device)
+	uint64 FVulkanSubresourceAllocator::EvictToHost(FVulkanDevice& Device, FVulkanCommandListContext& Context)
 	{
 		FScopeLock ScopeLock(&SubresourceAllocatorCS);
 		bIsEvicting = true;
@@ -4131,7 +4131,7 @@ namespace VulkanRHI
 				case EVulkanAllocationMetaImageOther:
 				{
 					FVulkanEvictable* Texture= Alloc.AllocationOwner;
-					Texture->Evict(Device);
+					Texture->Evict(Device, Context);
 				}
 				break;
 				default:

@@ -2493,17 +2493,21 @@ void FBaseGraphTask::LogPossiblyInvalidSubsequentsTask(const TCHAR* TaskName)
 }
 #endif
 
-static TLockFreeClassAllocator_TLSCache<FGraphEvent, PLATFORM_CACHE_LINE_SIZE> TheGraphEventAllocator;
+static TLockFreeClassAllocator_TLSCache<FGraphEvent, PLATFORM_CACHE_LINE_SIZE>& GetGraphEventAllocator()
+{
+	static TLockFreeClassAllocator_TLSCache<FGraphEvent, PLATFORM_CACHE_LINE_SIZE> Allocator;
+	return Allocator;
+}
 
 FGraphEventRef FGraphEvent::CreateGraphEvent()
 {
-	FGraphEvent* Instance = new(TheGraphEventAllocator.Allocate()) FGraphEvent{};
+	FGraphEvent* Instance = new(GetGraphEventAllocator().Allocate()) FGraphEvent{};
 	return Instance;
 }
 
 void FGraphEvent::Recycle(FGraphEvent* ToRecycle)
 {
-	TheGraphEventAllocator.Free(ToRecycle);
+	GetGraphEventAllocator().Free(ToRecycle);
 }
 
 void FGraphEvent::DispatchSubsequents(ENamedThreads::Type CurrentThreadIfKnown)

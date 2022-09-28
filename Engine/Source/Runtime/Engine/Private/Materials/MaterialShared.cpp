@@ -3749,7 +3749,7 @@ public:
 
 		}, TStatId(), nullptr, ENamedThreads::AnyHiPriThreadHiPriTask);
 
-		RHICmdListImmediate.QueueRenderThreadCommandListSubmit(Event, RHICmdList);
+		RHICmdListImmediate.QueueAsyncCommandListSubmit(RHICmdList);
 
 		GUniformExpressionCacheAsyncUpdateTask.SetTask(Event);
 	}

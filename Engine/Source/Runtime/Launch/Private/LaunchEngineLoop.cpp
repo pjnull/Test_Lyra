@@ -4677,9 +4677,9 @@ void FEngineLoop::Exit()
 		GBackgroundPriorityThreadPool->Destroy();
 	}
 
-	FTaskGraphInterface::Shutdown();
-
 	RHIExit();
+
+	FTaskGraphInterface::Shutdown();
 
 	FPlatformMisc::ShutdownTaggedStorage();
 

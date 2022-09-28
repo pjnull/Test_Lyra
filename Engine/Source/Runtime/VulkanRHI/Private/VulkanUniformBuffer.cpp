@@ -260,6 +260,14 @@ inline void FVulkanDynamicRHI::UpdateUniformBuffer(FRHICommandListBase& RHICmdLi
 			void* CmdListConstantBufferData = RHICmdList.Alloc(ConstantBufferSize, 16);
 			FMemory::Memcpy(CmdListConstantBufferData, Contents, ConstantBufferSize);
 
+			FVulkanCommandListContextImmediate* Context = &Device->GetImmediateContext();
+
+			// When we don't use the ring buffer, we'll need an active pipeline for a copy
+			if (!bUseRingBuffer && (RHICmdList.GetPipeline() == ERHIPipeline::None))
+			{
+				RHICmdList.SwitchPipeline(ERHIPipeline::Graphics);
+			}
+
 			RHICmdList.EnqueueLambda([UniformBuffer, CmdListResources, NumResources, ConstantBufferSize, CmdListConstantBufferData](FRHICommandListBase& CmdList)
 			{
 				FVulkanCommandListContext& Context = (FVulkanCommandListContext&)CmdList.GetContext().GetLowestLevelContext();

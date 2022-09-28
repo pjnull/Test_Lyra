@@ -5620,21 +5620,12 @@ bool UEngine::HandleToggleAsyncComputeCommand(const TCHAR* Cmd, FOutputDevice& A
 
 		GEnableAsyncCompute = !bWasAsyncCompute;
 
-		if (GEnableAsyncCompute)
-		{
-			FRHICommandListExecutor::GetImmediateAsyncComputeCommandList().SetComputeContext(RHIGetDefaultAsyncComputeContext());
-		}
-		else
-		{
-			FRHICommandListExecutor::GetImmediateAsyncComputeCommandList().SetContext(RHIGetDefaultContext());
-		}		
-
 		if (bWasThreadedRendering)
 		{
 			StartRenderingThread();
 		}
 		Ar.Logf(TEXT("AsyncCompute is now %s."), GEnableAsyncCompute ? TEXT("active") : TEXT("inactive"));
-	}	
+	}
 	return true;
 }
 

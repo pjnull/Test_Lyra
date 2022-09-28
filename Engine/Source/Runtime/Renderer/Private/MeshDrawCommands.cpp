@@ -1380,7 +1380,7 @@ public:
 			InstanceFactor,
 			RHICmdList);
 		RHICmdList.EndRenderPass();
-		RHICmdList.HandleRTThreadTaskCompletion(MyCompletionGraphEvent);
+		RHICmdList.FinishRecording();
 	}
 };
 

@@ -1788,7 +1788,7 @@ bool FDeferredShadingSceneRenderer::DispatchRayTracingWorldUpdates(FRDGBuilder& 
 		// Use ERDGPassFlags::NeverParallel so the pass never runs off the render thread and we always get the following order of execution on the CPU:
 		// BuildTLASInstanceBuffer, RayTracingUpdate, RayTracingEndUpdate, ..., ReleaseRayTracingResources
 		GraphBuilder.AddPass(RDG_EVENT_NAME("RayTracingUpdate"), PassParams, ComputePassFlags | ERDGPassFlags::NeverCull | ERDGPassFlags::NeverParallel,
-			[this, PassParams, bRayTracingAsyncBuild](FRHIComputeCommandList& RHICmdList)
+			[this, PassParams, bRayTracingAsyncBuild](FRHICommandListImmediate& RHICmdList)
 		{
 			{
 				SCOPED_GPU_STAT(RHICmdList, RayTracingGeometry);

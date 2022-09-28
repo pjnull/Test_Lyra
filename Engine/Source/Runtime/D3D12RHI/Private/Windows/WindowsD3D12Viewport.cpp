@@ -24,40 +24,32 @@ static FAutoConsoleVariableRef CVarD3DUseAllowTearing(
 	ECVF_RenderThreadSafe | ECVF_ReadOnly
 );
 
-FD3D12Viewport::FD3D12Viewport(class FD3D12Adapter* InParent, HWND InWindowHandle, uint32 InSizeX, uint32 InSizeY, bool bInIsFullscreen, EPixelFormat InPreferredPixelFormat) :
-	FD3D12AdapterChild(InParent),
-	LastFlipTime(0),
-	LastFrameComplete(0),
-	LastCompleteTime(0),
-	SyncCounter(0),
-	bSyncedLastFrame(false),
-	WindowHandle(InWindowHandle),
-	MaximumFrameLatency(3),
-	SizeX(InSizeX),
-	SizeY(InSizeY),
-	bIsFullscreen(bInIsFullscreen),
-	bFullscreenLost(false),
-	PixelFormat(InPreferredPixelFormat),
-	bIsValid(true),
-	bHDRMetaDataSet(false),
-	ColorSpace(DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709),
-	NumBackBuffers(WindowsDefaultNumBackBuffers),
-	DummyBackBuffer_RenderThread(nullptr),
-	CurrentBackBufferIndex_RHIThread(0),
-	BackBuffer_RHIThread(nullptr),
-	BackBuffer_RenderThread(nullptr),
-	BackBufferUAV_RenderThread(nullptr),
+FD3D12Viewport::FD3D12Viewport(class FD3D12Adapter* InParent, HWND InWindowHandle, uint32 InSizeX, uint32 InSizeY, bool bInIsFullscreen, EPixelFormat InPreferredPixelFormat)
+	: FD3D12AdapterChild(InParent)
+	, WindowHandle(InWindowHandle)
+	, SizeX(InSizeX)
+	, SizeY(InSizeY)
+	, bIsFullscreen(bInIsFullscreen)
+	, bFullscreenLost(false)
+	, PixelFormat(InPreferredPixelFormat)
+	, bIsValid(true)
+	, bHDRMetaDataSet(false)
+	, ColorSpace(DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709)
+	, NumBackBuffers(WindowsDefaultNumBackBuffers)
+	, DummyBackBuffer_RenderThread(nullptr)
+	, CurrentBackBufferIndex_RHIThread(0)
+	, BackBuffer_RHIThread(nullptr)
+	, BackBuffer_RenderThread(nullptr)
+	, BackBufferUAV_RenderThread(nullptr)
 #if WITH_MGPU
-	BackbufferMultiGPUBinding(0),
+	, BackbufferMultiGPUBinding(0)
 #endif //WITH_MGPU
-	ExpectedBackBufferIndex_RenderThread(0),
-	SDRDummyBackBuffer_RenderThread(nullptr),
-	SDRBackBuffer_RHIThread(nullptr),
-	SDRPixelFormat(PF_B8G8R8A8),
-	DisplayColorGamut(EDisplayColorGamut::sRGB_D65),
-	DisplayOutputFormat(EDisplayOutputFormat::SDR_sRGB),
-	Fence(InParent, FRHIGPUMask::All(), L"Viewport Fence"),
-	LastSignaledValue(0)
+	, ExpectedBackBufferIndex_RenderThread(0)
+	, SDRDummyBackBuffer_RenderThread(nullptr)
+	, SDRBackBuffer_RHIThread(nullptr)
+	, SDRPixelFormat(PF_B8G8R8A8)
+	, DisplayColorGamut(EDisplayColorGamut::sRGB_D65)
+	, DisplayOutputFormat(EDisplayOutputFormat::SDR_sRGB)
 #if WITH_MGPU
 	, FramePacerRunnable(nullptr)
 #endif //WITH_MGPU
@@ -83,8 +75,6 @@ void FD3D12Viewport::Init()
 		}
 	}
 
-	Fence.CreateFence();
-
 	CalculateSwapChainDepth(WindowsDefaultNumBackBuffers);
 
 	UINT SwapChainFlags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
@@ -97,7 +87,7 @@ void FD3D12Viewport::Init()
 	const DXGI_MODE_DESC BufferDesc = SetupDXGI_MODE_DESC();
 
 	// The command queue used here is irrelevant in regard to multi - GPU as it gets overriden in the Resize
-	ID3D12CommandQueue* CommandQueue = Adapter->GetDevice(0)->GetD3DCommandQueue();
+	ID3D12CommandQueue* CommandQueue = Adapter->GetDevice(0)->GetQueue(ED3D12QueueType::Direct).D3DCommandQueue;
 
 	// Create the swapchain.
 #if PLATFORM_HOLOLENS
@@ -136,7 +126,7 @@ void FD3D12Viewport::Init()
 	bNeedSwapChain = !FParse::Param(FCommandLine::Get(), TEXT("RenderOffScreen"));
 	if (bNeedSwapChain)
 	{
-		if (Adapter->GetOwningRHI()->IsQuadBufferStereoEnabled())
+		if (FD3D12DynamicRHI::GetD3DRHI()->IsQuadBufferStereoEnabled())
 		{
 			if (Factory2->IsWindowedStereoEnabled())
 			{
@@ -163,7 +153,7 @@ void FD3D12Viewport::Init()
 			else
 			{
 				UE_LOG(LogD3D12RHI, Log, TEXT("FD3D12Viewport::FD3D12Viewport was not able to create stereo SwapChain; Please enable stereo in driver settings."));
-				Adapter->GetOwningRHI()->DisableQuadBufferStereo();
+				FD3D12DynamicRHI::GetD3DRHI()->DisableQuadBufferStereo();
 			}
 		}
 
@@ -330,7 +320,7 @@ void FD3D12Viewport::ResizeInternal()
 			const uint32 GPUIndex = BackBufferGPUIndices[i];
 			FD3D12Device* Device = Adapter->GetDevice(GPUIndex);
 
-			CommandQueues.Add(Device->GetD3DCommandQueue());
+			CommandQueues.Add(Device->GetQueue(ED3D12QueueType::Direct).D3DCommandQueue);
 			NodeMasks.Add(Device->GetGPUMask().GetNative());
 		}
 
@@ -632,8 +622,7 @@ FD3D12Texture* FD3D12Viewport::GetBackBuffer_RenderThread() const
 
 bool FD3D12Viewport::IsPresentAllowed()
 {
-	FD3D12DynamicRHI& RHI = *ParentAdapter->GetOwningRHI();
-	return !RHI.RHIIsRenderingSuspended();
+	return !FD3D12DynamicRHI::GetD3DRHI()->RHIIsRenderingSuspended();
 }
 
 void FD3D12DynamicRHI::RHIGetDisplaysInformation(FDisplayInformationArray& OutDisplayInformation)

@@ -104,18 +104,7 @@ public:
 	virtual void IssueFrameEvent() override;
 
 #if D3D12_VIEWPORT_EXPOSES_SWAP_CHAIN
-	IDXGISwapChain1* GetSwapChain1() const { return SwapChain1; }
-#if DXGI_MAX_SWAPCHAIN_INTERFACE >= 2
-	IDXGISwapChain2* GetSwapChain2() const { return SwapChain2; }
-#endif
-#if DXGI_MAX_SWAPCHAIN_INTERFACE >= 3
-	IDXGISwapChain3* GetSwapChain3() const { return SwapChain3; }
-#endif
-#if DXGI_MAX_SWAPCHAIN_INTERFACE >= 4
-	IDXGISwapChain4* GetSwapChain4() const { return SwapChain4; }
-#endif
-
-	virtual void* GetNativeSwapChain() const override { return GetSwapChain1(); }
+	virtual void* GetNativeSwapChain() const override { return SwapChain1; }
 #endif // #if D3D12_VIEWPORT_EXPOSES_SWAP_CHAIN
 
 	virtual void* GetNativeBackBufferTexture() const override { return GetBackBuffer_RHIThread()->GetResource(); }
@@ -132,8 +121,6 @@ public:
 	uint32 GetNumBackBuffers() const { return NumBackBuffers; }
 
 	inline const bool IsFullscreen() const { return bIsFullscreen; }
-
-	FD3D12Fence& GetFence() { return Fence; }
 
 	/** Query the swap chain's current connected output for HDR support. */
 	bool CurrentOutputSupportsHDR() const;
@@ -174,9 +161,6 @@ private:
 	 */
 	FD3D12Texture* CreateDummyBackBufferTextures(FD3D12Adapter* InAdapter, EPixelFormat InPixelFormat, uint32 InSizeX, uint32 InSizeY, bool bInIsSDR);
 
-	/** Presents the frame synchronizing with DWM. */
-	void PresentWithVsyncDWM();
-
 	/**
 	 * Presents the swap chain checking the return result.
 	 * Returns true if Present was done by Engine.
@@ -193,13 +177,7 @@ private:
 	void FinalDestroyInternal();
 	void ClearPresentQueue();
 
-	uint64 LastFlipTime;
-	uint64 LastFrameComplete;
-	uint64 LastCompleteTime;
-	int32 SyncCounter;
-	bool bSyncedLastFrame;
 	HWND WindowHandle;
-	uint32 MaximumFrameLatency;
 	uint32 SizeX;
 	uint32 SizeY;
 	bool bIsFullscreen;
@@ -243,6 +221,7 @@ private:
 	uint32 ExpectedBackBufferIndex_RenderThread; // Expected back buffer GPU index - used and updated on RenderThread!
 #if WITH_MGPU
 	TArray<uint32> BackBufferGPUIndices;
+	FD3D12SyncPointRef LastFrameSyncPoint;
 #endif // WITH_MGPU
 
 	/** 
@@ -256,8 +235,7 @@ private:
 	EDisplayOutputFormat DisplayOutputFormat;
 
 	/** A fence value used to track the GPU's progress. */
-	FD3D12Fence Fence;
-	uint64 LastSignaledValue;
+	TArray<FD3D12SyncPointRef> FrameSyncPoints;
 
 	// Determine how deep the swapchain should be (based on AFR or not)
 	void CalculateSwapChainDepth(int32 DefaultSwapChainDepth);
