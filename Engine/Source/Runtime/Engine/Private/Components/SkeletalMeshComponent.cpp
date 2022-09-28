@@ -3172,7 +3172,8 @@ void USkeletalMeshComponent::ForEachAnimInstance(TFunctionRef<void(UAnimInstance
 		InFunction(AnimScriptInstance);
 	}
 
-	for(UAnimInstance* LinkedInstance : LinkedInstances)
+	// Copy LinkedInstances because the array can be concurrently modified inside this loop 
+	for(UAnimInstance* LinkedInstance : TArray<TObjectPtr<UAnimInstance>, TInlineAllocator<8>>(LinkedInstances))
 	{
 		if(LinkedInstance)
 		{
