@@ -8,6 +8,8 @@
 #include "SmartObjectSubsystem.h"
 #include "VisualLogger/VisualLogger.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(BTTask_FindAndUseGameplayBehaviorSmartObject)
+
 
 UBTTask_FindAndUseGameplayBehaviorSmartObject::UBTTask_FindAndUseGameplayBehaviorSmartObject(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

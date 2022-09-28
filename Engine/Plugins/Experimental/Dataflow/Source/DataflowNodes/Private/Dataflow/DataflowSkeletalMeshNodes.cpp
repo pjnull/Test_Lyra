@@ -9,6 +9,8 @@
 #include "Animation/Rig.h"
 #include "Engine/SkeletalMesh.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(DataflowSkeletalMeshNodes)
+
 namespace Dataflow
 {
 	void RegisterSkeletalMeshNodes()
@@ -55,5 +57,6 @@ void FSkeletalMeshBoneDataflowNode::Evaluate(Dataflow::FContext& Context, const 
 
 	}
 }
+
 
 

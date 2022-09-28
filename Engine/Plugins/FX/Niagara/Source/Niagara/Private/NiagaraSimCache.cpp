@@ -16,6 +16,8 @@
 #include "NiagaraSystem.h"
 #include "NiagaraSystemInstance.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(NiagaraSimCache)
+
 UNiagaraSimCache::FOnCacheBeginWrite	UNiagaraSimCache::OnCacheBeginWrite;
 UNiagaraSimCache::FOnCacheEndWrite		UNiagaraSimCache::OnCacheEndWrite;
 
@@ -647,3 +649,4 @@ void UNiagaraSimCache::ReadQuatAttributeWithRebase(TArray<FQuat>& OutValues, FNa
 		}
 	}
 }
+

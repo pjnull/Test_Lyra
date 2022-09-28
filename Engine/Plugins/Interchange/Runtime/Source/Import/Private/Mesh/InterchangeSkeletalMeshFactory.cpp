@@ -36,6 +36,8 @@
 #include "SkeletalMeshAttributes.h"
 #include "SkeletalMeshOperations.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(InterchangeSkeletalMeshFactory)
+
 #if WITH_EDITORONLY_DATA
 
 #include "EditorFramework/AssetImportData.h"
@@ -1665,3 +1667,4 @@ bool UInterchangeSkeletalMeshFactory::SetReimportSourceIndex(const UObject* Obje
 
 	return false;
 }
+

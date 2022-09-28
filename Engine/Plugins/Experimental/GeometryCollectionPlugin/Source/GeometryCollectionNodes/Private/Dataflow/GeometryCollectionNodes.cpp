@@ -21,6 +21,8 @@
 #include "Runtime/Engine/Public/EngineGlobals.h"
 #include "Math/UnrealMathUtility.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(GeometryCollectionNodes)
+
 namespace Dataflow
 {
 	void GeometryCollectionEngineAssetNodes()

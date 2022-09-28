@@ -10,6 +10,8 @@
 #include "Units/Execution/RigUnit_BeginExecution.h"
 #include "Units/Execution/RigUnit_InverseExecution.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(FKControlRig)
+
 #define LOCTEXT_NAMESPACE "OverrideControlRig"
 
 UFKControlRig::UFKControlRig(const FObjectInitializer& ObjectInitializer)
@@ -534,5 +536,6 @@ void UFKControlRig::ToggleApplyMode()
 }
 
 #undef LOCTEXT_NAMESPACE
+
 
 

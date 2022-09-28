@@ -16,6 +16,8 @@
 #include "ShaderParameterUtils.h"
 #include "TextureResource.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(NiagaraDataInterfaceGrid3DCollection)
+
 #define LOCTEXT_NAMESPACE "NiagaraDataInterfaceGrid3DCollection"
 
 IMPLEMENT_TYPE_LAYOUT(FNiagaraDataInterfaceParametersCS_Grid3DCollection);
@@ -3108,3 +3110,4 @@ FIntVector FNiagaraDataInterfaceProxyGrid3DCollectionProxy::GetElementCount(FNia
 }
 
 #undef LOCTEXT_NAMESPACE
+

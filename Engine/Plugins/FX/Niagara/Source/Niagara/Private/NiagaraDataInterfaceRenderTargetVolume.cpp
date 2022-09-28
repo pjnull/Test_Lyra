@@ -16,6 +16,8 @@
 #include "NiagaraShaderParametersBuilder.h"
 #include "NiagaraGpuComputeDebugInterface.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(NiagaraDataInterfaceRenderTargetVolume)
+
 #define LOCTEXT_NAMESPACE "NiagaraDataInterfaceRenderTargetVolume"
 
 namespace NDIRenderTargetVolumeLocal
@@ -723,3 +725,4 @@ FIntVector FNiagaraDataInterfaceProxyRenderTargetVolumeProxy::GetElementCount(FN
 }
 
 #undef LOCTEXT_NAMESPACE
+

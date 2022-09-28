@@ -29,6 +29,8 @@
 
 #include "Serialization/AsyncLoadingFlushContext.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(OnlineHotfixManager)
+
 #ifdef WITH_ONLINETRACING
 #include "OnlineTracingModule.h"
 #endif
@@ -2032,3 +2034,4 @@ struct FHotfixManagerExec :
 	}
 };
 static FHotfixManagerExec HotfixManagerExec;
+
