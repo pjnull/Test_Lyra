@@ -613,6 +613,7 @@ void FStarshipEditorStyle::FStyle::SetupGeneralStyles()
 		Set( "SpecialEditableTextImageNormal", SpecialEditableTextImageNormal );
 
 		const FEditableTextBoxStyle SpecialEditableTextBoxStyle = FEditableTextBoxStyle()
+			.SetTextStyle(NormalText)
 			.SetBackgroundImageNormal( *SpecialEditableTextImageNormal )
 			.SetBackgroundImageHovered( BOX_BRUSH( "Common/TextBox_Special_Hovered", FMargin(8.0f/32.0f) ) )
 			.SetBackgroundImageFocused( BOX_BRUSH( "Common/TextBox_Special_Hovered", FMargin(8.0f/32.0f) ) )
@@ -2168,6 +2169,7 @@ void FStarshipEditorStyle::FStyle::SetupSequencerStyles()
 		);
 
 		Set("Sequencer.HyperlinkTextBox", FEditableTextBoxStyle()
+			.SetTextStyle(NormalText)
 			.SetFont(DEFAULT_FONT("Regular", 9))
 			.SetBackgroundImageNormal(FSlateNoResource())
 			.SetBackgroundImageHovered(FSlateNoResource())
@@ -3256,6 +3258,7 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 				Set( "Graph.StateNode.NodeTitle", GraphStateNodeTitle );
 
 				FEditableTextBoxStyle GraphStateNodeTitleEditableText = FEditableTextBoxStyle()
+					.SetTextStyle(NormalText)
 					.SetFont(NormalText.Font)
 					.SetBackgroundImageNormal(FSlateRoundedBoxBrush(FStyleColors::Input, CoreStyleConstants::InputFocusRadius, FStyleColors::InputOutline, CoreStyleConstants::InputFocusThickness))
 					.SetBackgroundImageHovered(FSlateRoundedBoxBrush(FStyleColors::Input, CoreStyleConstants::InputFocusRadius, FStyleColors::Hover, CoreStyleConstants::InputFocusThickness))
@@ -3545,6 +3548,7 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 					.SetShadowColorAndOpacity(FLinearColor(0.8f, 0.8f, 0.8f, 0.5));
 
 				FEditableTextBoxStyle InlineEditableTextBlockEditable = FEditableTextBoxStyle()
+					.SetTextStyle(NormalText)
 					.SetFont(DEFAULT_FONT("Regular", 9))
 					.SetBackgroundImageNormal(FSlateRoundedBoxBrush(FStyleColors::Input, CoreStyleConstants::InputFocusRadius, FStyleColors::InputOutline, CoreStyleConstants::InputFocusThickness))
 					.SetBackgroundImageHovered(FSlateRoundedBoxBrush(FStyleColors::Input, CoreStyleConstants::InputFocusRadius, FStyleColors::Hover, CoreStyleConstants::InputFocusThickness))
@@ -3798,6 +3802,7 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 			// EditableTextBox
 			{
 				Set( "Graph.EditableTextBox", FEditableTextBoxStyle()
+					.SetTextStyle(NormalText)
 					.SetBackgroundImageNormal( BOX_BRUSH( "Graph/CommonWidgets/TextBox", FMargin(4.0f/16.0f) ) )
 					.SetBackgroundImageHovered( BOX_BRUSH( "Graph/CommonWidgets/TextBox_Hovered", FMargin(4.0f/16.0f) ) )
 					.SetBackgroundImageFocused( BOX_BRUSH( "Graph/CommonWidgets/TextBox_Hovered", FMargin(4.0f/16.0f) ) )
@@ -3809,6 +3814,7 @@ void FStarshipEditorStyle::FStyle::SetupGraphEditorStyles()
 			// VectorEditableTextBox
 			{
 				Set( "Graph.VectorEditableTextBox", FEditableTextBoxStyle()
+					.SetTextStyle(NormalText)
 					.SetBackgroundImageNormal( BOX_BRUSH( "Graph/CommonWidgets/TextBox", FMargin(4.0f/16.0f) ) )
 					.SetBackgroundImageHovered( BOX_BRUSH( "Graph/CommonWidgets/TextBox_Hovered", FMargin(4.0f/16.0f) ) )
 					.SetBackgroundImageFocused( BOX_BRUSH( "Graph/CommonWidgets/TextBox_Hovered", FMargin(4.0f/16.0f) ) )
@@ -6402,6 +6408,7 @@ void FStarshipEditorStyle::FStyle::SetupToolkitStyles()
 
 		// SEditableTextBox defaults...
 		Set("CurveTableEditor.Cell.Text", FEditableTextBoxStyle()
+			.SetTextStyle(NormalText)
 			.SetBackgroundImageNormal(FSlateNoResource())
 			.SetBackgroundImageHovered(FSlateRoundedBoxBrush(FStyleColors::Input, 0.0, FStyleColors::Hover, 1.0))
 			.SetBackgroundImageFocused(FSlateRoundedBoxBrush(FStyleColors::Input, 0.0, FStyleColors::Primary, 1.0))
