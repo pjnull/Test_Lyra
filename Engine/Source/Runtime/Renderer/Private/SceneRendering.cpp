@@ -2567,6 +2567,19 @@ FSceneRenderer::FSceneRenderer(const FSceneViewFamily* InViewFamily, FHitProxyCo
 			ViewFamily.SetScreenPercentageInterface(InViewFamily->ScreenPercentageInterface->Fork_GameThread(ViewFamily));
 		}
 
+		if (ViewFamily.TemporalUpscalerInterface)
+		{
+			ViewFamily.TemporalUpscalerInterface = nullptr;
+			ViewFamily.SetTemporalUpscalerInterface(InViewFamily->TemporalUpscalerInterface->Fork_GameThread(ViewFamily));
+
+			for (FViewInfo& View : Views)
+			{
+				View.AntiAliasingMethod = AAM_TemporalAA;
+				View.PrimaryScreenPercentageMethod = EPrimaryScreenPercentageMethod::TemporalUpscale;
+				check(View.VerifyMembersChecks());
+			}
+		}
+
 		if (ViewFamily.PrimarySpatialUpscalerInterface)
 		{
 			ViewFamily.PrimarySpatialUpscalerInterface = nullptr;
@@ -4589,7 +4602,8 @@ void FRendererModule::BeginRenderingViewFamilies(FCanvas* Canvas, TArrayView<FSc
 		}
 #endif // !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 
-		// Force the spatial upscaler to be set no earlier than ISceneViewExtension::BeginRenderViewFamily();
+		// Force the upscalers to be set no earlier than ISceneViewExtension::BeginRenderViewFamily();
+		check(ViewFamily->GetTemporalUpscalerInterface() == nullptr);
 		check(ViewFamily->GetPrimarySpatialUpscalerInterface() == nullptr);
 		check(ViewFamily->GetSecondarySpatialUpscalerInterface() == nullptr);
 
@@ -4597,6 +4611,9 @@ void FRendererModule::BeginRenderingViewFamilies(FCanvas* Canvas, TArrayView<FSc
 		{
 			ViewFamily->ViewExtensions[ViewExt]->BeginRenderViewFamily(*ViewFamily);
 		}
+
+		checkf(!(ViewFamily->GetTemporalUpscalerInterface() != nullptr && ViewFamily->GetPrimarySpatialUpscalerInterface() != nullptr),
+			TEXT("Conflict setting up a third party primary spatial upscaler or temporal upscaler."));
 	}
 
 	if (Scene)
