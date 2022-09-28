@@ -5517,14 +5517,16 @@ void FLinkerLoad::Detach()
  */
 void FLinkerLoad::AttachBulkData( UObject* Owner, FBulkData* BulkData )
 {
-	check( BulkDataLoaders.Find(BulkData)==INDEX_NONE );
-	BulkDataLoaders.Add( BulkData );
+	bool bAlreadyInSet = false;
+	BulkDataLoaders.Add(BulkData, &bAlreadyInSet);
+	check(!bAlreadyInSet);
 }
 
 void FLinkerLoad::AttachBulkData(UE::Serialization::FEditorBulkData* BulkData)
 {
-	check(EditorBulkDataLoaders.Find(BulkData) == INDEX_NONE);
-	EditorBulkDataLoaders.Add(BulkData);
+	bool bAlreadyInSet = false;
+	EditorBulkDataLoaders.Add(BulkData, &bAlreadyInSet);
+	check(!bAlreadyInSet);
 }
 
 /**
@@ -5562,8 +5564,7 @@ void FLinkerLoad::DetachAllBulkData(bool bEnsureAllBulkDataIsLoaded)
 {
 	// Old style bulkdata first
 	{
-		TArray<FBulkData*> BulkDataToDetach = BulkDataLoaders;
-		for (FBulkData* BulkData : BulkDataToDetach)
+		for (FBulkData* BulkData : BulkDataLoaders)
 		{
 			check(BulkData != nullptr);
 			BulkData->DetachFromArchive(this, bEnsureAllBulkDataIsLoaded);
@@ -5573,8 +5574,7 @@ void FLinkerLoad::DetachAllBulkData(bool bEnsureAllBulkDataIsLoaded)
 
 	// Then virtualized bulkdata
 	{
-		TArray<UE::Serialization::FEditorBulkData*> BulkDataToDetach = EditorBulkDataLoaders;
-		for (UE::Serialization::FEditorBulkData* BulkData : BulkDataToDetach)
+		for (UE::Serialization::FEditorBulkData* BulkData : EditorBulkDataLoaders)
 		{
 			check(BulkData != nullptr);
 			BulkData->DetachFromDisk(this, bEnsureAllBulkDataIsLoaded);
