@@ -2680,6 +2680,10 @@ struct FMeshNaniteSettings
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = NaniteSettings)
 	uint8 bEnabled : 1;
 
+	/** Whether to try and maintain the same surface area at all distances. Useful for foliage that thins out otherwise. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = NaniteSettings)
+	uint8 bPreserveArea : 1;
+
 	/** Position Precision. Step size is 2^(-PositionPrecision) cm. MIN_int32 is auto. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = NaniteSettings)
 	int32 PositionPrecision;
@@ -2707,6 +2711,7 @@ struct FMeshNaniteSettings
 	/** Default settings. */
 	FMeshNaniteSettings()
 	: bEnabled(false)
+	, bPreserveArea(false)
 	, PositionPrecision(MIN_int32)
 	, TargetMinimumResidencyInKB(0)
 	, KeepPercentTriangles(1.0f)
@@ -2718,6 +2723,7 @@ struct FMeshNaniteSettings
 
 	FMeshNaniteSettings(const FMeshNaniteSettings& Other)
 	: bEnabled(Other.bEnabled)
+	, bPreserveArea(Other.bPreserveArea)
 	, PositionPrecision(Other.PositionPrecision)
 	, TargetMinimumResidencyInKB(Other.TargetMinimumResidencyInKB)
 	, KeepPercentTriangles(Other.KeepPercentTriangles)
@@ -2731,6 +2737,7 @@ struct FMeshNaniteSettings
 	bool operator==(const FMeshNaniteSettings& Other) const
 	{
 		return bEnabled == Other.bEnabled
+			&& bPreserveArea == Other.bPreserveArea
 			&& PositionPrecision == Other.PositionPrecision
 			&& TargetMinimumResidencyInKB == Other.TargetMinimumResidencyInKB
 			&& KeepPercentTriangles == Other.KeepPercentTriangles
