@@ -36,7 +36,7 @@ void UAsyncNiagaraCaptureSimCache::SetReadyToDestroy()
 	{
 		CaptureSimCache->EndWrite();
 	}
-	CaptureComplete.Broadcast();
+	CaptureComplete.Broadcast(CaptureSimCache ? CaptureSimCache->IsCacheValid() : false);
 }
 
 bool UAsyncNiagaraCaptureSimCache::OnFrameTick(float DeltaTime)
@@ -84,7 +84,7 @@ bool UAsyncNiagaraCaptureSimCache::OnFrameTick(float DeltaTime)
 	return true;
 }
 
-UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCacheMultiFrame(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent, int32 NumFrames, int32 CaptureRate)
+UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCacheMultiFrame(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent, UNiagaraSimCache*& OutSimCache, int32 NumFrames, int32 CaptureRate)
 {
 	UAsyncNiagaraCaptureSimCache* CaptureAction = NewObject<UAsyncNiagaraCaptureSimCache>();
 	CaptureAction->CaptureSimCache = SimCache;
@@ -97,11 +97,12 @@ UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCac
 	{
 		SimCache->BeginWrite(CreateParameters, NiagaraComponent);
 	}
+	OutSimCache = SimCache;
 
 	return CaptureAction;
 }
 
-UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCacheUntilComplete(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent, int32 CaptureRate)
+UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCacheUntilComplete(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent, UNiagaraSimCache*& OutSimCache, int32 CaptureRate)
 {
 	UAsyncNiagaraCaptureSimCache* CaptureAction = NewObject<UAsyncNiagaraCaptureSimCache>();
 	CaptureAction->CaptureSimCache = SimCache;
@@ -114,6 +115,7 @@ UAsyncNiagaraCaptureSimCache* UAsyncNiagaraCaptureSimCache::CaptureNiagaraSimCac
 	{
 		SimCache->BeginWrite(CreateParameters, NiagaraComponent);
 	}
+	OutSimCache = SimCache;
 
 	return CaptureAction;
 }
@@ -123,17 +125,18 @@ UNiagaraSimCacheFunctionLibrary::UNiagaraSimCacheFunctionLibrary(const FObjectIn
 {
 }
 
-bool UNiagaraSimCacheFunctionLibrary::CaptureNiagaraSimCacheImmediate(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent)
+bool UNiagaraSimCacheFunctionLibrary::CaptureNiagaraSimCacheImmediate(UNiagaraSimCache* SimCache, FNiagaraSimCacheCreateParameters CreateParameters, UNiagaraComponent* NiagaraComponent, UNiagaraSimCache*& OutSimCache)
 {
-	if ( SimCache == nullptr || NiagaraComponent == nullptr )
+	bool bSuccess = false;
+	if (SimCache != nullptr && NiagaraComponent != nullptr)
 	{
-		return false;
+		SimCache->BeginWrite(CreateParameters, NiagaraComponent);
+		SimCache->WriteFrame(NiagaraComponent);
+		SimCache->EndWrite();
+		bSuccess = SimCache->IsCacheValid();
 	}
-
-	SimCache->BeginWrite(CreateParameters, NiagaraComponent);
-	SimCache->WriteFrame(NiagaraComponent);
-	SimCache->EndWrite();
-	return SimCache->IsCacheValid();
+	OutSimCache = SimCache;
+	return bSuccess;
 }
 
 UNiagaraSimCache* UNiagaraSimCacheFunctionLibrary::CreateNiagaraSimCache(UObject* WorldContextObject)
