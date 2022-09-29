@@ -485,6 +485,40 @@ void UPatternTool::Setup()
 	AddToolPropertySource(ScaleSettings);
 	ScaleSettings->RestoreProperties(this);
 
+	auto OnUniformChanged = [this](bool bNewValue)
+	{
+		if (bNewValue)
+		{
+			constexpr float Tolerance = 1E-08;
+			const FVector DefaultDirection = FVector::OneVector.GetUnsafeNormal();
+			
+			StartScaleDirection = ScaleSettings->StartScale.GetSafeNormal(Tolerance, DefaultDirection);
+			EndScaleDirection = ScaleSettings->EndScale.GetSafeNormal(Tolerance, DefaultDirection);
+		}
+	};
+	ScaleSettings->WatchProperty(ScaleSettings->bUniform, OnUniformChanged);
+	
+	StartScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->StartScale, [this](const FVector& NewStartScale)
+	{
+		if (ScaleSettings->bUniform)
+		{
+			ScaleSettings->StartScale = StartScaleDirection * NewStartScale.Size();
+			ScaleSettings->SilentUpdateWatcherAtIndex(StartScaleWatcherIdx);
+		}
+	});
+	
+	EndScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->EndScale, [this](const FVector& NewEndScale)
+	{
+		if (ScaleSettings->bUniform)
+		{
+			ScaleSettings->EndScale = EndScaleDirection * NewEndScale.Size();
+			ScaleSettings->SilentUpdateWatcherAtIndex(EndScaleWatcherIdx);
+		}
+	});
+
+	// Initialize StartScaleDirection and EndScaleDirection
+	OnUniformChanged(true);
+	
 	OutputSettings = NewObject<UPatternTool_OutputSettings>();
 	AddToolPropertySource(OutputSettings);
 	OutputSettings->RestoreProperties(this);
@@ -733,33 +767,33 @@ static void InitializeGenerator(FPatternGenerator& Generator, UPatternTool* Tool
 	if (Generator.bInterpolateRotation)
 	{
 		Generator.StartRotation = FQuaterniond(Tool->RotationSettings->StartRotation);
-		Generator.EndRotation = FQuaterniond(Tool->RotationSettings->Rotation);
+		Generator.EndRotation = FQuaterniond(Tool->RotationSettings->EndRotation);
 	}
 	else
 	{
-		Generator.StartRotation = Generator.EndRotation = FQuaterniond(Tool->RotationSettings->Rotation);
+		Generator.StartRotation = Generator.EndRotation = FQuaterniond(Tool->RotationSettings->StartRotation);
 	}
 
 	Generator.bInterpolateTranslation = Tool->TranslationSettings->bInterpolate;
 	if (Generator.bInterpolateTranslation)
 	{
 		Generator.StartTranslation = Tool->TranslationSettings->StartTranslation;
-		Generator.EndTranslation = Tool->TranslationSettings->Translation;
+		Generator.EndTranslation = Tool->TranslationSettings->EndTranslation;
 	}
 	else
 	{
-		Generator.StartTranslation = Generator.EndTranslation = Tool->TranslationSettings->Translation;
+		Generator.StartTranslation = Generator.EndTranslation = Tool->TranslationSettings->StartTranslation;
 	}
 
 	Generator.bInterpolateScale = Tool->ScaleSettings->bInterpolate;
 	if (Generator.bInterpolateScale)
 	{
-		Generator.StartScale = (Tool->ScaleSettings->bUniform) ? (FVector3d::One()*Tool->ScaleSettings->StartScale) : Tool->ScaleSettings->StartScaleNonUniform;
-		Generator.EndScale = (Tool->ScaleSettings->bUniform) ? (FVector3d::One()*Tool->ScaleSettings->Scale) : Tool->ScaleSettings->ScaleNonUniform;
+		Generator.StartScale = Tool->ScaleSettings->StartScale;
+		Generator.EndScale = Tool->ScaleSettings->EndScale;
 	}
 	else
 	{
-		Generator.StartScale = Generator.EndScale = (Tool->ScaleSettings->bUniform) ? (FVector3d::One()*Tool->ScaleSettings->Scale) : Tool->ScaleSettings->ScaleNonUniform;
+		Generator.StartScale = Generator.EndScale = Tool->ScaleSettings->StartScale;
 	}
 }
 
