@@ -136,3 +136,12 @@ bool UNiagaraSimCacheFunctionLibrary::CaptureNiagaraSimCacheImmediate(UNiagaraSi
 	return SimCache->IsCacheValid();
 }
 
+UNiagaraSimCache* UNiagaraSimCacheFunctionLibrary::CreateNiagaraSimCache(UObject* WorldContextObject)
+{
+	if ( UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull) )
+	{
+		return NewObject<UNiagaraSimCache>(WorldContextObject);
+	}
+
+	return nullptr;
+}
