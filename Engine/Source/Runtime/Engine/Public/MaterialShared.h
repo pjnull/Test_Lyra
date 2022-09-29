@@ -3377,7 +3377,7 @@ public:
 	{
 		Locs.AddUninitialized();
 		int64 ResourceOffset = this->Tell();
-		Locs.Last().Offset = ResourceOffset;
+		Locs.Last().Offset = IntCastChecked<uint32>(ResourceOffset);
 	}
 
 	inline void EndSerializingMaterialResource(const FMaterialResource& Resource)
