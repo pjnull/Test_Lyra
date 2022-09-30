@@ -84,9 +84,9 @@ void FLandscapeNotificationManager::Tick()
 		int32 NumIdenticalNotifications = Algo::CountIf(ValidNotifications, [NotificationType = LocalActiveNotification->GetNotificationType()](const TWeakPtr<FLandscapeNotification>& Notification)
 		{ return (Notification.Pin().Get()->GetNotificationType() == NotificationType); });
 
-		FText Text = FText::Format(LOCTEXT("NotificationFooter", "{0}\n[{1}]"),
+		FText Text = FText::Format(LOCTEXT("NotificationFooter", "{0} for {1}"),
 			LocalActiveNotification->NotificationText,
-			(NumIdenticalNotifications > 1) ? LOCTEXT("MultipleLandscapes", "Multiple landscapes") : FText::FromString(LocalActiveNotification->GetLandscape()->GetActorLabel()));
+			(NumIdenticalNotifications > 1) ? LOCTEXT("MultipleLandscapes", "multiple landscapes") : FText::FromString(LocalActiveNotification->GetLandscape()->GetActorLabel()));
 
 		ShowNotificationItem(Text);
 	}
