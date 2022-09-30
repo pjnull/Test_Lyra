@@ -4363,9 +4363,10 @@ void FAsyncPackage2::StartLoading(FIoBatch& IoBatch)
 						TEXT("Failed reading optional chunk for package: %s"), *Result.Status().ToString());
 					bLoadHasFailed = true;
 				}
-				int32 LocalPendingIoRequestsCounter = AsyncLoadingThread.PendingIoRequestsCounter.DecrementExchange() - 1;
-				TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
+				FAsyncLoadingThread2* LocalAsyncLoadingThread = &AsyncLoadingThread;
 				GetPackageNode(EEventLoadNode2::Package_ProcessSummary).ReleaseBarrier();
+				int32 LocalPendingIoRequestsCounter = LocalAsyncLoadingThread->PendingIoRequestsCounter.DecrementExchange() - 1;
+				TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
 			});
 	}
 #endif
@@ -4389,9 +4390,10 @@ void FAsyncPackage2::StartLoading(FIoBatch& IoBatch)
 					TEXT("Failed reading chunk for package: %s"), *Result.Status().ToString());
 				bLoadHasFailed = true;
 			}
-			int32 LocalPendingIoRequestsCounter = AsyncLoadingThread.PendingIoRequestsCounter.DecrementExchange() - 1;
-			TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
+			FAsyncLoadingThread2* LocalAsyncLoadingThread = &AsyncLoadingThread;
 			GetPackageNode(EEventLoadNode2::Package_ProcessSummary).ReleaseBarrier();
+			int32 LocalPendingIoRequestsCounter = LocalAsyncLoadingThread->PendingIoRequestsCounter.DecrementExchange() - 1;
+			TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
 		});
 
 	if (!Data.ShaderMapHashes.IsEmpty())
@@ -4406,9 +4408,10 @@ void FAsyncPackage2::StartLoading(FIoBatch& IoBatch)
 				[this, GraphEvent](TIoStatusOr<FIoBuffer> Result)
 				{
 					GraphEvent->DispatchSubsequents();
-					int32 LocalPendingIoRequestsCounter = AsyncLoadingThread.PendingIoRequestsCounter.DecrementExchange() - 1;
-					TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
+					FAsyncLoadingThread2* LocalAsyncLoadingThread = &AsyncLoadingThread;
 					GetPackageNode(Package_ExportsSerialized).ReleaseBarrier();
+					int32 LocalPendingIoRequestsCounter = LocalAsyncLoadingThread->PendingIoRequestsCounter.DecrementExchange() - 1;
+					TRACE_COUNTER_SET(AsyncLoadingPendingIoRequests, LocalPendingIoRequestsCounter);
 				});
 		};
 		FCoreDelegates::PreloadPackageShaderMaps.ExecuteIfBound(Data.ShaderMapHashes, ReadShaderMapFunc);
@@ -6500,6 +6503,7 @@ EAsyncPackageState::Type FAsyncLoadingThread2::TickAsyncLoadingFromGameThread(FA
 		ThreadState.SetTimeLimit(bUseTimeLimit, TimeLimit);
 
 		const bool bIsMultithreaded = FAsyncLoadingThread2::IsMultithreaded();
+		bool bMayProcessPendingCDOs = PendingCDOs.Num() > 0 && (PendingIoRequestsCounter.Load() == 0);
 		double TickStartTime = FPlatformTime::Seconds();
 
 		{
@@ -6515,9 +6519,14 @@ EAsyncPackageState::Type FAsyncLoadingThread2::TickAsyncLoadingFromGameThread(FA
 
 		if (Result != EAsyncPackageState::TimeOut)
 		{
-			if (!bDidSomething && PendingCDOs.Num() > 0)
+			if (!bDidSomething && bMayProcessPendingCDOs)
 			{
-				bDidSomething = ProcessPendingCDOs();
+				// Only process/create pending CDOs when absolutely required to unblock the current FlushAsyncLoading stack during initial load,
+				// i.e. when we are not making any progress and we are sure that there are no outstanding IO requests.
+				if (PendingIoRequestsCounter.Load() == 0)
+				{
+					bDidSomething = ProcessPendingCDOs();
+				}
 			}
 
 			// Flush deferred messages
