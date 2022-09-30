@@ -226,10 +226,11 @@ static void GetPropertyPathToTreeNodes(const TArray< TSharedRef<FDetailTreeNode>
 {
 	for (const TSharedRef<FDetailTreeNode>& TreeNode : RootTreeNodes)
 	{
-		if (TreeNode->IsLeaf())
+		FPropertyPath Path = TreeNode->GetPropertyPath();
+		if (Path.IsValid())
 		{
-			TArray<TSharedRef<FDetailTreeNode>>& Nodes = OutMap.FindOrAdd(TreeNode->GetPropertyPath().ToString());
-			Nodes.Add(TreeNode);
+			TArray<TSharedRef<FDetailTreeNode>>& Nodes = OutMap.FindOrAdd(Path.ToString());
+            Nodes.Add(TreeNode);
 		}
 
 		// Need to check children even if we're a leaf, because all DetailItemNodes are leaves, even if they may have sub-children
@@ -257,6 +258,11 @@ static TArray< TSharedRef< FDetailTreeNode > > FindBestFitTreeNodeFromProperty(c
 
 void SDetailsViewBase::HighlightProperty(const FPropertyPath& Property)
 {
+	if (!Property.IsValid())
+	{
+		return;
+	}
+	
 	TSharedPtr<FDetailTreeNode> PrevHighlightedNodePtr = CurrentlyHighlightedNode.Pin();
 	if (PrevHighlightedNodePtr.IsValid())
 	{
