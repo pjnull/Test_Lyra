@@ -170,6 +170,9 @@ public:
 
 	/** Delegate to get the names of all selected parameter items. */
 	DECLARE_DELEGATE_RetVal(TArray<FName>, FOnGetSelectedParameterNames);
+	
+	DECLARE_MULTICAST_DELEGATE(FOnInvalidateCachedDependencies);
+	
 	INiagaraParameterPanelViewModel();
 	virtual ~INiagaraParameterPanelViewModel() override;
 
@@ -277,6 +280,7 @@ public:
 	FOnNotifyParameterPendingRename& GetOnNotifyParameterPendingRenameDelegate() { return OnNotifyParameterPendingRenameDelegate; };
 	FOnNotifyParameterPendingNamespaceModifierRename& GetOnNotifyParameterPendingNamespaceModifierRenameDelegate() { return OnNotifyParameterPendingNamespaceModifierRenameDelegate; };
 	FOnGetParametersWithNamespaceModifierRenamePending& GetParametersWithNamespaceModifierRenamePendingDelegate() { return OnGetParametersWithNamespaceModifierRenamePendingDelegate; };
+	FOnInvalidateCachedDependencies& GetOnInvalidateCachedDependencies(){ return OnInvalidateCachedDependenciesDelegate;}
 
 	FText GetActiveSection() const
 	{
@@ -304,7 +308,12 @@ protected:
 	FOnNotifyParameterPendingRename OnNotifyParameterPendingRenameDelegate;
 	FOnNotifyParameterPendingNamespaceModifierRename OnNotifyParameterPendingNamespaceModifierRenameDelegate;
 	FOnGetParametersWithNamespaceModifierRenamePending OnGetParametersWithNamespaceModifierRenamePendingDelegate;
+    FOnInvalidateCachedDependencies OnInvalidateCachedDependenciesDelegate;
 
+	virtual bool IncludeViewItemsInSelectParameterItem() const { return false; }
+	
+	void InvalidateCachedDependencies() const { OnInvalidateCachedDependenciesDelegate.Broadcast(); };
+	
 	/** SharedPtr to menu and searchbox widget retained to prevent the shared ref returned by GetParameterMenu from being invalidated. */
 	mutable TSharedPtr<SWidget> ParameterMenuWidget;
 	mutable TSharedPtr<SEditableTextBox> ParameterMenuSearchBoxWidget;
@@ -320,6 +329,8 @@ protected:
 
 	TArray<FSectionDesc> Sections;
 	int32 ActiveSectionIndex;
+
+	virtual void OnINiagaraParameterPanelViewModelSelectionChanged(UNiagaraScriptVariable* InVar) {};
 };
 
 class FNiagaraSystemToolkitParameterPanelViewModel : public INiagaraParameterPanelViewModel, public TNiagaraViewModelManager<UNiagaraSystem, FNiagaraSystemToolkitParameterPanelViewModel>
@@ -405,6 +416,10 @@ public:
 	virtual bool UsesCategoryFilteringForInitialExpansion() const override { return true; }
 
 	virtual void PreSectionChange(const TArray<FNiagaraParameterPanelCategory>& ExpandedItems) override;
+protected:
+	virtual void OnINiagaraParameterPanelViewModelSelectionChanged(UNiagaraScriptVariable* InVar) override;
+	virtual bool IncludeViewItemsInSelectParameterItem() const { return true; }
+
 private:
 
 	bool  ShouldRouteThroughScratchParameterMap(const FNiagaraParameterPanelCategory* Category = nullptr, const FNiagaraVariableBase* Variable = nullptr);
@@ -433,6 +448,8 @@ private:
 private:
 	// Graphs viewed to gather UNiagaraScriptVariables that are displayed by the Parameter Panel.
 	TWeakObjectPtr<UNiagaraGraph> SystemScriptGraph;
+
+	mutable FNiagaraVariable SelectedVariable;
 
 	TSharedPtr<FNiagaraSystemViewModel> SystemViewModel;
 	TWeakPtr<FNiagaraSystemGraphSelectionViewModel> SystemGraphSelectionViewModelWeak;
