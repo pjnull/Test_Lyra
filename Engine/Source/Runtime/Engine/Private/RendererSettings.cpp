@@ -359,6 +359,8 @@ bool URendererSettings::CanEditChange(const FProperty* InProperty) const
 
 void URendererSettings::CheckForMissingShaderModels()
 {
+	// Don't show the SM6 toasts on non-Windows platforms to avoid confusion around platform requirements.
+#if PLATFORM_WINDOWS
 	if (GIsEditor && ShadowMapMethod == EShadowMapMethod::VirtualShadowMaps)
 	{
 		TArray<FString> D3D11TargetedShaderFormats;
@@ -406,6 +408,7 @@ void URendererSettings::CheckForMissingShaderModels()
 			ShaderModelNotificationPtr = FSlateNotificationManager::Get().AddNotification(Info);
 		}
 	}
+#endif // PLATFORM_WINDOWS
 }
 #endif // #if WITH_EDITOR
 
