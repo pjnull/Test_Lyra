@@ -3330,7 +3330,7 @@ public:
 			uint32 LongLatCubemapExtents = ComputeLongLatCubemapExtents(BaseSizeX, BuildSettings.MaxTextureResolution);
 			BaseSizeX = LongLatCubemapExtents;
 			BaseSizeY = LongLatCubemapExtents;
-			OutMip0NumSlices = 6;
+			OutMip0NumSlices = 6 * InMip0NumSlices;
 		}
 
 		// At this point we have a base mip size that is valid.
