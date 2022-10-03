@@ -2715,6 +2715,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 									if (StaticMeshRelevance.bUseSingleLayerWaterMaterial)
 									{
 										DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::SingleLayerWaterPass);
+										DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::SingleLayerWaterDepthPrepass);
 									}
 								}
 
@@ -3233,6 +3234,8 @@ void ComputeDynamicMeshRelevance(EShadingPath ShadingPath, bool bAddLightmapDens
 			{
 				PassMask.Set(EMeshPass::SingleLayerWaterPass);
 				View.NumVisibleDynamicMeshElements[EMeshPass::SingleLayerWaterPass] += NumElements;
+				PassMask.Set(EMeshPass::SingleLayerWaterDepthPrepass);
+				View.NumVisibleDynamicMeshElements[EMeshPass::SingleLayerWaterDepthPrepass] += NumElements;
 			}
 		}
 	}
