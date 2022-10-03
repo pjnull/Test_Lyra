@@ -2638,7 +2638,7 @@ struct FLinkedInstancesAdapter
 	{
 		if (InComponent && InAnimInstance)
 		{
-			InComponent->LinkedInstances.Add(InAnimInstance);
+			InComponent->LinkedInstances.AddUnique(InAnimInstance);
 		}
 	}
 
