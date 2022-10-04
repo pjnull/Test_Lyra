@@ -44,6 +44,7 @@ int bApplyEmissionAndTransmittance;
 int bApplyDirectLighting;
 int bApplyShadowTransmittance;
 int LightType;
+float VolumetricScatteringIntensity;
 
 // Shadowing
 uint VirtualShadowMapId;
@@ -220,7 +221,8 @@ void RenderLightingCacheWithLiveShadingCS(
 		return;
 	}
 
-	FDeferredLightData LightData = LoadLightData(LightType);
+	FDeferredLightData LightData = LoadLightData(LightType, VolumetricScatteringIntensity);
+
 #if DIM_LIGHTING_CACHE_MODE == LIGHTING_CACHE_TRANSMITTANCE
 	float3 L = LightData.Direction;
 	float3 ToLight = L * GetMaxShadowTraceDistance();
@@ -320,7 +322,7 @@ void RenderSingleScatteringWithLiveShadingCS(
 			bApplyShadowTransmittance
 		);
 
-		FDeferredLightData LightData = LoadLightData(LightType);
+		FDeferredLightData LightData = LoadLightData(LightType, VolumetricScatteringIntensity);
 		uint StepCount = CalcStepCount(RayMarchingContext);
 
 		RayMarchSingleScattering(

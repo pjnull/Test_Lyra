@@ -4,12 +4,12 @@
 #include "../DeferredLightingCommon.ush"
 #include "../LightGridCommon.ush"
 
-FDeferredLightData LoadLightData(uint LightType)
+FDeferredLightData LoadLightData(uint LightType, float VolumetricScatteringIntensity)
 {
 	FDeferredLightData LightData = (FDeferredLightData)0;
 	LightData.TranslatedWorldPosition = GetDeferredLightTranslatedWorldPosition();
 	LightData.InvRadius = DeferredLightUniforms.InvRadius;
-	LightData.Color = DeferredLightUniforms.Color;
+	LightData.Color = DeferredLightUniforms.Color * VolumetricScatteringIntensity;
 	LightData.FalloffExponent = DeferredLightUniforms.FalloffExponent;
 	LightData.Direction = DeferredLightUniforms.Direction;
 	LightData.Tangent = DeferredLightUniforms.Tangent;
