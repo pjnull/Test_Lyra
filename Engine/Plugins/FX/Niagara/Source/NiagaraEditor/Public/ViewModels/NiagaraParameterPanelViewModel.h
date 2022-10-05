@@ -234,7 +234,6 @@ public:
 	virtual bool GetCanPasteParameterMetaDataAndToolTip(FText& OutCanPasteToolTip);
 
 	virtual bool GetAllowMultiSelect() const { return false; }
-	virtual bool GetShowReferenceCounter() const { return true; }
 
 	virtual void DuplicateParameters(const TArray<FNiagaraParameterPanelItem> ItemToDuplicate) ;
 	virtual bool GetCanDuplicateParameterAndToolTip(const TArray<FNiagaraParameterPanelItem>& ItemsToDuplicate, FText& OutCanDuplicateParameterToolTip) const;
@@ -408,7 +407,6 @@ public:
 	virtual bool GetNamespaceActive(const FName& InNamespace) const override { return true; }
 
 	virtual TSharedPtr<FNiagaraObjectSelection> GetVariableObjectSelection() override { return VariableObjectSelection; };
-	virtual bool GetShowReferenceCounter() const override;
 
 	virtual void SetActiveSection(int32 InSection) override;
 
@@ -469,7 +467,6 @@ private:
 
 	TSharedPtr<FNiagaraObjectSelection> VariableObjectSelection;
 	int32 UserOnlyIdx = -1;
-	int32 CommonOnlyIdx = -1;
 	int32 ActiveScriptIdx = -1;
 	int32 ActiveSystemIdx = -1;
 	int32 LastActiveSystemSectionIdx = -1;
