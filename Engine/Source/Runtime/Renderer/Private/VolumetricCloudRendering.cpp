@@ -1674,6 +1674,8 @@ void FSceneRenderer::InitVolumetricCloudsForViews(FRDGBuilder& GraphBuilder, boo
 
 				for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 				{
+					RDG_EVENT_SCOPE_CONDITIONAL(GraphBuilder, Views.Num() > 1, "View%d", ViewIndex);
+
 					FViewInfo& ViewInfo = Views[ViewIndex];
 					FVector3f ViewOrigin(ViewInfo.ViewMatrices.GetViewOrigin());
 
@@ -2281,6 +2283,8 @@ bool FSceneRenderer::RenderVolumetricCloud(
 
 			for (int32 ViewIndex = 0; ViewIndex < ViewsToProcess.Num(); ViewIndex++)
 			{
+				RDG_EVENT_SCOPE_CONDITIONAL(GraphBuilder, ViewsToProcess.Num() > 1, "View%d", ViewIndex);
+
 				FLocalCloudView& ViewToProcess = ViewsToProcess[ViewIndex];
 				FViewInfo& ViewInfo = *ViewToProcess.ViewInfo;
 
@@ -2440,7 +2444,9 @@ bool FSceneRenderer::RenderVolumetricCloud(
 					SkyRC.ViewMatrices = &ViewInfo.ViewMatrices;
 					SkyRC.ViewUniformBuffer = bShouldViewRenderVolumetricCloudRenderTarget ? ViewInfo.VolumetricRenderTargetViewUniformBuffer : ViewInfo.ViewUniformBuffer;
 
-					SkyRC.Viewport = ViewInfo.ViewRect;
+					SkyRC.Viewport = bShouldViewRenderVolumetricCloudRenderTarget ?
+						FIntRect(FIntPoint(0, 0), FIntPoint(DestinationRT->Desc.GetSize().X, DestinationRT->Desc.GetSize().Y)) // this texture is per view, so we don't need to use viewrect inside it
+						: ViewInfo.ViewRect;
 					SkyRC.bLightDiskEnabled = !ViewInfo.bIsReflectionCapture;
 					SkyRC.AerialPerspectiveStartDepthInCm = GetValidAerialPerspectiveStartDepthInCm(ViewInfo, SkyAtmosphereSceneProxy);
 					SkyRC.NearClippingDistance = ViewInfo.NearClippingDistance;
