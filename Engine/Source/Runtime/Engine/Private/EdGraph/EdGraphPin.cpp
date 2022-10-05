@@ -757,7 +757,7 @@ FString UEdGraphPin::GetDefaultAsString() const
 {
 	if(DefaultObject)
 	{
-		return DefaultObject->GetPathName();
+		return DefaultObject.GetPathName();
 	}
 	else if(!DefaultTextValue.IsEmpty())
 	{
@@ -773,7 +773,7 @@ FString UEdGraphPin::GetDefaultAsString() const
 
 bool UEdGraphPin::IsDefaultAsStringEmpty() const
 {
-	return DefaultObject.IsNullNoResolve() && DefaultTextValue.IsEmpty() && DefaultValue.IsEmpty();
+	return !DefaultObject && DefaultTextValue.IsEmpty() && DefaultValue.IsEmpty();
 }
 
 FText UEdGraphPin::GetDefaultAsText() const
