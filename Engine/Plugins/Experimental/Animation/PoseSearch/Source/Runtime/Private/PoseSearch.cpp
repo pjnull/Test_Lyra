@@ -364,7 +364,7 @@ void UPoseSearchSchema::Finalize()
 	using namespace UE::PoseSearch;
 
 	// Discard null channels
-	Channels.RemoveAll([](TObjectPtr<UPoseSearchFeatureChannel>& Channel) { return Channel.IsNull(); });
+	Channels.RemoveAll([](TObjectPtr<UPoseSearchFeatureChannel>& Channel) { return !Channel; });
 
 	BoneReferences.Reset();
 
@@ -426,7 +426,7 @@ bool UPoseSearchSchema::IsValid() const
 
 	for (const TObjectPtr<UPoseSearchFeatureChannel>& Channel: Channels)
 	{
-		bValid &= !Channel.IsNull();
+		bValid &= Channel != nullptr;
 	}
 
 	bValid &= (BoneReferences.Num() == BoneIndices.Num());
@@ -2754,7 +2754,7 @@ void FSearchResult::Reset()
 
 static void FillCompactPoseAndComponentRefRotations(FAssetSamplingContext& Context)
 {
-	if (!Context.MirrorDataTable.IsNull())
+	if (Context.MirrorDataTable)
 	{
 		const UMirrorDataTable* MirrorDataTablePtr = Context.MirrorDataTable.Get();
 		MirrorDataTablePtr->FillCompactPoseAndComponentRefRotations(
