@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
 using System.Collections;
@@ -833,7 +833,7 @@ namespace UnrealBuildTool
 					// is where it will copy to, so it will error with reading and writing to the same location
 					string IntermediateDirectory = (ProjectFile == null ? Unreal.EngineDirectory : ProjectFile.Directory) + "/Intermediate/Mac";
 					string XcodeInputPListFile = IntermediateDirectory + "/" + ExeName + "-Info.plist";
-					AppendMacLine(FinalizeAppBundleScript, "mkdir \"{0}\"", IntermediateDirectory);
+					AppendMacLine(FinalizeAppBundleScript, "mkdir -p \"{0}\"", IntermediateDirectory);
 					AppendMacLine(FinalizeAppBundleScript, FormatCopyCommand(TempInfoPlist, XcodeInputPListFile));
 					AppendMacLine(FinalizeAppBundleScript, "chmod 644 \"{0}\"", XcodeInputPListFile);
 
