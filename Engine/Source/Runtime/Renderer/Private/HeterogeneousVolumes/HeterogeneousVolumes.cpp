@@ -24,12 +24,15 @@ static TAutoConsoleVariable<int32> CVarHeterogeneousVolumesDebug(
 	ECVF_RenderThreadSafe
 );
 
+#if 0
+// Currently disabled for 5.1
 static TAutoConsoleVariable<int32> CVarHeterogeneousVolumesHardwareRayTracing(
 	TEXT("r.HeterogeneousVolumes.HardwareRayTracing"),
 	0,
 	TEXT("Enables hardware ray tracing acceleration (Default = 0)"),
 	ECVF_RenderThreadSafe
 );
+#endif
 
 static TAutoConsoleVariable<int32> CVarHeterogeneousVolumesIndirectLighting(
 	TEXT("r.HeterogeneousVolumes.IndirectLighting"),
@@ -286,8 +289,13 @@ namespace HeterogeneousVolumes
 
 	bool UseHardwareRayTracing()
 	{
+#if 0
+		// Currently disabled for 5.1
 		return IsRayTracingEnabled()
 			&& (CVarHeterogeneousVolumesHardwareRayTracing.GetValueOnRenderThread() != 0);
+#else
+		return false;
+#endif
 	}
 
 	bool UseIndirectLighting()
