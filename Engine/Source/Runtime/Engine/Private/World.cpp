@@ -3818,7 +3818,6 @@ void FStreamingLevelsToConsider::Add_Internal(ULevelStreaming* StreamingLevel, b
 				};
 
 				StreamingLevels.Insert(StreamingLevel, Algo::LowerBound(StreamingLevels, StreamingLevel, PrioritySort));
-				StreamingLevel->OnStreamingLevelAddedToConsidered();
 			}
 		}
 	}
