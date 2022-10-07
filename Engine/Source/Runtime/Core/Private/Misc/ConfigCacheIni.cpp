@@ -758,7 +758,6 @@ void FConfigFile::CombineFromBuffer(const FString& Buffer, const FString& FileHi
 			Start[FCString::Strlen(Start)-1] = TEXT('\0');
 
 			// If we don't have an existing section by this name, add one
-			CurrentSection = FindOrAddSection( Start );
 			CurrentSectionName = Start;
 			
 			// lookup to see if there is an entry in the SectionName remap
@@ -770,6 +769,8 @@ void FConfigFile::CombineFromBuffer(const FString& Buffer, const FString& FileHi
 				
 				CurrentSectionName = *FoundRemap;
 			}
+			CurrentSection = FindOrAddSection(CurrentSectionName);
+
 			// look to see if there is a set of key remaps for this section
 			CurrentKeyRemap = KeyRemap.Find(CurrentSectionName);
 
