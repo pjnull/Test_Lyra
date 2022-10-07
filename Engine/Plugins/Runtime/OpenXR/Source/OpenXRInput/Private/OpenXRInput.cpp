@@ -571,11 +571,6 @@ void FOpenXRInputPlugin::FOpenXRInput::BuildEnhancedActions(TMap<FString, FInter
 
 void FOpenXRInputPlugin::FOpenXRInput::DestroyActions()
 {
-	if (OpenXRHMD)
-	{
-		OpenXRHMD->ResetActionDevices();
-	}
-
 	// Destroying an action set will also destroy all actions in the set
 	for (const FOpenXRActionSet& ActionSet : ActionSets)
 	{
