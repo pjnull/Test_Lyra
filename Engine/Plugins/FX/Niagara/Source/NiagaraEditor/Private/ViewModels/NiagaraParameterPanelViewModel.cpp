@@ -298,10 +298,10 @@ void INiagaraParameterPanelViewModel::RefreshFull(bool bDoCategoryExpansion) con
 {
 	INiagaraImmutableParameterPanelViewModel::RefreshFull(bDoCategoryExpansion);
 
-	TSharedPtr<INiagaraParameterPanelViewModel> MasterVM = MasterParameterPanelViewModel.Pin();
-	if (MasterVM.IsValid())
+	TSharedPtr<INiagaraParameterPanelViewModel> MainVM = MainParameterPanelViewModel.Pin();
+	if (MainVM.IsValid())
 	{
-		MasterVM->RefreshFull(bDoCategoryExpansion);
+		MainVM->RefreshFull(bDoCategoryExpansion);
 	}
 }
 
@@ -830,10 +830,10 @@ void INiagaraParameterPanelViewModel::SelectParameterItemByName(const FName Para
 
 	OnINiagaraParameterPanelViewModelSelectionChanged(FoundScriptVariable);
 
-	TSharedPtr<INiagaraParameterPanelViewModel> MasterVM = MasterParameterPanelViewModel.Pin();
-	if (MasterVM.IsValid())
+	TSharedPtr<INiagaraParameterPanelViewModel> MainVM = MainParameterPanelViewModel.Pin();
+	if (MainVM.IsValid())
 	{
-		MasterVM->SelectParameterItemByName(ParameterName, bRequestRename);
+		MainVM->SelectParameterItemByName(ParameterName, bRequestRename);
 	}
 }
 
@@ -1355,7 +1355,7 @@ void FNiagaraSystemToolkitParameterPanelViewModel::SetActiveSection(int32 InSect
 		if (ScratchDocumentVM.IsValid())
 		{
 			TWeakPtr<INiagaraParameterPanelViewModel> WeakVM = StaticCastSharedRef< INiagaraParameterPanelViewModel>(AsShared());
-			ScratchDocumentVM->GetParameterPanelViewModel()->SetMasterParameterPanelViewModel(WeakVM);
+			ScratchDocumentVM->GetParameterPanelViewModel()->SetMainParameterPanelViewModel(WeakVM);
 		}
 	}
 }

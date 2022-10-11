@@ -291,7 +291,7 @@ public:
 	virtual FText GetTooltipForSection(FText& InSection) const;
 	void SetActiveSection(FText& InSection);
 	virtual void SetActiveSection(int32 InSection);
-	virtual void SetMasterParameterPanelViewModel(TWeakPtr<INiagaraParameterPanelViewModel> InMasterParameterPanelViewModel) { MasterParameterPanelViewModel = InMasterParameterPanelViewModel; }
+	virtual void SetMainParameterPanelViewModel(TWeakPtr<INiagaraParameterPanelViewModel> InMainParameterPanelViewModel) { MainParameterPanelViewModel = InMainParameterPanelViewModel; }
 
 
 	virtual bool IsVariableSelected(FNiagaraVariableBase& InVar) const { return false; };
@@ -301,7 +301,7 @@ public:
 	static bool CanMakeNewParameterOfType(const FNiagaraTypeDefinition& InType);
 	
 protected:
-	TWeakPtr<INiagaraParameterPanelViewModel> MasterParameterPanelViewModel;
+	TWeakPtr<INiagaraParameterPanelViewModel> MainParameterPanelViewModel;
 	FOnParameterPanelViewModelExternalSelectionChanged OnParameterPanelViewModelExternalSelectionChangedDelegate;
 	FOnSelectParameterItemByName OnSelectParameterItemByNameDelegate;
 	FOnNotifyParameterPendingRename OnNotifyParameterPendingRenameDelegate;
