@@ -11105,6 +11105,7 @@ URigVMFunctionReferenceNode* URigVMController::AddFunctionReferenceNode(URigVMLi
 	FRigVMControllerCompileBracketScope CompileScope(this);
 	
 	RepopulatePinsOnNode(FunctionRefNode, false, false);
+	UpdateTemplateNodePinTypes(FunctionRefNode, false);
 
 	Notify(ERigVMGraphNotifType::NodeAdded, FunctionRefNode);
 
