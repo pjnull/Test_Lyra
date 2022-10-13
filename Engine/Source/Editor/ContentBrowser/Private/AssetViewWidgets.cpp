@@ -44,6 +44,7 @@
 #include "Misc/StringBuilder.h"
 #include "Modules/ModuleManager.h"
 #include "PluginDescriptor.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Rendering/SlateRenderer.h"
 #include "SAssetTagItem.h"
 #include "SThumbnailEditModeTools.h"
@@ -651,6 +652,8 @@ void SAssetViewItem::HandleSourceControlProviderChanged(ISourceControlProvider& 
 
 void SAssetViewItem::HandleSourceControlStateChanged()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SAssetViewItem::HandleSourceControlStateChanged);
+
 	if (AssetItem && AssetItem->IsFile() && !AssetItem->IsTemporary() && ISourceControlModule::Get().IsEnabled())
 	{
 		FString AssetFilename;
