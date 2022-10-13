@@ -695,14 +695,16 @@ static void GatherRayTracingRelevantPrimitives(const FScene& Scene, const FViewI
 
 		for (int PrimitiveIndex = 0; PrimitiveIndex < Scene.PrimitiveSceneProxies.Num(); PrimitiveIndex++)
 		{
-			// Find the next TypeOffsetTable entry that's relevant to this primitive idnex.
+			// Find the next TypeOffsetTable entry that's relevant to this primitive index.
 			while (PrimitiveIndex >= int(Scene.TypeOffsetTable[BroadIndex].Offset))
 			{
 				BroadIndex++;
 			}
 
+            const ERayTracingPrimitiveFlags Flags = Scene.PrimitiveRayTracingFlags[PrimitiveIndex];
+
 			// Skip before dereferencing SceneInfo
-			if (Scene.PrimitiveRayTracingFlags[PrimitiveIndex] == ERayTracingPrimitiveFlags::UnsupportedProxyType)
+			if (Flags == ERayTracingPrimitiveFlags::UnsupportedProxyType)
 			{
 				// Find the index of a proxy of the next type, skipping over a batch of proxies that are the same type as current.
 				// This assumes that FPrimitiveSceneProxy::IsRayTracingRelevant() is consistent for all proxies of the same type.
@@ -743,7 +745,7 @@ static void GatherRayTracingRelevantPrimitives(const FScene& Scene, const FViewI
 			}
 
 			// Marked visible and used after point, check if streaming then mark as used in the TLAS (so it can be streamed in)
-			if (EnumHasAnyFlags(Scene.PrimitiveRayTracingFlags[PrimitiveIndex], ERayTracingPrimitiveFlags::Streaming))
+			if (EnumHasAnyFlags(Flags, ERayTracingPrimitiveFlags::Streaming))
 			{
 				// Is the cached data dirty?
 				if (SceneInfo->bCachedRaytracingDataDirty)
@@ -758,7 +760,7 @@ static void GatherRayTracingRelevantPrimitives(const FScene& Scene, const FViewI
 			FRayTracingRelevantPrimitive Item;
 			Item.PrimitiveIndex = PrimitiveIndex;
 
-			if (EnumHasAnyFlags(Scene.PrimitiveRayTracingFlags[PrimitiveIndex], ERayTracingPrimitiveFlags::StaticMesh))
+			if (EnumHasAnyFlags(Flags, ERayTracingPrimitiveFlags::StaticMesh))
 			{
 				if (View.Family->EngineShowFlags.StaticMeshes)
 				{
@@ -768,7 +770,7 @@ static void GatherRayTracingRelevantPrimitives(const FScene& Scene, const FViewI
 			}
 			else if (View.Family->EngineShowFlags.SkeletalMeshes)
 			{
-				checkf(!EnumHasAllFlags(Scene.PrimitiveRayTracingFlags[PrimitiveIndex], ERayTracingPrimitiveFlags::CacheInstances), 
+				checkf(!EnumHasAllFlags(Flags, ERayTracingPrimitiveFlags::CacheInstances),
 					TEXT("Only static primitives are expected to use CacheInstances flag."));
 
 				Item.bStatic = false;
