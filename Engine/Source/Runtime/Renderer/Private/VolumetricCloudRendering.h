@@ -146,7 +146,18 @@ struct FCloudRenderContext
 
 	int VirtualShadowMapId0 = INDEX_NONE;
 
+	FRDGTextureRef DefaultCloudColorCubeTexture = nullptr;
+	FRDGTextureRef DefaultCloudColor2DTexture = nullptr;
+	FRDGTextureRef DefaultCloudDepthTexture = nullptr;
+	FRDGTextureUAVRef DefaultCloudColorCubeTextureUAV = nullptr;
+	FRDGTextureUAVRef DefaultCloudColor2DTextureUAV = nullptr;
+	FRDGTextureUAVRef DefaultCloudDepthTextureUAV = nullptr;
+
+	FRDGTextureUAVRef ComputeOverlapCloudColorCubeTextureUAVWithoutBarrier = nullptr;
+
 	FCloudRenderContext();
+
+	void CreateDefaultTexturesIfNeeded(FRDGBuilder& GraphBuilder);
 
 private:
 };
