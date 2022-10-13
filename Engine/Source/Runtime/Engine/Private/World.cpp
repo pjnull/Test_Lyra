@@ -2776,7 +2776,7 @@ bool UWorld::SupportsMakingVisibleTransactionRequests() const
 		// We don't support this flag to change dynamically (read ULevelStreaming CVar once)
 		if (!bSupportsMakingVisibleTransactionRequests.IsSet())
 		{
-			bSupportsMakingVisibleTransactionRequests = ULevelStreaming::DefaultAllowClientUseMakingVisibleTransactionRequests() || (IsPartitionedWorld() && UWorldPartition::UseMakingVisibleTransactionRequests());
+			bSupportsMakingVisibleTransactionRequests = ULevelStreaming::DefaultAllowClientUseMakingVisibleTransactionRequests() || (IsPartitionedWorld() && GetWorldPartition()->UseMakingVisibleTransactionRequests());
 		}
 		return bSupportsMakingVisibleTransactionRequests.GetValue();
 	}
@@ -2790,7 +2790,7 @@ bool UWorld::SupportsMakingInvisibleTransactionRequests() const
 		// We don't support this flag to change dynamically (read ULevelStreaming CVar once)
 		if (!bSupportsMakingInvisibleTransactionRequests.IsSet())
 		{
-			bSupportsMakingInvisibleTransactionRequests = ULevelStreaming::DefaultAllowClientUseMakingInvisibleTransactionRequests() || (IsPartitionedWorld() && UWorldPartition::UseMakingInvisibleTransactionRequests());
+			bSupportsMakingInvisibleTransactionRequests = ULevelStreaming::DefaultAllowClientUseMakingInvisibleTransactionRequests() || (IsPartitionedWorld() && GetWorldPartition()->UseMakingInvisibleTransactionRequests());
 		}
 		return bSupportsMakingInvisibleTransactionRequests.GetValue();
 	}
