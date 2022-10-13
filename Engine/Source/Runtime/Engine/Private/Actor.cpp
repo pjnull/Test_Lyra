@@ -178,6 +178,8 @@ void AActor::InitializeDefaults()
 	DefaultUpdateOverlapsMethodDuringLevelStreaming = EActorUpdateOverlapsMethod::OnlyUpdateMovable;
 	
 	bHasDeferredComponentRegistration = false;
+	bHasRegisteredAllComponents = false;
+
 #if WITH_EDITORONLY_DATA
 	bIsInEditingLevelInstance = false;
 	PivotOffset = FVector::ZeroVector;
@@ -5167,6 +5169,8 @@ void AActor::UnregisterAllComponents(const bool bForReregister)
 		}
 	}
 
+	bHasRegisteredAllComponents = false;
+
 	PostUnregisterAllComponents();
 }
 
@@ -5187,6 +5191,7 @@ void AActor::RegisterAllComponents()
 
 	// Clear this flag as it's no longer deferred
 	bHasDeferredComponentRegistration = false;
+	bHasRegisteredAllComponents = true;
 }
 
 // Walks through components hierarchy and returns closest to root parent component that is unregistered
