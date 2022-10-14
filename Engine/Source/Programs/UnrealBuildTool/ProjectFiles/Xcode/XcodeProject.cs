@@ -2184,6 +2184,8 @@ namespace UnrealBuildTool.XcodeProjectXcconfig
 					LegacyProjectFile.ProjectTargets.AddRange(ProjectTargets);
 					LegacyProjectFile.SourceFiles.AddRange(SourceFiles);
 					LegacyProjectFile.IsGeneratedProject = IsGeneratedProject;
+					LegacyProjectFile.IsStubProject = IsStubProject;
+					LegacyProjectFile.IsForeignProject = IsForeignProject;
 				}
 			}
 		}
