@@ -129,6 +129,7 @@ FDeferredLightData LoadLightData(uint LightType)
 	return LightData;
 }
 
+// Must match FLumenPackedLight in LumenSceneDirectLighting.cpp
 struct FLumenPackedLight
 {
 	float3 WorldPosition;
@@ -158,10 +159,14 @@ struct FLumenPackedLight
 	float ProxyRadius;
 
 	float3 ProxyDirection;
-	uint bHasShadowMask_RectLightAtlasMaxLevel;
+	float RectLightAtlasMaxLevel;
 	
 	float2 SinCosConeAngleOrRectLightAtlasUVScale;
 	float2 RectLightAtlasUVOffset;
+
+	uint LightingChannelMask;
+	uint bHasShadowMask;
+	uint Padding[2];
 };
 
 struct FLumenLight
@@ -176,6 +181,7 @@ struct FLumenLight
 	float SinConeAngle;
 
 	uint VirtualShadowMapId;
+	uint LightingChannelMask;
 	uint bHasShadowMask;
 	uint Type;
 };
@@ -207,7 +213,7 @@ FLumenLight LoadLumenLight(uint LightIndex, float3 PreViewTranslation)
 	DeferredLightData.RectLightBarnLength = PackedLight.RectLightBarnLength;
 	DeferredLightData.RectLightAtlasUVScale = PackedLight.SinCosConeAngleOrRectLightAtlasUVScale;
 	DeferredLightData.RectLightAtlasUVOffset = PackedLight.RectLightAtlasUVOffset;
-	DeferredLightData.RectLightAtlasMaxLevel = asfloat(BitFieldExtractU32(PackedLight.bHasShadowMask_RectLightAtlasMaxLevel, 31, 0));
+	DeferredLightData.RectLightAtlasMaxLevel = PackedLight.RectLightAtlasMaxLevel;
 	DeferredLightData.bInverseSquared = PackedLight.FalloffExponent == 0.0f;
 	DeferredLightData.bRadialLight = PackedLight.LightType != LIGHT_TYPE_DIRECTIONAL;
 	DeferredLightData.bSpotLight = PackedLight.LightType == LIGHT_TYPE_SPOT;
@@ -222,7 +228,8 @@ FLumenLight LoadLumenLight(uint LightIndex, float3 PreViewTranslation)
 	LumenLight.CosConeAngle = PackedLight.SinCosConeAngleOrRectLightAtlasUVScale.y;
 	LumenLight.SinConeAngle = PackedLight.SinCosConeAngleOrRectLightAtlasUVScale.x;
 	LumenLight.VirtualShadowMapId = PackedLight.VirtualShadowMapId;
-	LumenLight.bHasShadowMask = BitFieldExtractU32(PackedLight.bHasShadowMask_RectLightAtlasMaxLevel, 1, 31);
+	LumenLight.bHasShadowMask = PackedLight.bHasShadowMask;
+	LumenLight.LightingChannelMask = PackedLight.LightingChannelMask;
 	LumenLight.Type = PackedLight.LightType;
 	return LumenLight;
 }
