@@ -41,6 +41,7 @@ class FRecastQueryFilter;
 class INavLinkCustomInterface;
 class UCanvas;
 class UNavArea;
+class UNavigationDataChunk;
 class UPrimitiveComponent;
 class URecastNavMeshDataChunk;
 class ARecastNavMesh;
