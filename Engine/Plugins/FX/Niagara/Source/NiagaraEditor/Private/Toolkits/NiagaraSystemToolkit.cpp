@@ -1400,9 +1400,14 @@ void FNiagaraSystemToolkit::OnSystemSelectionChanged()
 	RefreshParameters();
 }
 
-void FNiagaraSystemToolkit::OnViewModelRequestFocusTab(FName TabName)
+void FNiagaraSystemToolkit::OnViewModelRequestFocusTab(FName TabName, bool bDrawAttention)
 {
-	GetTabManager()->TryInvokeTab(TabName);
+	TSharedPtr<SDockTab> DockTab = GetTabManager()->TryInvokeTab(TabName);
+
+	if(DockTab.IsValid() && bDrawAttention)
+	{
+		DockTab->FlashTab();
+	}
 }
 
 

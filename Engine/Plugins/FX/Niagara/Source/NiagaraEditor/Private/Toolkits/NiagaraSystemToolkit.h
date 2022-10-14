@@ -194,7 +194,7 @@ private:
 	void OnPinnedCurvesChanged();
 	void RefreshParameters();
 	void OnSystemSelectionChanged();
-	void OnViewModelRequestFocusTab(FName TabName);
+	void OnViewModelRequestFocusTab(FName TabName, bool bDrawAttention = false);
 	
 	const FName GetNiagaraSystemMessageLogName(UNiagaraSystem* InSystem) const;
 	void OnSaveThumbnailImage();
