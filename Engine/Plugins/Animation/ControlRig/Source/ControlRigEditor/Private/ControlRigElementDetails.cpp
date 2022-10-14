@@ -3059,7 +3059,7 @@ void FRigControlElementDetails::CustomizeAnimationChannels(IDetailLayoutBuilder&
 
 FReply FRigControlElementDetails::OnAddAnimationChannelClicked()
 {
-	if(!IsAnyElementNotOfType(ERigElementType::Control) || IsAnyElementProcedural())
+	if(IsAnyElementNotOfType(ERigElementType::Control) || IsAnyElementProcedural())
 	{
 		return FReply::Handled();
 	}
@@ -3075,6 +3075,7 @@ FReply FRigControlElementDetails::OnAddAnimationChannelClicked()
 	Settings.MaximumValue = FRigControlValue::Make<float>(1.f);
 	Settings.DisplayName = HierarchyToChange->GetSafeNewDisplayName(Key, ChannelName);
 	HierarchyToChange->GetController(true)->AddAnimationChannel(*ChannelName, Key, Settings, true, true);
+	HierarchyToChange->GetController(true)->SelectElement(Key);
 	return FReply::Handled();
 }
 
