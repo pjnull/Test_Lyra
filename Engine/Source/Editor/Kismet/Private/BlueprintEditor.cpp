@@ -9806,7 +9806,10 @@ void FBlueprintEditor::RestoreEditedObjectState()
 			Blueprint->LastEditedDocuments.Add(FBlueprintEditorUtils::FindUserConstructionScript(Blueprint));
 		}
 
-		Blueprint->LastEditedDocuments.Add(FBlueprintEditorUtils::FindEventGraph(Blueprint));
+		if (Blueprint->SupportsEventGraphs())
+		{
+			Blueprint->LastEditedDocuments.Add(FBlueprintEditorUtils::FindEventGraph(Blueprint));
+		}
 	}
 
 	for (int32 i = 0; i < Blueprint->LastEditedDocuments.Num(); i++)
@@ -9815,6 +9818,11 @@ void FBlueprintEditor::RestoreEditedObjectState()
 		{
 			if(UEdGraph* Graph = Cast<UEdGraph>(Obj))
 			{
+				if (FBlueprintEditorUtils::IsEventGraph(Graph) && !Blueprint->SupportsEventGraphs())
+				{
+					continue;
+				}
+
 				struct LocalStruct
 				{
 					static TSharedPtr<SDockTab> OpenGraphTree(FBlueprintEditor* InBlueprintEditor, UEdGraph* InGraph)
