@@ -1526,6 +1526,7 @@ void UWorld::RepairChaosActors()
 					PersistentLevel->OwningWorld = this;
 				}
 
+				PersistentLevel->Actors[i]->SetHasActorRegisteredAllComponents();
 				PersistentLevel->Actors[i]->PostRegisterAllComponents();
 
 				if (bClearOwningWorld)
