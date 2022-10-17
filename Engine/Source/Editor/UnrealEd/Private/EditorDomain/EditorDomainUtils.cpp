@@ -168,7 +168,7 @@ bool bGGlobalConstructClassesInitialized = false;
 int64 GMaxBulkDataSize = -1;
 
 // Change to a new guid when EditorDomain needs to be invalidated
-const TCHAR* EditorDomainVersion = TEXT("1A71E99C857343C7A6AEB0035E8F5F26");
+const TCHAR* EditorDomainVersion = TEXT("D0A87D5986BD47479D64C08F70CE9BB2");
 
 // Identifier of the CacheBuckets for EditorDomain tables
 const TCHAR* EditorDomainPackageBucketName = TEXT("EditorDomainPackage");
@@ -492,18 +492,6 @@ FClassDigestData* FPrecacheClassDigest::GetRecursive(FName ClassName, bool bAllo
 		}
 	}
 
-	UStruct* Struct = nullptr;
-	if (FPackageName::IsScriptPackage(NameStringBuffer))
-	{
-		Struct = FindObject<UStruct>(nullptr, *NameStringBuffer);
-		if (!Struct)
-		{
-			// If ClassName is native but is not yet loaded then abort and the caller gives an error or retries later
-			ClassDigests.Remove(ClassName);
-			return nullptr;
-		}
-	}
-
 	// Fill in digest data config-driven flags
 	DigestData->EditorDomainUse = EDomainUse::LoadEnabled | EDomainUse::SaveEnabled;
 	DigestData->EditorDomainUse &= ~MapFindRef(GClassBlockedUses, ClassName, EDomainUse::None);
@@ -521,18 +509,39 @@ FClassDigestData* FPrecacheClassDigest::GetRecursive(FName ClassName, bool bAllo
 	}
 
 	// Fill in native-specific digest data, get the ParentName, and if non-native, get the native ancestor struct
-	FName ParentName;
-	if (Struct)
+	UStruct* Struct = nullptr;
+	bool bIsNative = FPackageName::IsScriptPackage(NameStringBuffer);
+	if (bIsNative)
 	{
-		DigestData->ResolvedClosestNative = RedirectsResolvedName;
-		DigestData->bNative = true;
-		DigestData->SchemaHash = Struct->GetSchemaHash(false /* bSkipEditorOnly */);
-		UStruct* ParentStruct = Struct->GetSuperStruct();
-		if (ParentStruct)
+		Struct = FindObject<UStruct>(nullptr, *NameStringBuffer);
+	}
+	FName ParentName;
+	if (bIsNative)
+	{
+		if (Struct)
 		{
-			NameStringBuffer.Reset();
-			ParentStruct->GetPathName(nullptr, NameStringBuffer);
-			ParentName = FName(*NameStringBuffer);
+			DigestData->ResolvedClosestNative = RedirectsResolvedName;
+			DigestData->bNative = true;
+			DigestData->SchemaHash = Struct->GetSchemaHash(false /* bSkipEditorOnly */);
+			UStruct* ParentStruct = Struct->GetSuperStruct();
+			if (ParentStruct)
+			{
+				NameStringBuffer.Reset();
+				ParentStruct->GetPathName(nullptr, NameStringBuffer);
+				ParentName = FName(*NameStringBuffer);
+			}
+		}
+		else
+		{
+			UE_LOG(LogEditorDomain, Display, TEXT("Class %s is imported by a package but does not exist in memory. EditorDomain keys for packages using it will be invalid if it still exists.")
+				TEXT("\n\tTo clear this message, resave packages that use the deleted class, or load its module earlier than the packages that use it are referenced."),
+				*NameStringBuffer);
+
+			// Create placeholder data that acts as if this class is a leaf off of UObject
+			DigestData->ResolvedClosestNative = FName(*UObject::StaticClass()->GetPathName());
+			DigestData->bNative = true;
+			DigestData->SchemaHash.Reset();
+			ParentName = DigestData->ResolvedClosestNative;
 		}
 	}
 	else
@@ -551,19 +560,23 @@ FClassDigestData* FPrecacheClassDigest::GetRecursive(FName ClassName, bool bAllo
 		// if its parent classes are not, then we will not be able to propagate information from the parent classes; wait on the class to be parsed
 		AncestorPathNames.Reset();
 		IAssetRegistry::Get()->GetAncestorClassNames(ClassObjectPathName, AncestorPathNames);
-		for (const FTopLevelAssetPath& PathName : AncestorPathNames)
+		if (!AncestorPathNames.IsEmpty())
 		{
-			// TODO_EDITORDOMAIN: For robustness and performance, we need the AssetRegistry to return FullPathNames rather than ShortNames
-			// For now, we lookup each shortname using FindObject, and do not handle propagating data from blueprint classes to child classes
-			if (UStruct* CurrentStruct = FindObject<UStruct>(PathName))
+			NameStringBuffer.Reset();
+			AncestorPathNames[0].AppendString(NameStringBuffer);
+			ParentName = FName(*NameStringBuffer);
+			for (const FTopLevelAssetPath& PathName : AncestorPathNames)
 			{
-				NameStringBuffer.Reset();
-				CurrentStruct->GetPathName(nullptr, NameStringBuffer);
-				if (FPackageName::IsScriptPackage(NameStringBuffer))
+				if (UStruct* CurrentStruct = FindObject<UStruct>(PathName))
 				{
-					ParentName = FName(*NameStringBuffer);
-					Struct = CurrentStruct;
-					break;
+					NameStringBuffer.Reset();
+					CurrentStruct->GetPathName(nullptr, NameStringBuffer);
+					if (FPackageName::IsScriptPackage(NameStringBuffer))
+					{
+						Struct = CurrentStruct;
+						DigestData->ResolvedClosestNative = FName(*NameStringBuffer);
+						break;
+					}
 				}
 			}
 		}
@@ -571,7 +584,10 @@ FClassDigestData* FPrecacheClassDigest::GetRecursive(FName ClassName, bool bAllo
 		{
 			ParentName = FName(*UObject::StaticClass()->GetPathName());
 		}
-		DigestData->ResolvedClosestNative = ParentName;
+		if (DigestData->ResolvedClosestNative.IsNone())
+		{
+			DigestData->ResolvedClosestNative = FName(*UObject::StaticClass()->GetPathName());
+		}
 	}
 	check(!DigestData->ResolvedClosestNative.IsNone());
 
@@ -594,8 +610,8 @@ FClassDigestData* FPrecacheClassDigest::GetRecursive(FName ClassName, bool bAllo
 	TArray<FName> ConstructClasses; // Not a class scratch variable because we use it across recursive calls
 	if (!ParentName.IsNone())
 	{
-		// CoreRedirects are expected to act only on import classes from packages; they are not expected to act on the parent class pointer
-		// of a native class, which is authoritative, so set bAllowRedirects = false
+		// Set bAllowRedirects = false. ParentName already has been CoreRedirected, because it is from the native
+		// struct's parent class pointer or it is from GetAncestorClassNames which gives the redirected ancestors.
 		FClassDigestData* ParentDigest = GetRecursive(ParentName, false /* bAllowRedirects */);
 		// The map has possibly been modified so we need to recalculate the address of ClassName's DigestData
 		DigestData = &ClassDigests.FindChecked(ClassName);
@@ -1608,6 +1624,11 @@ private:
 	uint64 BulkDataSize = 0;
 };
 
+static FGuid IoHashToGuid(const FIoHash& Hash)
+{
+	const uint32* HashInts = reinterpret_cast<const uint32*>(Hash.GetBytes());
+	return FGuid(HashInts[0], HashInts[1], HashInts[2], HashInts[3]);
+}
 
 bool TrySavePackage(UPackage* Package)
 {
@@ -1650,8 +1671,6 @@ bool TrySavePackage(UPackage* Package)
 	uint32 SaveFlags = SAVE_NoError // Do not crash the SaveServer on an error
 		| SAVE_BulkDataByReference	// EditorDomain saves reference bulkdata from the WorkspaceDomain rather than duplicating it
 		| SAVE_Async				// SavePackage support for PackageWriter is only implemented with SAVE_Async
-		// EDITOR_DOMAIN_TODO: Add a a save flag that specifies the creation of a deterministic guid
-		// | SAVE_KeepGUID;			// Prevent indeterminism by keeping the Guid
 		;
 
 	TArray<UObject*> PackageObjects;
@@ -1693,6 +1712,9 @@ bool TrySavePackage(UPackage* Package)
 	SaveArgs.SaveFlags = SaveFlags;
 	SaveArgs.bSlowTask = false;
 	SaveArgs.SavePackageContext = &SavePackageContext;
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS;
+	SaveArgs.OutputPackageGuid.Emplace(IoHashToGuid(PackageDigest.Hash));
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS;
 	FSavePackageResultStruct Result = GEditor->Save(Package, nullptr, TEXT("EditorDomainPackageWriter"), SaveArgs);
 	if (Result.Result != ESavePackageResult::Success)
 	{
