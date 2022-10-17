@@ -322,6 +322,8 @@ void FSceneRenderer::ComputeLightGrid(FRDGBuilder& GraphBuilder, bool bCullLight
 		int32 ClusteredSupportedEnd = 0;
 		int32 LumenSupportedStart = 0;
 
+		const float Exposure = View.GetLastEyeAdaptationExposure();
+
 		if (bCullLightsToGrid)
 		{
 			// Simple lights are copied without view dependent checks, so same in and out
@@ -364,7 +366,7 @@ void FSceneRenderer::ComputeLightGrid(FRDGBuilder& GraphBuilder, bool bCullLight
 
 					const FVector3f LightTranslatedWorldPosition(View.ViewMatrices.GetPreViewTranslation() + SimpleLightPerViewData.Position);
 					LightData.LightPositionAndInvRadius = FVector4f(LightTranslatedWorldPosition, 1.0f / FMath::Max(SimpleLight.Radius, KINDA_SMALL_NUMBER));
-					LightData.LightColorAndFalloffExponent = FVector4f((FVector3f)SimpleLight.Color, SimpleLight.Exponent);
+					LightData.LightColorAndFalloffExponent = FVector4f((FVector3f)SimpleLight.Color * FLightRenderParameters::GetLightExposureScale(Exposure, SimpleLight.InverseExposureBlend), SimpleLight.Exponent);
 
 					// No shadowmap channels for simple lights
 					uint32 ShadowMapChannelMask = 0;
@@ -387,8 +389,6 @@ void FSceneRenderer::ComputeLightGrid(FRDGBuilder& GraphBuilder, bool bCullLight
 #endif // ENABLE_LIGHT_CULLING_VIEW_SPACE_BUILD_DATA
 				}
 			}
-
-			const float Exposure = View.GetLastEyeAdaptationExposure();
 
 			float SelectedForwardDirectionalLightIntensitySq = 0.0f;
 			int32 SelectedForwardDirectionalLightPriority = -1;
