@@ -2892,6 +2892,12 @@ void UMaterialInstance::PostLoad()
 	}
 #endif // WITH_EDITORONLY_DATA
 
+	if (!GIsEditor)
+	{
+		// Filter out ShadingModels field to a current platform settings
+		FilterOutPlatformShadingModels(GMaxRHIShaderPlatform, ShadingModels);
+	}
+
 #if WITH_EDITOR
 	UpdateCachedData();
 #endif
