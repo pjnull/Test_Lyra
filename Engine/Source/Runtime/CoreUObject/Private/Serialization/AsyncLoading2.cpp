@@ -63,6 +63,7 @@
 #include "HAL/LowLevelMemStats.h"
 #include "HAL/IPlatformFileOpenLogWrapper.h"
 #include "Modules/ModuleManager.h"
+#include "Containers/MpscQueue.h"
 #include "Containers/SpscQueue.h"
 #include "Misc/PathViews.h"
 #include "UObject/LinkerLoad.h"
@@ -1857,24 +1858,6 @@ struct FAsyncLoadingThreadState2
 
 	}
 
-	bool HasDeferredFrees() const
-	{
-		return DeferredFreeArcs.Num() > 0;
-	}
-
-	void ProcessDeferredFrees()
-	{
-		if (DeferredFreeArcs.Num() > 0)
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(ProcessDeferredFrees);
-			for (TTuple<FEventLoadNode2**, uint32>& DeferredFreeArc : DeferredFreeArcs)
-			{
-				GraphAllocator.FreeArcs(DeferredFreeArc.Get<0>(), DeferredFreeArc.Get<1>());
-			}
-			DeferredFreeArcs.Reset();
-		}
-	}
-
 	void SetTimeLimit(bool bInUseTimeLimit, double InTimeLimit)
 	{
 		bUseTimeLimit = bInUseTimeLimit;
@@ -1914,7 +1897,6 @@ struct FAsyncLoadingThreadState2
 	}
 
 	FAsyncLoadEventGraphAllocator& GraphAllocator;
-	TArray<TTuple<FEventLoadNode2**, uint32>> DeferredFreeArcs;
 	TArray<FEventLoadNode2*> NodesToFire;
 	FEventLoadNode2* CurrentlyExecutingEventNode = nullptr;
 	TArray<FAsyncLoadingSyncLoadContext*> SyncLoadContextStack;
@@ -2591,6 +2573,7 @@ public:
 
 private:
 	/** Thread to run the worker FRunnable on */
+	static constexpr int32 DefaultAsyncPackagesReserveCount = 512;
 	FRunnableThread* Thread;
 	TAtomic<bool> bStopRequested { false };
 	TAtomic<bool> bSuspendRequested { false };
@@ -2616,7 +2599,7 @@ private:
 	TSet<FWeakObjectPtr> LoadedAssets;
 #endif
 	/** [ASYNC/GAME THREAD] Packages to be deleted from async thread */
-	TSpscQueue<FAsyncPackage2*> DeferredDeletePackages;
+	TMpscQueue<FAsyncPackage2*> DeferredDeletePackages;
 	
 	struct FFailedPackageRequest
 	{
@@ -2631,7 +2614,7 @@ private:
 	/** Packages in active loading with GetAsyncPackageId() as key */
 	TMap<FPackageId, FAsyncPackage2*> AsyncPackageLookup;
 
-	TSpscQueue<FAsyncPackage2*> ExternalReadQueue;
+	TMpscQueue<FAsyncPackage2*> ExternalReadQueue;
 	TAtomic<int32> PendingIoRequestsCounter{ 0 };
 	
 	/** List of all pending package requests */
@@ -2665,7 +2648,7 @@ private:
 	FPackageStore& PackageStore;
 	FLoadedPackageStore LoadedPackageStore;
 	FGlobalImportStore GlobalImportStore;
-	TSpscQueue<FPackageRequest> PackageRequestQueue;
+	TMpscQueue<FPackageRequest> PackageRequestQueue;
 	TArray<FAsyncPackage2*> PendingPackages;
 
 	/** [GAME THREAD] Initial load pending CDOs */
@@ -2905,6 +2888,10 @@ public:
 		{
 			PendingRequests.Remove(ID);
 			TRACE_LOADTIME_END_REQUEST(ID);
+		}
+		if (PendingRequests.IsEmpty())
+		{
+			PendingRequests.Empty(DefaultAsyncPackagesReserveCount);
 		}
 	}
 
@@ -3156,6 +3143,10 @@ private:
 		for (int32 RequestId : Package->RequestIDs)
 		{
 			RequestIdToPackageMap.Remove(RequestId);
+		}
+		if (RequestIdToPackageMap.IsEmpty())
+		{
+			RequestIdToPackageMap.Empty(DefaultAsyncPackagesReserveCount);
 		}
 		delete Package;
 		--PackagesWithRemainingWorkCounter;
@@ -3639,7 +3630,7 @@ void FEventLoadNode2::ProcessDependencies(FAsyncLoadingThreadState2& ThreadState
 				ThreadState.NodesToFire.Push(Dependent);
 			}
 		}
-		ThreadState.DeferredFreeArcs.Add(MakeTuple(MultipleDependents, DependenciesCapacity));
+		Package->GetGraphAllocator().FreeArcs(MultipleDependents, DependenciesCapacity);
 	}
 	if (ThreadState.bShouldFireNodes)
 	{
@@ -6203,8 +6194,6 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessAsyncLoadingFromGameThread
 				break;
 			}
 
-			ThreadState.ProcessDeferredFrees();
-
 			if (!DeferredDeletePackages.IsEmpty())
 			{
 				FAsyncPackage2* Package = nullptr;
@@ -6359,6 +6348,10 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 			{
 				FScopeLock LockAsyncPackages(&AsyncPackagesCritical);
 				AsyncPackageLookup.Remove(Package->Desc.UPackageId);
+				if (AsyncPackageLookup.IsEmpty())
+				{
+					AsyncPackageLookup.Empty(DefaultAsyncPackagesReserveCount);
+				}
 				if (!Package->bLoadHasFailed)
 				{
 #if WITH_EDITOR
@@ -6485,10 +6478,6 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 
 		// We're not done until all packages have been deleted
 		Result = CompletedPackages.Num() ? EAsyncPackageState::PendingImports  : EAsyncPackageState::Complete;
-		if (Result == EAsyncPackageState::Complete && ThreadState.HasDeferredFrees())
-		{
-			ThreadState.ProcessDeferredFrees();
-		}
 	}
 
 	return Result;
@@ -6573,6 +6562,10 @@ FAsyncLoadingThread2::FAsyncLoadingThread2(FIoDispatcher& InIoDispatcher, IAsync
 #endif
 
 	EventQueue.SetZenaphore(&AltZenaphore);
+
+	AsyncPackageLookup.Reserve(DefaultAsyncPackagesReserveCount);
+	PendingPackages.Reserve(DefaultAsyncPackagesReserveCount);
+	RequestIdToPackageMap.Reserve(DefaultAsyncPackagesReserveCount);
 
 	EventSpecs.AddDefaulted(EEventLoadNode2::Package_NumPhases + EEventLoadNode2::ExportBundle_NumPhases);
 	EventSpecs[EEventLoadNode2::Package_ProcessSummary] = { &FAsyncPackage2::Event_ProcessPackageSummary, &EventQueue, false };
@@ -6804,12 +6797,6 @@ uint32 FAsyncLoadingThread2::Run()
 								continue;
 							}
 						}
-					}
-
-					if (ThreadState.HasDeferredFrees())
-					{
-						ThreadState.ProcessDeferredFrees();
-						continue;
 					}
 
 					if (!DeferredDeletePackages.IsEmpty())
