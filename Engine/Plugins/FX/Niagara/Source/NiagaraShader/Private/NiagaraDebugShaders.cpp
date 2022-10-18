@@ -7,9 +7,9 @@
 #include "CommonRenderResources.h"
 #include "Modules/ModuleManager.h"
 
-#include "RenderGraphBuilder.h"
-#include "Runtime/Renderer/Private/ScreenPass.h"
 #include "PipelineStateCache.h"
+#include "RenderGraphBuilder.h"
+#include "ScreenPass.h"
 
 int GNiagaraGpuComputeDebug_ShowNaNInf = 1;
 static FAutoConsoleVariableRef CVarNiagaraGpuComputeDebug_ShowNaNInf(

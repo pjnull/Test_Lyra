@@ -2,13 +2,13 @@
 
 #include "NiagaraDataInterfaceRigidMeshCollisionQuery.h"
 #include "Algo/ForEach.h"
-#include "Components/SkeletalMeshComponent.h"
-#include "Engine/Canvas.h"
-#include "Renderer/Private/DistanceFieldLightingShared.h"
 #include "Animation/SkeletalMeshActor.h"
 #include "AnimationRuntime.h"
-#include "SkeletalRenderPublic.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "DistanceFieldLightingShared.h"
+#include "Engine/Canvas.h"
 #include "EngineUtils.h"
+#include "SkeletalRenderPublic.h"
 
 #include "NiagaraComponent.h"
 #include "NiagaraDataInterfaceUtilities.h"
