@@ -2915,7 +2915,25 @@ private:
 	}
 #endif
 
+	bool ProcessDeferredDeletePackagesQueue(int32 MaxCount = MAX_int32)
+	{
+		bool bDidSomething = false;
+		if (!DeferredDeletePackages.IsEmpty())
+		{
+			FAsyncPackage2* Package = nullptr;
+			int32 Count = 0;
+			while (++Count <= MaxCount && DeferredDeletePackages.Dequeue(Package))
+			{
+				DeleteAsyncPackage(Package);
+				bDidSomething = true;
+			}
+		}
+		return bDidSomething;
+	}
+
 	void OnLeakedPackageRename(UPackage* Package);
+
+	void OnPreGarbageCollect();
 
 	void RemoveUnreachableObjects(FUnreachableObjects& ObjectsToRemove);
 
@@ -6194,11 +6212,8 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessAsyncLoadingFromGameThread
 				break;
 			}
 
-			if (!DeferredDeletePackages.IsEmpty())
+			if (ProcessDeferredDeletePackagesQueue(1))
 			{
-				FAsyncPackage2* Package = nullptr;
-				DeferredDeletePackages.Dequeue(Package);
-				DeleteAsyncPackage(Package);
 				bDidSomething = true;
 				break;
 			}
@@ -6582,6 +6597,7 @@ FAsyncLoadingThread2::FAsyncLoadingThread2(FIoDispatcher& InIoDispatcher, IAsync
 	AsyncLoadingTickCounter = 0;
 
 	FCoreUObjectInternalDelegates::GetOnLeakedPackageRenameDelegate().AddRaw(this, &FAsyncLoadingThread2::OnLeakedPackageRename);
+	FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddRaw(this, &FAsyncLoadingThread2::OnPreGarbageCollect);
 
 	FAsyncLoadingThreadState2::TlsSlot = FPlatformTLS::AllocTlsSlot();
 	GameThreadState = MakeUnique<FAsyncLoadingThreadState2>(GraphAllocator, IoDispatcher);
@@ -6604,7 +6620,6 @@ FAsyncLoadingThread2::~FAsyncLoadingThread2()
 void FAsyncLoadingThread2::ShutdownLoading()
 {
 	FCoreUObjectDelegates::GetPreGarbageCollectDelegate().RemoveAll(this);
-	FCoreUObjectDelegates::GetPostGarbageCollect().RemoveAll(this);
 	FCoreUObjectInternalDelegates::GetOnLeakedPackageRenameDelegate().RemoveAll(this);
 
 	delete Thread;
@@ -6799,14 +6814,8 @@ uint32 FAsyncLoadingThread2::Run()
 						}
 					}
 
-					if (!DeferredDeletePackages.IsEmpty())
+					if (ProcessDeferredDeletePackagesQueue(100))
 					{
-						FAsyncPackage2* Package = nullptr;
-						int32 Count = 0;
-						while (++Count <= 100 && DeferredDeletePackages.Dequeue(Package))
-						{
-							DeleteAsyncPackage(Package);
-						}
 						continue;
 					}
 				} // release FGCScopeGuard
@@ -7022,6 +7031,14 @@ void FAsyncLoadingThread2::OnLeakedPackageRename(UPackage* Package)
 		return;
 	}
 
+	UE_LOG(LogStreaming, Display, TEXT("Renaming leaked package %s (0x%llX)"), *Package->GetName(), Package->GetPackageId().ValueForDebugging());
+
+	// Flush the delete queue to clear references to the renamed package, if there are still references after this we're not done with loading the package and it shouldn't have been renamed
+	// If this function is called from within a GC the ALT will be inactive and not touching the deferred delete queue or the unreachable objects array
+	// If this function is called outside of a GC (CheckAndHandleStaleWorldObjectReferences) the call to FlushAsyncLoading above will empty the deferred delete queue but the ALT can still be processing
+	// the unreachable objects array so we need to protect that with a lock
+	ProcessDeferredDeletePackagesQueue();
+
 	FScopeLock UnreachableObjectsLock(&UnreachableObjectsCritical);
 
 	// unreachable objects from last GC should typically have been processed already,
@@ -7035,6 +7052,8 @@ void FAsyncLoadingThread2::OnLeakedPackageRename(UPackage* Package)
 	{
 		return;
 	}
+
+	UE_CLOG(PackageRef->GetRefCount() != 0, LogStreaming, Fatal, TEXT("Renaming leaked package %s (0x%llX) that's still referenced by active loading (RefCount=%d)"), *Package->GetName(), Package->GetPackageId().ValueForDebugging(), PackageRef->GetRefCount());
 
 	// Code such as LoadMap or LevelStreaming is about to rename a loaded package which was detected as leaking so that we can load another copy of it.
 	// We should not have any loading happening at present, so we can remove these objects from our stores 
@@ -7053,6 +7072,12 @@ void FAsyncLoadingThread2::OnLeakedPackageRename(UPackage* Package)
 	Package->SetCanBeImportedFlag(false);
 }
 
+void FAsyncLoadingThread2::OnPreGarbageCollect()
+{
+	// Flush the delete queue so that we don't prevent packages from being garbage collected if we're done with them
+	ProcessDeferredDeletePackagesQueue();
+}
+
 void FAsyncLoadingThread2::RemoveUnreachableObjects(FUnreachableObjects& ObjectsToRemove)
 {
 	if (ObjectsToRemove.Num() == 0)
@@ -7069,14 +7094,14 @@ void FAsyncLoadingThread2::RemoveUnreachableObjects(FUnreachableObjects& Objects
 
 	const double StartTime = FPlatformTime::Seconds();
 
+	GlobalImportStore.RemovePublicExports(ObjectsToRemove);
+	LoadedPackageStore.RemovePackages(ObjectsToRemove);
+	ObjectsToRemove.Reset();
+
 	const int32 NewLoadedPackageCount = LoadedPackageStore.NumTracked();
 	const int32 NewPublicExportCount = GlobalImportStore.GetStoredPublicExportsCount();
 	const int32 RemovedLoadedPackageCount = OldLoadedPackageCount - NewLoadedPackageCount;
 	const int32 RemovedPublicExportCount = OldPublicExportCount - NewPublicExportCount;
-
-	GlobalImportStore.RemovePublicExports(ObjectsToRemove);
-	LoadedPackageStore.RemovePackages(ObjectsToRemove);
-	ObjectsToRemove.Reset();
 
 	const double StopTime = FPlatformTime::Seconds();
 	UE_LOG(LogStreaming, Display,
