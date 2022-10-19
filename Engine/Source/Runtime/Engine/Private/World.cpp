@@ -5323,9 +5323,13 @@ void UWorld::AddController( AController* Controller )
 {	
 	check( Controller );
 	ControllerList.AddUnique( Controller );	
-	if( Cast<APlayerController>(Controller) )
+	if( APlayerController* PlayerController = Cast<APlayerController>(Controller) )
 	{
-		PlayerControllerList.AddUnique( Cast<APlayerController>(Controller) );
+		if(!PlayerControllerList.Contains( PlayerController ))
+		{
+			PlayerControllerList.Add(PlayerController);
+			PlayerController->OnAddedToPlayerControllerList();
+		}
 	}
 }
 
@@ -5335,9 +5339,12 @@ void UWorld::RemoveController( AController* Controller )
 	check( Controller );
 	if( ControllerList.Remove( Controller ) > 0 )
 	{
-		if( Cast<APlayerController>(Controller) )
+		if( APlayerController* PlayerController = Cast<APlayerController>(Controller) )
 		{
-			PlayerControllerList.Remove( Cast<APlayerController>(Controller) );
+			if (PlayerControllerList.Remove(PlayerController) > 0)
+			{
+				PlayerController->OnRemovedFromPlayerControllerList();
+			}
 		}
 	}
 }
@@ -7283,6 +7290,7 @@ UWorld* FSeamlessTravelHandler::Tick()
 			}
 
 			bool bCreateNewGameMode = !bIsClient;
+			TArray<AController*> KeptControllers;
 			{
 				// scope because after GC the kept pointers will be bad
 				AGameModeBase* KeptGameMode = nullptr;
@@ -7294,11 +7302,12 @@ UWorld* FSeamlessTravelHandler::Tick()
 				for (AActor* const TheActor : ActuallyKeptActors)
 				{
 					KeepAnnotation.Clear(TheActor);
-					TheActor->Rename(nullptr, LoadedWorld->PersistentLevel);
-					// if it's a Controller, add it to the appropriate list in the new world's WorldSettings
-					if (TheActor->IsA<AController>())
+					
+					// if it's a Controller, remove it from the appropriate list in the current world's WorldSettings
+					if (AController* Controller = Cast<AController>(TheActor))
 					{
-						LoadedWorld->AddController(static_cast<AController*>(TheActor));
+						CurrentWorld->RemoveController(Controller);
+						KeptControllers.Add(Controller);
 					}
 					else if (TheActor->IsA<AGameModeBase>())
 					{
@@ -7308,6 +7317,8 @@ UWorld* FSeamlessTravelHandler::Tick()
 					{
 						KeptGameState = static_cast<AGameStateBase*>(TheActor);
 					}
+
+					TheActor->Rename(nullptr, LoadedWorld->PersistentLevel);
 
 					TheActor->bActorSeamlessTraveled = true;
 				}
@@ -7414,6 +7425,13 @@ UWorld* FSeamlessTravelHandler::Tick()
 			{
 				LoadedWorld->InitWorld();
 			}
+
+			// add controllers to initialized world 
+			for (AController* Controller : KeptControllers)
+			{
+				LoadedWorld->AddController(Controller);
+			}
+
 			bWorldChanged = true;
 			// Track session change on seamless travel.
 			NETWORK_PROFILER(GNetworkProfiler.TrackSessionChange(true, LoadedWorld->URL));
