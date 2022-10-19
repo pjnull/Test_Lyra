@@ -2384,7 +2384,7 @@ bool FTextureEditorToolkit::HandleReimportActionCanExecute( ) const
 
 void FTextureEditorToolkit::HandleReimportActionExecute( )
 {
-	FReimportManager::Instance()->Reimport(Texture, /*bAskForNewFileIfMissing=*/true);
+	FReimportManager::Instance()->ReimportAsync(Texture, /*bAskForNewFileIfMissing=*/true);
 }
 
 
