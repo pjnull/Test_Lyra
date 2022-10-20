@@ -34,6 +34,7 @@
 #include "Widgets/SNiagaraParameterMenu.h"
 #include "Widgets/SNiagaraParameterPanel.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboButton.h"
 #include "ViewModels/Stack/NiagaraStackViewModel.h"
 #include "ViewModels/NiagaraScratchPadScriptViewModel.h"
 #include "ViewModels/NiagaraSystemEditorDocumentsViewModel.h"
@@ -1169,7 +1170,7 @@ bool FNiagaraSystemToolkitParameterPanelViewModel::IsVariableSelected(FNiagaraVa
 		}
 
 	}
-	if (IncludeViewItemsInSelectParameterItem() && InVar == SelectedVariable)
+	if (IncludeViewItemsInSelectParameterItem() && InVar == (const FNiagaraVariableBase&)SelectedVariable)
 	{
 		return true;
 	}
@@ -2553,7 +2554,7 @@ void FNiagaraSystemToolkitParameterPanelViewModel::OnParameterRenamedExternally(
 
 					if (!bFound)
 					{
-						if (const FNiagaraParameterPanelItem* FoundItemPtr = CachedViewedItems.FindByPredicate([&InOldVar](const FNiagaraParameterPanelItem& Item) { return Item.GetVariable() == InOldVar; }))
+						if (const FNiagaraParameterPanelItem* FoundItemPtr = CachedViewedItems.FindByPredicate([&InOldVar](const FNiagaraParameterPanelItem& Item) { return (const FNiagaraVariableBase&)Item.GetVariable() == InOldVar; }))
 						{
 							RenameParameter(*FoundItemPtr, InNewVar.GetName());
 						}
@@ -2593,7 +2594,7 @@ void FNiagaraSystemToolkitParameterPanelViewModel::OnParameterRenamedExternally(
 
 		if (!bFound)
 		{
-			if (const FNiagaraParameterPanelItem* FoundItemPtr = CachedViewedItems.FindByPredicate([&InOldVar](const FNiagaraParameterPanelItem& Item) { return Item.GetVariable() == InOldVar; }))
+			if (const FNiagaraParameterPanelItem* FoundItemPtr = CachedViewedItems.FindByPredicate([&InOldVar](const FNiagaraParameterPanelItem& Item) { return (const FNiagaraVariableBase&)Item.GetVariable() == InOldVar; }))
 			{
 				RenameParameter(*FoundItemPtr, InNewVar.GetName());
 			}
