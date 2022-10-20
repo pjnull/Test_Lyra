@@ -2426,6 +2426,11 @@ IPluginManager::FNewPluginMountedEvent& FPluginManager::OnPluginEdited()
 	return PluginEditedEvent;
 }
 
+IPluginManager::FNewPluginMountedEvent& FPluginManager::OnPluginUnmounted()
+{
+	return PluginUnmountedEvent;
+}
+
 void FPluginManager::MountNewlyCreatedPlugin(const FString& PluginName)
 {
 	TSharedPtr<FPlugin> Plugin = FindPluginInstance(PluginName);
@@ -2607,6 +2612,11 @@ bool FPluginManager::UnmountPluginFromExternalSource(const TSharedPtr<FPlugin>& 
 		}
 
 		UnRegisterMountPointDelegate.Execute(Plugin->GetMountedAssetPath(), Plugin->GetContentDir());
+
+		if (PluginUnmountedEvent.IsBound())
+		{
+			PluginUnmountedEvent.Broadcast(*Plugin);
+		}
 	}
 
 	Plugin->bEnabled = false;
