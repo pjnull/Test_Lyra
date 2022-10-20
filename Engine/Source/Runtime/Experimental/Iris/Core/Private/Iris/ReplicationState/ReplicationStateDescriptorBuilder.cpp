@@ -157,7 +157,7 @@ public:
 
 private:
 
-	static const SIZE_T MinAlignment = 4;
+	static const SIZE_T MinAlignment = 1;
 
 	using FSizeAndAlignment = FMemoryLayoutUtil::FSizeAndAlignment;
 	using FOffsetAndSize = FMemoryLayoutUtil::FOffsetAndSize;
