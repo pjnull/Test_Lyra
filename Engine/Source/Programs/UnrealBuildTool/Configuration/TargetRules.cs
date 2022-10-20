@@ -1512,6 +1512,12 @@ namespace UnrealBuildTool
 		public bool bForceDeterministic = false;
 
 		/// <summary>
+		/// Whether PCH headers should be force included for gen.cpp files when PCH is disabled.
+		/// </summary>
+		[XmlConfigFile(Category = "BuildConfiguration")]
+		public bool bForceIncludePCHHeadersForGenCppFilesWhenPCHIsDisabled = true;
+
+		/// <summary>
 		/// Whether to just preprocess source files for this target, and skip compilation
 		/// </summary>
 		[CommandLine("-Preprocess")]
@@ -3189,6 +3195,11 @@ namespace UnrealBuildTool
 		public bool bForceDeterministic
 		{
 			get { return Inner.bForceDeterministic; }
+		}
+
+		public bool bForceIncludePCHHeadersForGenCppFilesWhenPCHIsDisabled
+		{
+			get { return Inner.bForceIncludePCHHeadersForGenCppFilesWhenPCHIsDisabled; }
 		}
 
 		public bool bPreprocessOnly
