@@ -2679,6 +2679,13 @@ public:
 		check(CppClassStaticFunctions.GetAppendToClassSchema());
 		CppClassStaticFunctions.GetAppendToClassSchema()(Context);
 	}
+
+	/** Calls the c++ class's DeclareConstructClasses static function (from the nearest native parent if this is not native) */
+	void CallDeclareConstructClasses(TArray<FTopLevelAssetPath>& OutConstructClasses) const
+	{
+		check(CppClassStaticFunctions.GetDeclareConstructClasses());
+		CppClassStaticFunctions.GetDeclareConstructClasses()(OutConstructClasses, this);
+	}
 #endif
 
 	/** The class default object; used for delta serialization and object initialization */
@@ -3041,7 +3048,7 @@ public:
 	{
 		if (ClassDefaultObject == nullptr && bCreateIfNeeded)
 		{
-			UE_TRACK_REFERENCING_PACKAGE_SCOPED((GetOutermost()), PackageAccessTrackingOps::NAME_CreateDefaultObject);
+			UE_TRACK_REFERENCING_PACKAGE_SCOPED(this, PackageAccessTrackingOps::NAME_CreateDefaultObject);
 			const_cast<UClass*>(this)->CreateDefaultObject();
 		}
 

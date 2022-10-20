@@ -163,6 +163,7 @@ FCoreUObjectDelegates::FOnObjectsReplaced FCoreUObjectDelegates::OnObjectsReplac
 FCoreUObjectDelegates::FOnObjectsReplaced FCoreUObjectDelegates::OnObjectsReinstanced;
 FCoreUObjectDelegates::FOnObjectPostCDOCompiled FCoreUObjectDelegates::OnObjectPostCDOCompiled;
 FCoreUObjectDelegates::FOnAssetLoaded FCoreUObjectDelegates::OnAssetLoaded;
+FCoreUObjectDelegates::FOnObjectConstructed FCoreUObjectDelegates::OnObjectConstructed;
 FCoreUObjectDelegates::FOnEndLoadPackage FCoreUObjectDelegates::OnEndLoadPackage;
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 FCoreUObjectDelegates::FOnObjectSaved FCoreUObjectDelegates::OnObjectSaved;
@@ -4215,6 +4216,10 @@ UObject* StaticConstructObject_Internal(const FStaticConstructObjectParameters& 
 		SaveToTransactionBuffer(Result, false);
 		Result->ClearGarbage();
 	}
+
+#if WITH_EDITOR
+	FCoreUObjectDelegates::OnObjectConstructed.Broadcast(Result);
+#endif
 	return Result;
 }
 
