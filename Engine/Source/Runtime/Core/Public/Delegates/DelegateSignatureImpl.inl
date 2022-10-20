@@ -23,7 +23,6 @@ class FDelegateHandle;
 class IDelegateInstance;
 struct FWeakObjectPtr;
 template <typename FuncType, typename UserPolicy> struct IBaseDelegateInstance;
-template<typename UserPolicy> class TMulticastDelegateBase;
 template <typename T> struct TObjectPtr;
 
 template <typename T>
@@ -31,6 +30,9 @@ T* ToRawPtr(const TObjectPtr<T>& Ptr);
 
 template <typename To, typename From>
 To* Cast(From* Src);
+
+template<typename UserPolicy> class TMulticastDelegateBase;
+template<typename UserPolicy> class TTSMulticastDelegateBase;
 
 /**
  * Unicast delegate template class.
@@ -42,7 +44,7 @@ To* Cast(From* Src);
 template <typename DelegateSignature, typename UserPolicy = FDefaultDelegateUserPolicy>
 class TDelegate
 {
-	static_assert(sizeof(DelegateSignature) == 0, "Expected a function signature for the delegate template parameter");
+	static_assert(sizeof(UserPolicy) == 0, "Expected a function signature for the delegate template parameter");
 };
 
 template <typename InRetValType, typename... ParamTypes, typename UserPolicy>
@@ -56,12 +58,15 @@ class TDelegate<InRetValType(ParamTypes...), UserPolicy> : public TDelegateBase<
 	using DelegateInstanceType  = typename UserPolicy::FDelegateInstanceExtras;
 	using MulticastDelegateType = typename UserPolicy::FMulticastDelegateExtras;
 
-	static_assert(std::is_convertible<DelegateType*,          FDelegateBase*                     >::value, "UserPolicy::FDelegateExtras should publicly inherit FDelegateBase");
-	static_assert(std::is_convertible<DelegateInstanceType*,  IDelegateInstance*                 >::value, "UserPolicy::FDelegateInstanceExtras should publicly inherit IDelegateInstance");
-	static_assert(std::is_convertible<MulticastDelegateType*, TMulticastDelegateBase<UserPolicy>*>::value, "UserPolicy::FMulticastDelegateExtras should publicly inherit TMulticastDelegateBase<UserPolicy>");
+	static_assert(std::is_convertible_v<DelegateType*, FDelegateBase*>, "UserPolicy::FDelegateExtras should publicly inherit FDelegateBase");
+	static_assert(std::is_convertible_v<DelegateInstanceType*, IDelegateInstance*>, "UserPolicy::FDelegateInstanceExtras should publicly inherit IDelegateInstance");
+	static_assert(std::is_convertible_v<MulticastDelegateType*, TMulticastDelegateBase<UserPolicy>*> || std::is_convertible_v<MulticastDelegateType*, TTSMulticastDelegateBase<UserPolicy>*>, "UserPolicy::FMulticastDelegateExtras should publicly inherit TMulticastDelegateBase<UserPolicy> or TTSMulticastDelegateBase<UserPolicy>");
 
 	template <typename>
 	friend class TMulticastDelegateBase;
+
+	template <typename>
+	friend class TTSMulticastDelegateBase;
 
 public:
 	// Make sure FDelegateBase's public functions are publicly exposed through the TDelegate API
