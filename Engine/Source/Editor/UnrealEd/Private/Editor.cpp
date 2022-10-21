@@ -911,14 +911,14 @@ FReimportManager::FReimportManager()
 	// Create reimport handler for PhysicalMaterialMasks
 	UPhysicalMaterialMaskFactory::StaticClass();
 
-	InterchangePostReimportedDelegateHandle = UInterchangeManager::GetInterchangeManager().OnAssetPostReimport.AddRaw(this, &FReimportManager::OnInterchangePostReimported);
-
 	UInterchangeManager& InterchangeManager = UInterchangeManager::GetInterchangeManager();
+	InterchangePostReimportedDelegateHandle = InterchangeManager.OnAssetPostReimport.AddRaw(this, &FReimportManager::OnInterchangePostReimported);
+
 	InterchangeManager.OnPreDestroyInterchangeManager.AddLambda([InterchangePostReimportedDelegateHandleClosure = InterchangePostReimportedDelegateHandle]()
 		{
 			if (InterchangePostReimportedDelegateHandleClosure.IsValid())
 			{
-				UInterchangeManager::GetInterchangeManager().OnAssetPostImport.Remove(InterchangePostReimportedDelegateHandleClosure);
+				UInterchangeManager::GetInterchangeManager().OnAssetPostReimport.Remove(InterchangePostReimportedDelegateHandleClosure);
 			}
 		});
 }
@@ -926,10 +926,6 @@ FReimportManager::FReimportManager()
 FReimportManager::~FReimportManager()
 {
 	Handlers.Empty();
-	if (InterchangePostReimportedDelegateHandle.IsValid())
-	{
-		UInterchangeManager::GetInterchangeManager().OnAssetPostImport.Remove(InterchangePostReimportedDelegateHandle);
-	}
 }
 
 int32 FReimportHandler::GetPriority() const
