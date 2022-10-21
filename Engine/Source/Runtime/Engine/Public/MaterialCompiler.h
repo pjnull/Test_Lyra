@@ -530,6 +530,9 @@ public:
 	virtual int32 GetCloudSampleShadowSampleDistance() = 0;
 	virtual int32 GetVolumeSampleConservativeDensity() = 0;
 
+	virtual int32 GetCloudEmptySpaceSkippingSphereCenterWorldPosition() = 0;
+	virtual int32 GetCloudEmptySpaceSkippingSphereRadius() = 0;
+
 	virtual int32 GetHairUV() = 0;
 	virtual int32 GetHairDimensions() = 0;
 	virtual int32 GetHairSeed() = 0;
@@ -1021,6 +1024,16 @@ public:
 	virtual int32 GetVolumeSampleConservativeDensity() override
 	{
 		return Compiler->GetVolumeSampleConservativeDensity();
+	}
+
+	virtual int32 GetCloudEmptySpaceSkippingSphereCenterWorldPosition() override
+	{
+		return Compiler->GetCloudEmptySpaceSkippingSphereCenterWorldPosition();
+	}
+
+	virtual int32 GetCloudEmptySpaceSkippingSphereRadius() override
+	{
+		return Compiler->GetCloudEmptySpaceSkippingSphereRadius();
 	}
 
 	virtual int32 SceneDepthWithoutWater(int32 Offset, int32 ViewportUV, bool bUseOffset, float FallbackDepth) override
