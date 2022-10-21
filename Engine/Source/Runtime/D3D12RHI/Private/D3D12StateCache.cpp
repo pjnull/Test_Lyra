@@ -670,9 +670,9 @@ void FD3D12StateCache::ApplyResources(const FD3D12RootSignature* const pRootSign
 		FD3D12ShaderResourceViewCache& SRVCache = PipelineState.Common.SRVCache;
 
 #define CONDITIONAL_SET_SRVS(Shader) \
-		if (CurrentShaderDirtySRVSlots[##Shader]) \
+		if (CurrentShaderDirtySRVSlots[Shader]) \
 		{ \
-			DescriptorCache.SetSRVs<##Shader>(pRootSignature, SRVCache, CurrentShaderDirtySRVSlots[##Shader], NumSRVs[##Shader], ViewHeapSlot); \
+			DescriptorCache.SetSRVs<Shader>(pRootSignature, SRVCache, CurrentShaderDirtySRVSlots[Shader], NumSRVs[Shader], ViewHeapSlot); \
 		}
 
 		if (StartStage == SF_Compute)
@@ -698,15 +698,15 @@ void FD3D12StateCache::ApplyResources(const FD3D12RootSignature* const pRootSign
 
 #if USE_STATIC_ROOT_SIGNATURE
 	#define CONDITIONAL_SET_CBVS(Shader) \
-		if (CurrentShaderDirtyCBVSlots[##Shader]) \
+		if (CurrentShaderDirtyCBVSlots[Shader]) \
 		{ \
-			DescriptorCache.SetConstantBuffers<##Shader>(pRootSignature, CBVCache, CurrentShaderDirtyCBVSlots[##Shader], NumCBVs[##Shader], ViewHeapSlot); \
+			DescriptorCache.SetConstantBuffers<Shader>(pRootSignature, CBVCache, CurrentShaderDirtyCBVSlots[Shader], NumCBVs[Shader], ViewHeapSlot); \
 		}
 #else
 	#define CONDITIONAL_SET_CBVS(Shader) \
-		if (CurrentShaderDirtyCBVSlots[##Shader]) \
+		if (CurrentShaderDirtyCBVSlots[Shader]) \
 		{ \
-			DescriptorCache.SetConstantBuffers<##Shader>(pRootSignature, CBVCache, CurrentShaderDirtyCBVSlots[##Shader]); \
+			DescriptorCache.SetConstantBuffers<Shader>(pRootSignature, CBVCache, CurrentShaderDirtyCBVSlots[Shader]); \
 		}
 #endif
 		if (StartStage == SF_Compute)
@@ -861,9 +861,9 @@ void FD3D12StateCache::ApplySamplers(const FD3D12RootSignature* const pRootSigna
 	uint32 SamplerHeapSlot = SamplerHeap->ReserveSlots(NumSamplers[SF_NumStandardFrequencies]);
 
 #define CONDITIONAL_SET_SAMPLERS(Shader) \
-	if (CurrentShaderDirtySamplerSlots[##Shader]) \
+	if (CurrentShaderDirtySamplerSlots[Shader]) \
 	{ \
-		DescriptorCache.SetSamplers<##Shader>(pRootSignature, Cache, CurrentShaderDirtySamplerSlots[##Shader], NumSamplers[##Shader], SamplerHeapSlot); \
+		DescriptorCache.SetSamplers<Shader>(pRootSignature, Cache, CurrentShaderDirtySamplerSlots[Shader], NumSamplers[Shader], SamplerHeapSlot); \
 	}
 
 	if (StartStage == SF_Compute)
