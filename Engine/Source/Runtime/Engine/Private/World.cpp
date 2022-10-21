@@ -5885,13 +5885,38 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 					{
 						if (EncryptionToken.IsEmpty())
 						{
-							Connection->SendChallengeControlMessage();
+							EEncryptionFailureAction FailureResult = EEncryptionFailureAction::Default;
+							
+							if (FNetDelegates::OnReceivedNetworkEncryptionFailure.IsBound())
+							{
+								FailureResult = FNetDelegates::OnReceivedNetworkEncryptionFailure.Execute(Connection);
+							}
+
+							const bool bGameplayDisableEncryptionCheck = FailureResult == EEncryptionFailureAction::AllowConnection;
+							const bool bEncryptionRequired = NetDriver->IsEncryptionRequired() && !bGameplayDisableEncryptionCheck;
+
+							if (!bEncryptionRequired)
+							{
+								Connection->SendChallengeControlMessage();
+							}
+							else
+							{
+								FString FailureMsg(TEXT("Encryption token missing"));
+
+								UE_LOG(LogNet, Warning, TEXT("%s: No EncryptionToken specified, disconnecting."), ToCStr(Connection->GetName()));
+
+								Connection->SendCloseReason(ENetCloseResult::EncryptionTokenMissing);
+								FNetControlMessage<NMT_Failure>::Send(Connection, FailureMsg);
+								Connection->FlushNet(true);
+								Connection->Close(ENetCloseResult::EncryptionTokenMissing);
+							}
 						}
 						else
 						{
 							if (FNetDelegates::OnReceivedNetworkEncryptionToken.IsBound())
 							{
-								FNetDelegates::OnReceivedNetworkEncryptionToken.Execute(EncryptionToken, FOnEncryptionKeyResponse::CreateUObject(Connection, &UNetConnection::SendChallengeControlMessage));
+								FNetDelegates::OnReceivedNetworkEncryptionToken.Execute(EncryptionToken,
+									FOnEncryptionKeyResponse::CreateUObject(Connection, &UNetConnection::SendChallengeControlMessage));
 							}
 							else
 							{
@@ -5903,6 +5928,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 								Connection->SendCloseReason(ENetCloseResult::EncryptionFailure);
 								FNetControlMessage<NMT_Failure>::Send(Connection, FailureMsg);
 								Connection->FlushNet(true);
+								Connection->Close(ENetCloseResult::EncryptionFailure);
 							}
 						}
 					}
@@ -6005,9 +6031,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 						Connection->SendCloseReason(ENetCloseResult::PreLoginFailure);
 						FNetControlMessage<NMT_Failure>::Send(Connection, ErrorMsg);
 						Connection->FlushNet(true);
-						//@todo sz - can't close the connection here since it will leave the failure message 
-						// in the send buffer and just close the socket. 
-						//Connection->Close(ENetCloseResult::PreLoginFailure);
+						Connection->Close(ENetCloseResult::PreLoginFailure);
 					}
 					else
 					{
@@ -6049,9 +6073,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 						Connection->SendCloseReason(ENetCloseResult::JoinFailure);
 						FNetControlMessage<NMT_Failure>::Send(Connection, ErrorMsg);
 						Connection->FlushNet(true);
-						//@todo sz - can't close the connection here since it will leave the failure message 
-						// in the send buffer and just close the socket. 
-						//Connection->Close(ENetCloseResult::JoinFailure);
+						Connection->Close(ENetCloseResult::JoinFailure);
 					}
 					else
 					{
@@ -6149,9 +6171,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 						Connection->SendCloseReason(ENetCloseResult::PreLoginFailure);
 						FNetControlMessage<NMT_Failure>::Send(Connection, ErrorMsg);
 						Connection->FlushNet(true);
-						//@todo sz - can't close the connection here since it will leave the failure message 
-						// in the send buffer and just close the socket. 
-						//Connection->Close(ENetCloseResult::PreLoginFailure);
+						Connection->Close(ENetCloseResult::PreLoginFailure);
 					}
 					else
 					{
@@ -6186,9 +6206,7 @@ void UWorld::NotifyControlMessage(UNetConnection* Connection, uint8 MessageType,
 							Connection->SendCloseReason(ENetCloseResult::JoinSplitFailure);
 							FNetControlMessage<NMT_Failure>::Send(Connection, ErrorMsg);
 							Connection->FlushNet(true);
-							//@todo sz - can't close the connection here since it will leave the failure message 
-							// in the send buffer and just close the socket. 
-							//Connection->Close(ENetCloseResult::JoinSplitFailure);
+							Connection->Close(ENetCloseResult::JoinSplitFailure);
 						}
 						else
 						{
