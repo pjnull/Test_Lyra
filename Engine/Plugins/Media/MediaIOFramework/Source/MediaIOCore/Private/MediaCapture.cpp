@@ -858,13 +858,6 @@ bool UMediaCapture::CaptureSceneViewport(TSharedPtr<FSceneViewport>& InSceneView
 
 	// This could have been updated by the initialization done by the implementation
 	bShouldCaptureRHIResource = ShouldCaptureRHIResource(); 
-	if (bShouldCaptureRHIResource && DesiredOutputResourceType != EMediaCaptureResourceType::Texture)
-	{
-		UE_LOG(LogMediaIOCore, Warning, TEXT("Can't capture RHI resource when not using texture output resource"));
-		ResetFixedViewportSize(InSceneViewport, false);
-		SetState(EMediaCaptureState::Stopped);
-		MediaCaptureDetails::ShowSlateNotification();
-	}
 
 	if (bInitialized)
 	{
@@ -927,12 +920,6 @@ bool UMediaCapture::CaptureRHITexture(const FRHICaptureResourceDescription& Reso
 
 	// This could have been updated by the call to implementation initialization
 	bShouldCaptureRHIResource = ShouldCaptureRHIResource();
-	if (bShouldCaptureRHIResource && DesiredOutputResourceType != EMediaCaptureResourceType::Texture)
-	{
-		UE_LOG(LogMediaIOCore, Warning, TEXT("Can't capture RHI resource when not using texture output resource"));
-		SetState(EMediaCaptureState::Stopped);
-		MediaCaptureDetails::ShowSlateNotification();
-	}
 
 	if (bInitialized)
 	{
@@ -1002,12 +989,6 @@ bool UMediaCapture::CaptureTextureRenderTarget2D(UTextureRenderTarget2D* InRende
 
 	// This could have been updated by the initialization done by the implementation
 	bShouldCaptureRHIResource = ShouldCaptureRHIResource();
-	if (bShouldCaptureRHIResource && DesiredOutputResourceType != EMediaCaptureResourceType::Texture)
-	{
-		UE_LOG(LogMediaIOCore, Warning, TEXT("Can't capture RHI resource when not using texture output resource"));
-		SetState(EMediaCaptureState::Stopped);
-		MediaCaptureDetails::ShowSlateNotification();
-	}
 
 	if (bInitialized)
 	{
@@ -1751,6 +1732,7 @@ bool UMediaCapture::ProcessCapture_RenderThread(FRDGBuilder& GraphBuilder, UMedi
 			if (ensure(CapturingFrame->IsTextureResource()))
 			{
 				FTextureCaptureFrame* TextureFrame = static_cast<FTextureCaptureFrame*>(CapturingFrame);
+				InMediaCapture->BeforeFrameCaptured_RenderingThread(CapturingFrame->CaptureBaseData, CapturingFrame->UserData, TextureFrame->GetTextureResource());
 				bHasCaptureSuceeded = FMediaCaptureHelper::CaptureFrame(CaptureArgs, TextureFrame);
 			}
 			else
@@ -1763,6 +1745,7 @@ bool UMediaCapture::ProcessCapture_RenderThread(FRDGBuilder& GraphBuilder, UMedi
 			if (ensure(CapturingFrame->IsBufferResource()))
 			{
 				FBufferCaptureFrame* BufferFrame = static_cast<FBufferCaptureFrame*>(CapturingFrame);
+				InMediaCapture->BeforeFrameCaptured_RenderingThread(CapturingFrame->CaptureBaseData, CapturingFrame->UserData, BufferFrame->GetBufferResource());
 				bHasCaptureSuceeded = FMediaCaptureHelper::CaptureFrame(CaptureArgs, BufferFrame);
 			}
 			else
@@ -1856,13 +1839,19 @@ bool UMediaCapture::ProcessReadyFrame_RenderThread(FRHICommandListImmediate& RHI
 
 				TRACE_CPUPROFILER_EVENT_SCOPE(UMediaCapture::RHIResourceCaptured);
 				SCOPE_CYCLE_COUNTER(STAT_MediaCapture_RenderThread_CaptureCallback)
-				InMediaCapture->OnRHIResourceCaptured_RenderingThread(ReadyFrame->CaptureBaseData, ReadyFrame->UserData, TextureFrame->GetRHIResource());
-
-				UE_LOG(LogMediaIOCore, Verbose, TEXT("[%s] - Completed pending frame %d."), *InMediaCapture->MediaOutputName, ReadyFrame->FrameId);
-				ReadyFrame->bDoingGPUCopy = false;
-				InMediaCapture->FrameManager->CompleteNextPending(*ReadyFrame);
-				--PendingFrameCount;
+					InMediaCapture->OnRHIResourceCaptured_RenderingThread(ReadyFrame->CaptureBaseData, ReadyFrame->UserData, TextureFrame->GetRHIResource());
 			}
+			else
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(UMediaCapture::RHIResourceCaptured);
+				FBufferCaptureFrame* BufferFrame = static_cast<FBufferCaptureFrame*>(ReadyFrame);
+				InMediaCapture->OnRHIResourceCaptured_RenderingThread(ReadyFrame->CaptureBaseData, ReadyFrame->UserData, BufferFrame->GetRHIResource());
+			}
+
+			UE_LOG(LogMediaIOCore, Verbose, TEXT("[%s] - Completed pending frame %d."), *InMediaCapture->MediaOutputName, ReadyFrame->FrameId);
+			ReadyFrame->bDoingGPUCopy = false;
+			InMediaCapture->FrameManager->CompleteNextPending(*ReadyFrame);
+			--PendingFrameCount;
 		}
 	}
 
