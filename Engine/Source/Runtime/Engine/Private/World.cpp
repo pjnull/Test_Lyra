@@ -1283,6 +1283,15 @@ void UWorld::PostLoad()
 	ResetAverageRequiredTexturePoolSize();
 }
 
+#if WITH_EDITORONLY_DATA
+void UWorld::DeclareConstructClasses(TArray<FTopLevelAssetPath>& OutConstructClasses, const UClass* SpecificSubclass)
+{
+	Super::DeclareConstructClasses(OutConstructClasses, SpecificSubclass);
+	OutConstructClasses.Add(FTopLevelAssetPath(GEngine->WorldSettingsClass));
+	OutConstructClasses.Add(FTopLevelAssetPath(UWorldThumbnailInfo::StaticClass()));
+}
+#endif
+
 void UWorld::PreDuplicate(FObjectDuplicationParameters& DupParams)
 {
 	if (PersistentLevel)

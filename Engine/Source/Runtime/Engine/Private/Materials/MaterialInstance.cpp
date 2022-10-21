@@ -2960,6 +2960,14 @@ void UMaterialInstance::PostLoad()
 	//DumpDebugInfo(*GLog);
 }
 
+#if WITH_EDITORONLY_DATA
+void UMaterialInstance::DeclareConstructClasses(TArray<FTopLevelAssetPath>& OutConstructClasses, const UClass* SpecificSubclass)
+{
+	Super::DeclareConstructClasses(OutConstructClasses, SpecificSubclass);
+	OutConstructClasses.Add(FTopLevelAssetPath(UMaterialInstanceEditorOnlyData::StaticClass()));
+}
+#endif
+
 void UMaterialInstance::BeginDestroy()
 {
 	TArray<TRefCountPtr<FMaterialResource>> ResourcesToDestroy;

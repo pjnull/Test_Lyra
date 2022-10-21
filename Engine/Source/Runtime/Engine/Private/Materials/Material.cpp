@@ -3853,6 +3853,14 @@ void UMaterial::PostLoad()
 	//DumpDebugInfo(*GLog);
 }
 
+#if WITH_EDITORONLY_DATA
+void UMaterial::DeclareConstructClasses(TArray<FTopLevelAssetPath>& OutConstructClasses, const UClass* SpecificSubclass)
+{
+	Super::DeclareConstructClasses(OutConstructClasses, SpecificSubclass);
+	OutConstructClasses.Add(FTopLevelAssetPath(UMaterialEditorOnlyData::StaticClass()));
+}
+#endif
+
 void UMaterial::DumpDebugInfo(FOutputDevice& OutputDevice) const
 {
 	for (FMaterialResource* Resource : MaterialResources)
