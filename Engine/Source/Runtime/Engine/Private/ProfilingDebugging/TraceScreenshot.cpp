@@ -13,6 +13,7 @@
 #include "ProfilingDebugging/MiscTrace.h"
 #include "Tasks/Task.h"
 #include "Trace/Trace.inl"
+#include "UnrealClient.h"
 
 static void TraceScreenshotCommandCallback(const TArray<FString>& Args)
 {

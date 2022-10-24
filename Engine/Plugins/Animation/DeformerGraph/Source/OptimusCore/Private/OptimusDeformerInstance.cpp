@@ -9,6 +9,7 @@
 #include "OptimusDeformer.h"
 #include "OptimusVariableDescription.h"
 #include "RenderGraphBuilder.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 #include "SkeletalRenderPublic.h"
 #include "DataInterfaces/OptimusDataInterfaceRawBuffer.h"
 

@@ -15,6 +15,7 @@
 #include "Animation/AnimData/AnimDataModel.h"
 #include "Misc/FileHelper.h"
 #include "Serialization/JsonWriter.h"
+#include "UObject/LinkerLoad.h"
 
 CSV_DECLARE_CATEGORY_MODULE_EXTERN(ENGINE_API, Animation);
 
