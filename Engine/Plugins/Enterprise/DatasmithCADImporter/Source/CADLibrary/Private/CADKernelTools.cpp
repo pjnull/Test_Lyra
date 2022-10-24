@@ -271,7 +271,8 @@ bool FCADKernelTools::Tessellate(UE::CADKernel::FTopologicalShapeEntity& CADTopo
 	TSharedRef<FModelMesh> CADKernelModelMesh = FEntity::MakeShared<FModelMesh>();
 	FParametricMesher Mesher(*CADKernelModelMesh);
 
-	DefineMeshCriteria(*CADKernelModelMesh, TessellationContext.ImportParameters, 0.01);
+	constexpr double GeometricTolerance = 0.01;
+	DefineMeshCriteria(*CADKernelModelMesh, TessellationContext.ImportParameters, GeometricTolerance);
 	Mesher.MeshEntity(CADTopologicalEntity);
 
 	return ConvertModelMeshToMeshDescription(TessellationContext, CADKernelModelMesh, OutMeshDescription);
@@ -389,13 +390,15 @@ void FCADKernelTools::DefineMeshCriteria(UE::CADKernel::FModelMesh& MeshModel, c
 
 	if (ImportParameters.GetMaxEdgeLength() > SMALL_NUMBER)
 	{
-		TSharedPtr<UE::CADKernel::FCriterion> MaxSizeCriterion = UE::CADKernel::FCriterion::CreateCriterion(UE::CADKernel::ECriterion::MaxSize, ImportParameters.GetMaxEdgeLength());
+		const double MaxSize = ImportParameters.GetMaxEdgeLength() * 10.; // cm to mm
+		TSharedPtr<UE::CADKernel::FCriterion> MaxSizeCriterion = UE::CADKernel::FCriterion::CreateCriterion(UE::CADKernel::ECriterion::MaxSize, MaxSize);
 		MeshModel.AddCriterion(MaxSizeCriterion);
 	}
 
 	if (ImportParameters.GetChordTolerance() > SMALL_NUMBER)
 	{
-		TSharedPtr<UE::CADKernel::FCriterion> ChordCriterion = UE::CADKernel::FCriterion::CreateCriterion(UE::CADKernel::ECriterion::Sag, ImportParameters.GetChordTolerance());
+		double MaxChord = ImportParameters.GetChordTolerance() * 10.; // cm to mm
+		TSharedPtr<UE::CADKernel::FCriterion> ChordCriterion = UE::CADKernel::FCriterion::CreateCriterion(UE::CADKernel::ECriterion::Sag, MaxChord);
 		MeshModel.AddCriterion(ChordCriterion);
 	}
 
