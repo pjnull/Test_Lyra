@@ -2356,7 +2356,10 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 	FILCUpdatePrimTaskData ILCTaskData;
 
 	// Find the visible primitives.
-	GraphBuilder.RHICmdList.ImmediateFlush(EImmediateFlushType::DispatchToRHIThread);
+	if (GDynamicRHI->RHIIncludeOptionalFlushes())
+	{
+		GraphBuilder.RHICmdList.ImmediateFlush(EImmediateFlushType::DispatchToRHIThread);
+	}
 
 	FInstanceCullingManager& InstanceCullingManager = *GraphBuilder.AllocObject<FInstanceCullingManager>(Scene->GPUScene.IsEnabled(), GraphBuilder);
 
@@ -3267,6 +3270,9 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 	}
 	// End shadow and fog after base pass
 
+	// Trigger a command submit here, to avoid GPU bubbles
+	AddDispatchToRHIThreadPass(GraphBuilder);
+	
 	if (bNaniteEnabled)
 	{
 		// Needs doing after shadows such that the checks for shadow atlases etc work.

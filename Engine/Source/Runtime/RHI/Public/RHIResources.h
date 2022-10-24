@@ -2240,6 +2240,8 @@ public:
 	virtual void WaitForFrameEventCompletion() { }
 
 	virtual void IssueFrameEvent() { }
+
+	virtual bool NeedFlushBeforeEndDrawing() { return true; }
 };
 
 //
