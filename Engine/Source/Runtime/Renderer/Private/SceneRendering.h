@@ -1732,6 +1732,8 @@ public:
 	const FSceneTextures& GetSceneTextures() const;
 	const FSceneTextures* GetSceneTexturesChecked() const;
 
+	RENDERER_API FRDGTextureRef GetVolumetricCloudTexture(FRDGBuilder& GraphBuilder) const;
+
 	/**
 	 * Collector for view-dependent data.
 	 */
