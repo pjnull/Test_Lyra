@@ -1724,6 +1724,7 @@ void FVideoDecoderH264::ProcessOutput(bool bFlush)
 								}
 							}
 						}
+						CFRelease(Dict);
 					}
 					double PixelAspectRatio = (double)ax / (double)ay;
 
