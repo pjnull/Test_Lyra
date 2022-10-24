@@ -2474,7 +2474,7 @@ static inline void AdjustColorsNew(FLinearColor* Colors, int64 Count, const FTex
 	for (int64 i=0; i<Count; i++)
 	{
 		FLinearColor OriginalColor = Colors[i];
-	
+			
 		if (!bHDRSource)
 		{
 			// Ensure we are clamped as expected (can drift out of clamp due to previous processing)
@@ -2488,13 +2488,6 @@ static inline void AdjustColorsNew(FLinearColor* Colors, int64 Count, const FTex
 		{
 			Colors[i] = FLinearColor::Transparent;
 			continue;
-		}
-
-		if (bHDRSource)
-		{
-			UE_LOG(LogTextureCompressor, Warning,
-				TEXT("Negative pixel values (%f, %f, %f) are not expected"),
-				OriginalColor.R, OriginalColor.G, OriginalColor.B);
 		}
 
 		// Convert to HSV
