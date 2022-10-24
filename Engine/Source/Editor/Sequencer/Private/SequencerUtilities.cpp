@@ -1737,6 +1737,17 @@ bool FSequencerUtilities::PasteSections(const FString& TextToImport, FMovieScene
 
 			Section->ClearFlags(RF_Transient);
 			Section->Rename(nullptr, Track);
+
+			if (Track->SupportsMultipleRows())
+			{
+				Section->SetRowIndex(RowIndex);
+			}
+			else if (!Section->HasStartFrame() && !Section->HasEndFrame())
+			{
+				// If the track doesn't support multiple rows and the pasted section is infinite, it should win out over existing sections
+				Track->RemoveAllAnimationData();
+			}
+
 			Track->AddSection(*Section);
 			if (Section->HasStartFrame())
 			{
@@ -1744,10 +1755,6 @@ bool FSequencerUtilities::PasteSections(const FString& TextToImport, FMovieScene
 				Section->MoveSection(NewStartFrame - Section->GetInclusiveStartFrame());
 			}
 
-			if (Track->SupportsMultipleRows())
-			{
-				Section->SetRowIndex(RowIndex);
-			}
 			OutSections.Add(Section);
 		}
 
