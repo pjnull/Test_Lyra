@@ -2,6 +2,7 @@
 
 #include "USDPrimConversion.h"
 
+#include "Engine/SkinnedAssetCommon.h"
 #include "UnrealUSDWrapper.h"
 #include "USDAttributeUtils.h"
 #include "USDConversionUtils.h"
