@@ -6,6 +6,7 @@
 
 #include "Dataflow/DataflowNodeFactory.h"
 #include "Dataflow/GeometryCollectionNodes.h"
+#include "Dataflow/Nodes/GeometryCollectionAssetNodes.h"
 #include "Dataflow/GeometryCollectionProcessingNodes.h"
 #include "Dataflow/GeometryCollectionSkeletalMeshNodes.h"
 #include "Dataflow/GeometryCollectionTetrahedralNodes.h"
@@ -15,6 +16,7 @@
 
 void IGeometryCollectionNodesPlugin::StartupModule()
 {
+	Dataflow::GeometryCollectionEngineNodes();
 	Dataflow::GeometryCollectionEngineAssetNodes();
 	Dataflow::GeometryCollectionProcessingNodes();
 	Dataflow::GeometryCollectionSkeletalMeshNodes();

@@ -26,7 +26,7 @@
 
 namespace Dataflow
 {
-	void GeometryCollectionEngineAssetNodes()
+	void GeometryCollectionEngineNodes()
 	{
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FGetCollectionAssetDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FExampleCollectionEditDataflowNode);
