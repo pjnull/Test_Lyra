@@ -3333,9 +3333,16 @@ bool FRecastTileGenerator::GenerateCompressedLayers(FNavMeshBuildContext& BuildC
 	}
 
 #if RECAST_INTERNAL_DEBUG_DATA
-	if (IsTileDebugActive() && TileDebugSettings.bHeightfieldSolidFromRasterization)
+	if (IsTileDebugActive())
 	{
-		duDebugDrawHeightfieldSolid(&BuildContext.InternalDebugData, *RasterContext.SolidHF);
+		if (TileDebugSettings.bHeightfieldSolidFromRasterization)
+		{
+			duDebugDrawHeightfieldSolid(&BuildContext.InternalDebugData, *RasterContext.SolidHF);
+		}
+		if (TileDebugSettings.bHeightfieldSolidBounds)
+		{
+			duDebugDrawHeightfieldBounds(&BuildContext.InternalDebugData, *RasterContext.SolidHF);
+		}
 	}
 #endif
 
