@@ -46,6 +46,7 @@
 #include "ContentStreaming.h"
 #include "Animation/AnimTrace.h"
 #include "Animation/BuiltInAttributeTypes.h"
+#include "Animation/AnimSubsystem_SharedLinkedAnimLayers.h"
 #include "HAL/LowLevelMemTracker.h"
 #include "HAL/LowLevelMemStats.h"
 #include "HAL/IConsoleManager.h"
@@ -3107,6 +3108,15 @@ UAnimInstance* USkeletalMeshComponent::GetPostProcessInstance() const
 
 void USkeletalMeshComponent::ResetLinkedAnimInstances()
 {
+	// Reset linked anim layers shared data 
+	if (AnimScriptInstance)
+	{
+		if (FAnimSubsystem_SharedLinkedAnimLayers* SharedLinkedAnimLayers = AnimScriptInstance->FindSubsystem<FAnimSubsystem_SharedLinkedAnimLayers>())
+		{
+			SharedLinkedAnimLayers->Reset();
+		}
+	}
+
 	for(UAnimInstance* LinkedInstance : LinkedInstances)
 	{
 		if(LinkedInstance && LinkedInstance->bCreatedByLinkedAnimGraph)
