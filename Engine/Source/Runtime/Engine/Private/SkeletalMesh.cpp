@@ -5184,7 +5184,7 @@ bool USkeletalMesh::IsMaterialUsed(int32 MaterialIndex) const
 	return false;
 }
 
-#if WITH_EDITOR
+
 void USkeletalMesh::AddSkinWeightProfile(const FSkinWeightProfileInfo& Profile) 
 {
 	WaitUntilAsyncPropertyReleased(ESkeletalMeshAsyncProperties::SkinWeightProfiles); 
@@ -5192,7 +5192,7 @@ void USkeletalMesh::AddSkinWeightProfile(const FSkinWeightProfileInfo& Profile)
 	SkinWeightProfiles.Add(Profile); 
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
-#endif
+
 
 void USkeletalMesh::ReleaseSkinWeightProfileResources()
 {
