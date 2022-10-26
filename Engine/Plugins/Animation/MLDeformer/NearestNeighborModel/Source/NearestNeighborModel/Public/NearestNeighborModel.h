@@ -213,6 +213,8 @@ public:
 	void InitInputInfo();
 	void InitPreviousWeights();
 
+	void ResetMorphBuffers();
+
 #if WITH_EDITORONLY_DATA
 	TObjectPtr<UAnimSequence> GetNearestNeighborSkeletons(int32 PartId);
 	const TObjectPtr<UAnimSequence> GetNearestNeighborSkeletons(int32 PartId) const;
