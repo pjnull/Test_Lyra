@@ -3173,6 +3173,10 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 	// Rebuild scene textures to include GBuffers.
 	SceneTextures.SetupMode |= ESceneTextureSetupMode::GBuffers;
+	if (bShouldRenderVelocities && (bBasePassCanOutputVelocity || Scene->EarlyZPassMode == DDM_AllOpaqueNoVelocity))
+	{
+		SceneTextures.SetupMode |= ESceneTextureSetupMode::SceneVelocity;
+	}
 	SceneTextures.UniformBuffer = CreateSceneTextureUniformBuffer(GraphBuilder, &SceneTextures, FeatureLevel, SceneTextures.SetupMode);
 
 	if (bRealTimeSkyCaptureEnabled)
