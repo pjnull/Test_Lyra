@@ -1492,6 +1492,11 @@ void FD3D12DynamicRHI::Init()
 
 	GRHICommandList.GetImmediateCommandList().InitializeImmediateContexts();
 
+	for (TSharedPtr<FD3D12Adapter>& Adapter : ChosenAdapters)
+	{
+		FD3D12BufferedGPUTiming::Initialize(Adapter.Get());
+	}
+
 	FRenderResource::InitPreRHIResources();
 	GIsRHIInitialized = true;
 }
