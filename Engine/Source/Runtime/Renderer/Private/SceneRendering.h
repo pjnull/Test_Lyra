@@ -897,6 +897,7 @@ struct FTemporalAAHistory
 struct FTSRHistory
 {
 	// Output resolution.
+	TRefCountPtr<IPooledRenderTarget> Output;
 	TRefCountPtr<IPooledRenderTarget> ColorArray;
 	TRefCountPtr<IPooledRenderTarget> Metadata;
 	TRefCountPtr<IPooledRenderTarget> TranslucencyAlpha;
@@ -908,6 +909,7 @@ struct FTSRHistory
 	TRefCountPtr<IPooledRenderTarget> Velocity;
 
 	// Previous frame's history.
+	TRefCountPtr<IPooledRenderTarget> PrevOutput;
 	TRefCountPtr<IPooledRenderTarget> PrevColorArray;
 
 	// Frame's input and output resolution.
@@ -930,7 +932,7 @@ struct FTSRHistory
 
 	bool IsValid() const
 	{
-		return ColorArray.IsValid();
+		return Metadata.IsValid();
 	}
 
 	uint64 GetGPUSizeBytes(bool bLogSizes) const;
