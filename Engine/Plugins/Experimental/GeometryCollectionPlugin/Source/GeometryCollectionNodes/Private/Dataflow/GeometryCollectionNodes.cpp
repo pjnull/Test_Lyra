@@ -173,7 +173,7 @@ void FResetGeometryCollectionDataflowNode::Evaluate(Dataflow::FContext& Context,
 						}
 					}
 				}
-				GeometryCollectionObject->UpdateConvexGeometry();
+				GeometryCollectionObject->UpdateGeometryDependentProperties();
 				GeometryCollectionObject->InitializeMaterials();
 				GeometryCollectionObject->InvalidateCollection();
 
