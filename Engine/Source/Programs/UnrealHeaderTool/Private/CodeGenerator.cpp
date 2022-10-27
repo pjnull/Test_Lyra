@@ -7127,9 +7127,6 @@ void ParseSourceFiles(TArray<FUnrealSourceFile*>& OrderedSourceFiles)
 			const FManifestModule& Module = ParsedCPP.PackageDef.GetModule();
 			FUnrealSourceFile& SourceFile = ParsedCPP.SourceFile;
 
-			FString ModuleRelativeFilename = SourceFile.GetFilename();
-			ConvertToBuildIncludePath(Module, ModuleRelativeFilename);
-
 			auto ParseSource = [&ParsedCPP]()
 			{
 				++GSourcesParsing;
