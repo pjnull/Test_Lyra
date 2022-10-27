@@ -2837,6 +2837,8 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 					// Nanite::VisBuffer (Culling and Rasterization)
 					{
+						DynamicRenderScaling::FRDGScope DynamicScalingScope(GraphBuilder, GDynamicNaniteScalingPrimary);
+
 						RDG_GPU_STAT_SCOPE(GraphBuilder, NaniteVisBuffer);
 						RDG_EVENT_SCOPE(GraphBuilder, "Nanite::VisBuffer");
 
