@@ -1305,6 +1305,8 @@ void FD3D12Adapter::CleanupResources()
 		Viewport->WaitForFrameEventCompletion();
 	}
 
+	TransientMemoryCache = nullptr;
+
 #if D3D12_RHI_RAYTRACING
 	for (uint32 GPUIndex : FRHIGPUMask::All())
 	{
