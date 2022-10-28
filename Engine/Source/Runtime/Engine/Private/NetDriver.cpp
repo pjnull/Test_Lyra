@@ -5,7 +5,6 @@
 =============================================================================*/
 
 #include "Engine/NetDriver.h"
-#include "CoreMinimal.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/CommandLine.h"
 #include "Misc/NetworkGuid.h"
@@ -529,6 +528,15 @@ UNetDriver::UNetDriver(const FObjectInitializer& ObjectInitializer)
 {
 	UpdateDelayRandomStream.Initialize(FApp::bUseFixedSeed ? GetFName() : NAME_None);
 }
+
+UNetDriver::UNetDriver(FVTableHelper& Helper)
+	: Super(Helper)
+{
+}
+
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+UNetDriver::~UNetDriver() = default;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 void UNetDriver::InitPacketSimulationSettings()
 {
@@ -1375,7 +1383,7 @@ bool UNetDriver::InitBase(bool bInitAsClient, FNetworkNotify* InNotify, const FU
 
 	if (!bInitAsClient)
 	{
-		ConnectionlessHandler.Reset(nullptr);
+		ConnectionlessHandler.Reset();
 		
 		if (!IsUsingIrisReplication())
 		{
@@ -1636,7 +1644,7 @@ void UNetDriver::Shutdown()
 	}
 	ActorChannelPool.Empty();
 
-	ConnectionlessHandler.Reset(nullptr);
+	ConnectionlessHandler.Reset();
 
 	SetReplicationDriver(nullptr);
 #if UE_WITH_IRIS
@@ -1780,13 +1788,16 @@ void UNetDriver::TickDispatch( float DeltaTime )
 			{
 				UNetConnection* CurConn = ClientConnections[ConnIdx];
 
-				if (CurConn->GetConnectionState() == USOCK_Closed)
+				if (IsValid(CurConn))
 				{
-					CurConn->CleanUp();
-				}
-				else if (IsValid(CurConn))
-				{
-					CurConn->PreTickDispatch();
+					if (CurConn->GetConnectionState() == USOCK_Closed)
+					{
+						CurConn->CleanUp();
+					}
+					else
+					{
+						CurConn->PreTickDispatch();
+					}
 				}
 			}
 		}
@@ -5712,9 +5723,9 @@ void UNetDriver::InitDestroyedStartupActors()
 			if (Level)
 			{
 				const TArray<FReplicatedStaticActorDestructionInfo>& DestroyedReplicatedStaticActors = Level->GetDestroyedReplicatedStaticActors();
-				for(const FReplicatedStaticActorDestructionInfo& Info : DestroyedReplicatedStaticActors)
+				for(const FReplicatedStaticActorDestructionInfo& CurInfo : DestroyedReplicatedStaticActors)
 				{
-					CreateReplicatedStaticActorDestructionInfo(Level, Info);
+					CreateReplicatedStaticActorDestructionInfo(Level, CurInfo);
 				}
 			}
 		}
