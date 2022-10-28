@@ -5042,12 +5042,13 @@ void UClass::Serialize( FArchive& Ar )
 	{
 		if (Ar.IsSaving())
 		{
-			bCooked = Ar.IsCooking();
+			bool bCookedAsBool = bCooked || Ar.IsCooking();
+			Ar << bCookedAsBool;
 		}
-		bool bCookedAsBool = bCooked;
-		Ar << bCookedAsBool;
 		if (Ar.IsLoading())
 		{
+			bool bCookedAsBool = false;
+			Ar << bCookedAsBool;
 			bCooked = bCookedAsBool;
 		}
 	}
