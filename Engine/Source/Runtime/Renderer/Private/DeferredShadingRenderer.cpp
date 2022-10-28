@@ -2191,7 +2191,7 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 
 	GRayTracingGeometryManager.Tick();
 
-	if (bHasRayTracingEnableChanged)
+	if ((GetRayTracingMode() == ERayTracingMode::Dynamic) && bHasRayTracingEnableChanged)
 	{
 		Scene->GetRayTracingDynamicGeometryCollection()->Clear();
 	}
