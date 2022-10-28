@@ -2680,6 +2680,7 @@ DEFINE_STAT(STAT_AddToWorldTime);
 DEFINE_STAT(STAT_RemoveFromWorldTime);
 DEFINE_STAT(STAT_UpdateLevelStreamingTime);
 DEFINE_STAT(STAT_ManageLevelsToConsider);
+DEFINE_STAT(STAT_UpdateStreamingState);
 
 /**
  * Static helper function for Add/RemoveToWorld to determine whether we've already spent all the allotted time.
@@ -3831,6 +3832,9 @@ void UWorld::BlockTillLevelStreamingCompleted()
 
 void UWorld::InternalUpdateStreamingState()
 {
+	CSV_SCOPED_TIMING_STAT_EXCLUSIVE(UpdateStreamingState);
+	SCOPE_CYCLE_COUNTER(STAT_UpdateStreamingState);
+
 	// Update streaming levels state using streaming volumes.
 	// Issues level streaming load/unload requests based on local players being inside/outside level streaming volumes.
 	ProcessLevelStreamingVolumes();
