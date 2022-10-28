@@ -3854,16 +3854,18 @@ void SAnimNotifyPanel::Construct(const FArguments& InArgs, const TSharedRef<FAni
 	OnNotifyNodesBeingDragged = InArgs._OnNotifyNodesBeingDragged;
 	bIsSelecting = false;
 	bIsUpdating = false;
+	bUpdateRequested = false;
+	bRefreshRequested = false;
 
 	InModel->OnHandleObjectsSelected().AddSP(this, &SAnimNotifyPanel::HandleObjectsSelected);
 
 	FAnimNotifyPanelCommands::Register();
 	BindCommands();
 
-	Sequence->RegisterOnNotifyChanged(UAnimSequenceBase::FOnNotifyChanged::CreateSP(this, &SAnimNotifyPanel::RefreshNotifyTracks ));
+	Sequence->RegisterOnNotifyChanged(UAnimSequenceBase::FOnNotifyChanged::CreateSP(this, &SAnimNotifyPanel::RequestRefresh ));
 
-	InModel->GetEditableSkeleton()->RegisterOnNotifiesChanged(FSimpleDelegate::CreateSP(this, &SAnimNotifyPanel::RefreshNotifyTracks));
-	InModel->OnTracksChanged().Add(FSimpleDelegate::CreateSP(this, &SAnimNotifyPanel::RefreshNotifyTracks));
+	InModel->GetEditableSkeleton()->RegisterOnNotifiesChanged(FSimpleDelegate::CreateSP(this, &SAnimNotifyPanel::RequestRefresh));
+	InModel->OnTracksChanged().Add(FSimpleDelegate::CreateSP(this, &SAnimNotifyPanel::RequestRefresh));
 
 	if(GEditor)
 	{
@@ -3897,7 +3899,7 @@ void SAnimNotifyPanel::Construct(const FArguments& InArgs, const TSharedRef<FAni
 	PopulateNotifyBlueprintClasses(NotifyClassNames);
 	PopulateNotifyBlueprintClasses(NotifyStateClassNames);
 
-	Update();
+	RequestUpdate();
 }
 
 SAnimNotifyPanel::~SAnimNotifyPanel()
@@ -3963,7 +3965,7 @@ FReply SAnimNotifyPanel::InsertTrack(int32 TrackIndexToInsert)
 	Sequence->PostEditChange();
 	Sequence->MarkPackageDirty();
 
-	Update();
+	RequestUpdate();
 
 	return FReply::Handled();
 }
@@ -3977,7 +3979,7 @@ FReply SAnimNotifyPanel::AddTrack()
 	Sequence->AnimNotifyTracks.Add(NewItem);
 	Sequence->MarkPackageDirty();
 
-	Update();
+	RequestUpdate();
 
 	return FReply::Handled();
 }
@@ -4010,7 +4012,7 @@ FReply SAnimNotifyPanel::DeleteTrack(int32 TrackIndexToDelete)
 			Sequence->AnimNotifyTracks.RemoveAt(TrackIndexToDelete);
 			Sequence->PostEditChange();
 			Sequence->MarkPackageDirty();
-			Update();
+			RequestUpdate();
 		}
 	}
 	return FReply::Handled();
@@ -4053,6 +4055,16 @@ void SAnimNotifyPanel::Update()
 
 		OnNotifiesChanged.ExecuteIfBound();
 	}
+}
+
+void SAnimNotifyPanel::RequestUpdate()
+{
+	bUpdateRequested = true;
+}
+
+void SAnimNotifyPanel::RequestRefresh()
+{
+	bRefreshRequested = true;
 }
 
 // Helper to save/restore selection state when widgets are recreated
@@ -4126,7 +4138,7 @@ void SAnimNotifyPanel::RefreshNotifyTracks()
 				.ViewInputMax(ViewInputMax)
 				.OnGetScrubValue(OnGetScrubValue)
 				.OnGetDraggedNodePos(this, &SAnimNotifyPanel::CalculateDraggedNodePos)
-				.OnUpdatePanel(this, &SAnimNotifyPanel::Update)
+				.OnUpdatePanel(this, &SAnimNotifyPanel::RequestUpdate)
 				.OnGetNotifyBlueprintData(this, &SAnimNotifyPanel::OnGetNotifyBlueprintData, &NotifyClassNames)
 				.OnGetNotifyStateBlueprintData(this, &SAnimNotifyPanel::OnGetNotifyBlueprintData, &NotifyStateClassNames)
 				.OnGetNotifyNativeClasses(this, &SAnimNotifyPanel::OnGetNativeNotifyData, UAnimNotify::StaticClass(), &NotifyClassNames)
@@ -4200,7 +4212,7 @@ FReply SAnimNotifyPanel::OnNotifyNodeDragStarted(TArray<TSharedPtr<SAnimNotifyNo
 	}
 
 	FPanTrackRequest PanRequestDelegate = FPanTrackRequest::CreateSP(this, &SAnimNotifyPanel::PanInputViewRange);
-	FOnUpdatePanel UpdateDelegate = FOnUpdatePanel::CreateSP(this, &SAnimNotifyPanel::Update);
+	FOnUpdatePanel UpdateDelegate = FOnUpdatePanel::CreateSP(this, &SAnimNotifyPanel::RequestUpdate);
 	return FReply::Handled().BeginDragDrop(FNotifyDragDropOp::New(Nodes, NodeDragDecorator, NotifyAnimTracks, Sequence, ScreenCursorPos, OverlayOrigin, OverlayExtents, CurrentDragXPosition, PanRequestDelegate, OnSnapPosition, UpdateDelegate, OnNotifyNodesBeingDragged));
 }
 
@@ -4270,7 +4282,7 @@ void SAnimNotifyPanel::DeleteSelectedNodeObjects()
 	TArray<UObject*> Objects;
 	OnSelectionChanged.ExecuteIfBound(Objects);
 
-	Update();
+	RequestUpdate();
 }
 
 void SAnimNotifyPanel::SetSequence(class UAnimSequenceBase*	InSequence)
@@ -4278,7 +4290,7 @@ void SAnimNotifyPanel::SetSequence(class UAnimSequenceBase*	InSequence)
 	if (InSequence != Sequence)
 	{
 		Sequence = InSequence;
-		Update();
+		RequestUpdate();
 	}
 }
 
@@ -4496,7 +4508,7 @@ void SAnimNotifyPanel::OnReplaceSelectedWithNotify(FString NewNotifyName, UClass
 	Sequence->PostEditChange();
 	Sequence->MarkPackageDirty();
 
-	Update();
+	RequestUpdate();
 }
 
 void SAnimNotifyPanel::OnReplaceSelectedWithNotifyBlueprint(FString NewBlueprintNotifyName, FString NewBlueprintNotifyClass)
@@ -4634,7 +4646,7 @@ void SAnimNotifyPanel::OnPropertyChanged(UObject* ChangedObject, FPropertyChange
 			if(Event.Notify == ChangedObject || Event.NotifyStateClass == ChangedObject)
 			{
 				// If we've changed a notify present in the sequence, refresh our tracks.
-				Update();
+				RequestUpdate();
 			}
 		}
 	}
@@ -4745,6 +4757,21 @@ int32 SAnimNotifyPanel::OnPaint(const FPaintArgs& Args, const FGeometry& Allotte
 	}
 
 	return LayerId;
+}
+
+void SAnimNotifyPanel::Tick( const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime )
+{
+	if(bUpdateRequested)
+	{
+		Update();
+		bUpdateRequested = false;
+		bRefreshRequested = false;
+	}
+	if(bRefreshRequested)
+	{
+		RefreshNotifyTracks();
+		bRefreshRequested = false;
+	}
 }
 
 void SAnimNotifyPanel::RefreshMarqueeSelectedNodes(const FGeometry& PanelGeo)
