@@ -2847,7 +2847,7 @@ void UGroomComponent::InitResources(bool bIsBindingReloading)
 				}
 
 				#if RHI_RAYTRACING
-				if (IsRayTracingEnabled() && bVisibleInRayTracing)
+				if (IsRayTracingAllowed() && bVisibleInRayTracing)
 				{
 					if (bNeedDeformedPositions)
 					{
@@ -2915,7 +2915,7 @@ void UGroomComponent::InitResources(bool bIsBindingReloading)
 				}
 
 				#if RHI_RAYTRACING
-				if (IsRayTracingEnabled() && bVisibleInRayTracing)
+				if (IsRayTracingAllowed() && bVisibleInRayTracing)
 				{
 					if (bNeedDeformedPositions)
 					{
