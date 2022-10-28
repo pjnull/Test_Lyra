@@ -5331,6 +5331,16 @@ void UWorld::RemoveOnActorDestroyededHandler(FDelegateHandle InHandle) const
 	OnActorDestroyed.Remove(InHandle);
 }
 
+FDelegateHandle UWorld::AddOnActorRemovedFromWorldHandler(const FOnActorRemovedFromWorld::FDelegate& InHandler) const
+{
+	return OnActorRemovedFromWorld.Add(InHandler);
+}
+
+void UWorld::RemoveOnActorRemovedFromWorldHandler(FDelegateHandle InHandle) const
+{
+	OnActorRemovedFromWorld.Remove(InHandle);
+}
+
 FDelegateHandle UWorld::AddMovieSceneSequenceTickHandler(const FOnMovieSceneSequenceTick::FDelegate& InHandler)
 {
 	return MovieSceneSequenceTick.Add(InHandler);
