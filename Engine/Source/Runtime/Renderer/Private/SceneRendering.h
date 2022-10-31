@@ -1438,6 +1438,8 @@ public:
 
 	// Sky / Atmosphere textures (transient owned by this view info) and pointer to constants owned by SkyAtmosphere proxy.
 	TRefCountPtr<IPooledRenderTarget> SkyAtmosphereCameraAerialPerspectiveVolume;
+	TRefCountPtr<IPooledRenderTarget> SkyAtmosphereCameraAerialPerspectiveVolumeMieOnly;
+	TRefCountPtr<IPooledRenderTarget> SkyAtmosphereCameraAerialPerspectiveVolumeRayOnly;
 	TRefCountPtr<IPooledRenderTarget> SkyAtmosphereViewLutTexture;
 	const FAtmosphereUniformShaderParameters* SkyAtmosphereUniformShaderParameters;
 
