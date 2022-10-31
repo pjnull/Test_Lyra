@@ -2344,6 +2344,7 @@ protected:
 		bool bSkipVolumetricRenderTarget,
 		bool bSkipPerPixelTracing,
 		FRDGTextureRef HalfResolutionDepthCheckerboardMinMaxTexture,
+		FRDGTextureRef QuarterResolutionDepthMinMaxTexture,
 		bool bAsyncCompute,
 		FInstanceCullingManager& InstanceCullingManager);
 
@@ -2732,6 +2733,9 @@ void VirtualTextureFeedbackEnd(FRDGBuilder& GraphBuilder);
 
 /** Creates a half resolution checkerboard min / max depth buffer from the input full resolution depth buffer. */
 FRDGTextureRef CreateHalfResolutionDepthCheckerboardMinMax(FRDGBuilder& GraphBuilder, TArrayView<const FViewInfo> Views, FRDGTextureRef SceneDepth);
+
+/** Creates a half resolution depth buffer storing the min and max depth for each 2x2 pixel quad of a half resolution buffer. */
+FRDGTextureRef CreateQuarterResolutionDepthMinAndMax(FRDGBuilder& GraphBuilder, TArrayView<const FViewInfo> Views, FRDGTextureRef DepthTexture);
 
 inline const FSceneTexturesConfig& FViewInfo::GetSceneTexturesConfig() const
 {
