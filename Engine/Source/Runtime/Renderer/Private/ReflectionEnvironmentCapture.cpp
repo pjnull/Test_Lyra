@@ -1173,7 +1173,7 @@ void CaptureSceneIntoScratchCubemap(
 			// Alert the RHI that we're rendering a new frame
 			// Not really a new frame, but it will allow pooling mechanisms to update, like the uniform buffer pool
 			ENQUEUE_RENDER_COMMAND(BeginFrame)(
-				[](FRHICommandList& RHICmdList)
+				[](FRHICommandListImmediate& RHICmdList)
 			{
 				GFrameNumberRenderThread++;
 				RHICmdList.BeginFrame();

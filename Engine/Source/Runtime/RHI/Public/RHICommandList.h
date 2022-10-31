@@ -602,6 +602,10 @@ public:
 
 	void SetExecuteStat(TStatId Stat) { ExecuteStat = Stat; }
 
+#if HAS_GPU_STATS
+	void SetStatsCategory(FDrawCallCategoryName* Category);
+#endif
+
 	FGraphEventRef RHIThreadFence(bool bSetLockFence = false);
 
 	FORCEINLINE void* LockBuffer(FRHIBuffer* Buffer, uint32 Offset, uint32 SizeRHI, EResourceLockMode LockMode)
@@ -677,11 +681,6 @@ protected:
 		PersistentState.SubpassHint = SubpassHint;
 		PersistentState.SubpassIndex = 0;
 	}
-
-private:
-	// Replays recorded commands into the specified contexts.
-	// Used internally, do not call directly.
-	void Execute(TRHIPipelineArray<IRHIComputeContext*>& InOutPipeContexts);
 
 protected:
 	// Blocks the calling thread until the dispatch event is completed.
@@ -760,6 +759,41 @@ protected:
 		FGraphEventArray QueuedFenceCandidateEvents;
 		TArray<TRefCountPtr<FFenceCandidate>, FConcurrentLinearArrayAllocator> QueuedFenceCandidates;
 
+		struct FGPUStats
+		{
+#if HAS_GPU_STATS
+			FDrawCallCategoryName* CategoryTOP = nullptr;
+			FDrawCallCategoryName* CategoryBOP = nullptr;
+#endif
+
+			FRHIDrawStats* Ptr = nullptr;
+
+			void InitFrom(FGPUStats* Other)
+			{
+				if (!Other)
+					return;
+
+				Ptr = Other->Ptr;
+#if HAS_GPU_STATS
+				CategoryBOP = Other->CategoryTOP;
+#endif
+			}
+
+			void ApplyToContext(IRHIComputeContext* Context)
+			{
+				uint32 CategoryID = FRHIDrawStats::NoCategory;
+#if HAS_GPU_STATS
+				check(!CategoryBOP || CategoryBOP->ShouldCountDraws());
+				if (CategoryBOP)
+				{
+					CategoryID = CategoryBOP->Index;
+				}
+#endif
+
+				Context->StatsSetCategory(Ptr, CategoryID);
+			}
+		} Stats;
+
 		FPersistentState(FRHIGPUMask InInitialGPUMask, ERecordingThread InRecordingThread)
 			: RecordingThread(InRecordingThread)
 			, CurrentGPUMask(InInitialGPUMask)
@@ -816,6 +850,9 @@ public:
 
 private:
 	FRHICommandListBase(FPersistentState&& InPersistentState);
+
+	// Replays recorded commands into the specified contexts. Used internally, do not call directly.
+	void Execute(TRHIPipelineArray<IRHIComputeContext*>& InOutPipeContexts, FPersistentState::FGPUStats* ParentStats);
 
 	friend class FRHICommandListExecutor;
 	friend class FRHICommandListIterator;
@@ -2283,7 +2320,7 @@ template<> RHI_API void FRHICommandSetShaderUniformBuffer        <FRHIComputeSha
 template<> RHI_API void FRHICommandSetShaderTexture              <FRHIComputeShader>::Execute(FRHICommandListBase& CmdList);
 template<> RHI_API void FRHICommandSetShaderResourceViewParameter<FRHIComputeShader>::Execute(FRHICommandListBase& CmdList);
 template<> RHI_API void FRHICommandSetShaderSampler              <FRHIComputeShader>::Execute(FRHICommandListBase& CmdList);
-template<> RHI_API void FRHICommandSetUAVParameter<FRHIComputeShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetUAVParameter               <FRHIComputeShader>::Execute(FRHICommandListBase& CmdList);
 
 class RHI_API FRHIComputeCommandList : public FRHICommandListBase
 {
@@ -2982,12 +3019,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 };
 
-template<> RHI_API void FRHICommandSetShaderParameter<FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
-template<> RHI_API void FRHICommandSetShaderUniformBuffer<FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
-template<> RHI_API void FRHICommandSetShaderTexture<FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetShaderParameter            <FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetShaderUniformBuffer        <FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetShaderTexture              <FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
 template<> RHI_API void FRHICommandSetShaderResourceViewParameter<FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
-template<> RHI_API void FRHICommandSetShaderSampler<FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
-template<> RHI_API void FRHICommandSetUAVParameter<FRHIPixelShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetShaderSampler              <FRHIGraphicsShader>::Execute(FRHICommandListBase& CmdList);
+template<> RHI_API void FRHICommandSetUAVParameter               <FRHIPixelShader   >::Execute(FRHICommandListBase& CmdList);
 
 class RHI_API FRHICommandList : public FRHIComputeCommandList
 {
@@ -3604,14 +3641,6 @@ public:
 		IncrementSubpass();
 	}
 
-	// These 6 are special in that they must be called on the immediate command list and they force a flush only when we are not doing RHI thread
-	void BeginScene();
-	void EndScene();
-	void BeginDrawingViewport(FRHIViewport* Viewport, FRHITexture* RenderTargetRHI);
-	void EndDrawingViewport(FRHIViewport* Viewport, bool bPresent, bool bLockToVsync);
-	void BeginFrame();
-	void EndFrame();
-
 	FORCEINLINE_DEBUGGABLE void RHIInvalidateCachedState()
 	{
 		if (Bypass())
@@ -3945,14 +3974,17 @@ extern RHI_API ERHIAccess RHIGetDefaultResourceState(EBufferUsageFlags InUsage, 
 class RHI_API FRHICommandListImmediate : public FRHICommandList
 {
 	friend class FRHICommandListExecutor;
+	friend struct FRHICommandBeginFrame;
 
 	static FGraphEventArray WaitOutstandingTasks;
 	static FGraphEventRef   RHIThreadTask;
+	static FRHIDrawStats    FrameDrawStats;
 
 	FRHICommandListImmediate()
 		: FRHICommandList(FRHIGPUMask::All(), ERecordingThread::Render)
 	{
 		PersistentState.bImmediate = true;
+		PersistentState.Stats.Ptr = &FrameDrawStats;
 	}
 
 	~FRHICommandListImmediate()
@@ -3986,7 +4018,19 @@ class RHI_API FRHICommandListImmediate : public FRHICommandList
 	//
 	void Reset();
 
+	//
+	// Called on RHIBeginFrame. Updates the draw call counters / stats.
+	//
+	void ProcessStats();
+
 public:
+	void BeginScene();
+	void EndScene();
+	void BeginDrawingViewport(FRHIViewport* Viewport, FRHITexture* RenderTargetRHI);
+	void EndDrawingViewport(FRHIViewport* Viewport, bool bPresent, bool bLockToVsync);
+	void BeginFrame();
+	void EndFrame();
+
 	struct FQueuedCommandList
 	{
 		// The command list to enqueue.
