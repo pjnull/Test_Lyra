@@ -494,8 +494,10 @@ public:
 	*/
 	static FNiagaraShaderMap* FindId(const FNiagaraShaderMapId& ShaderMapId, EShaderPlatform Platform);
 
+#if ALLOW_SHADERMAP_DEBUG_DATA
 	/** Flushes the given shader types from any loaded FNiagaraShaderMaps. */
 	static void FlushShaderTypes(TArray<const FShaderType*>& ShaderTypesToFlush);
+#endif
 
 	// ShaderMap interface
 	template<typename ShaderType> TNiagaraShaderRef<ShaderType> GetShader(int32 PermutationId) const { return TNiagaraShaderRef<ShaderType>(GetContent()->GetShader<ShaderType>(PermutationId), *this); }
@@ -625,11 +627,16 @@ private:
 	*/
 	static TMap<FNiagaraShaderMapId, FNiagaraShaderMap*> GIdToNiagaraShaderMap[SP_NumPlatforms];
 
+#if ALLOW_SHADERMAP_DEBUG_DATA
 	/**
 	* All script shader maps in memory.
 	* No ref counting needed as these are removed on destruction of the shader map.
 	*/
 	static TArray<FNiagaraShaderMap*> AllNiagaraShaderMaps;
+
+	/** Guards access to AllNiagaraShaderMaps, which can be written to from an async loading thread. */
+	static FCriticalSection AllNiagaraShaderMapsGuard;
+#endif
 
 	/** Tracks resources and their shader maps that need to be compiled but whose compilation is being deferred. */
 	static TMap<TRefCountPtr<FNiagaraShaderMap>, TArray<FNiagaraShaderScript*> > NiagaraShaderMapsBeingCompiled;

@@ -72,7 +72,10 @@ namespace NiagaraShaderCookStats
 //
 NIAGARASHADER_API FCriticalSection GIdToNiagaraShaderMapCS;
 TMap<FNiagaraShaderMapId, FNiagaraShaderMap*> FNiagaraShaderMap::GIdToNiagaraShaderMap[SP_NumPlatforms];
+#if ALLOW_SHADERMAP_DEBUG_DATA
 TArray<FNiagaraShaderMap*> FNiagaraShaderMap::AllNiagaraShaderMaps;
+FCriticalSection FNiagaraShaderMap::AllNiagaraShaderMapsGuard;
+#endif
 
 
 /** 
@@ -529,9 +532,11 @@ FNiagaraShaderMap* FNiagaraShaderMap::FindId(const FNiagaraShaderMapId& ShaderMa
 	return Result;
 }
 
+#if ALLOW_SHADERMAP_DEBUG_DATA
 /** Flushes the given shader types from any loaded FNiagaraShaderMap's. */
 void FNiagaraShaderMap::FlushShaderTypes(TArray<const FShaderType*>& ShaderTypesToFlush)
 {
+	FScopeLock AllSMAccess(&AllNiagaraShaderMapsGuard);
 	for (int32 ShaderMapIndex = 0; ShaderMapIndex < AllNiagaraShaderMaps.Num(); ShaderMapIndex++)
 	{
 		FNiagaraShaderMap* CurrentShaderMap = AllNiagaraShaderMaps[ShaderMapIndex];
@@ -542,6 +547,7 @@ void FNiagaraShaderMap::FlushShaderTypes(TArray<const FShaderType*>& ShaderTypes
 		}
 	}
 }
+#endif
 
 void NiagaraShaderMapAppendKeyString(EShaderPlatform Platform, FString& KeyString)
 {
@@ -1015,7 +1021,10 @@ FNiagaraShaderMap::FNiagaraShaderMap() :
 	bIsPersistent(true) 
 {
 	checkSlow(IsInGameThread() || IsAsyncLoading());
+#if ALLOW_SHADERMAP_DEBUG_DATA
+	FScopeLock AllSMAccess(&AllNiagaraShaderMapsGuard);
 	AllNiagaraShaderMaps.Add(this);
+#endif
 }
 
 FNiagaraShaderMap::~FNiagaraShaderMap()
@@ -1023,7 +1032,10 @@ FNiagaraShaderMap::~FNiagaraShaderMap()
 	checkSlow(IsInGameThread() || IsAsyncLoading());
 	check(bDeletedThroughDeferredCleanup);
 	check(!bRegistered);
+#if ALLOW_SHADERMAP_DEBUG_DATA
+	FScopeLock AllSMAccess(&AllNiagaraShaderMapsGuard);
 	AllNiagaraShaderMaps.RemoveSwap(this);
+#endif
 }
 
 /**
