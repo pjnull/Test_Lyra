@@ -1997,7 +1997,7 @@ public:
 	};
 	/** Default constructor. */
 	explicit FShaderMapContent(EShaderPlatform InPlatform)
-		: ShaderHash(128u), Platform(InPlatform)
+		: ShaderHash(128u), ShaderPlatformName(FDataDrivenShaderPlatformInfo::GetName(InPlatform).ToString())
 	{}
 
 	/** Destructor ensures pipelines cleared up. */
@@ -2006,7 +2006,7 @@ public:
 		Empty();
 	}
 
-	EShaderPlatform GetShaderPlatform() const { return Platform; }
+	EShaderPlatform GetShaderPlatform() const { return FDataDrivenShaderPlatformInfo::GetShaderPlatformFromName(FName(ShaderPlatformName)); };
 
 	void Validate(const FShaderMapBase& InShaderMap) const;
 
@@ -2015,7 +2015,7 @@ public:
 	ShaderType* GetShader(int32 PermutationId = 0) const
 	{
 		FShader* Shader = GetShader(&ShaderType::StaticType, PermutationId);
-		checkf(Shader != nullptr, TEXT("Failed to find shader type %s in Platform %s"), ShaderType::StaticType.GetName(), *LegacyShaderPlatformToShaderFormat(Platform).ToString());
+		checkf(Shader != nullptr, TEXT("Failed to find shader type %s in Platform %s"), ShaderType::StaticType.GetName(), *LegacyShaderPlatformToShaderFormat(GetShaderPlatform()).ToString());
 		return static_cast<ShaderType*>(Shader);
 	}
 
@@ -2143,8 +2143,8 @@ protected:
 	LAYOUT_FIELD(TMemoryImageArray<int32>, ShaderPermutations);
 	LAYOUT_FIELD(TMemoryImageArray<TMemoryImagePtr<FShader>>, Shaders);
 	LAYOUT_FIELD(TMemoryImageArray<TMemoryImagePtr<FShaderPipeline>>, ShaderPipelines);
-	/** The platform this shader map was compiled with */
-	LAYOUT_FIELD(TEnumAsByte<EShaderPlatform>, Platform);
+	/** The ShaderPlatform Name this shader map was compiled with */
+	LAYOUT_FIELD(FMemoryImageString, ShaderPlatformName);
 };
 
 class RENDERCORE_API FShaderMapBase
