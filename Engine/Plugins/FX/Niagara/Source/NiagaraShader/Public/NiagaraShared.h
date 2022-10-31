@@ -12,6 +12,7 @@
 #include "Engine/EngineTypes.h"
 #include "Templates/RefCounting.h"
 #include "Misc/SecureHash.h"
+#include "MaterialShared.h"
 #include "RHI.h"
 #include "RenderResource.h"
 #include "RenderingThread.h"
