@@ -302,6 +302,16 @@ void SLevelViewportToolBar::Construct( const FArguments& InArgs )
 					.ExtensionContext(ExtensionContextObject)
 				]
 				+ SHorizontalBox::Slot()
+				.Padding(ToolbarSlotPadding)
+				.AutoWidth()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Fill)
+				[
+					SNew(SExtensionPanel)
+					.ExtensionPanelID("LevelViewportToolBar.RightExtension")
+					.ExtensionContext(ExtensionContextObject)
+				]
+				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.MaxWidth(TAttribute<float>::CreateSP(this, &SLevelViewportToolBar::GetTransformToolbarWidth))
 				.Padding(ToolbarSlotPadding)
