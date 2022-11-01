@@ -704,6 +704,7 @@ public:
 		, GameThreadShaderMap(nullptr)
 		, RenderingThreadShaderMap(nullptr)
 		, ScriptParametersMetadata(MakeShared<FNiagaraShaderScriptParametersMetadata>())
+		, ScriptParametersMetadata_RT(ScriptParametersMetadata)
 		, FeatureLevel(GMaxRHIFeatureLevel)
 		, ShaderPlatform(SP_NumPlatforms)
 		, bLoadedCookedShaderMapId(false)
@@ -872,6 +873,7 @@ public:
 	
 	NIAGARASHADER_API void BuildScriptParametersMetadata(const FNiagaraShaderScriptParametersMetadata& ScriptParametersMetadata);
 	TSharedRef<FNiagaraShaderScriptParametersMetadata> GetScriptParametersMetadata() const { check(ScriptParametersMetadata.IsValid()); return ScriptParametersMetadata.ToSharedRef(); }
+	const FNiagaraShaderScriptParametersMetadata& GetScriptParametersMetadata_RT() const { check(ScriptParametersMetadata_RT.IsValid()); return *ScriptParametersMetadata_RT.Get(); }
 
 	NIAGARASHADER_API FOnNiagaraScriptCompilationComplete& OnCompilationComplete()
 	{
@@ -929,6 +931,7 @@ private:
 	FNiagaraShaderMap* RenderingThreadShaderMap;
 
 	TSharedPtr<FNiagaraShaderScriptParametersMetadata> ScriptParametersMetadata;
+	TSharedPtr<FNiagaraShaderScriptParametersMetadata> ScriptParametersMetadata_RT;
 
 	/** Guid id for base script*/
 	FGuid BaseScriptId_DEPRECATED;

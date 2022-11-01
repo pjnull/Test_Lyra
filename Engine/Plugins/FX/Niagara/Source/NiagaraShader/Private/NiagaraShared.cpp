@@ -712,6 +712,13 @@ void FNiagaraShaderScript::BuildScriptParametersMetadata(const FNiagaraShaderScr
 	}
 
 	ScriptParametersMetadata->ShaderParametersMetadata = MakeShareable<FShaderParametersMetadata>(ShaderMetadataBuilder.Build(FShaderParametersMetadata::EUseCase::ShaderParameterStruct, TEXT("FNiagaraShaderScript")));
+
+	ENQUEUE_RENDER_COMMAND(SetScriptParametersMetadata)(
+		[this, NewMetaData=ScriptParametersMetadata](FRHICommandListImmediate& RHICmdList)
+		{
+			ScriptParametersMetadata_RT=NewMetaData;
+		}
+	);
 }
 
 FNiagaraShaderRef FNiagaraShaderScript::GetShader(int32 PermutationId) const
