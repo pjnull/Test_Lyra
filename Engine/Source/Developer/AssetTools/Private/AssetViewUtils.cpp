@@ -1741,7 +1741,7 @@ void AssetViewUtils::SyncPackagesFromSourceControl(const TArray<FString>& Packag
 		UPackageTools::UnloadPackages(PackagesToUnload);
 
 		// Re-cache the SCC state...
-		SCCProvider.Execute(ISourceControlOperation::Create<FUpdateStatus>(), PackageFilenames, EConcurrency::Asynchronous);
+		SCCProvider.Execute(ISourceControlOperation::Create<FUpdateStatus>(), PackageFilenames);
 	}
 }
 
@@ -1873,7 +1873,7 @@ void AssetViewUtils::SyncPathsFromSourceControl(const TArray<FString>& ContentPa
 		UPackageTools::UnloadPackages(PackageRawPtrsToUnload);
 
 		// Re-cache the SCC state...
-		SCCProvider.Execute(ISourceControlOperation::Create<FUpdateStatus>(), PathsOnDisk, EConcurrency::Asynchronous);
+		SCCProvider.Execute(ISourceControlOperation::Create<FUpdateStatus>(), PathsOnDisk);
 	}
 }
 
