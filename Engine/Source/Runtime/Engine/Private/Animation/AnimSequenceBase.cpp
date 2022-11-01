@@ -18,6 +18,7 @@
 #include "Modules/ModuleManager.h"
 #include "MathUtil.h"
 #include "UObject/LinkerLoad.h"
+#include "UObject/Package.h"
 #include "UObject/UObjectIterator.h"
 
 #if WITH_EDITOR
