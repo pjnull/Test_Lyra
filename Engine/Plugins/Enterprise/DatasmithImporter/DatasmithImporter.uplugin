@@ -80,6 +80,10 @@
 		{
 			"Name": "VariantManager",
 			"Enabled": true
+		},
+		{
+			"Name": "UdpMessaging",
+			"Enabled": true
 		}
 	]
 }
