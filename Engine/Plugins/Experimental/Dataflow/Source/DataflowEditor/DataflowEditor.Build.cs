@@ -33,7 +33,6 @@ namespace UnrealBuildTool.Rules
 					"DataflowCore",
 					"DataflowEngine",
 					"Slate",
-					"DeveloperSettings",
 				}
 			);
 		}
