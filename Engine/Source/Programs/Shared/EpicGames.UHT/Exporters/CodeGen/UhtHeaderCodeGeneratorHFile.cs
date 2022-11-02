@@ -328,7 +328,9 @@ namespace EpicGames.UHT.Exporters.CodeGen
 				}
 
 				//if (!function.FunctionFlags.HasAnyFlags(EFunctionFlags.RequiredAPI)) // TODO: This requires too much fixup for now
+				//{
 				//	addAPI = false
+				//}
 
 				if (addAPI)
 				{
