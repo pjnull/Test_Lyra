@@ -23,6 +23,8 @@
 
 #define UE_API ZEN_API
 
+struct FAnalyticsEventAttribute;
+
 namespace UE::Zen
 {
 
@@ -136,6 +138,7 @@ private:
 	void PromptUserToStopRunningServerInstance(const FString& ServerFilePath);
 	FString ConditionalUpdateLocalInstall();
 	static bool AutoLaunch(const FServiceAutoLaunchSettings& InSettings, FString&& ExecutablePath, FString& OutHostName, uint16& OutPort);
+	void OnAnalyticsEvent(TArray<FAnalyticsEventAttribute>& Attributes);
 
 	mutable TPimplPtr<class FZenHttpRequest> StatsHttpRequest;
 	mutable TFuture<FZenStats> StatsRequest;
