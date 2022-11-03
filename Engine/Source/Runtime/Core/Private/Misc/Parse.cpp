@@ -68,14 +68,14 @@ class FConsoleVariableDumpVisitor
 public:
 	// @param Name must not be 0
 	// @param " must not be 0
-	static void OnConsoleVariable(const TCHAR *Name, IConsoleObject* CVar,TSet<FString>& Sink)
+	static void OnConsoleVariable(const TCHAR *Name, IConsoleObject* CVar,TSet<FString>* Sink)
 	{
 		if(CVar->TestFlags(ECVF_Unregistered))
 		{
 			return;
 		}
 
-		Sink.Add(Name);
+		Sink->Add(Name);
 	}
 };
 
@@ -89,9 +89,9 @@ void ConsoleCommandLibrary_DumpLibrary(UWorld* InWorld, FExec& SubSystem, const 
 
 	{
 		IConsoleManager::Get().ForEachConsoleObjectThatStartsWith(
-			FConsoleObjectVisitor::CreateStatic< TSet<FString>& >(
+			FConsoleObjectVisitor::CreateStatic(
 			&FConsoleVariableDumpVisitor::OnConsoleVariable,
-			LocalConsoleCommandLibrary.KnownNames ) );
+			&LocalConsoleCommandLibrary.KnownNames ) );
 	}
 
 	LocalConsoleCommandLibrary.KnownNames.Sort( TLess<FString>() );
@@ -123,9 +123,9 @@ void ConsoleCommandLibrary_DumpLibraryHTML(UWorld* InWorld, FExec& SubSystem, co
 
 	{
 		IConsoleManager::Get().ForEachConsoleObjectThatStartsWith(
-			FConsoleObjectVisitor::CreateStatic< TSet<FString>& >(
+			FConsoleObjectVisitor::CreateStatic(
 			&FConsoleVariableDumpVisitor::OnConsoleVariable,
-			LocalConsoleCommandLibrary.KnownNames ) );
+			&LocalConsoleCommandLibrary.KnownNames ) );
 	}
 
 	LocalConsoleCommandLibrary.KnownNames.Sort( TLess<FString>() );
