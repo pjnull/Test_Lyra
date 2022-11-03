@@ -33,8 +33,8 @@ const FName FGeometryCollection::SimulatableParticlesAttribute("SimulatableParti
 const FName FGeometryCollection::SimulationTypeAttribute("SimulationType");
 const FName FGeometryCollection::StatusFlagsAttribute("StatusFlags");
 
-FGeometryCollection::FGeometryCollection()
-	: FTransformCollection()
+FGeometryCollection::FGeometryCollection(FClassType InType)
+	: FTransformCollection(InType.Union({ FGeometryCollection::StaticType() }))
 	, FGeometryCollectionConvexPropertiesInterface(this)
 	, FGeometryCollectionProximityPropertiesInterface(this)
 {
