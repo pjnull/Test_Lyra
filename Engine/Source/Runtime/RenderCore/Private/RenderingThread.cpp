@@ -1061,6 +1061,9 @@ FRHICOMMAND_MACRO(FRHISyncFrameCommand)
 	}
 };
 
+FRenderCommandFence::FRenderCommandFence() = default;
+FRenderCommandFence::~FRenderCommandFence() = default;
+
 void FRenderCommandFence::BeginFence(bool bSyncToRHIAndGPU)
 {
 	if (!GIsThreadedRendering)
