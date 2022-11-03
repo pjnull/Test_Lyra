@@ -1207,7 +1207,7 @@ void FGeometryCollectionEngineConversion::AppendSkeleton(const USkeleton* InSkel
 		}
 
 		ensure(Roots.Num());
-		TransformSourceFacade.AddTransformSource(InCollection, InSkeleton->GetName(), InSkeleton->GetGuid(), Roots);
+		TransformSourceFacade.AddTransformSource(InCollection, InSkeleton->GetName(), InSkeleton->GetGuid().ToString(), Roots);
 	}
 }
 
