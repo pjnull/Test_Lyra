@@ -77,6 +77,54 @@ inline void TryBulkSerializeManagedArray(Chaos::FChaosArchive& Ar, TArray<FIntVe
 	Array.BulkSerialize(Ar);
 }
 
+
+// --------------------------------------------------------------------------
+// utility functions to estimate the allocated size of managed arrays
+// --------------------------------------------------------------------------
+namespace ManagedArrayTypeSize
+{
+	template<typename T>
+	inline SIZE_T GetAllocatedSize(const T& Value)
+	{
+		return sizeof(T);
+	}
+
+	template<typename T>
+	inline SIZE_T GetAllocatedSize(const TArray<T>& Array)
+	{
+		return Array.GetAllocatedSize();
+	}
+
+	template<typename T>
+	inline SIZE_T GetAllocatedSize(const TSet<T>& Set)
+	{
+		return Set.GetAllocatedSize();
+	}
+
+	template<typename T>
+	inline SIZE_T GetAllocatedSize(const TUniquePtr<T>& Ptr)
+	{
+		return Ptr ? ManagedArrayTypeSize::GetAllocatedSize(*Ptr) : 0;
+	}
+
+	template<typename T, ESPMode Mode>
+	inline SIZE_T GetAllocatedSize(const TSharedPtr<T, Mode>& Ptr)
+	{
+		return Ptr ? ManagedArrayTypeSize::GetAllocatedSize(*Ptr) : 0;
+	}
+
+	inline SIZE_T GetAllocatedSize(const Chaos::FImplicitObject3* ImplicitObjectPtr)
+	{
+		return ImplicitObjectPtr ? sizeof(Chaos::FImplicitObject3) : 0;
+	}
+
+	inline SIZE_T GetAllocatedSize(const Chaos::FBVHParticlesFloat3& BVHParticles)
+	{
+		return BVHParticles.GetAllocatedSize();
+	}
+}
+
+
 /***
 *  Managed Array Base
 *
@@ -117,6 +165,11 @@ protected:
 	* Init from a predefined Array
 	*/
 	virtual void Init(const FManagedArrayBase& ) {};
+
+	/**
+	* Get allocated memory 
+	*/
+	virtual SIZE_T GetAllocatedSize() const { return 0; }
 
 public:
 	FManagedArrayBase()
@@ -309,6 +362,11 @@ public:
 
 		Resize(Size);
 		InitHelper(Array, NewTypedArray, Size);
+	}
+
+	virtual SIZE_T GetAllocatedSize() const override
+	{
+		return ManagedArrayTypeSize::GetAllocatedSize(Array);
 	}
 
 	/**
