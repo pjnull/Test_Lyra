@@ -25,6 +25,7 @@
 #include "DistanceFieldAmbientOcclusion.h"
 #include "GlobalDistanceField.h"
 #include "PostProcess/PostProcessing.h"
+#include "PostProcess/PostProcessEyeAdaptation.h"
 #include "DistanceFieldAtlas.h"
 #include "EngineModule.h"
 #include "SceneViewExtension.h"
@@ -3225,6 +3226,9 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 		// VisualizeVirtualShadowMap TODO
 	}
 
+	// Extract emissive from SceneColor (before lighting is applied) + material diffuse and subsurface colors
+	FRDGTextureRef ExposureIlluminanceSetup = AddSetupExposureIlluminancePass(GraphBuilder, Views, SceneTextures);
+
 	if (ViewFamily.EngineShowFlags.VisualizeLightCulling)
 	{
 		FRDGTextureRef VisualizeLightCullingTexture = GraphBuilder.CreateTexture(SceneTextures.Color.Target->Desc, TEXT("SceneColorVisualizeLightCulling"));
@@ -3642,6 +3646,8 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 		ComposeVolumetricRenderTargetOverScene(GraphBuilder, Views, SceneTextures.Color.Target, SceneTextures.Depth.Target, bShouldRenderSingleLayerWater, SceneWithoutWaterTextures, SceneTextures);
 	}
 
+	FRDGTextureRef ExposureIlluminance = AddCalculateExposureIlluminancePass(GraphBuilder, Views, SceneTextures, ExposureIlluminanceSetup);
+
 	FRendererModule& RendererModule = static_cast<FRendererModule&>(GetRendererModule());
 	RendererModule.RenderPostOpaqueExtensions(GraphBuilder, Views, SceneTextures);
 
@@ -3902,6 +3908,7 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 		FPostProcessingInputs PostProcessingInputs;
 		PostProcessingInputs.ViewFamilyTexture = ViewFamilyTexture;
 		PostProcessingInputs.CustomDepthTexture = SceneTextures.CustomDepth.Depth;
+		PostProcessingInputs.ExposureIlluminance = ExposureIlluminance;
 		PostProcessingInputs.SceneTextures = SceneTextures.UniformBuffer;
 
 		GraphBuilder.FlushSetupQueue();

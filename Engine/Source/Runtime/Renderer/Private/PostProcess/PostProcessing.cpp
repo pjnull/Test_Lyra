@@ -804,11 +804,16 @@ void AddPostProcessingPasses(
 		{
 			FScreenPassTexture HistogramSceneColor = bProcessQuarterResolution ? QuarterResSceneColor : HalfResSceneColor;
 
-			static const auto CVarIgnoreMaterials = IConsoleManager::Get().FindTConsoleVariableDataBool(TEXT("r.AutoExposure.IgnoreMaterials"));
-
-			if (CVarIgnoreMaterials->GetValueOnRenderThread())
+			if (IsAutoExposureUsingIlluminanceEnabled(View))
 			{
-				HistogramSceneColor = OriginalSceneColor;
+				if (Inputs.ExposureIlluminance)
+				{
+					HistogramSceneColor = FScreenPassTexture(Inputs.ExposureIlluminance, PrimaryViewRect);
+				}
+				else
+				{
+					HistogramSceneColor = OriginalSceneColor;
+				}
 			}
 
 			HistogramTexture = AddHistogramPass(
