@@ -444,7 +444,6 @@ bool FManagedArrayCollection::HasCycle(FName NewGroup, FName DependencyGroup)
 	return false;
 }
 
-
 #include <sstream> 
 #include <string>
 FString FManagedArrayCollection::ToString() const
