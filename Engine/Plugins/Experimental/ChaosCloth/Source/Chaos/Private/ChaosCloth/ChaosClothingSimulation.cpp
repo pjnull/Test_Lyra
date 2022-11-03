@@ -17,6 +17,7 @@
 #include "DynamicMeshBuilder.h"
 
 #include "HAL/IConsoleManager.h"
+#include "SceneManagement.h"
 
 #if WITH_EDITOR || CHAOS_DEBUG_DRAW
 #include "Chaos/Sphere.h"

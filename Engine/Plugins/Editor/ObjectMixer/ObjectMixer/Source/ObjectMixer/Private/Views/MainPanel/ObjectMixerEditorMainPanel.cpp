@@ -3,6 +3,7 @@
 #include "Views/MainPanel/ObjectMixerEditorMainPanel.h"
 
 #include "ObjectMixerEditorSerializedData.h"
+#include "UObject/Package.h"
 #include "Views/List/ObjectMixerEditorList.h"
 #include "Views/MainPanel/SObjectMixerEditorMainPanel.h"
 

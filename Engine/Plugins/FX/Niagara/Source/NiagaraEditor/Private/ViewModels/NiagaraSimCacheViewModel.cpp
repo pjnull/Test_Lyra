@@ -5,6 +5,7 @@
 #include "NiagaraEditorCommon.h"
 #include "NiagaraDebuggerCommon.h"
 #include "Misc/ScopeExit.h"
+#include "Serialization/MemoryReader.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 #define LOCTEXT_NAMESPACE "NiagaraSimCacheViewModel"

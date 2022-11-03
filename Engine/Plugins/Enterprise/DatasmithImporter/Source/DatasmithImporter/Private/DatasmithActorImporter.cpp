@@ -12,6 +12,7 @@
 #include "DatasmithMaterialExpressions.h"
 #include "DatasmithSceneActor.h"
 #include "DatasmithSceneFactory.h"
+#include "Engine/Blueprint.h"
 #include "IDatasmithSceneElements.h"
 
 #include "ObjectTemplates/DatasmithActorTemplate.h"
