@@ -2,11 +2,11 @@
 
 #pragma once
 
+#include "Components/MeshComponent.h"
 #include "CoreMinimal.h"
-#include "UObject/ObjectMacros.h"
-#include "GameFramework/Actor.h"
-#include "Engine/Classes/Components/MeshComponent.h"
 #include "Engine/Scene.h"
+#include "GameFramework/Actor.h"
+#include "UObject/ObjectMacros.h"
 #include "ColorCorrectRegion.generated.h"
 
 
