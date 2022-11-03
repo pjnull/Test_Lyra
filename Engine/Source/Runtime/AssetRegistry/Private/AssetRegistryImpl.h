@@ -205,6 +205,9 @@ public:
 	void AddDirectoryReferencer(FName PackageName, const FString& DirectoryLocalPathOrLongPackageName);
 	/** Remove all directory watches for PackageName. */
 	void RemoveDirectoryReferencer(FName PackageName);
+
+	/** Called when new gatherer is registered. Requires subsequent call to RebuildAssetDependencyGathererMapIfNeeded */
+	void OnAssetDependencyGathererRegistered() { bRegisteredDependencyGathererClassesDirty = true; }
 #endif
 
 	/** Adds an asset to the empty package list which contains packages that have no assets left in them */
@@ -311,6 +314,9 @@ private:
 
 	/** Update Redirect collector with redirects loaded from asset registry */
 	void UpdateRedirectCollector();
+
+	/** If new gatherers were registered, this call will refresh the mapping */
+	void RebuildAssetDependencyGathererMapIfNeeded();
 #endif // WITH_EDITOR
 	void GetSubClasses_Recursive(Impl::FClassInheritanceContext& InheritanceContext, FTopLevelAssetPath InClassName,
 		TSet<FTopLevelAssetPath>& SubClassNames, TSet<FTopLevelAssetPath>& ProcessedClassNames, const TSet<FTopLevelAssetPath>& ExcludedClassNames) const;
@@ -433,6 +439,7 @@ private:
 
 	/** A map of per asset class dependency gatherer called in LoadCalculatedDependencies */
 	TMap<UClass*, UE::AssetDependencyGatherer::Private::FRegisteredAssetDependencyGatherer*> RegisteredDependencyGathererClasses;
+	bool bRegisteredDependencyGathererClassesDirty;
 #endif
 #if WITH_ENGINE && WITH_EDITOR
 	/** Class names that return true for IsAsset but which should not be treated as assets in uncooked packages */
