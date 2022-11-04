@@ -5,6 +5,7 @@
 #include "Logging/LogMacros.h"
 #include "CoreGlobals.h"
 #include "HAL/LowLevelMemTracker.h"
+#include "HAL/IConsoleManager.h"
 #include "ProfilingDebugging/CsvProfiler.h"
 
 #if UE_USE_VERYLARGEPAGEALLOCATOR
