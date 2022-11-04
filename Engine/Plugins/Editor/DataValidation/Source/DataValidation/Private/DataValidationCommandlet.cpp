@@ -40,6 +40,14 @@ bool UDataValidationCommandlet::ValidateData(const FString& FullCommandLine)
 	ParseCommandLine(*FullCommandLine, Tokens, Switches, Params);
 
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(AssetRegistryConstants::ModuleName);
+		
+	FString ScanAllAssets;
+	FParse::Value(*FullCommandLine, TEXT("ScanAllAssets="), ScanAllAssets);
+	if (!ScanAllAssets.IsEmpty() && ScanAllAssets.Equals("true") || ScanAllAssets.Equals("True"))
+	{
+		AssetRegistryModule.Get().SearchAllAssets(true);
+	}
+
 	TArray<FAssetData> AssetDataList;
 	FString AssetTypeString;
 	if (FParse::Value(*FullCommandLine, TEXT("AssetType="), AssetTypeString) && !AssetTypeString.IsEmpty())
