@@ -1946,6 +1946,12 @@ bool UWorldPartitionRuntimeSpatialHash::ContainsRuntimeHash(const FString& Name)
 	return bResult;
 }
 
+bool UWorldPartitionRuntimeSpatialHash::IsStreaming3D() const
+{
+	// If using Z culling, return true.
+	return GetEffectiveEnableZCulling(bEnableZCulling);
+}
+
 TArray<const FSpatialHashStreamingGrid*> UWorldPartitionRuntimeSpatialHash::GetFilteredStreamingGrids() const
 {
 	TArray<const FSpatialHashStreamingGrid*> FilteredStreamingGrids;
