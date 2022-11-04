@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AbcImporter.h"
+#include "Animation/Skeleton.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/WindowsHWrapper.h"
