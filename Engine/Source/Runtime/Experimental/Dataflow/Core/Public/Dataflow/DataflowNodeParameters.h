@@ -141,6 +141,7 @@ namespace Dataflow
 			return HasDataImpl(Key, InTimestamp);
 		}
 		
+		FTimestamp GetTimestamp() const { return Timestamp; }
 		virtual void Evaluate(const FDataflowNode* Node, const FDataflowOutput* Output) = 0;
 		virtual bool Evaluate(const FDataflowOutput& Connection) = 0;
 	};
