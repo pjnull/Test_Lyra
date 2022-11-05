@@ -43,6 +43,7 @@
 #include "Texture/InterchangeTexturePayloadInterface.h"
 #include "TextureCompiler.h"
 #include "TextureImportSettings.h"
+#include "TextureResource.h"
 #include "UDIMUtilities.h"
 #include "UObject/ObjectMacros.h"
 

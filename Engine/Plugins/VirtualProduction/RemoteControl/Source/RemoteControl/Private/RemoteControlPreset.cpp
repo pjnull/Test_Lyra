@@ -8,6 +8,8 @@
 #include "Components/ActorComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/Engine.h"
+#include "Engine/Level.h"
 #include "GameFramework/Actor.h"
 #include "HAL/IConsoleManager.h"
 #include "IRemoteControlModule.h"
@@ -27,6 +29,7 @@
 
 #include "UObject/Object.h"
 #include "UObject/ObjectMacros.h"
+#include "UObject/Package.h"
 #if WITH_EDITOR
 #include "AnalyticsEventAttribute.h"
 #include "Editor.h"

@@ -5,6 +5,8 @@
 =============================================================================*/
 #include "WorldPartition/WorldPartitionRuntimeSpatialHash.h"
 
+#include "Engine/Engine.h"
+#include "Misc/Paths.h"
 #include "WorldPartition/WorldPartitionStreamingGenerationContext.h"
 #include "WorldPartition/WorldPartitionRuntimeSpatialHashCell.h"
 #include "WorldPartition/WorldPartitionRuntimeLevelStreamingCell.h"

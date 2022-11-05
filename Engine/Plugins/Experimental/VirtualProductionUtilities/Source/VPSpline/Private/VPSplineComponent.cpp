@@ -2,6 +2,7 @@
 
 #include "VPSplineComponent.h"
 
+#include "Engine/Engine.h"
 #include "VPSpline.h"
 #include "VPSplineLog.h"
 

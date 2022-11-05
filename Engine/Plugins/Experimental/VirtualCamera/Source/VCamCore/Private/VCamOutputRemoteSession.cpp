@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "VCamOutputRemoteSession.h"
+#include "Engine/GameInstance.h"
+#include "UObject/Package.h"
 #include "VCamOutputComposure.h"
 #include "Channels/RemoteSessionImageChannel.h"
 #include "Channels/RemoteSessionInputChannel.h"

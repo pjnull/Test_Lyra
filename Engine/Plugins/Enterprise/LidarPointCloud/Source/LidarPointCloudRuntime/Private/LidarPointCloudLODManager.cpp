@@ -13,6 +13,7 @@
 #include "Misc/ScopeTryLock.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
+#include "UnrealClient.h"
 
 #if WITH_EDITOR
 #include "Settings/EditorStyleSettings.h"

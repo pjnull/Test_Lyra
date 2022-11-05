@@ -2,6 +2,7 @@
 
 #include "NiagaraPerfBaseline.h"
 #include "Engine/Engine.h"
+#include "Misc/Paths.h"
 #include "NiagaraComponent.h"
 #include "NiagaraEffectType.h"
 #include "NiagaraFunctionLibrary.h"
@@ -14,6 +15,7 @@
 #include "HighResScreenshot.h"
 #include "CanvasTypes.h"
 #include "HAL/FileManager.h"
+#include "UObject/UObjectIterator.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(NiagaraPerfBaseline)
 
