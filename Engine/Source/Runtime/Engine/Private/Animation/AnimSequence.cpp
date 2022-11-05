@@ -3904,6 +3904,11 @@ uint8* UAnimSequence::FindSyncMarkerPropertyData(int32 SyncMarkerIndex, FArrayPr
 	return NULL;
 }
 
+bool UAnimSequence::DoesNeedRecompress() const
+{
+	return GetSkeleton() && (bUseRawDataOnly || (GetSkeletonVirtualBoneGuid() != GetSkeleton()->GetVirtualBoneGuid()));
+}
+
 bool UAnimSequence::CreateAnimation(USkeletalMesh* Mesh)
 {
 	// create animation from Mesh's ref pose

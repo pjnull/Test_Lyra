@@ -88,9 +88,7 @@ struct FSlotAnimationTrack
 	UPROPERTY(EditAnywhere, Category=Slot)
 	FAnimTrack AnimTrack;
 
-	FSlotAnimationTrack()
-		: SlotName(FAnimSlotGroup::DefaultSlotName)
-	{}
+	ENGINE_API FSlotAnimationTrack();
 };
 
 /** 

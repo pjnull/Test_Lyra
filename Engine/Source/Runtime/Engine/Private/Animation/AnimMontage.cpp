@@ -1949,6 +1949,10 @@ bool FAnimMontageInstance::SimulateAdvance(float DeltaTime, float& InOutPosition
 	return true;
 }
 
+FSlotAnimationTrack::FSlotAnimationTrack()
+	: SlotName(FAnimSlotGroup::DefaultSlotName)
+{}
+
 void FMontageSubStepper::Initialize(const struct FAnimMontageInstance& InAnimInstance)
 {
 	MontageInstance = &InAnimInstance;

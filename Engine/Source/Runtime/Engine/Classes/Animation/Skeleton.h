@@ -33,6 +33,7 @@ class USkinnedAsset;
 class FPackageReloadedEvent;
 struct FAssetData;
 enum class EPackageReloadPhase : uint8;
+typedef SmartName::UID_Type SkeletonAnimCurveUID;
 
 /** This is a mapping table between bone in a particular skeletal mesh and bone of this skeleton set. */
 USTRUCT()
@@ -522,7 +523,7 @@ public:
 	TMap< FName, FReferencePose > AnimRetargetSources;
 
 	// Typedefs for greater smartname UID readability, add one for each smartname category 
-	typedef SmartName::UID_Type AnimCurveUID;
+	typedef SkeletonAnimCurveUID AnimCurveUID;
 
 	// Names for smartname mappings, if you're adding a new category of smartnames add a new name here
 	static ENGINE_API const FName AnimCurveMappingName;

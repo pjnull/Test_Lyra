@@ -6,10 +6,16 @@
 #include "UObject/ObjectMacros.h"
 #include "Animation/AnimTypes.h"
 #include "Animation/SmartName.h"
-#include "Animation/Skeleton.h"
 #include "Curves/RichCurve.h"
 #include "Misc/EnumRange.h"
+
+#if UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_2
+#include "Animation/Skeleton.h"
+#endif
+
 #include "AnimCurveTypes.generated.h"
+
+typedef SmartName::UID_Type SkeletonAnimCurveUID;
 
 UENUM()
 enum class EAnimCurveType : uint8 
@@ -273,7 +279,7 @@ public:
 	FName CurveName;
 
 private:
-	mutable USkeleton::AnimCurveUID CachedUID;
+	mutable SkeletonAnimCurveUID CachedUID;
 	mutable FName CachedCurveName;
 
 public:
@@ -286,7 +292,7 @@ public:
 	const FFloatCurve* GetFloatCurve(const UAnimSequenceBase* InAnimSequence) const;
 
 protected:
-	USkeleton::AnimCurveUID GetAnimCurveUID(const UAnimSequenceBase* InAnimSequence) const;
+	SkeletonAnimCurveUID GetAnimCurveUID(const UAnimSequenceBase* InAnimSequence) const;
 };
 
 /**
@@ -414,7 +420,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** Invalidate value of InUID */
-	void InvalidateCurveWeight(USkeleton::AnimCurveUID InUid)
+	void InvalidateCurveWeight(SkeletonAnimCurveUID InUid)
 	{
 		check(bInitialized);
 
@@ -427,7 +433,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** Set value of InUID to InValue */
-	void Set(USkeleton::AnimCurveUID InUid, float InValue)
+	void Set(SkeletonAnimCurveUID InUid, float InValue)
 	{
 		check(bInitialized);
 
@@ -440,7 +446,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** Get Value of InUID - @todo : add validation check here and make sure caller also knows it's not valid*/
-	float Get(USkeleton::AnimCurveUID InUid) const
+	float Get(SkeletonAnimCurveUID InUid) const
 	{
 		check(bInitialized);
 
@@ -454,7 +460,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** Get Value of InUID with validation and default value */
-	float Get(USkeleton::AnimCurveUID InUid, bool& OutIsValid, float InDefaultValue=0.f) const
+	float Get(SkeletonAnimCurveUID InUid, bool& OutIsValid, float InDefaultValue=0.f) const
 	{
 		check(bInitialized);
 
@@ -470,7 +476,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** Get Array Index by UID */
-	int32 GetArrayIndexByUID(USkeleton::AnimCurveUID InUid) const
+	int32 GetArrayIndexByUID(SkeletonAnimCurveUID InUid) const
 	{
 		int32 ArrayIndex = (*UIDToArrayIndexLUT).IsValidIndex(InUid) ? (*UIDToArrayIndexLUT)[InUid] : MAX_uint16;
 		if (ArrayIndex != MAX_uint16)
@@ -481,7 +487,7 @@ struct FBaseBlendedCurve
 	}
 
 	/** return true if enabled. return false otherwise. */
-	bool IsEnabled(USkeleton::AnimCurveUID InUid) const
+	bool IsEnabled(SkeletonAnimCurveUID InUid) const
 	{
 		check(bInitialized);
 
@@ -865,12 +871,12 @@ struct FRawCurveTracks
 	/**
 	 * Find curve data based on the curve UID
 	 */
-	ENGINE_API FAnimCurveBase * GetCurveData(USkeleton::AnimCurveUID Uid, ERawCurveTrackTypes SupportedCurveType = ERawCurveTrackTypes::RCT_Float);
+	ENGINE_API FAnimCurveBase * GetCurveData(SkeletonAnimCurveUID Uid, ERawCurveTrackTypes SupportedCurveType = ERawCurveTrackTypes::RCT_Float);
 
 	/**
 	* Find curve data based on the curve UID
 	*/
-	ENGINE_API const FAnimCurveBase * GetCurveData(USkeleton::AnimCurveUID Uid, ERawCurveTrackTypes SupportedCurveType = ERawCurveTrackTypes::RCT_Float) const;
+	ENGINE_API const FAnimCurveBase * GetCurveData(SkeletonAnimCurveUID Uid, ERawCurveTrackTypes SupportedCurveType = ERawCurveTrackTypes::RCT_Float) const;
 
 	/**
 	 * Add new curve from the provided UID and return true if success
@@ -929,13 +935,13 @@ private:
 	 * Find curve data based on the curve UID
 	 */
 	template <typename DataType>
-	DataType * GetCurveDataImpl(TArray<DataType>& Curves, USkeleton::AnimCurveUID Uid);
+	DataType * GetCurveDataImpl(TArray<DataType>& Curves, SkeletonAnimCurveUID Uid);
 
 	/**
 	* Find curve data based on the curve UID
 	*/
 	template <typename DataType>
-	const DataType * GetCurveDataImpl(const TArray<DataType>& Curves, USkeleton::AnimCurveUID Uid) const;
+	const DataType * GetCurveDataImpl(const TArray<DataType>& Curves, SkeletonAnimCurveUID Uid) const;
 
 	/**
 	 * Add new curve from the provided UID and return true if success
