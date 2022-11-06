@@ -4589,22 +4589,15 @@ void FEngineLoop::Exit()
 #endif // WITH_EDITOR
 	FModuleManager::Get().UnloadModule("WorldBrowser", true);
 
-#if !PLATFORM_ANDROID 	// AppPreExit doesn't work on Android
 	AppPreExit();
 
 	TermGamePhys();
-#endif
 
 #if WITH_COREUOBJECT
 	// PackageResourceManager depends on AssetRegistry, so must be shutdown before we unload the AssetRegistry module
 	IPackageResourceManager::Shutdown();
 #endif
 	FModuleManager::Get().UnloadModule("AssetRegistry", true);
-
-#if PLATFORM_ANDROID
-	// AppPreExit() stops malloc profiler, do it here instead
-	MALLOC_PROFILER( GMalloc->Exec(nullptr, TEXT("MPROF STOP"), *GLog);	);
-#endif // !ANDROID
 
 #if WITH_EDITOR
 	IBulkDataRegistry::Shutdown();
@@ -4633,7 +4626,6 @@ void FEngineLoop::Exit()
 	UE::Virtualization::Shutdown();
 #endif //WITH_EDITOR
 
-#if !PLATFORM_ANDROID // UnloadModules doesn't work on Android
 #if WITH_ENGINE
 	// Save the hot reload state
 	IHotReloadInterface* HotReload = IHotReloadInterface::GetPtr();
@@ -4650,7 +4642,6 @@ void FEngineLoop::Exit()
 		SCOPED_BOOT_TIMING("UnloadModulesAtShutdown");
 		FModuleManager::Get().UnloadModulesAtShutdown();
 	}
-#endif // !ANDROID
 
 	IStreamingManager::Shutdown();
 
