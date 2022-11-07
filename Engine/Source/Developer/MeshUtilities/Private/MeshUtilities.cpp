@@ -4080,7 +4080,7 @@ public:
 						Vertex.InfluenceWeights[i] = 0;
 					}
 
-					uint32	TotalInfluenceWeight = 0;
+					uint32	TotalInfluenceWeight = InfluenceCount == 0 ? Vertex.InfluenceWeights[0] : 0;
 					for (uint32 i = 0; i < InfluenceCount; i++)
 					{
 						FBoneIndexType BoneIndex = (FBoneIndexType)BuildData.Influences[InfIdx + i].BoneIndex;
