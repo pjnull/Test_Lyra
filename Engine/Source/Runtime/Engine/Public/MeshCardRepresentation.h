@@ -202,6 +202,7 @@ class FMeshCardsBuildData
 {
 public:
 	FBox Bounds;
+	bool bMostlyTwoSided;
 	TArray<FLumenCardBuildData> CardBuildData;
 
 	// Temporary debug visualization data, don't serialize
@@ -211,6 +212,7 @@ public:
 	{
 		// Note: this is derived data, no need for versioning (bump the DDC guid)
 		Ar << Data.Bounds;
+		Ar << Data.bMostlyTwoSided;
 		Ar << Data.CardBuildData;
 		return Ar;
 	}
