@@ -620,7 +620,7 @@ void FLandscapeSceneViewExtension::PreRenderView_RenderThread(FRDGBuilder& Graph
 	// Kick the job once all views have been collected.
 	if (!LandscapeRenderSystems.IsEmpty() && LandscapeViews.Num() == InView.Family->Views.Num())
 	{
-		const auto ComputeLODs = [this]
+		auto ComputeLODs = [this]
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(FLandscapeRenderSystem::ComputeLODs);
 			FOptionalTaskTagScope Scope(ETaskTag::EParallelRenderingThread);
@@ -651,7 +651,7 @@ void FLandscapeSceneViewExtension::PreRenderView_RenderThread(FRDGBuilder& Graph
 
 		if (GIsThreadedRendering && GLandscapeUseAsyncTasksForLODComputation)
 		{
-			LandscapeSetupTask = UE::Tasks::Launch(UE_SOURCE_LOCATION, ComputeLODs, LowLevelTasks::ETaskPriority::Normal);
+			LandscapeSetupTask = UE::Tasks::Launch(UE_SOURCE_LOCATION, MoveTemp(ComputeLODs), LowLevelTasks::ETaskPriority::Normal);
 		}
 		else
 		{
