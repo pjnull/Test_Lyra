@@ -62,8 +62,8 @@ public:
 protected:
 
 	bool IsSomethingSelected() const;
-	bool GetCurrentTransform(FTransform& OutWorld, FTransform& OutParent) const;
-	bool IsRootSelected(UMovieSceneSkeletalAnimationSection* Section);
+	bool GetTransformAtFirstSectionStart(FTransform& OutWorld, FTransform& OutParent) const;
+	bool IsRootSelected(UMovieSceneSkeletalAnimationSection* Section) const;
 
 protected:
 	/** Interrogator that is an gc object */
