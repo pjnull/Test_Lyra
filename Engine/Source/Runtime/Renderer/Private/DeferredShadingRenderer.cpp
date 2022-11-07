@@ -3305,6 +3305,8 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 	FAsyncLumenIndirectLightingOutputs AsyncLumenIndirectLightingOutputs;
 	const bool bHasLumenLights = SortedLightSet.LumenLightStart < SortedLightSet.SortedLights.Num();
 
+	GraphBuilder.FlushSetupQueue();
+
 	// Shadows, lumen and fog after base pass
 	if (!bHasRayTracedOverlay)
 	{
