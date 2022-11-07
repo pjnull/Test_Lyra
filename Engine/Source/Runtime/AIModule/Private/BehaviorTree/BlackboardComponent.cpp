@@ -155,7 +155,7 @@ bool UBlackboardComponent::InitializeBlackboard(UBlackboardData& NewAsset)
 					KeyType->PreInitialize(*this);
 
 					const uint16 KeyMemory = KeyType->GetValueSize() + (KeyType->HasInstance() ? sizeof(FBlackboardInstancedKeyMemory) : 0);
-					InitList.Add(FBlackboardInitializationData(KeyIndex + It->GetFirstKeyID(), KeyMemory));
+					InitList.Add(FBlackboardInitializationData(KeyIndex + (int32)It->GetFirstKeyID(), KeyMemory));
 				}
 			}
 		}
@@ -208,7 +208,7 @@ void UBlackboardComponent::DestroyValues()
 			UBlackboardKeyType* KeyType = It->Keys[KeyIndex].KeyType;
 			if (KeyType)
 			{
-				const int32 UseIdx = KeyIndex + It->GetFirstKeyID();
+				const int32 UseIdx = KeyIndex + (int32)It->GetFirstKeyID();
 				uint8* KeyMemory = GetKeyRawData(UseIdx);
 				KeyType->WrappedFree(*this, KeyMemory);
 			}
@@ -237,7 +237,7 @@ void UBlackboardComponent::PopulateSynchronizedKeys()
 				if (Key.bInstanceSynced)
 				{
 					UBlackboardData* const OtherBlackboardAsset = OtherBlackboard->GetBlackboardAsset();
-					const int32 OtherKeyID = OtherBlackboardAsset ? OtherBlackboardAsset->GetKeyID(Key.EntryName) : FBlackboard::InvalidKey;
+					const FBlackboard::FKey OtherKeyID = OtherBlackboardAsset ? OtherBlackboardAsset->GetKeyID(Key.EntryName) : FBlackboard::InvalidKey;
 					if (OtherKeyID != FBlackboard::InvalidKey)
 					{
 						const FBlackboardEntry* const OtherKey = OtherBlackboard->GetBlackboardAsset()->GetKey(OtherKeyID);
@@ -608,7 +608,7 @@ void UBlackboardComponent::DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const
 			{
 				const FBlackboardEntry& Key = It->Keys[KeyIndex];
 
-				const uint8* ValueData = GetKeyRawData(It->GetFirstKeyID() + KeyIndex);
+				const uint8* ValueData = GetKeyRawData((int32)It->GetFirstKeyID() + KeyIndex);
 				FString ValueDesc = Key.KeyType ? *(Key.KeyType->WrappedDescribeValue(*this, ValueData)) : TEXT("empty");
 
 				Category.Add(Key.EntryName.ToString(), ValueDesc);
@@ -786,7 +786,7 @@ void UBlackboardComponent::ClearValue(FBlackboard::FKey KeyID)
 					if (OtherBlackboard != nullptr && ShouldSyncWithBlackboard(*OtherBlackboard))
 					{
 						UBlackboardData* const OtherBlackboardAsset = OtherBlackboard->GetBlackboardAsset();
-						const int32 OtherKeyID = OtherBlackboardAsset ? OtherBlackboardAsset->GetKeyID(EntryInfo->EntryName) : FBlackboard::InvalidKey;
+						const FBlackboard::FKey OtherKeyID = OtherBlackboardAsset ? OtherBlackboardAsset->GetKeyID(EntryInfo->EntryName) : FBlackboard::InvalidKey;
 						if (OtherKeyID != FBlackboard::InvalidKey)
 						{
 							const FBlackboardEntry* OtherEntryInfo = OtherBlackboard->BlackboardAsset->GetKey(OtherKeyID);

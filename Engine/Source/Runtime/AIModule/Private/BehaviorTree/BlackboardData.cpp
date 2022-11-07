@@ -83,9 +83,9 @@ const FBlackboardEntry* UBlackboardData::GetKey(FBlackboard::FKey KeyID) const
 {
 	if (KeyID != FBlackboard::InvalidKey)
 	{
-		if (KeyID >= FirstKeyID)
+		if ((int32)KeyID >= (int32)FirstKeyID)
 		{
-			return &Keys[KeyID - FirstKeyID];
+			return &Keys[(int32)KeyID - (int32)FirstKeyID];
 		}
 		else if (Parent)
 		{
@@ -98,7 +98,7 @@ const FBlackboardEntry* UBlackboardData::GetKey(FBlackboard::FKey KeyID) const
 
 int32 UBlackboardData::GetNumKeys() const
 {
-	return FirstKeyID + Keys.Num();
+	return (int32)FirstKeyID + Keys.Num();
 }
 
 FBlackboard::FKey UBlackboardData::InternalGetKeyID(const FName& KeyName, EKeyLookupMode LookupMode) const
@@ -107,7 +107,7 @@ FBlackboard::FKey UBlackboardData::InternalGetKeyID(const FName& KeyName, EKeyLo
 	{
 		if (Keys[KeyIndex].EntryName == KeyName)
 		{
-			return KeyIndex + FirstKeyID;
+			return KeyIndex + (int32)FirstKeyID;
 		}
 	}
 
