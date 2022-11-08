@@ -1225,42 +1225,6 @@ bool UAnimDataController::SetCurveAttributes(const FAnimationCurveIdentifier& Cu
 	ValidateModel();
 
 	FRichCurve* RichCurve = Model->GetMutableRichCurve(CurveId);
-	ERawCurveTrackTypes SupportedCurveType = CurveId.CurveType;
-	if (RichCurve)
-	{
-		CONDITIONAL_TRANSACTION(LOCTEXT("SettingNamedCurveAttributes", "Setting Curve Attributes"));
-
-		FCurveAttributes CurrentAttributes;
-		CurrentAttributes.SetPreExtrapolation(RichCurve->PreInfinityExtrap);
-		CurrentAttributes.SetPostExtrapolation(RichCurve->PostInfinityExtrap);		
-		CONDITIONAL_ACTION(UE::Anim::FSetRichCurveAttributesAction, CurveId, CurrentAttributes);
-
-		if(Attributes.HasPreExtrapolation())
-		{
-			RichCurve->PreInfinityExtrap = Attributes.GetPreExtrapolation();
-		}
-
-		if(Attributes.HasPostExtrapolation())
-		{
-			RichCurve->PostInfinityExtrap = Attributes.GetPostExtrapolation();
-		}		
-
-		FCurveChangedPayload Payload;
-		Payload.Identifier = CurveId;
-		Model->Notify(EAnimDataModelNotifyType::CurveChanged, Payload);
-
-		return true;
-	}
-
-	return false;
-}
-
-
-bool UAnimDataController::SetCurveAttributes(const FAnimationCurveIdentifier& CurveId, const FCurveAttributes& Attributes, bool bShouldTransact)
-{
-	ValidateModel();
-
-	FRichCurve* RichCurve = Model->GetMutableRichCurve(CurveId);
 	if (RichCurve)
 	{
 		FTransaction Transaction = ConditionalTransaction(LOCTEXT("SettingNamedCurveAttributes", "Setting Curve Attributes"), bShouldTransact);

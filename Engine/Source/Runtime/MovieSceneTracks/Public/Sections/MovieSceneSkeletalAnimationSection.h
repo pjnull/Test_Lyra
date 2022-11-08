@@ -166,7 +166,6 @@ private:
 	FName SlotName_DEPRECATED;
 
 public:
-
 	/* Location offset applied before the matched offset*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Root Motions")
 	FVector StartLocationOffset;

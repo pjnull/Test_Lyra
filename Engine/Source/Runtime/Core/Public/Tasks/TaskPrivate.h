@@ -705,9 +705,9 @@ namespace UE::Tasks
 		public:
 			virtual bool TryExecuteTaskVirtual() override
 			{
-				return FTaskBase::TryExecute(
+				return TryExecute(
 					[](FTaskBase& Task)
-					{ 
+					{
 						TExecutableTaskBase& This = static_cast<TExecutableTaskBase&>(Task);
 						Invoke(*This.TaskBodyStorage.GetTypedPtr());
 
