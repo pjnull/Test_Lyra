@@ -500,7 +500,7 @@ void UTemplateSequencePropertyScalingEvaluatorSystem::OnRun(FSystemTaskPrerequis
 		.Dispatch_PerEntity<FGatherPropertyScales>(&Linker->EntityManager, InPrerequisites, &Subsequents, this);
 	if (GatherTask)
 	{
-		InPrerequisites.AddMasterTask(GatherTask);
+		InPrerequisites.AddRootTask(GatherTask);
 	}
 
 	// Step 2: If we have any transform property scaling, iterate specifically on them and apply the scale factor

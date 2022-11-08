@@ -1,199 +1,183 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using EpicGames.Serialization;
+using EpicGames.Core;
 
 namespace EpicGames.Horde.Storage
 {
 	/// <summary>
-	/// Stores a reference from a parent to child node, which can be resurrected after the child node is flushed to storage if subsequently modified.
+	/// Stores a reference from a parent to child node. The reference may be to a node in memory, or to a node in the storage system.
 	/// </summary>
 	public class TreeNodeRef
 	{
 		/// <summary>
-		/// Cached reference to the parent node
+		/// Node that owns this ref
 		/// </summary>
 		internal TreeNode? _owner;
 
 		/// <summary>
-		/// Strong reference to the current node
+		/// Store containing the node data. May be null for nodes in memory.
 		/// </summary>
-		internal TreeNode? _strongRef;
+		public IStorageClient? Store { get; private set; }
 
 		/// <summary>
-		/// Weak reference to the child node. Maintained after the object has been flushed.
+		/// Hash of the referenced node. Invalid for nodes in memory.
 		/// </summary>
-		internal WeakReference<TreeNode>? _weakRef;
+		public IoHash Hash { get; private set; }
 
 		/// <summary>
-		/// Last time that the node was modified
+		/// Locator for the blob containing this node. Invalid for nodes in memory.
 		/// </summary>
-		internal long _lastModifiedTime;
+		public NodeLocator Locator { get; private set; }
 
 		/// <summary>
-		/// Handle to the node in storage. May be set to null when the node is in memory.
+		/// The target node, or null if the node is not resident in memory.
 		/// </summary>
-		internal ITreeBlobRef? _target;
-
-		/// <summary>
-		/// Reference to the node in storage, if unmodified.
-		/// </summary>
-		public ITreeBlobRef? Target => ReferenceEquals(_strongRef, null) ? null : _target;
-
-		/// <summary>
-		/// Reference to the node.
-		/// </summary>
-		public TreeNode? Node
+		public TreeNode? Target
 		{
-			get => _strongRef;
+			get => _target;
 			set
 			{
-				_strongRef = value;
-				_weakRef = null;
-			}
-		}
-
-		/// <summary>
-		/// Creates a reference to a node with the given hash
-		/// </summary>
-		/// <param name="persistedNode">Hash of the referenced node</param>
-		public TreeNodeRef(ITreeBlobRef persistedNode)
-		{
-			_target = persistedNode;
-		}
-
-		/// <summary>
-		/// Creates a reference to a node with the given hash
-		/// </summary>
-		/// <param name="owner">The node which owns the reference</param>
-		/// <param name="persistedNode">Hash of the referenced node</param>
-		public TreeNodeRef(TreeNode owner, ITreeBlobRef persistedNode)
-		{
-			_owner = owner;
-			_target = persistedNode;
-		}
-
-		/// <summary>
-		/// Creates a reference to the given node
-		/// </summary>
-		/// <param name="owner">The node which owns the reference</param>
-		/// <param name="node">The referenced node</param>
-		public TreeNodeRef(TreeNode owner, TreeNode node)
-		{
-			_owner = owner;
-			_strongRef = node;
-			_lastModifiedTime = Stopwatch.GetTimestamp();
-
-			node.IncomingRef = this;
-		}
-
-		/// <summary>
-		/// Reparent this reference to a new owner.
-		/// </summary>
-		public void Reparent(TreeNode newOwner)
-		{
-			MarkAsDirty();
-			_owner = newOwner;
-			MarkAsDirty();
-		}
-
-		/// <summary>
-		/// Figure out whether this ref is dirty
-		/// </summary>
-		/// <returns></returns>
-		public bool IsDirty() => _lastModifiedTime != 0;
-
-		/// <summary>
-		/// Converts the node in this reference from a weak to strong reference.
-		/// </summary>
-		/// <returns>True if the ref contains a valid node on return</returns>
-		protected TreeNode? ConvertToStrongRef()
-		{
-			// Check if it's already a strong ref
-			if (_strongRef != null)
-			{
-				return _strongRef;
-			}
-
-			// Otherwise check if it's a weak ref that hasn't been GC'd yet
-			if (_weakRef != null && _weakRef.TryGetTarget(out _strongRef))
-			{
-				_weakRef = null;
-				return _strongRef;
-			}
-
-			return null;
-		}
-
-		/// <summary>
-		/// Marks this reference as dirty
-		/// </summary>
-		internal void MarkAsDirty()
-		{
-			if (_lastModifiedTime == 0)
-			{
-				_target = null;
-
-				_lastModifiedTime = Stopwatch.GetTimestamp();
-				if (_strongRef == null)
+				if (value != _target)
 				{
-					if (_weakRef == null || !_weakRef.TryGetTarget(out _strongRef))
+					if (value == null)
 					{
-						throw new InvalidOperationException("Unable to resolve weak reference to node");
+						_target = value;
 					}
-					_weakRef = null;
+					else
+					{
+						if (value.IncomingRef != null)
+						{
+							throw new ArgumentException("Target node may not be part of an existing tree.");
+						}
+						if (_target != null)
+						{
+							_target.IncomingRef = null;
+						}
+						_target = value;
+						MarkAsDirty();
+					}
 				}
-				_owner?.IncomingRef?.MarkAsDirty();
 			}
 		}
 
 		/// <summary>
-		/// Marks this reference as clean
+		/// Node pointed to by this ref
 		/// </summary>
-		internal void MarkAsClean(ITreeBlobRef persistedNode)
+		private TreeNode? _target;
+
+		/// <summary>
+		/// Whether this ref is dirty
+		/// </summary>
+		private bool _dirty;
+
+		/// <summary>
+		/// Creates a reference to a node in memory.
+		/// </summary>
+		/// <param name="target">Node to reference</param>
+		protected internal TreeNodeRef(TreeNode target)
 		{
-			_target = persistedNode;
-
-			if (_strongRef != null)
-			{
-				OnCollapse();
-
-				_weakRef = new WeakReference<TreeNode>(_strongRef);
-				_strongRef = null;
-			}
-
-			_lastModifiedTime = 0;
+			Debug.Assert(target != null);
+			Target = target;
+			_dirty = true;
 		}
 
 		/// <summary>
-		/// Collapse this reference and write its node to storage
+		/// Creates a reference to a node with the given hash
 		/// </summary>
-		/// <param name="writer">Writer to output the node to</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <param name="owner">Node which owns the ref</param>
+		/// <param name="store">Store to fetch this node from</param>
+		/// <param name="hash">Hash of the referenced node</param>
+		/// <param name="locator">Locator for the node</param>
+		internal TreeNodeRef(TreeNode owner, IStorageClient store, IoHash hash, NodeLocator locator)
+		{
+			Debug.Assert(store != null);
+			_owner = owner;
+
+			Store = store;
+			Hash = hash;
+			Locator = locator;
+
+			_dirty = false;
+		}
+
+		/// <summary>
+		/// Deserialization constructor
+		/// </summary>
+		/// <param name="reader"></param>
+		public TreeNodeRef(ITreeNodeReader reader)
+		{
+			TreeNodeRefData data = reader.ReadRef();
+			Store = data.Store;
+			Hash = data.Hash;
+			Locator = data.Locator;
+
+			_dirty = false;
+			Debug.Assert(Hash != IoHash.Zero);
+		}
+
+		/// <summary>
+		/// Determines whether the the referenced node has modified from the last version written to storage
+		/// </summary>
 		/// <returns></returns>
-		public async ValueTask<ITreeBlobRef> CollapseAsync(ITreeWriter writer, CancellationToken cancellationToken)
+		public bool IsDirty() => _dirty;
+
+		/// <summary>
+		/// Update the reference to refer to a node in memory.
+		/// </summary>
+		public void MarkAsDirty()
 		{
-			ITreeBlobRef? target = _target;
-			if (target == null)
+			Debug.Assert(Target != null);
+
+			Store = null;
+			Hash = default;
+			Locator = default;
+
+			if (!_dirty)
 			{
-				ITreeBlob blob = await Node!.SerializeAsync(writer, cancellationToken);
-				target = await writer.WriteNodeAsync(blob.Data, blob.Refs, cancellationToken);
-				MarkAsClean(target);
+				_dirty = true;
+				if (_owner != null && _owner.IncomingRef != null)
+				{
+					_owner.IncomingRef.MarkAsDirty();
+				}
 			}
-			return target;
 		}
 
 		/// <summary>
-		/// Callback for when a reference is collapsed to a hash value. At the time of calling, both the hash and node data will be valid.
+		/// Update the reference to refer to a location in storage.
 		/// </summary>
-		protected virtual void OnCollapse()
+		/// <param name="store">The storage client</param>
+		/// <param name="hash">Hash of the node</param>
+		/// <param name="locator">Location of the node</param>
+		internal void MarkAsWritten(IStorageClient store, IoHash hash, NodeLocator locator)
 		{
+			if (hash == Hash)
+			{
+				Store = store;
+				Locator = locator;
+				_dirty = false;
+			}
 		}
+
+		/// <summary>
+		/// Updates the hash and revision number for the ref.
+		/// </summary>
+		/// <param name="hash">Hash of the node</param>
+		/// <returns></returns>
+		internal void MarkAsPendingWrite(IoHash hash)
+		{
+			Hash = hash;
+			_dirty = false;
+		}
+
+		/// <summary>
+		/// Serialize the node to the given writer
+		/// </summary>
+		/// <param name="writer"></param>
+		public void Serialize(ITreeNodeWriter writer) => writer.WriteRef(this);
 	}
 
 	/// <summary>
@@ -202,45 +186,42 @@ namespace EpicGames.Horde.Storage
 	/// <typeparam name="T">Type of the node</typeparam>
 	public class TreeNodeRef<T> : TreeNodeRef where T : TreeNode
 	{
-		static readonly TreeNodeSerializer<T> Serializer = CreateSerializer();
-
-		/// <inheritdoc cref="TreeNodeRef.Node"/>
-		public new T? Node
+		/// <summary>
+		/// Accessor for the target node
+		/// </summary>
+		public new T? Target
 		{
-			get => (T?)base.Node;
-			set => base.Node = value;
+			get => (T?)base.Target;
+			set => base.Target = value;
 		}
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="owner">The node which owns the reference</param>
-		/// <param name="target">Hash of the referenced node</param>
-		public TreeNodeRef(TreeNode owner, ITreeBlobRef target) : base(owner, target)
+		/// <param name="target">The referenced node</param>
+		public TreeNodeRef(T target) : base(target)
 		{
 		}
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="owner">The node which owns the reference</param>
-		/// <param name="node">The referenced node</param>
-		public TreeNodeRef(TreeNode owner, T node) : base(owner, node)
+		/// <param name="owner">Node which owns the ref</param>
+		/// <param name="store">Storage client containing the node data</param>
+		/// <param name="hash">Hash of the referenced node</param>
+		/// <param name="locator">Locator for the node</param>
+		internal TreeNodeRef(TreeNode owner, IStorageClient store, IoHash hash, NodeLocator locator) 
+			: base(owner, store, hash, locator)
 		{
 		}
 
 		/// <summary>
-		/// Create an instance of the serializer for this node type
+		/// Constructor
 		/// </summary>
-		/// <returns>New serializer instance</returns>
-		static TreeNodeSerializer<T> CreateSerializer()
+		/// <param name="reader"></param>
+		public TreeNodeRef(ITreeNodeReader reader)
+			: base(reader)
 		{
-			TreeSerializerAttribute? attribute = typeof(T).GetCustomAttribute<TreeSerializerAttribute>();
-			if (attribute == null)
-			{
-				throw new InvalidOperationException($"No serializer is defined for {typeof(T).Name}");
-			}
-			return (TreeNodeSerializer<T>)Activator.CreateInstance(attribute.Type)!;
 		}
 
 		/// <summary>
@@ -250,19 +231,27 @@ namespace EpicGames.Horde.Storage
 		/// <returns></returns>
 		public async ValueTask<T> ExpandAsync(CancellationToken cancellationToken = default)
 		{
-			T? result = (T?)ConvertToStrongRef();
-			if (result == null)
+			if (base.Target == null)
 			{
-				Debug.Assert(_target != null);
-				ITreeBlob node = await _target.GetTargetAsync(cancellationToken);
-
-				_strongRef = Serializer.Deserialize(node);
-				_strongRef.IncomingRef = this;
-
-				result = (T)_strongRef;
+				base.Target = await Store!.ReadNodeAsync<T>(Locator, cancellationToken);
+				Target!.IncomingRef = this;
 			}
-			return result;
+			return Target!;
+		}
+
+		/// <summary>
+		/// Resolve this reference to a concrete node
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns></returns>
+		public async ValueTask<T> ExpandCopyAsync(CancellationToken cancellationToken = default)
+		{
+			return await Store!.ReadNodeAsync<T>(Locator, cancellationToken);
 		}
 	}
-}
 
+	/// <summary>
+	/// Deserialized ref data
+	/// </summary>
+	public record struct TreeNodeRefData(IStorageClient Store, IoHash Hash, NodeLocator Locator);
+}

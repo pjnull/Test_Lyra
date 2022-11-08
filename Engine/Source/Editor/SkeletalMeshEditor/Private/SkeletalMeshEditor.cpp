@@ -244,8 +244,7 @@ void FSkeletalMeshEditor::InitSkeletalMeshEditor(const EToolkitMode::Type Mode, 
 
 	PersonaToolkit->GetPreviewScene()->SetDefaultAnimationMode(EPreviewSceneDefaultAnimationMode::ReferencePose);
 
-	TSharedRef<IAssetFamily> AssetFamily = PersonaModule.CreatePersonaAssetFamily(InSkeletalMesh);
-	AssetFamily->RecordAssetOpened(FAssetData(InSkeletalMesh));
+	PersonaModule.RecordAssetOpened(FAssetData(InSkeletalMesh));
 
 	TSharedPtr<IPersonaPreviewScene> PreviewScene = PersonaToolkit->GetPreviewScene();
 
@@ -1066,7 +1065,7 @@ void FSkeletalMeshEditor::ApplyClothing(UClothingAssetBase* InAsset, int32 InLod
 				//Successful bind so set the SectionUserData
 				int32 AssetIndex = INDEX_NONE;
 				check(Mesh->GetMeshClothingAssets().Find(ClothingAsset, AssetIndex));
-				OriginalSectionData.CorrespondClothAssetIndex = AssetIndex;
+				OriginalSectionData.CorrespondClothAssetIndex = static_cast<int16>(AssetIndex);
 				OriginalSectionData.ClothingData.AssetGuid = ClothingAsset->GetAssetGuid();
 				OriginalSectionData.ClothingData.AssetLodIndex = InClothingLod;
 			}

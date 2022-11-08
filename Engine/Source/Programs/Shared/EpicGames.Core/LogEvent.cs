@@ -32,6 +32,9 @@ namespace EpicGames.Core
 		public static readonly Utf8String Type = new Utf8String("$type");
 		public static readonly Utf8String Text = new Utf8String("$text");
 
+		public static readonly Utf8String File = new Utf8String("file"); // For source file / asset types
+		public static readonly Utf8String Identifier = new Utf8String("identifier"); // For symbols
+
 		public static readonly Utf8String Exception = new Utf8String("exception");
 		public static readonly Utf8String Trace = new Utf8String("trace");
 		public static readonly Utf8String InnerException = new Utf8String("innerException");
@@ -200,7 +203,9 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="reader">The Json reader</param>
 		/// <returns>New log event</returns>
+#pragma warning disable CA1045 // Do not pass types by reference
 		public static LogEvent Read(ref Utf8JsonReader reader)
+#pragma warning restore CA1045 // Do not pass types by reference
 		{
 			DateTime time = new DateTime(0);
 			LogLevel level = LogLevel.None;
@@ -221,7 +226,7 @@ namespace EpicGames.Core
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Level.Span))
 				{
-					level = Enum.Parse<LogLevel>(reader.GetString());
+					level = Enum.Parse<LogLevel>(reader.GetString()!);
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Id.Span))
 				{
@@ -237,11 +242,11 @@ namespace EpicGames.Core
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Message.Span))
 				{
-					message = reader.GetString();
+					message = reader.GetString()!;
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Format.Span))
 				{
-					format = reader.GetString();
+					format = reader.GetString()!;
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Properties.Span))
 				{
@@ -278,7 +283,7 @@ namespace EpicGames.Core
 				case JsonTokenType.StartObject:
 					return ReadStructuredPropertyValue(ref reader);
 				case JsonTokenType.String:
-					return reader.GetString();
+					return reader.GetString()!;
 				case JsonTokenType.Number:
 					if (reader.TryGetInt32(out int intValue))
 					{
@@ -308,11 +313,11 @@ namespace EpicGames.Core
 			{
 				if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Type.Span))
 				{
-					type = reader.GetString();
+					type = reader.GetString() ?? String.Empty;
 				}
 				else if (Utf8StringComparer.OrdinalIgnoreCase.Equals(propertyName, LogEventPropertyName.Text.Span))
 				{
-					text = reader.GetString();
+					text = reader.GetString() ?? String.Empty;
 				}
 				else
 				{
@@ -539,7 +544,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Multiple inner exceptions, in the case of an <see cref="AggregateException"/>
 		/// </summary>
-		public List<LogException> InnerExceptions { get; set; } = new List<LogException>();
+		public List<LogException> InnerExceptions { get; } = new List<LogException>();
 
 		/// <summary>
 		/// Constructor
@@ -572,7 +577,6 @@ namespace EpicGames.Core
 				AggregateException? aggregateException = exception as AggregateException;
 				if (aggregateException != null && aggregateException.InnerExceptions.Count > 0)
 				{
-					result.InnerExceptions = new List<LogException>();
 					for (int idx = 0; idx < 16 && idx < aggregateException.InnerExceptions.Count; idx++) // Cap number of exceptions returned to avoid huge messages
 					{
 						LogException innerException = FromException(aggregateException.InnerExceptions[idx]);

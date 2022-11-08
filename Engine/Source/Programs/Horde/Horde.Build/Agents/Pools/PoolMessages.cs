@@ -8,6 +8,98 @@ using Horde.Build.Agents.Fleet;
 
 namespace Horde.Build.Agents.Pools
 {
+	/// <see cref="PoolSizeStrategyInfo" />
+	public class PoolSizeStrategyMessage
+	{
+		/// <summary>
+		/// Strategy implementation to use
+		/// </summary>
+		public PoolSizeStrategy Type { get; set; }
+		
+		/// <summary>
+		/// Condition if this strategy should be enabled (right now, using date/time as a distinguishing factor)
+		/// </summary>
+		public Condition? Condition { get; set; }
+
+		/// <summary>
+		/// Configuration for the strategy, serialized as JSON
+		/// </summary>
+		public string Config { get; set; } = "";
+		
+		/// <summary>
+		/// Empty constructor for JSON serialization
+		/// </summary>
+		public PoolSizeStrategyMessage()
+		{
+		}
+
+		/// <summary>
+		/// Construct a public REST API representation from the internal one
+		/// </summary>
+		/// <param name="strategy"></param>
+		public PoolSizeStrategyMessage(PoolSizeStrategyInfo strategy)
+		{
+			Type = strategy.Type;
+			Condition = strategy.Condition;
+			Config = strategy.Config;
+		}
+		
+		/// <summary>
+		/// Convert this public REST API object to an internal representation
+		/// </summary>
+		/// <returns></returns>
+		public PoolSizeStrategyInfo Convert()
+		{
+			return new PoolSizeStrategyInfo(Type, Condition, Config);
+		}
+	}
+	
+	/// <see cref="FleetManagerInfo" />
+	public class FleetManagerMessage
+	{
+		/// <summary>
+		/// Strategy implementation to use
+		/// </summary>
+		public FleetManagerType Type { get; set; }
+		
+		/// <summary>
+		/// Condition if this strategy should be enabled (right now, using date/time as a distinguishing factor)
+		/// </summary>
+		public Condition? Condition { get; set; }
+
+		/// <summary>
+		/// Configuration for the strategy, serialized as JSON
+		/// </summary>
+		public string Config { get; set; } = "";
+		
+		/// <summary>
+		/// Empty constructor for JSON serialization
+		/// </summary>
+		public FleetManagerMessage()
+		{
+		}
+
+		/// <summary>
+		/// Construct a public REST API representation from the internal one
+		/// </summary>
+		/// <param name="info"></param>
+		public FleetManagerMessage(FleetManagerInfo info)
+		{
+			Type = info.Type;
+			Condition = info.Condition;
+			Config = info.Config;
+		}
+		
+		/// <summary>
+		/// Convert this public REST API object to an internal representation
+		/// </summary>
+		/// <returns></returns>
+		public FleetManagerInfo Convert()
+		{
+			return new FleetManagerInfo(Type, Condition, Config);
+		}
+	}
+
 	/// <see cref="LeaseUtilizationSettings" />
 	public class LeaseUtilizationSettingsMessage
 	{
@@ -152,6 +244,16 @@ namespace Horde.Build.Agents.Pools
 		public int? ScaleInCooldown { get; set; }
 		
 		/// <summary>
+		/// Pool sizing strategies
+		/// </summary>
+		public List<PoolSizeStrategyMessage>? SizeStrategies { get; set; }
+		
+		/// <summary>
+		/// Fleet managers
+		/// </summary>
+		public List<FleetManagerMessage>? FleetManagers { get; set; }
+		
+		/// <summary>
 		/// Pool sizing strategy
 		/// </summary>
 		public PoolSizeStrategy? SizeStrategy { get; set; }
@@ -246,6 +348,16 @@ namespace Horde.Build.Agents.Pools
 		/// Pool sizing strategy
 		/// </summary>
 		public PoolSizeStrategy? SizeStrategy { get; set; }
+		
+		/// <summary>
+		/// Pool sizing strategies
+		/// </summary>
+		public List<PoolSizeStrategyMessage>? SizeStrategies { get; set; }
+		
+		/// <summary>
+		/// Fleet managers
+		/// </summary>
+		public List<FleetManagerMessage>? FleetManagers { get; set; }
 
 		/// <summary>
 		/// Set pool to use default strategy
@@ -346,22 +458,32 @@ namespace Horde.Build.Agents.Pools
 		public int? ScaleInCooldown { get; set; }
 		
 		/// <summary>
-		/// Pool sizing strategy to be used for this pool
+		/// Pool sizing strategies to be used for this pool
+		/// </summary>
+		public List<PoolSizeStrategyMessage> SizeStrategies { get; set; }
+		
+		/// <summary>
+		/// Fleet managers to be used for this pool
+		/// </summary>
+		public List<FleetManagerMessage> FleetManagers { get; set; }
+
+		/// <summary>
+		/// Pool sizing strategy to be used for this pool (deprecated, see SizeStrategies field)
 		/// </summary>
 		public PoolSizeStrategy? SizeStrategy { get; set; }
 		
 		/// <summary>
-		/// Settings for lease utilization pool sizing strategy (if used)
+		/// Settings for lease utilization pool sizing strategy (deprecated, see SizeStrategies field)
 		/// </summary>
 		public LeaseUtilizationSettingsMessage? LeaseUtilizationSettings { get; set; }
 		
 		/// <summary>
-		/// Settings for job queue pool sizing strategy (if used) 
+		/// Settings for job queue pool sizing strategy (deprecated, see SizeStrategies field)
 		/// </summary>
 		public JobQueueSettingsMessage? JobQueueSettings { get; set; }
 
 		/// <summary>
-		/// Settings for compute queue pool sizing strategy for AWS metrics (if used) 
+		/// Settings for compute queue pool sizing strategy for AWS metrics (deprecated, see SizeStrategies field)
 		/// </summary>
 		public ComputeQueueAwsMetricSettingsMessage? ComputeQueueAwsMetricSettings { get; set; }
 
@@ -398,6 +520,8 @@ namespace Horde.Build.Agents.Pools
 			ConformInterval = pool.ConformInterval == null ? null : (int)pool.ConformInterval.Value.TotalHours;
 			ScaleOutCooldown = pool.ScaleOutCooldown == null ? null : (int)pool.ScaleOutCooldown.Value.TotalSeconds;
 			ScaleInCooldown = pool.ScaleInCooldown == null ? null : (int)pool.ScaleInCooldown.Value.TotalSeconds;
+			SizeStrategies = pool.SizeStrategies.Select(x => new PoolSizeStrategyMessage(x)).ToList();
+			FleetManagers = pool.FleetManagers.Select(x => new FleetManagerMessage(x)).ToList();
 			SizeStrategy = pool.SizeStrategy;
 			LeaseUtilizationSettings = pool.LeaseUtilizationSettings == null ? null : new LeaseUtilizationSettingsMessage(pool.LeaseUtilizationSettings);
 			JobQueueSettings = pool.JobQueueSettings == null ? null : new JobQueueSettingsMessage(pool.JobQueueSettings);

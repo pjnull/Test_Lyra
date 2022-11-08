@@ -3286,10 +3286,18 @@ namespace AutomationScripts
 					}
 				}
 
-				string WriteBackMetadataToAssetRegistry;
-				if (PlatformGameConfig.GetString("/Script/UnrealEd.ProjectPackagingSettings", "WriteBackMetadataToAssetRegistry", out WriteBackMetadataToAssetRegistry))
+
+				if (Params.WriteBackMetadataToAssetRegistry.Length != 0)
 				{
-					AdditionalArgs += " -WriteBackMetadataToAssetRegistry=" + WriteBackMetadataToAssetRegistry;
+					AdditionalArgs += " -WriteBackMetadataToAssetRegistry=" + Params.WriteBackMetadataToAssetRegistry;
+				}
+				else
+				{
+					string WriteBackMetadataToAssetRegistry;
+					if (PlatformGameConfig.GetString("/Script/UnrealEd.ProjectPackagingSettings", "WriteBackMetadataToAssetRegistry", out WriteBackMetadataToAssetRegistry))
+					{
+						AdditionalArgs += " -WriteBackMetadataToAssetRegistry=" + WriteBackMetadataToAssetRegistry;
+					}
 				}
 
 
@@ -4030,6 +4038,11 @@ namespace AutomationScripts
 				return false;
 			}
 
+			if (Params.IsProgramTarget)
+			{
+				return false;
+			}
+
 			if (Params.SkipIoStore)
 			{
 				return false;
@@ -4446,7 +4459,19 @@ namespace AutomationScripts
 		//@todo move this
 		public static List<DeploymentContext> CreateDeploymentContext(ProjectParams Params, bool InDedicatedServer, bool DoCleanStage = false)
 		{
-			ParamList<string> ListToProcess = InDedicatedServer && (Params.Cook || Params.CookOnTheFly) ? Params.ServerCookedTargets : Params.ClientCookedTargets;
+			ParamList<string> ListToProcess;
+			if (Params.IsProgramTarget)
+			{
+				ListToProcess = Params.ProgramTargets;
+			}
+			else if (InDedicatedServer && (Params.Cook || Params.CookOnTheFly))
+			{
+				ListToProcess = Params.ServerCookedTargets;
+			}
+			else
+			{
+				ListToProcess = Params.ClientCookedTargets;
+			} 
 			var ConfigsToProcess = InDedicatedServer && (Params.Cook || Params.CookOnTheFly) ? Params.ServerConfigsToBuild : Params.ClientConfigsToBuild;
 
 			List<Tuple<string, UnrealTargetConfiguration>> TargetAndConfigPairs = new List<Tuple<string, UnrealTargetConfiguration>>();
@@ -4456,7 +4481,8 @@ namespace AutomationScripts
 				// If we are staging a client and have been asked to include editor targets, we currently only want to
 				// include a single Development editor target. Ideally, we should have shipping editor configs and then
 				// just include the requested configs for all targets
-				if (Params.EditorTargets.Contains(Target) || Params.ProgramTargets.Contains(Target))
+				if ((Params.HasEditorTargets && Params.EditorTargets.Contains(Target)) || 
+					(Params.HasProgramTargets && Params.ProgramTargets.Contains(Target)))
 				{
 					TargetAndConfigPairs.Add(new Tuple<string, UnrealTargetConfiguration>(Target, UnrealTargetConfiguration.Development));
 				}

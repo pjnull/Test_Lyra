@@ -60,7 +60,7 @@ FFCPXMLImportVisitor::FFCPXMLImportVisitor(TSharedRef<FMovieSceneImportData> InI
 , bInAudioTrackNode(false)
 , CurrVideoTrackRowIndex(0)
 , CurrAudioTrackListIndex(0)
-, CurrAudioMasterTrack(nullptr)
+, CurrAudioData(nullptr)
 , CurrAudioTrackRowIndex(0)
 , bCurrImportAudioTrackIsStereoChannel(false)
 , MaxVideoTrackRowIndex(0)
@@ -71,7 +71,7 @@ FFCPXMLImportVisitor::FFCPXMLImportVisitor(TSharedRef<FMovieSceneImportData> InI
 	{
 		if (AudioTrackList[0].IsValid())
 		{
-			CurrAudioMasterTrack = AudioTrackList[0]->AudioTrackData;
+			CurrAudioData = AudioTrackList[0]->AudioTrackData;
 			CurrAudioTrackRowIndex = AudioTrackList[0]->RowIndex;
 		}
 	}
@@ -169,7 +169,7 @@ bool FFCPXMLImportVisitor::VisitNode(TSharedRef<FFCPXMLTrackNode> InTrackNode)
 				{
 					return false;
 				}
-				CurrAudioMasterTrack = AudioTrackList[CurrAudioTrackListIndex]->AudioTrackData;
+				CurrAudioData = AudioTrackList[CurrAudioTrackListIndex]->AudioTrackData;
 				CurrAudioTrackRowIndex = AudioTrackList[CurrAudioTrackListIndex]->RowIndex;
 			}
 			else
@@ -385,10 +385,10 @@ bool FFCPXMLImportVisitor::VisitAudioClipItemNode(TSharedRef<FFCPXMLClipItemNode
 
 	// Get next audio section based on the audio metadata
 	TSharedPtr<FMovieSceneImportAudioSectionData> AudioSectionData = nullptr;
-	TSharedPtr<FMovieSceneImportAudioMasterTrackData> AudioMasterTrackData = nullptr;
+	TSharedPtr<FMovieSceneImportAudioData> AudioData = nullptr;
 	if (AudioMetadata.IsValid())
 	{
-		if (!GetNextAudioSection(AudioMetadata, AudioMasterTrackData, AudioSectionData))
+		if (!GetNextAudioSection(AudioMetadata, AudioData, AudioSectionData))
 		{
 			return false;
 		}
@@ -396,12 +396,12 @@ bool FFCPXMLImportVisitor::VisitAudioClipItemNode(TSharedRef<FFCPXMLClipItemNode
 
 	if (AudioSectionData.IsValid())
 	{
-		if (CurrAudioMasterTrack.IsValid() && CurrAudioMasterTrack->MovieSceneTrack != nullptr &&
-			AudioMasterTrackData.IsValid() && AudioMasterTrackData->MovieSceneTrack != nullptr &&
-			CurrAudioMasterTrack->MovieSceneTrack->GetFullName() != AudioMasterTrackData->MovieSceneTrack->GetFullName())
+		if (CurrAudioData.IsValid() && CurrAudioData->MovieSceneTrack != nullptr &&
+			AudioData.IsValid() && AudioData->MovieSceneTrack != nullptr &&
+			CurrAudioData->MovieSceneTrack->GetFullName() != AudioData->MovieSceneTrack->GetFullName())
 		{
 			// Move audio section
-			if (!ImportData->MoveAudioSection(AudioSectionData, AudioMasterTrackData, CurrAudioMasterTrack, CurrAudioTrackRowIndex))
+			if (!ImportData->MoveAudioSection(AudioSectionData, AudioData, CurrAudioData, CurrAudioTrackRowIndex))
 			{
 				return false;
 			}
@@ -419,7 +419,7 @@ bool FFCPXMLImportVisitor::VisitAudioClipItemNode(TSharedRef<FFCPXMLClipItemNode
 		if (!SoundWaveName.IsEmpty())
 		{
 			// Add new audio section
-			AudioSectionData = ImportData->CreateAudioSection(SoundWaveName, bUseSoundPathName, CurrAudioMasterTrack, CurrAudioTrackRowIndex, FrameRate, Start, End, StartOffset);
+			AudioSectionData = ImportData->CreateAudioSection(SoundWaveName, bUseSoundPathName, CurrAudioData, CurrAudioTrackRowIndex, FrameRate, Start, End, StartOffset);
 			if (!AudioSectionData.IsValid())
 			{
 				return false;
@@ -563,13 +563,13 @@ bool FFCPXMLImportVisitor::ConstructAudioTrackList()
 		return false;
 	}
 
-	for (TSharedPtr<FMovieSceneImportAudioMasterTrackData> MasterTrackData : ImportData->MovieSceneData->AudioMasterTracks)
+	for (TSharedPtr<FMovieSceneImportAudioData> AudioData : ImportData->MovieSceneData->AudioData)
 	{
-		for (TSharedPtr<FMovieSceneImportAudioTrackData> TrackData : MasterTrackData->AudioTracks)
+		for (TSharedPtr<FMovieSceneImportAudioTrackData> AudioTrackData : AudioData->AudioTracks)
 		{
-			if (TrackData.IsValid())
+			if (AudioTrackData.IsValid())
 			{
-				TSharedPtr<FFCPXMLImportAudioTrackListItem> ListItem = MakeShared<FFCPXMLImportAudioTrackListItem>(MasterTrackData, TrackData->RowIndex);
+				TSharedPtr<FFCPXMLImportAudioTrackListItem> ListItem = MakeShared<FFCPXMLImportAudioTrackListItem>(AudioData, AudioTrackData->RowIndex);
 				AudioTrackList.Add(ListItem);
 			}
 		}
@@ -686,7 +686,7 @@ TSharedPtr<FFCPXMLImportAudioMetadata> FFCPXMLImportVisitor::GetAudioMetadataObj
 }
 
 /** Get audio section path name based on node metadata and masterclip id */
-bool FFCPXMLImportVisitor::GetNextAudioSection(TSharedPtr<FFCPXMLImportAudioMetadata> InAudioMetadata, TSharedPtr<FMovieSceneImportAudioMasterTrackData>& OutAudioMasterTrackData, TSharedPtr<FMovieSceneImportAudioSectionData>& OutAudioSectionData)
+bool FFCPXMLImportVisitor::GetNextAudioSection(TSharedPtr<FFCPXMLImportAudioMetadata> InAudioMetadata, TSharedPtr<FMovieSceneImportAudioData>& OutAudioData, TSharedPtr<FMovieSceneImportAudioSectionData>& OutAudioSectionData)
 {
 	if (!InAudioMetadata.IsValid())
 	{
@@ -708,7 +708,7 @@ bool FFCPXMLImportVisitor::GetNextAudioSection(TSharedPtr<FFCPXMLImportAudioMeta
 	// Find actual audio section
 	if (!AudioSectionPathName.IsEmpty())
 	{
-		OutAudioSectionData = ImportData->FindAudioSection(AudioSectionPathName, OutAudioMasterTrackData);
+		OutAudioSectionData = ImportData->FindAudioSection(AudioSectionPathName, OutAudioData);
 	}
 
 	return true;

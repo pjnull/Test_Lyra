@@ -29,31 +29,66 @@ RWBuffer<uint> SimpleTileListDataBuffer;
 RWBuffer<uint> SingleTileListDataBuffer;
 RWBuffer<uint> ComplexTileListDataBuffer;
 
+#if PERMUTATION_DECAL
+RWBuffer<uint> DecalSimpleTileListDataBuffer;
+RWBuffer<uint> DecalSingleTileListDataBuffer;
+RWBuffer<uint> DecalComplexTileListDataBuffer;
+
+Texture2D<float4> DBufferATexture;
+Texture2D<float4> DBufferBTexture;
+Texture2D<float4> DBufferCTexture;
+Texture2D<uint> DBufferRenderMask;
+
+SamplerState DBufferATextureSampler;
+SamplerState DBufferBTextureSampler;
+SamplerState DBufferCTextureSampler;
+
+// @param BufferUV - UV space in the DBuffer textures
+uint GetDBufferTargetMask(uint2 PixelPos)
+{
+	#if PLATFORM_SUPPORTS_RENDERTARGET_WRITE_MASK
+	return DecodeRTWriteMask(PixelPos, DBufferRenderMask, 3);
+	#elif PLATFORM_SUPPORTS_PER_PIXEL_DBUFFER_MASK
+	uint Mask = DBufferRenderMask.Load(uint3(PixelPos, 0));
+	return Mask > 0 ? 0x07 : 0x00;
+	#else
+	// For debug purpose:
+	// return 
+	//	(DBufferATexture.Load(uint3(PixelPos, 0)).a < 1.f ? 0x1 : 0x0) |
+	//	(DBufferBTexture.Load(uint3(PixelPos, 0)).a < 1.f ? 0x2 : 0x0) |
+	//	(DBufferCTexture.Load(uint3(PixelPos, 0)).a < 1.f ? 0x3 : 0x0) ;
+	return 0x07;
+	#endif
+}
+
+#endif // PERMUTATION_DECAL
+
 #if STRATA_OPAQUE_ROUGH_REFRACTION_ENABLED
 RWBuffer<uint> OpaqueRoughRefractionTileListDataBuffer;
-RWBuffer<uint> SSSWithoutOpaqueRoughRefractionTileListDataBuffer;
+RWBuffer<uint> OpaqueRoughRefractionSSSWithoutTileListDataBuffer;
 Texture2D<float3> OpaqueRoughRefractionTexture;
-#endif
+#endif // STRATA_OPAQUE_ROUGH_REFRACTION_ENABLED
 
 #if !PERMUTATION_WAVE_OPS
 groupshared uint s_TileFlags[GROUP_THREAD_COUNT];
 #endif
 
+#if PERMUTATION_WAVE_OPS && COMPILER_SUPPORTS_WAVE_SIZE
+WAVESIZE(64) // PERMUTATION_WAVE_OPS is true only when wave>=64 are available
+#endif
 [numthreads(STRATA_TILE_SIZE, STRATA_TILE_SIZE, 1)]
 void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex : SV_GroupIndex, uint3 GroupId : SV_GroupID)
 {
-	if (all(DispatchThreadId == 0))
+	// Init primitive index
+	if (DispatchThreadId.x < STRATA_TILE_TYPE_COUNT && DispatchThreadId.y == 0)
 	{
+		const uint TileType = DispatchThreadId.x;
 		const uint IndexCountPerInstance = bRectPrimitive > 0 ? 4 : 6;
-		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SIMPLE)					+ 0] = IndexCountPerInstance;
-		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SINGLE)					+ 0] = IndexCountPerInstance;
-		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_COMPLEX)					+ 0] = IndexCountPerInstance;
-		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT)				+ 0] = IndexCountPerInstance;
-		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT) + 0] = IndexCountPerInstance;
+		TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(TileType) + 0] = IndexCountPerInstance;
 	}
 
 	const uint2 PixelCoord = DispatchThreadId.xy + View.ViewRectMin.xy;
-	const bool bIsValid = all(DispatchThreadId.xy < View.ViewSizeAndInvSize.xy);
+	const bool bIsValid = all(DispatchThreadId.xy < uint2(View.ViewSizeAndInvSize.xy));
 
 	// If CMask data are available, we use it as a coarse evaluation to know if a tile contains any data. 
 	// * If the tile is entirely empty: we clear the header & SSS data
@@ -74,12 +109,14 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 #endif
 
 	// Pixels outside of the view area are considered simple to enable screen borders to receive the simple permutation when not aligned to shader group size.
-	bool bContainsComplexMaterial = false;
-	bool bContainsSimpleMaterial  = false;
-	bool bContainsSingleMaterial  = false;
-	bool bContainsStrataMaterial  = false;
-	bool bContainsOpaqueRoughRefraction = false;
-	bool bContainsScreenSpaceSubsurfaceScattering = false;
+	bool bContainsComplexMaterial					= false;
+	bool bContainsSimpleMaterial					= false;
+	bool bContainsSingleMaterial					= false;
+	bool bContainsStrataMaterial					= false;
+	bool bContainsDecals							= false;
+	bool bContainsOpaqueRoughRefraction				= false;
+	bool bContainsScreenSpaceSubsurfaceScattering	= false;
+
 	FStrataOpaqueRoughRefractionData OpaqueRoughRefractionData = (FStrataOpaqueRoughRefractionData)0;
 	if (bIsValid)
 	{
@@ -97,10 +134,53 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 		bContainsComplexMaterial = !bIsSingle && !bIsSimple;
 		bContainsScreenSpaceSubsurfaceScattering = HasSubsurface(StrataPixelHeader);
 
+	#if PERMUTATION_DECAL
+		const uint DBufferResponseMask = SceneStencilTexture.Load(uint3(PixelCoord, 0)) STENCIL_COMPONENT_SWIZZLE;
+		const uint DBufferTargetMask = GetDBufferTargetMask(PixelCoord);
+		bContainsDecals = DBufferResponseMask != 0 && DBufferTargetMask != 0;
+	#endif
+
 	#if STRATA_OPAQUE_ROUGH_REFRACTION_ENABLED
 		OpaqueRoughRefractionData = StrataUnpackOpaqueRoughRefractionData(OpaqueRoughRefractionTexture[PixelCoord]);
 		bContainsOpaqueRoughRefraction = OpaqueRoughRefractionData.OpaqueRoughRefractionEnabled > 0.0f;
 	#endif
+
+		// Output/Patch SSS data for legacy encoding (this allows to save ALU & bandwidth during the base pass0
+		uint OptimisedLegacyMode = ((PackedHeader >> (HEADER_SINGLEENCODING_BIT_COUNT)) & HEADER_SINGLE_OPTLEGACYMODE_BIT_MASK);
+		const bool bIsLegacyWrap = OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_SSSWRAP;
+		const bool bIsLegacySSSProfile = OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_SSSPROFILE;
+		if (bIsSingle && (bIsLegacyWrap || bIsLegacySSSProfile))
+		{
+			bContainsScreenSpaceSubsurfaceScattering = true;
+			if (bIsLegacyWrap)
+			{
+				const uint PackedSSSWOpacity7bits = (PackedHeader >> (HEADER_SINGLEENCODING_BIT_COUNT + HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)) & 0x7F;
+				FStrataSubsurfaceHeader SSSHeader = (FStrataSubsurfaceHeader)0;
+				StrataSubSurfaceHeaderSetSSSType(SSSHeader, SSS_TYPE_WRAP);
+				StrataSubSurfaceHeaderSetWrapOpacity(SSSHeader, UnpackR7(PackedSSSWOpacity7bits));
+				StrataStoreSubsurfaceHeader(MaterialTextureArrayUAV, FirstSliceStoringStrataSSSData, PixelCoord, SSSHeader.Bytes);
+			}
+			else if (bIsLegacySSSProfile)
+			{
+				const uint Data1 = MaterialTextureArrayUAV[uint3(PixelCoord, 1)];
+				const uint Data2 = MaterialTextureArrayUAV[uint3(PixelCoord, 2)];
+				float  RadiusScale = UnpackR8(Data1 >> 24);
+				float  ProfileId   = UnpackR8(Data2 >> 24);
+
+				const uint PackedDiffuse20Bits = (Data1 & 0xFFFFF);
+				const float3 BaseColor = UnpackR7G7B6Gamma2(PackedDiffuse20Bits);
+
+				FStrataSubsurfaceHeader SSSHeader = (FStrataSubsurfaceHeader)0;
+				StrataSubSurfaceHeaderSetSSSType(SSSHeader, SSS_TYPE_DIFFUSION_PROFILE);
+				StrataSubSurfaceHeaderSetProfile(SSSHeader, RadiusScale, StrataSubsurfaceProfileIdTo8bits(ProfileId));
+
+				FStrataSubsurfaceExtras SSSExtras = (FStrataSubsurfaceExtras)0;
+				StrataSubsurfaceExtrasSetBaseColor(SSSExtras, BaseColor);
+
+				StrataStoreSubsurfaceHeader(MaterialTextureArrayUAV, FirstSliceStoringStrataSSSData, PixelCoord, SSSHeader.Bytes);
+				StrataStoreSubsurfaceExtras(MaterialTextureArrayUAV, FirstSliceStoringStrataSSSData, PixelCoord, SSSExtras.Bytes);
+			}
+		}
 
 		// Fine grain test for clearing based on CMask data
 	#if PERMUTATION_CMASK
@@ -130,20 +210,23 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 
 #if PERMUTATION_WAVE_OPS
 	const bool bTileContainsStrata							= WaveActiveAnyTrue(bContainsStrataMaterial);
-//	const bool bTileContainsSimple							= WaveActiveAnyTrue(bContainsSimpleMaterial);
+	const bool bTileContainsSimple							= WaveActiveAnyTrue(bContainsSimpleMaterial);
 	const bool bTileContainsSingle							= WaveActiveAnyTrue(bContainsSingleMaterial);
 	const bool bTileContainsComplex							= WaveActiveAnyTrue(bContainsComplexMaterial);
 	const bool bTileContainsOpaqueRoughRefraction			= WaveActiveAnyTrue(bContainsOpaqueRoughRefraction);
 	const bool bTileContainsScreenSpaceSubsurfaceScattering	= WaveActiveAnyTrue(bContainsScreenSpaceSubsurfaceScattering);
+	const bool bTileContainsDecals							= WaveActiveAnyTrue(bContainsDecals);
 #else // PERMUTATION_WAVE_OPS
 
 	s_TileFlags[LinearIndex] = 
-		(bContainsStrataMaterial					? 0x1u	: 0u) | 
-//		(bContainsSimpleMaterial					? 0x2u	: 0u) | 
-		(bContainsSingleMaterial					? 0x4u	: 0u) | 
-		(bContainsComplexMaterial					? 0x8u	: 0u) | 
-		(bContainsOpaqueRoughRefraction				? 0x10u : 0u) |
-		(bContainsScreenSpaceSubsurfaceScattering	? 0x20u : 0u);
+		  (bContainsStrataMaterial					? 0x1u	: 0u)
+		| (bContainsSimpleMaterial					? 0x2u	: 0u)
+		| (bContainsSingleMaterial					? 0x4u	: 0u) 
+		| (bContainsComplexMaterial					? 0x8u	: 0u) 
+		| (bContainsOpaqueRoughRefraction			? 0x10u : 0u)
+		| (bContainsScreenSpaceSubsurfaceScattering	? 0x20u : 0u)
+		| (bContainsScreenSpaceSubsurfaceScattering	? 0x20u : 0u)
+		| (bContainsDecals							? 0x40u : 0u);
 
 	GroupMemoryBarrierWithGroupSync();
 	if (LinearIndex < 32)
@@ -176,11 +259,12 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 	const uint FinalTileFlags = s_TileFlags[LinearIndex] | s_TileFlags[LinearIndex + 1];
 
 	const bool bTileContainsStrata							= (FinalTileFlags & 0x1u) > 0;
-//	const bool bTileContainsSimple							= (FinalTileFlags & 0x2u) > 0;
+	const bool bTileContainsSimple							= (FinalTileFlags & 0x2u) > 0;
 	const bool bTileContainsSingle							= (FinalTileFlags & 0x4u) > 0;
 	const bool bTileContainsComplex							= (FinalTileFlags & 0x8u) > 0;
 	const bool bTileContainsOpaqueRoughRefraction			= (FinalTileFlags & 0x10u) > 0;
 	const bool bTileContainsScreenSpaceSubsurfaceScattering	= (FinalTileFlags & 0x20u) > 0;
+	const bool bTileContainsDecals							= (FinalTileFlags & 0x40u) > 0;
 #endif // PERMUTATION_WAVE_OPS
 
 	if (LinearIndex < 1 && bTileContainsStrata)
@@ -216,8 +300,32 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 		if(bTileContainsScreenSpaceSubsurfaceScattering && !bTileContainsOpaqueRoughRefraction)
 		{
 			uint WriteToIndex;
-			InterlockedAdd(TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT) + 1], 1, WriteToIndex);
-			SSSWithoutOpaqueRoughRefractionTileListDataBuffer[WriteToIndex] = EncodedTile;
+			InterlockedAdd(TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT_SSS_WITHOUT) + 1], 1, WriteToIndex);
+			OpaqueRoughRefractionSSSWithoutTileListDataBuffer[WriteToIndex] = EncodedTile;
+		}
+	#endif
+
+	#if PERMUTATION_DECAL
+		if (bTileContainsDecals)
+		{
+			if (bTileContainsComplex)
+			{
+				uint WriteToIndex;
+				InterlockedAdd(TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_DECAL_COMPLEX) + 1], 1, WriteToIndex);
+				DecalComplexTileListDataBuffer[WriteToIndex] = EncodedTile;
+			}
+			else if (bTileContainsSingle)
+			{
+				uint WriteToIndex;
+				InterlockedAdd(TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_DECAL_SINGLE) + 1], 1, WriteToIndex);
+				DecalSingleTileListDataBuffer[WriteToIndex] = EncodedTile;
+			}
+			else // (bTileContainsSimple)
+			{
+				uint WriteToIndex;
+				InterlockedAdd(TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_DECAL_SIMPLE) + 1], 1, WriteToIndex);
+				DecalSimpleTileListDataBuffer[WriteToIndex] = EncodedTile;
+			}
 		}
 	#endif
 	}
@@ -235,28 +343,15 @@ void TileMainCS(uint2 DispatchThreadId : SV_DispatchThreadID, uint LinearIndex :
 Buffer<uint>   TileDrawIndirectDataBuffer;
 RWBuffer<uint> TileDispatchIndirectDataBuffer;
 
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void ArgsMainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 {
-	if (all(DispatchThreadId == 0))
+	const uint TileType = DispatchThreadId.x;
+	if (TileType < STRATA_TILE_TYPE_COUNT)
 	{
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SIMPLE)					+ 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SIMPLE)						+ 1];
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SINGLE)					+ 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SINGLE)						+ 1];
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_COMPLEX)					+ 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_COMPLEX)					+ 1];
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT)				+ 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT)				+ 1];
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT)	+ 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT)	+ 1];
-
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SIMPLE)					+ 1] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SINGLE)					+ 1] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_COMPLEX)					+ 1] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT)				+ 1] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT) + 1] = 1;
-
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SIMPLE)					+ 2] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SINGLE)					+ 2] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_COMPLEX)					+ 2] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_ROUGH_REFRACT)				+ 2] = 1;
-		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT)	+ 2] = 1;
+		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(TileType) + 0] = TileDrawIndirectDataBuffer[GetStrataTileTypeDrawIndirectArgOffset_DWord(TileType) + 1];
+		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(TileType) + 1] = 1;
+		TileDispatchIndirectDataBuffer[GetStrataTileTypeDispatchIndirectArgOffset_DWord(TileType) + 2] = 1;
 	}
 }
 
@@ -331,6 +426,9 @@ uint2 LinearCoordToTileCoord(uint InLinear)
 	return uint2(InLinear % OverflowTileCount.x, InLinear / OverflowTileCount.x) + OverflowTileOffset;
 }
 
+#if PERMUTATION_WAVE_OPS && COMPILER_SUPPORTS_WAVE_SIZE
+WAVESIZE(64) // PERMUTATION_WAVE_OPS is true only when wave>=64 are available
+#endif
 [numthreads(STRATA_TILE_SIZE, STRATA_TILE_SIZE, 1)]
 void BSDFTileMainCS(uint2 GroupThreadId : SV_GroupThreadID, uint2 GroupId : SV_GroupID, uint LinearIndex : SV_GroupIndex)
 {

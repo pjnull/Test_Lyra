@@ -3,43 +3,33 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Threading.Tasks;
 using EpicGames.Core;
-using Horde.Build.Jobs.Graphs;
-using Horde.Build.Jobs;
-using Horde.Build.Issues;
-using Horde.Build.Logs;
-using Horde.Build.Users;
-using Horde.Build.Projects;
-using Horde.Build.Streams;
-using Horde.Build.Server;
-using Horde.Build.Tests.Stubs.Services;
-using Horde.Build.Utilities;
-using HordeCommon;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MongoDB.Bson;
 using MongoDB.Driver;
-using Moq;
-using Horde.Build.Issues.Handlers;
-using System.Threading;
 using EpicGames.Horde.Storage;
-using Horde.Build.Storage;
-using Horde.Build.Storage.Backends;
-using Microsoft.Extensions.Caching.Memory;
 using System.Buffers;
+using System.Threading;
+using Horde.Build.Server;
+using Horde.Build.Storage;
+using Horde.Build.Utilities;
 
 namespace Horde.Build.Tests
 {
+	using BackendId = StringId<IStorageBackend>;
+
 	[TestClass]
 	public class BlobStoreTests : TestSetup
 	{
-		IBlobStore CreateBlobStore()
+		async Task<IStorageClient> CreateStorageClientAsync()
 		{
-			return new BasicBlobStore(MongoService, new TransientStorageBackend(), ServiceProvider.GetRequiredService<IMemoryCache>(), ServiceProvider.GetRequiredService<ILogger<BasicBlobStore>>());
+			GlobalConfig globalConfig = new GlobalConfig();
+			globalConfig.Storage.Backends.Add(new BackendConfig { Id = new BackendId("default-backend"), Type = StorageBackendType.Memory });
+			globalConfig.Storage.Namespaces.Add(new NamespaceConfig { Id = new NamespaceId("default"), Backend = new BackendId("default-backend"), GcDelayHrs = 0.0 });
+			await ConfigCollection.AddConfigAsync("globals", globalConfig);
+			Assert.IsNotNull(await GlobalsService.TryUpdateAsync(await GlobalsService.GetAsync(), "globals"));
+
+			return await StorageService.GetClientAsync(new NamespaceId("default"), CancellationToken.None);
 		}
 
 		static byte[] CreateTestData(int length, int seed)
@@ -49,60 +39,134 @@ namespace Horde.Build.Tests
 			return data;
 		}
 
+		class Blob
+		{
+			public ReadOnlyMemory<byte> Data { get; set; } = ReadOnlyMemory<byte>.Empty;
+			public List<BlobLocator> References { get; set; } = new List<BlobLocator>();
+		}
+
+		static Bundle CreateTestBundle(ReadOnlyMemory<byte> data, IReadOnlyList<BlobLocator> refs)
+		{
+			List<BundleImport> imports = new List<BundleImport>();
+
+			Dictionary<BlobLocator, int> locatorToIndex = new Dictionary<BlobLocator, int>();
+			foreach (BlobLocator locator in refs)
+			{
+				int index;
+				if (!locatorToIndex.TryGetValue(locator, out index))
+				{
+					BundleImport import = new BundleImport(locator, new List<(int, IoHash)> { (0, IoHash.Zero) });
+					imports.Add(import);
+					locatorToIndex.Add(locator, imports.Count - 1);
+				}
+			}
+
+			List<BundleExport> exports = new List<BundleExport>();
+			exports.Add(new BundleExport(IoHash.Compute(data.Span), (int)data.Length, refs.Select(x => locatorToIndex[x]).ToArray()));
+
+			List<BundlePacket> packets = new List<BundlePacket>();
+			packets.Add(new BundlePacket((int)data.Length, (int)data.Length));
+
+			BundleHeader header = new BundleHeader(BundleCompressionFormat.None, imports, exports, packets);
+			return new Bundle(header, new[] { data });
+		}
+
+		static async Task<Blob> ReadBlobAsync(IStorageClient store, BlobLocator locator)
+		{
+			Bundle bundle = await store.ReadBundleAsync(locator);
+			return ExtractBlobFromBundle(bundle);
+		}
+
+		static Blob ExtractBlobFromBundle(Bundle bundle)
+		{
+			Blob blob = new Blob();
+			blob.Data = bundle.Packets[0];
+			blob.References = bundle.Header.Exports[0].References.Select(x => bundle.Header.Imports[x].Locator).ToList();
+			return blob;
+		}
+
 		[TestMethod]
 		public async Task LeafTest()
 		{
-			IBlobStore store = CreateBlobStore();
+			IStorageClient store = await CreateStorageClientAsync();
 
 			byte[] input = CreateTestData(256, 0);
+			BlobLocator locator = await store.WriteBundleAsync(CreateTestBundle(input, Array.Empty<BlobLocator>()));
 
-			BlobId blobId = await store.WriteBlobAsync(new ReadOnlySequence<byte>(input), Array.Empty<BlobId>());
-
-			IBlob blob = await store.ReadBlobAsync(blobId);
-			Assert.IsTrue(blob.Data.Span.SequenceEqual(input));
+			Bundle outputBundle = await store.ReadBundleAsync(locator);
+			Assert.IsTrue(outputBundle.Packets[0].Span.SequenceEqual(input));
 		}
 
 		[TestMethod]
 		public async Task ReferenceTest()
 		{
-			IBlobStore store = CreateBlobStore();
+			IStorageClient store = await CreateStorageClientAsync();
 
 			byte[] input1 = CreateTestData(256, 1);
-			BlobId blobId1 = await store.WriteBlobAsync(new ReadOnlySequence<byte>(input1), Array.Empty<BlobId>());
-			IBlob blob1 = await store.ReadBlobAsync(blobId1);
+			BlobLocator locator1 = await store.WriteBundleAsync(CreateTestBundle(input1, Array.Empty<BlobLocator>()));
+			Blob blob1 = await ReadBlobAsync(store, locator1);
 			Assert.IsTrue(blob1.Data.Span.SequenceEqual(input1));
-			Assert.IsTrue(blob1.References.SequenceEqual(Array.Empty<BlobId>()));
+			Assert.IsTrue(blob1.References.SequenceEqual(Array.Empty<BlobLocator>()));
 
 			byte[] input2 = CreateTestData(256, 2);
-			BlobId blobId2 = await store.WriteBlobAsync(new ReadOnlySequence<byte>(input2), new BlobId[] { blob1.Id });
-			IBlob blob2 = await store.ReadBlobAsync(blobId2);
+			BlobLocator locator2 = await store.WriteBundleAsync(CreateTestBundle(input2, new BlobLocator[] { locator1 }));
+			Blob blob2 = await ReadBlobAsync(store, locator2);
 			Assert.IsTrue(blob2.Data.Span.SequenceEqual(input2));
-			Assert.IsTrue(blob2.References.SequenceEqual(new BlobId[] { blob1.Id }));
+			Assert.IsTrue(blob2.References.SequenceEqual(new BlobLocator[] { locator1 }));
 
 			byte[] input3 = CreateTestData(256, 3);
-			BlobId blobId3 = await store.WriteBlobAsync(new ReadOnlySequence<byte>(input3), new BlobId[] { blob1.Id, blob2.Id, blob1.Id });
-			IBlob blob3 = await store.ReadBlobAsync(blobId3);
+			BlobLocator locator3 = await store.WriteBundleAsync(CreateTestBundle(input3, new BlobLocator[] { locator1, locator2, locator1 }));
+			Blob blob3 = await ReadBlobAsync(store, locator3);
 			Assert.IsTrue(blob3.Data.Span.SequenceEqual(input3));
-			Assert.IsTrue(blob3.References.SequenceEqual(new BlobId[] { blob1.Id, blob2.Id, blob1.Id }));
+			Assert.IsTrue(blob3.References.SequenceEqual(new BlobLocator[] { locator1, locator2, locator1 }));
 
 			for(int idx = 0; idx < 2; idx++)
 			{
 				RefName refName = new RefName("hello");
-				await store.WriteRefTargetAsync(refName, blob3.Id);
-				BlobId refTargetId = await store.ReadRefIdAsync(refName);
-				Assert.AreEqual(blob3.Id, refTargetId);
+				await store.WriteRefTargetAsync(refName, new NodeLocator(locator3, 0));
+				NodeLocator refTarget = await store.ReadRefTargetAsync(refName);
+				Assert.AreEqual(locator3, refTarget.Blob);
 			}
 
 			RefName refName2 = new RefName("hello2");
 
-			BlobId refTargetId2 = await store.WriteRefAsync(refName2, new ReadOnlySequence<byte>(input3), new BlobId[] { blob1.Id, blob2.Id });
-			IBlob refTarget2 = await store.ReadBlobAsync(refTargetId2);
+			NodeLocator refTargetId2 = await store.WriteRefAsync(refName2, CreateTestBundle(input3, new BlobLocator[] { locator1, locator2 }), 0);
+			Blob refTarget2 = await ReadBlobAsync(store, refTargetId2.Blob);
 			Assert.IsTrue(refTarget2.Data.Span.SequenceEqual(input3));
-			Assert.IsTrue(refTarget2.References.SequenceEqual(new BlobId[] { blob1.Id, blob2.Id }));
+			Assert.IsTrue(refTarget2.References.SequenceEqual(new BlobLocator[] { locator1, locator2 }));
+		}
 
-			refTarget2 = await store.ReadRefAsync(refName2);
-			Assert.IsTrue(refTarget2.Data.Span.SequenceEqual(input3));
-			Assert.IsTrue(refTarget2.References.SequenceEqual(new BlobId[] { blob1.Id, blob2.Id }));
+		[TestMethod]
+		public async Task RefExpiryTest()
+		{
+			IStorageClient store = await CreateStorageClientAsync();
+			NodeLocator target = new NodeLocator(new BlobLocator(HostId.Empty, new BlobId("test")), 123);
+
+			await store.WriteRefTargetAsync("test-ref-1", target);
+			await store.WriteRefTargetAsync("test-ref-2", target, new RefOptions { Lifetime = TimeSpan.FromMinutes(30.0), Extend = true });
+			await store.WriteRefTargetAsync("test-ref-3", target, new RefOptions { Lifetime = TimeSpan.FromMinutes(30.0), Extend = false });
+
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-1"));
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-2"));
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-3"));
+
+			await Clock.AdvanceAsync(TimeSpan.FromMinutes(25.0));
+
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-1"));
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-2"));
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-3"));
+
+			await Clock.AdvanceAsync(TimeSpan.FromMinutes(25.0));
+
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-1"));
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-2"));
+			Assert.AreEqual(default, await store.TryReadRefTargetAsync("test-ref-3"));
+
+			await Clock.AdvanceAsync(TimeSpan.FromMinutes(35.0));
+
+			Assert.AreEqual(target, await store.TryReadRefTargetAsync("test-ref-1"));
+			Assert.AreEqual(default, await store.TryReadRefTargetAsync("test-ref-2"));
+			Assert.AreEqual(default, await store.TryReadRefTargetAsync("test-ref-3"));
 		}
 	}
 }

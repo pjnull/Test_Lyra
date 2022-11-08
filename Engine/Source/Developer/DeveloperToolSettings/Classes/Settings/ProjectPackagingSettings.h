@@ -368,16 +368,16 @@ public:
 	FString PackageCompressionMethod;
 		
 	/*
-	 * For compressors with variable levels, select the encoder effort level, which makes packages smaller but takes more time to encode.
+	 * For compressors with variable levels, select the compressor effort level, which makes packages smaller but takes more time to encode.
 	 * This does not affect decode speed.  For faster iteration, use lower effort levels (eg. 1)
 	 */
-	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Encoder Effort Level for Debug & Development"))
+	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Compressor Effort Level for Debug & Development"))
 	int32 PackageCompressionLevel_DebugDevelopment;
 	
-	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Encoder Effort Level for Test & Shipping"))
+	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Compressor Effort Level for Test & Shipping"))
 	int32 PackageCompressionLevel_TestShipping;
 	
-	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Encoder Effort Level for Distribution"))
+	UPROPERTY(config, EditAnywhere, Category = Packaging, AdvancedDisplay, meta = (DisplayName = "Compressor Effort Level for Distribution"))
 	int32 PackageCompressionLevel_Distribution;
 
 	/**
@@ -544,7 +544,7 @@ public:
 	TArray<FString> CompressedChunkWildcard;
 
 	UE_DEPRECATED(5.1, "This property is no longer supported. Use IniKeyDenylist.")
-	UPROPERTY(config, EditAnywhere, Category = Packaging)
+	UPROPERTY(config /*, EditAnywhere, Category = Packaging */, meta = (DeprecatedProperty, DeprecationMessage = "This property is no longer supported. Use IniKeyDenylist."))
 	TArray<FString> IniKeyBlacklist;
 
 	/** List of ini file keys to strip when packaging */
@@ -552,7 +552,7 @@ public:
 	TArray<FString> IniKeyDenylist;
 
 	UE_DEPRECATED(5.1, "This property is no longer supported. Use IniSectionDenylist.")
-	UPROPERTY(config, EditAnywhere, Category = Packaging)
+	UPROPERTY(config /*, EditAnywhere, Category = Packaging */, meta = (DeprecatedProperty, DeprecationMessage = "This property is no longer supported. Use IniSectionDenylist."))
 	TArray<FString> IniSectionBlacklist;
 
 	/** List of ini file sections to strip when packaging */

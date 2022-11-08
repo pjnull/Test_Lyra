@@ -2,20 +2,20 @@
 
 #include "SEmptyTab.h"
 
+#include "Framework/Application/SlateApplication.h"
 #include "SWorkspaceWindow.h"
 #include "SPrimaryButton.h"
 #include "SlateUGSStyle.h"
 
 #include "UGSTab.h"
 
-// Todo: delete
-#include "Widgets/Colors/SSimpleGradient.h"
+#include "Widgets/Images/SImage.h"
 
 #define LOCTEXT_NAMESPACE "UGSEmptyTab"
 
-void SEmptyTab::Construct(const FArguments& InArgs)
+void SEmptyTab::Construct(const FArguments& InArgs, UGSTab* InTab)
 {
-	Tab = InArgs._Tab;
+	Tab = InTab;
 
 	this->ChildSlot
 	[
@@ -72,7 +72,7 @@ void SEmptyTab::Construct(const FArguments& InArgs)
 FReply SEmptyTab::OnOpenProjectClicked()
 {
 	FSlateApplication& SlateApplication = FSlateApplication::Get();
-	SlateApplication.AddModalWindow(SNew(SWorkspaceWindow).Tab(Tab), Tab->GetTabArgs().GetOwnerWindow(), false);
+	SlateApplication.AddModalWindow(SNew(SWorkspaceWindow, Tab), Tab->GetTabArgs().GetOwnerWindow(), false);
 
 	return FReply::Handled();
 }

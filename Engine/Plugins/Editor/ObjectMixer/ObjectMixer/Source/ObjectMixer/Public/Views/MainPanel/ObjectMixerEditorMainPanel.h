@@ -4,16 +4,19 @@
 
 #include "ObjectFilter/ObjectMixerEditorObjectFilter.h"
 
+#include "Folder.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Widgets/SWidget.h"
 
-class FObjectMixerEditorListFilter_Collection;
-class UObjectMixerEditorSerializedData;
-struct FObjectMixerEditorListRow;
-class IObjectMixerEditorListFilter;
-class UObjectMixerObjectFilter;
 class FObjectMixerEditorList;
+class FObjectMixerEditorListFilter_Collection;
+class FUICommandList;
+class IObjectMixerEditorListFilter;
 class SObjectMixerEditorMainPanel;
+class UObjectMixerEditorSerializedData;
+class UObjectMixerObjectFilter;
+
+struct FObjectMixerEditorListRow;
 
 DECLARE_MULTICAST_DELEGATE(FOnPreFilterChange)
 DECLARE_MULTICAST_DELEGATE(FOnPostFilterChange)
@@ -28,6 +31,8 @@ public:
 	~FObjectMixerEditorMainPanel() = default;
 
 	void Init();
+	
+	void RegisterAndMapContextMenuCommands();
 
 	TSharedRef<SWidget> GetOrCreateWidget();
 
@@ -43,6 +48,13 @@ public:
 	 * Useful for when the list state has gone stale but the variable count has not changed.
 	 */
 	void RefreshList() const;
+
+	/** Called when the Rename command is executed from the UI or hotkey. */
+	void OnRenameCommand();
+
+	void OnRequestNewFolder(TOptional<FFolder> ExplicitParentFolder = TOptional<FFolder>());
+
+	void OnRequestMoveFolder(const FFolder& FolderToMove, const FFolder& TargetNewParentFolder);
 
 	void RequestSyncEditorSelectionToListSelection() const;
 
@@ -111,38 +123,6 @@ public:
 	const TArray<TSharedRef<IObjectMixerEditorListFilter>>& GetListFilters() const;
 	TArray<TWeakPtr<IObjectMixerEditorListFilter>> GetWeakActiveListFiltersSortedByName() const;
 
-	/**
-	 * Get the rows that have solo visibility. All other rows should be set to temporarily invisible in editor.
-	 */
-	TSet<TWeakPtr<FObjectMixerEditorListRow>> GetSoloRows()
-	{
-		return SoloRows;
-	}
-
-	/**
-	 * Add a row that has solo visibility. This does not set temporary editor invisibility for other rows.
-	 */
-	void AddSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow)
-	{
-		SoloRows.Add(InRow);
-	}
-
-	/**
-	 * Remove a row that does not have solo visibility. This does not set temporary editor invisibility for other rows.
-	 */
-	void RemoveSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow)
-	{
-		SoloRows.Remove(InRow);
-	}
-
-	/**
-	 * Clear the rows that have solo visibility. This does not remove temporary editor invisibility for other rows.
-	 */
-	void ClearSoloRows()
-	{
-		SoloRows.Empty();
-	}
-
 	TSubclassOf<UObjectMixerObjectFilter> GetObjectFilterClass() const
 	{
 		return ObjectFilterClass;
@@ -188,6 +168,9 @@ public:
 	FOnPreFilterChange OnPreFilterChange;
 	FOnPostFilterChange OnPostFilterChange;
 
+	TSharedPtr<FUICommandList> ObjectMixerElementEditCommands;
+	TSharedPtr<FUICommandList> ObjectMixerFolderEditCommands;
+
 private:
 
 	TSharedPtr<SObjectMixerEditorMainPanel> MainPanelWidget;
@@ -205,8 +188,6 @@ private:
 	 * Determines the style of the tree (flat list or hierarchy)
 	 */
 	EObjectMixerTreeViewMode TreeViewMode = EObjectMixerTreeViewMode::Folders;
-
-	TSet<TWeakPtr<FObjectMixerEditorListRow>> SoloRows = {};
 
 	FName ModuleName = NAME_None;
 };

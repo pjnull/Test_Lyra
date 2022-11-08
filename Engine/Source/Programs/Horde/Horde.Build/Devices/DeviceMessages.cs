@@ -343,6 +343,11 @@ namespace Horde.Build.Devices
 		public DateTime? CheckOutTime { get; set; }
 
 		/// <summary>
+		/// When the checkout will expire
+		/// </summary>
+		public DateTime? CheckOutExpirationTime { get; set; }
+
+		/// <summary>
 		/// The last user to modifiy the device
 		/// </summary>
 		public string? ModifiedByUser { get; set; }
@@ -355,7 +360,7 @@ namespace Horde.Build.Devices
 		/// <summary>
 		/// Device response constructor
 		/// </summary>
-		public GetDeviceResponse(string id, string platformId, string poolId, string name, bool enabled, string? address, string? modelId, string? modifiedByUser, string? notes, DateTime? problemTime, DateTime? maintenanceTime, List<DeviceUtilizationTelemetry>? utilization, string? checkedOutByUser = null, DateTime? checkOutTime = null)
+		public GetDeviceResponse(string id, string platformId, string poolId, string name, bool enabled, string? address, string? modelId, string? modifiedByUser, string? notes, DateTime? problemTime, DateTime? maintenanceTime, List<DeviceUtilizationTelemetry>? utilization, string? checkedOutByUser = null, DateTime? checkOutTime = null, DateTime? checkOutExpirationTime = null)
 		{
 			Id = id;
 			Name = name;
@@ -371,6 +376,7 @@ namespace Horde.Build.Devices
 			Utilization = utilization?.Select(u => new GetDeviceUtilizationResponse(u)).ToList();
 			CheckedOutByUserId = checkedOutByUser;
 			CheckOutTime = checkOutTime;
+			CheckOutExpirationTime = checkOutExpirationTime;
 		}
 	}
 
@@ -623,7 +629,6 @@ namespace Horde.Build.Devices
 			ReservationFinishUtc = data.ReservationFinishUtc;
 			ProblemTimeUtc = data.ProblemTimeUtc;
 		}
-
 	}
 
 	/// <summary>
@@ -654,7 +659,6 @@ namespace Horde.Build.Devices
 			Telemetry = telemetry;
 		}
 	}
-
 
 	/// <summary>
 	/// Stream device telemetry for pool snapshot
@@ -702,7 +706,6 @@ namespace Horde.Build.Devices
 			JobName = jobName;
 			StepName = stepName;
 		}
-
 	}
 
 	/// <summary>
@@ -801,9 +804,7 @@ namespace Horde.Build.Devices
 			CreateTimeUtc = createTimeUtc;
 			Telemetry = telemetry;
 		}
-
 	}
-
 
 	// Legacy clients
 
@@ -984,29 +985,5 @@ namespace Horde.Build.Devices
 		/// </summary>
 		[Required]
 		public string DeviceData { get; set; } = null!;
-	}
-
-	/// <summary>
-	/// Platform mapping update for V1 devices
-	/// </summary>
-	public class UpdatePlatformMapRequest
-	{
-		/// <summary>
-		/// Platform name => platform id
-		/// </summary>
-		[Required]
-		public Dictionary<string, string> PlatformMap { get; set; } = null!;
-
-		/// <summary>
-		/// Platform id => name
-		/// </summary>
-		[Required]
-		public Dictionary<string, string> PlatformReverseMap { get; set; } = null!;
-
-		/// <summary>
-		/// Perfspec v1 => model names
-		/// </summary>
-		[Required]
-		public Dictionary<string, string> PerfSpecHighMap { get; set; } = null!;
 	}
 }

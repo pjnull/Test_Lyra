@@ -155,13 +155,41 @@ static bool IsBasePassWaitForTasksEnabled()
 	return CVarRHICmdFlushRenderThreadTasksBasePass.GetValueOnRenderThread() > 0 || CVarRHICmdFlushRenderThreadTasks.GetValueOnRenderThread() > 0;
 }
 
+static bool IsStandardTranslucenyPassSeparated()
+{
+	static const auto TranslucencyStandardSeparatedCVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Translucency.StandardSeparated"));
+	return TranslucencyStandardSeparatedCVar && TranslucencyStandardSeparatedCVar->GetValueOnRenderThread() != 0;
+}
+
+template<uint32 StencilRef> void SetTranslucentPassDepthStencilState(FMeshPassProcessorRenderState& DrawRenderState, bool bDisableDepthTest)
+{
+	if (bDisableDepthTest)
+	{
+		DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
+			false, CF_Always,
+			true , CF_Always, SO_Keep, SO_Keep, SO_Replace,
+			false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
+			StencilRef, StencilRef>::GetRHI());
+		DrawRenderState.SetStencilRef(StencilRef);
+	}
+	else
+	{
+		DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
+			false, CF_DepthNearOrEqual,
+			true , CF_Always, SO_Keep, SO_Keep, SO_Replace,
+			false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
+			StencilRef, StencilRef>::GetRHI());
+		DrawRenderState.SetStencilRef(StencilRef);
+	}
+}
+
 void SetTranslucentRenderState(FMeshPassProcessorRenderState& DrawRenderState, const FMaterial& Material, const EShaderPlatform Platform, ETranslucencyPass::Type InTranslucencyPassType)
 {
 	if (Material.IsStrataMaterial())
 	{
 		if (Material.IsDualBlendingEnabled(Platform))
 		{
-			if (InTranslucencyPassType == ETranslucencyPass::TPT_StandardTranslucency || InTranslucencyPassType == ETranslucencyPass::TPT_AllTranslucency)
+			if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyStandard || InTranslucencyPassType == ETranslucencyPass::TPT_AllTranslucency)
 			{
 				// If we are in the transparancy pass (before DoF) we do standard dual blending, and the alpha gets ignored
 				// Blend by putting add in target 0 and multiply by background in target 1.
@@ -173,7 +201,7 @@ void SetTranslucentRenderState(FMeshPassProcessorRenderState& DrawRenderState, c
 				// Alpha is BF_Zero for source and BF_One for dest, which leaves alpha unchanged
 				DrawRenderState.SetBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_Source1Color, BO_Add, BF_Zero, BF_One>::GetRHI());
 			}
-			else if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyAfterDOFModulate)
+			else if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyAfterDOFModulate || InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyStandardModulate)
 			{
 				// In the separate pass (after DoF) modulate, we want to only darken the target by our multiplication term, and ignore the addition term.
 				// For regular dual blending, our function is:
@@ -213,7 +241,7 @@ void SetTranslucentRenderState(FMeshPassProcessorRenderState& DrawRenderState, c
 		// Special case for dual blending, which is not exposed as a parameter in the material editor
 		if (Material.IsDualBlendingEnabled(Platform))
 		{
-			if (InTranslucencyPassType == ETranslucencyPass::TPT_StandardTranslucency || InTranslucencyPassType == ETranslucencyPass::TPT_AllTranslucency)
+			if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyStandard || InTranslucencyPassType == ETranslucencyPass::TPT_AllTranslucency)
 			{
 				// If we are in the transparancy pass (before DoF) we do standard dual blending, and the alpha gets ignored
 
@@ -226,7 +254,7 @@ void SetTranslucentRenderState(FMeshPassProcessorRenderState& DrawRenderState, c
 				// Alpha is BF_Zero for source and BF_One for dest, which leaves alpha unchanged
 				DrawRenderState.SetBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_Source1Color, BO_Add, BF_Zero, BF_One>::GetRHI());
 			}
-			else if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyAfterDOFModulate)
+			else if (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyAfterDOFModulate || InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyStandardModulate)
 			{
 				// In the separate pass (after DoF) modulate, we want to only darken the target by our multiplication term, and ignore the addition term.
 				// For regular dual blending, our function is:
@@ -288,28 +316,23 @@ void SetTranslucentRenderState(FMeshPassProcessorRenderState& DrawRenderState, c
 	const bool bEnableResponsiveAA = Material.ShouldEnableResponsiveAA();
 	const bool bIsPostMotionBlur = Material.IsTranslucencyAfterMotionBlurEnabled();
 
+	// When separate standard translucent are used, we must mark the distoprtion bit for the composition to happen correctly for any BeforeDoF translucent.
+	const bool bSeparatedStandardTranslucent = (InTranslucencyPassType == ETranslucencyPass::TPT_TranslucencyStandard || InTranslucencyPassType == ETranslucencyPass::TPT_AllTranslucency) && IsStandardTranslucenyPassSeparated();
+
 	if (bEnableResponsiveAA && !bIsPostMotionBlur)
 	{
-		if (bDisableDepthTest)
+		if (bSeparatedStandardTranslucent)
 		{
-			DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
-				false, CF_Always,
-				true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-				false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-				STENCIL_TEMPORAL_RESPONSIVE_AA_MASK, STENCIL_TEMPORAL_RESPONSIVE_AA_MASK
-			>::GetRHI());
-			DrawRenderState.SetStencilRef(STENCIL_TEMPORAL_RESPONSIVE_AA_MASK);
+			SetTranslucentPassDepthStencilState<STENCIL_TEMPORAL_RESPONSIVE_AA_MASK | DISTORTION_STENCIL_MASK_BIT>(DrawRenderState, bDisableDepthTest);
 		}
 		else
 		{
-			DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
-				false, CF_DepthNearOrEqual,
-				true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-				false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-				STENCIL_TEMPORAL_RESPONSIVE_AA_MASK, STENCIL_TEMPORAL_RESPONSIVE_AA_MASK
-			>::GetRHI());
-			DrawRenderState.SetStencilRef(STENCIL_TEMPORAL_RESPONSIVE_AA_MASK);
+			SetTranslucentPassDepthStencilState<STENCIL_TEMPORAL_RESPONSIVE_AA_MASK>(DrawRenderState, bDisableDepthTest);
 		}
+		}
+	else if (bSeparatedStandardTranslucent)
+	{
+		SetTranslucentPassDepthStencilState<DISTORTION_STENCIL_MASK_BIT>(DrawRenderState, bDisableDepthTest);
 	}
 	else if (bDisableDepthTest)
 	{
@@ -354,6 +377,30 @@ FMeshDrawCommandSortKey CalculateBasePassMeshStaticSortKey(EDepthDrawingMode Ear
 	return SortKey;
 }
 
+template<bool bDepthTest, ECompareFunction CompareFunction, uint32 StencilWriteMask>
+void SetDepthStencilStateForBasePass_Internal(FMeshPassProcessorRenderState& InDrawRenderState)
+{
+	InDrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
+		bDepthTest, CompareFunction,
+		true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
+		false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
+		0xFF, StencilWriteMask>::GetRHI());
+}
+
+template<bool bDepthTest, ECompareFunction CompareFunction>
+void SetDepthStencilStateForBasePass_Internal(FMeshPassProcessorRenderState& InDrawRenderState, ERHIFeatureLevel::Type FeatureLevel)
+{	
+	const static bool bStrataDufferPassEnabled = Strata::IsStrataEnabled() && Strata::IsStrataDbufferPassEnabled(GShaderPlatformForFeatureLevel[FeatureLevel]);
+	if (bStrataDufferPassEnabled)
+	{
+		SetDepthStencilStateForBasePass_Internal<bDepthTest, CompareFunction, GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_NORMAL, 1) | GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_DIFFUSE, 1) | GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_ROUGHNESS, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)>(InDrawRenderState);
+	}
+	else
+	{
+		SetDepthStencilStateForBasePass_Internal<bDepthTest, CompareFunction, GET_STENCIL_BIT_MASK(RECEIVE_DECAL, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)>(InDrawRenderState);
+	}
+}
+
 void SetDepthStencilStateForBasePass(
 	FMeshPassProcessorRenderState& DrawRenderState,
 	ERHIFeatureLevel::Type FeatureLevel,
@@ -367,30 +414,15 @@ void SetDepthStencilStateForBasePass(
 	{
 		if (bMaskedInEarlyPass)
 		{
-			DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
-				false, CF_Equal,
-				true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-				false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-				0xFF, GET_STENCIL_BIT_MASK(RECEIVE_DECAL, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)
-			>::GetRHI());
+			SetDepthStencilStateForBasePass_Internal<false, CF_Equal>(DrawRenderState, FeatureLevel);
 		}
 		else if (DrawRenderState.GetDepthStencilAccess() & FExclusiveDepthStencil::DepthWrite)
 		{
-			DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
-				true, CF_GreaterEqual,
-				true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-				false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-				0xFF, GET_STENCIL_BIT_MASK(RECEIVE_DECAL, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)
-			>::GetRHI());
+			SetDepthStencilStateForBasePass_Internal<true, CF_GreaterEqual>(DrawRenderState, FeatureLevel);
 		}
 		else
 		{
-			DrawRenderState.SetDepthStencilState(TStaticDepthStencilState<
-				false, CF_GreaterEqual,
-				true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-				false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-				0xFF, GET_STENCIL_BIT_MASK(RECEIVE_DECAL, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)
-			>::GetRHI());
+			SetDepthStencilStateForBasePass_Internal<false, CF_GreaterEqual>(DrawRenderState, FeatureLevel);
 		}
 	}
 	else if (bMaskedInEarlyPass)
@@ -400,13 +432,7 @@ void SetDepthStencilStateForBasePass(
 
 	if (bForceEnableStencilDitherState)
 	{
-		DrawRenderState.SetDepthStencilState(
-			TStaticDepthStencilState<
-			false, CF_Equal,
-			true, CF_Always, SO_Keep, SO_Keep, SO_Replace,
-			false, CF_Always, SO_Keep, SO_Keep, SO_Keep,
-			0xFF, GET_STENCIL_BIT_MASK(RECEIVE_DECAL, 1) | GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, 1) | STENCIL_LIGHTING_CHANNELS_MASK(0x7)
-			>::GetRHI());
+		SetDepthStencilStateForBasePass_Internal<false, CF_Equal>(DrawRenderState, FeatureLevel);
 	}
 }
 
@@ -847,7 +873,8 @@ void ModifyBasePassCSPSCompilationEnvironment(const FMeshMaterialShaderPermutati
 		OutEnvironment.SetRenderTargetOutputFormat(VelocityIndex, PF_G16R16);
 	}
 
-	if (bIsSingleLayerWater && IsWaterDistanceFieldShadowEnabled(Parameters.Platform))
+	const bool bNeedsSeparateMainDirLightTexture = IsWaterDistanceFieldShadowEnabled(Parameters.Platform) || IsWaterVirtualShadowMapFilteringEnabled(Parameters.Platform);
+	if (bIsSingleLayerWater && bNeedsSeparateMainDirLightTexture)
 	{
 		// See FShaderCompileUtilities::FetchGBufferParamsRuntime for the details
 		const bool bHasTangent = false;
@@ -1695,11 +1722,37 @@ bool FBasePassMeshProcessor::Process(
 	
 	if (bEnableReceiveDecalOutput)
 	{
+		static const bool bStrataDufferPassEnabled = Strata::IsStrataEnabled() && Strata::IsStrataDbufferPassEnabled(GShaderPlatformForFeatureLevel[FeatureLevel]);
+
 		// Set stencil value for this draw call
 		// This is effectively extending the GBuffer using the stencil bits
-		const uint8 StencilValue = GET_STENCIL_BIT_MASK(RECEIVE_DECAL, PrimitiveSceneProxy ? !!PrimitiveSceneProxy->ReceivesDecals() : 0x00)
+		uint8 StencilValue = 0;
+		if (bStrataDufferPassEnabled)
+		{
+			// Set material's decal responsness through stencil bit. This is only used when Strata DBuffer pass is enabled.
+			// This 'stencil marking' allows Strata's DBuffer pass to blend decal appropriately. It is only used for Simple 
+			// and Single materials, as other materials (Complex, ...) get decal applied during the base pass.
+			const uint8 StrataMaterialType	= MaterialResource.MaterialGetStrataMaterialType_RenderThread();
+			const uint32 DecalResponse		= MaterialResource.GetMaterialDecalResponse();
+			const bool bSupportDBufferPass	= StrataMaterialType == 0 || StrataMaterialType == 1; // Simple or single
+			const bool bRoughnessResponse	= bSupportDBufferPass && (DecalResponse == MDR_ColorNormalRoughness || DecalResponse == MDR_ColorRoughness	|| DecalResponse == MDR_NormalRoughness || DecalResponse == MDR_Roughness);
+			const bool bColorResponse		= bSupportDBufferPass && (DecalResponse == MDR_ColorNormalRoughness || DecalResponse == MDR_ColorNormal		|| DecalResponse == MDR_ColorRoughness	|| DecalResponse == MDR_Color);
+			const bool bNormalResponse		= bSupportDBufferPass && (DecalResponse == MDR_ColorNormalRoughness || DecalResponse == MDR_ColorNormal		|| DecalResponse == MDR_NormalRoughness || DecalResponse == MDR_Normal);
+
+			StencilValue =
+			  GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_NORMAL, bNormalResponse ? 0x1 : 0x0)
+			| GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_DIFFUSE, bColorResponse ? 0x1 : 0x0)
+			| GET_STENCIL_BIT_MASK(STRATA_RECEIVE_DBUFFER_ROUGHNESS, bRoughnessResponse ? 0x1 : 0x0)
 			| GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, PrimitiveSceneProxy ? PrimitiveSceneProxy->HasDistanceFieldRepresentation() : 0x00)
 			| STENCIL_LIGHTING_CHANNELS_MASK(PrimitiveSceneProxy ? PrimitiveSceneProxy->GetLightingChannelStencilValue() : 0x00);
+		}
+		else
+		{
+			StencilValue = 
+			  GET_STENCIL_BIT_MASK(RECEIVE_DECAL, PrimitiveSceneProxy ? !!PrimitiveSceneProxy->ReceivesDecals() : 0x00)
+			| GET_STENCIL_BIT_MASK(DISTANCE_FIELD_REPRESENTATION, PrimitiveSceneProxy ? PrimitiveSceneProxy->HasDistanceFieldRepresentation() : 0x00)
+			| STENCIL_LIGHTING_CHANNELS_MASK(PrimitiveSceneProxy ? PrimitiveSceneProxy->GetLightingChannelStencilValue() : 0x00);
+		}
 		DrawRenderState.SetStencilRef(StencilValue);
 	}
 
@@ -1781,8 +1834,13 @@ bool FBasePassMeshProcessor::ShouldDraw(const FMaterial& Material)
 		{
 			switch (TranslucencyPassType)
 			{
-			case ETranslucencyPass::TPT_StandardTranslucency:
+			case ETranslucencyPass::TPT_TranslucencyStandard:
 				bShouldDraw = !Material.IsTranslucencyAfterDOFEnabled() && !Material.IsTranslucencyAfterMotionBlurEnabled();
+				break;
+
+			case ETranslucencyPass::TPT_TranslucencyStandardModulate:
+				bShouldDraw = !Material.IsTranslucencyAfterDOFEnabled() && !Material.IsTranslucencyAfterMotionBlurEnabled() 
+					&& (Material.IsDualBlendingEnabled(GetFeatureLevelShaderPlatform(FeatureLevel)) || BlendMode == BLEND_Modulate || StrataBlendMode == SBM_ColoredTransmittanceOnly);
 				break;
 
 			case ETranslucencyPass::TPT_TranslucencyAfterDOF:
@@ -2247,7 +2305,17 @@ FMeshPassProcessor* CreateTranslucencyStandardPassProcessor(ERHIFeatureLevel::Ty
 
 	const FBasePassMeshProcessor::EFlags Flags = FBasePassMeshProcessor::EFlags::CanUseDepthStencil;
 
-	return new FBasePassMeshProcessor(EMeshPass::TranslucencyStandard, Scene, FeatureLevel, InViewIfDynamicMeshCommand, PassDrawRenderState, InDrawListContext, Flags, ETranslucencyPass::TPT_StandardTranslucency);
+	return new FBasePassMeshProcessor(EMeshPass::TranslucencyStandard, Scene, FeatureLevel, InViewIfDynamicMeshCommand, PassDrawRenderState, InDrawListContext, Flags, ETranslucencyPass::TPT_TranslucencyStandard);
+}
+
+FMeshPassProcessor* CreateTranslucencyStandardModulatePassProcessor(ERHIFeatureLevel::Type FeatureLevel, const FScene* Scene, const FSceneView* InViewIfDynamicMeshCommand, FMeshPassDrawListContext* InDrawListContext)
+{
+	FMeshPassProcessorRenderState PassDrawRenderState;
+	PassDrawRenderState.SetDepthStencilState(TStaticDepthStencilState<false, CF_DepthNearOrEqual>::GetRHI());
+
+	const FBasePassMeshProcessor::EFlags Flags = FBasePassMeshProcessor::EFlags::CanUseDepthStencil;
+
+	return new FBasePassMeshProcessor(EMeshPass::TranslucencyStandardModulate, Scene, FeatureLevel, InViewIfDynamicMeshCommand, PassDrawRenderState, InDrawListContext, Flags, ETranslucencyPass::TPT_TranslucencyStandardModulate);
 }
 
 FMeshPassProcessor* CreateTranslucencyAfterDOFProcessor(ERHIFeatureLevel::Type FeatureLevel, const FScene* Scene, const FSceneView* InViewIfDynamicMeshCommand, FMeshPassDrawListContext* InDrawListContext)
@@ -2291,9 +2359,10 @@ FMeshPassProcessor* CreateTranslucencyAllPassProcessor(ERHIFeatureLevel::Type Fe
 	return new FBasePassMeshProcessor(EMeshPass::TranslucencyAll, Scene, FeatureLevel, InViewIfDynamicMeshCommand, PassDrawRenderState, InDrawListContext, Flags, ETranslucencyPass::TPT_AllTranslucency);
 }
 
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(BasePass, CreateBasePassProcessor, EShadingPath::Deferred, EMeshPass::BasePass, EMeshPassFlags::CachedMeshCommands | EMeshPassFlags::MainView);
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyStandardPass, CreateTranslucencyStandardPassProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyStandard, EMeshPassFlags::MainView);
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyAfterDOFPass, CreateTranslucencyAfterDOFProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterDOF, EMeshPassFlags::MainView);
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyAfterDOFModulatePass, CreateTranslucencyAfterDOFModulateProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterDOFModulate, EMeshPassFlags::MainView);
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyAfterMotionBlurPass, CreateTranslucencyAfterMotionBlurProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterMotionBlur, EMeshPassFlags::MainView);
-REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyAllPass, CreateTranslucencyAllPassProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAll, EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterBasePass(&CreateBasePassProcessor, EShadingPath::Deferred, EMeshPass::BasePass, EMeshPassFlags::CachedMeshCommands | EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterTranslucencyStandardPass(&CreateTranslucencyStandardPassProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyStandard, EMeshPassFlags::MainView);
+REGISTER_MESHPASSPROCESSOR_AND_PSOCOLLECTOR(TranslucencyStandardModulatePass, CreateTranslucencyStandardModulatePassProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyStandardModulate, EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterTranslucencyAfterDOFPass(&CreateTranslucencyAfterDOFProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterDOF, EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterTranslucencyAfterDOFModulatePass(&CreateTranslucencyAfterDOFModulateProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterDOFModulate, EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterTranslucencyAfterMotionBlurPass(&CreateTranslucencyAfterMotionBlurProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAfterMotionBlur, EMeshPassFlags::MainView);
+FRegisterPassProcessorCreateFunction RegisterTranslucencyAllPass(&CreateTranslucencyAllPassProcessor, EShadingPath::Deferred, EMeshPass::TranslucencyAll, EMeshPassFlags::MainView);

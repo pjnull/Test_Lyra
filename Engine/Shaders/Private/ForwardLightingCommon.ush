@@ -9,6 +9,7 @@
 
 #include "DeferredLightingCommon.ush"
 #include "LightGridCommon.ush"
+#include "LightData.ush"
 
 #define FILTER_DIRECTIONAL_LIGHT_SHADOWING 1
 #include "ForwardShadowingCommon.ush"
@@ -121,7 +122,7 @@ float GetIndirectOcclusion(float2 ScreenUV, bool bHasDynamicIndirectShadowCaster
 FDeferredLightingSplit GetForwardDirectLightingSplit(
 	uint GridIndex, float3 TranslatedWorldPosition, float3 CameraVector, FGBufferData GBufferData, float2 ScreenUV, uint PrimitiveId, uint EyeIndex, float Dither, 
 	float InDirectionalLightCloudShadow, float3 InDirectionalLightAtmosphereTransmittance, inout float OutDirectionalLightShadow,
-	bool bSeparateMainDirLightLuminance, inout float3 SeparatedMainDirLightLuminance)
+	bool bSeparateMainDirLightLuminance, inout float3 SeparatedMainDirLightLuminance, bool bSkipDirLightVirtualShadowMapEvaluation)
 {
 	float3 WorldPosition = TranslatedWorldPosition - LWCHackToFloat(PrimaryView.PreViewTranslation);
 
@@ -148,29 +149,20 @@ FDeferredLightingSplit GetForwardDirectLightingSplit(
 	BRANCH
 	if (DirectionalLightData.HasDirectionalLight)
 	{
-		FDeferredLightData LightData = (FDeferredLightData)0;
-		LightData.Color = DirectionalLightData.DirectionalLightColor;
-		LightData.FalloffExponent = 0;
-		LightData.Direction = DirectionalLightData.DirectionalLightDirection;
-		LightData.DistanceFadeMAD = DirectionalLightData.DirectionalLightDistanceFadeMAD;
-		LightData.bRadialLight = false;
-		LightData.SpecularScale = SpecularScale;
-
-		LightData.ShadowedBits = (DirectionalLightData.DirectionalLightShadowMapChannelMask & 0xFF) != 0 ? 1 : 0;
-		// Static shadowing uses ShadowMapChannel, dynamic shadows are packed into light attenuation using PreviewShadowMapChannel
-		LightData.ShadowMapChannelMask = UnpackShadowMapChannelMask(DirectionalLightData.DirectionalLightShadowMapChannelMask);
-		LightData.HairTransmittance = InitHairTransmittanceData();
+		half4 PreviewShadowMapChannelMask = 1;
+		uint  DirLightingChannelMask = LIGHTING_CHANNEL_MASK;
+		FDeferredLightData LightData = ConvertToDeferredLight(DirectionalLightData, SpecularScale, PreviewShadowMapChannelMask, DirLightingChannelMask);
 		#if USE_HAIR_COMPLEX_TRANSMITTANCE
 		if (GBufferData.ShadingModelID == SHADINGMODELID_HAIR)
 		{
 			LightData.HairTransmittance = EvaluateDualScattering(GBufferData, -CameraVector, LightData.Direction);
 		}
 		#endif
+
 		// We want to force the directional light shadow when using water material to see shadow on the water. This could be an option later.
 		#if DISABLE_FORWARD_DIRECTIONAL_LIGHT_SHADOW
 			float4 LightAttenuation = float4(1, 1, 1, 1);
 		#elif ((MATERIALBLENDING_SOLID || MATERIALBLENDING_MASKED) && !MATERIAL_SHADINGMODEL_SINGLELAYERWATER)
-			float4 PreviewShadowMapChannelMask = UnpackShadowMapChannelMask(DirectionalLightData.DirectionalLightShadowMapChannelMask >> 4);
 			float DynamicShadowing = dot(PreviewShadowMapChannelMask, DynamicShadowFactors);
 
 			// In the forward shading path we can't separate per-object shadows from CSM, since we only spend one light attenuation channel per light
@@ -191,14 +183,14 @@ FDeferredLightingSplit GetForwardDirectLightingSplit(
 			bool bUnused = false;
 			float DynamicShadowFactor = ComputeDirectionalLightDynamicShadowing(TranslatedWorldPosition, GBufferData.Depth, bUnused);
 			
-#if VIRTUAL_SHADOW_MAP
+			#if VIRTUAL_SHADOW_MAP
 			BRANCH
-			if ( ForwardLightData.DirectionalLightVSM != INDEX_NONE )
+			if ( !bSkipDirLightVirtualShadowMapEvaluation && ForwardLightData.DirectionalLightVSM != INDEX_NONE )
 			{
 				FVirtualShadowMapSampleResult VirtualShadowMapSample = SampleVirtualShadowMapTranslatedWorld( ForwardLightData.DirectionalLightVSM, TranslatedWorldPosition );
 				DynamicShadowFactor *= VirtualShadowMapSample.ShadowFactor;
 			}
-#endif
+			#endif
 
 			float4 LightAttenuation = float4(DynamicShadowFactor.x, DynamicShadowFactor.x, 1, 1);
 		#endif
@@ -206,7 +198,7 @@ FDeferredLightingSplit GetForwardDirectLightingSplit(
 		FDeferredLightingSplit NewLighting = GetDynamicLightingSplit(TranslatedWorldPosition, -CameraVector, GBufferData, 1, GBufferData.ShadingModelID, LightData, LightAttenuation, Dither, uint2(0,0), OutDirectionalLightShadow);
 
 		FLATTEN
-		if ((DirectionalLightData.DirectionalLightShadowMapChannelMask >> 8) & LightingChannelMask)
+		if (DirLightingChannelMask & LightingChannelMask)
 		{
 		#if ENABLE_FORWARD_CLOUD_SHADOW
 			// This cannot go into LightAttenuation due to some distance based attenuation math being applied.
@@ -241,30 +233,12 @@ FDeferredLightingSplit GetForwardDirectLightingSplit(
 	LOOP
 	for (uint LocalLightListIndex = 0; LocalLightListIndex < NumLocalLights; LocalLightListIndex++)
 	{
+		half4 PreviewShadowMapChannelMask = 1;
+		uint  LocalLightingChannelMask = LIGHTING_CHANNEL_MASK;
 		const FLocalLightData LocalLight = GetLocalLightData(CulledLightsGrid.DataStartIndex + LocalLightListIndex, EyeIndex);
-		 
-		FDeferredLightData LightData = (FDeferredLightData)0;
-		LightData.TranslatedWorldPosition = LocalLight.LightPositionAndInvRadius.xyz;
-		LightData.InvRadius = LocalLight.LightPositionAndInvRadius.w;
-		LightData.Color = LocalLight.LightColorAndFalloffExponent.xyz;
-		LightData.FalloffExponent = LocalLight.LightColorAndFalloffExponent.w;
-		LightData.Direction = LocalLight.LightDirectionAndShadowMask.xyz;
-		LightData.SpotAngles = LocalLight.SpotAnglesAndSourceRadiusPacked.xy;
-		LightData.SourceRadius = LocalLight.SpotAnglesAndSourceRadiusPacked.z;
-		LightData.SourceLength = f16tof32(asuint(LocalLight.SpotAnglesAndSourceRadiusPacked.w));
-		LightData.Tangent = LocalLight.LightTangentAndSoftSourceRadius.xyz;
-		LightData.SoftSourceRadius = LocalLight.LightTangentAndSoftSourceRadius.w;
-		LightData.bInverseSquared = LightData.FalloffExponent == 0;
-		LightData.bRadialLight = true;
-		LightData.bSpotLight = LightData.SpotAngles.x > -2.0f;
-		LightData.SpecularScale = SpecularScale * LocalLight.RectBarnDoorAndVirtualShadowMapIdAndSpecularScale.w;
-		// Initialize rect light once parameters are supported onto FLocalLightData
-		// LightData.RectLightAtlasMaxLevel = LocalLight.RectLightAtlasMaxLevel;
-		// LightData.RectLightAtlasUVOffset = LocalLight.RectLightAtlasUVOffset;
-		// LightData.RectLightAtlasUVScale  = LocalLight.RectLightAtlasUVScale;
-		// LightData.RectLightBarnCosAngle	= DeferredLightUniforms.RectLightBarnCosAngle;
-		// LightData.RectLightBarnLength	= DeferredLightUniforms.RectLightBarnLength;
-		LightData.HairTransmittance = InitHairTransmittanceData();
+		FDeferredLightData LightData = ConvertToDeferredLight(LocalLight, SpecularScale, PreviewShadowMapChannelMask, LocalLightingChannelMask);
+		// Rect light optionally supported in forward.
+		LightData.bRectLight = LightData.bRectLight && SUPPORT_RECTLIGHT_ON_FORWARD_LIT_TRANSLUCENT;
 		#if USE_HAIR_COMPLEX_TRANSMITTANCE
 		if (GBufferData.ShadingModelID == SHADINGMODELID_HAIR)
 		{
@@ -272,24 +246,13 @@ FDeferredLightingSplit GetForwardDirectLightingSplit(
 		}
 		#endif
 
-		// LightType=bits[17:16], LightingChannelMask=[15:8], DynShadowMask=[7:4] ShadowMapChannelMask=[3:0]
-		uint LightTypeAndPackedShadowMapChannelMask = asuint(LocalLight.LightDirectionAndShadowMask.w);
-
-		// TODO: currently LightType is ignored and the code always sets 'LightData.bRectLight' to false (initialization)
-		//       but the light grid adds rect lights as well so this probably leads to artifacts.
-		uint LightType = UnpackLightType(LightTypeAndPackedShadowMapChannelMask);
-
-		LightData.ShadowedBits = (LightTypeAndPackedShadowMapChannelMask & 0xFF) != 0 ? 1 : 0;
-		// Static shadowing uses ShadowMapChannel, dynamic shadows are packed into light attenuation using PreviewShadowMapChannel
-		LightData.ShadowMapChannelMask = UnpackShadowMapChannelMask(LightTypeAndPackedShadowMapChannelMask);
-		float4 PreviewShadowMapChannelMask = UnpackShadowMapChannelMask(LightTypeAndPackedShadowMapChannelMask >> 4);
 		float DynamicShadowing = dot(PreviewShadowMapChannelMask, DynamicShadowFactors);
 		float4 LightAttenuation = float4(1, 1, DynamicShadowing.x, DynamicShadowing.x);
 		float SurfaceShadow = 1.0f;
 		FDeferredLightingSplit NewLighting = GetDynamicLightingSplit(TranslatedWorldPosition, -CameraVector, GBufferData, 1, GBufferData.ShadingModelID, LightData, LightAttenuation, Dither, uint2(0,0), SurfaceShadow);
 
 		FLATTEN
-		if ((LightTypeAndPackedShadowMapChannelMask >> 8) & LightingChannelMask)
+		if (LocalLightingChannelMask & LightingChannelMask)
 		{
 			DirectLighting.DiffuseLighting += NewLighting.DiffuseLighting;
 			DirectLighting.SpecularLighting += NewLighting.SpecularLighting;
@@ -352,14 +315,8 @@ float3 GetForwardDirectLightingForVertexLighting(uint GridIndex, float3 Translat
 	for (uint LocalLightListIndex = 0; LocalLightListIndex < NumLocalLights; LocalLightListIndex++)
 	{
 		const FLocalLightData LocalLight = GetLocalLightData(CulledLightsGrid.DataStartIndex + LocalLightListIndex, EyeIndex);
-		 
-		FSimpleDeferredLightData LightData = (FSimpleDeferredLightData)0;
-		LightData.TranslatedWorldPosition = LocalLight.LightPositionAndInvRadius.xyz;
-		LightData.InvRadius = LocalLight.LightPositionAndInvRadius.w;
-		LightData.Color = LocalLight.LightColorAndFalloffExponent.xyz;
-		LightData.FalloffExponent = LocalLight.LightColorAndFalloffExponent.w;
-		LightData.bInverseSquared = LightData.FalloffExponent == 0;
-						
+		const FSimpleDeferredLightData LightData = ConvertToSimpleLight(LocalLight);
+
 		// No specular for vertex lighting
 		float3 CameraVector = 0;
 		float3 SpecularColor = 0;
@@ -405,7 +362,7 @@ half3 GetImageBasedReflectionSpecular(FMaterialPixelParameters MaterialParameter
 	
 	bUseLumenFrontLayerReflection = UseFrontLayerReflection(MaterialParameters.ViewBufferUV, MaterialParameters.ScreenPosition.w);
 
-	FRadianceCacheCoverage LumenRadianceCacheCoverage;
+	FRadianceCacheCoverage LumenRadianceCacheCoverage = InitRadianceCacheCoverage();
 	LumenRadianceCacheCoverage.bValid = false;
 
 	// Lumen Radiance Cache for reflections on translucency

@@ -15,6 +15,7 @@
 #include "Misc/StringBuilder.h"
 #include "HAL/IConsoleManager.h"
 #include "Containers/LazyPrintf.h"
+#include "Containers/StringView.h"
 
 #if !UE_BUILD_SHIPPING 
 /**
@@ -79,7 +80,7 @@ public:
 	}
 };
 
-void ConsoleCommandLibrary_DumpLibrary(UWorld* InWorld, FExec& SubSystem, const FString& Pattern, FOutputDevice& Ar)
+bool ConsoleCommandLibrary_DumpLibrary(UWorld* InWorld, FExec& SubSystem, const FString& Pattern, FOutputDevice& Ar)
 {
 	ConsoleCommandLibrary LocalConsoleCommandLibrary(Pattern);
 
@@ -110,9 +111,11 @@ void ConsoleCommandLibrary_DumpLibrary(UWorld* InWorld, FExec& SubSystem, const 
 		Ar.Logf(TEXT("ERROR: The function was supposed to only find matching commands but not have any side effect."));
 		Ar.Logf(TEXT("However Exec() returned true which means we either executed a command or the command parsing returned true where it shouldn't."));
 	}
+
+	return true;
 }
 
-void ConsoleCommandLibrary_DumpLibraryHTML(UWorld* InWorld, FExec& SubSystem, const FString& OutPath)
+bool ConsoleCommandLibrary_DumpLibraryHTML(UWorld* InWorld, FExec& SubSystem, const FString& OutPath)
 {
 	const FString& Pattern(TEXT("*"));
 	ConsoleCommandLibrary LocalConsoleCommandLibrary(Pattern);
@@ -205,9 +208,12 @@ void ConsoleCommandLibrary_DumpLibraryHTML(UWorld* InWorld, FExec& SubSystem, co
 
 			delete File;
 			File = 0;
+
+			return true;
 		}
 	}
 
+	return false;
 /*
 	// the pattern (e.g. Motion*) should not really trigger the execution
 	if(bExecuted)
@@ -788,7 +794,7 @@ bool FParse::Token( const TCHAR*& Str, TCHAR* Result, int32 MaxLen, bool UseEsca
 		while( *Str && *Str!=TEXT('"') && (Len+1)<MaxLen )
 		{
 			TCHAR c = *Str++;
-			if( c=='\\' && UseEscape )
+			if( c==TEXT('\\') && UseEscape )
 			{
 				// Get escape.
 				c = *Str++;
@@ -849,12 +855,12 @@ bool FParse::Token( const TCHAR*& Str, TCHAR* Result, int32 MaxLen, bool UseEsca
 		}
 	}
 	Result[Len] = TCHAR('\0');
-	return Len != TCHAR('\0');
+	return Len != 0;
 }
 
 bool FParse::Token( const TCHAR*& Str, FString& Arg, bool UseEscape )
 {
-	Arg.Empty();
+	Arg.Reset();
 
 	// Skip preceeding spaces and tabs.
 	while( FChar::IsWhitespace(*Str) )
@@ -927,20 +933,21 @@ bool FParse::Token( const TCHAR*& Str, FString& Arg, bool UseEscape )
 }
 FString FParse::Token( const TCHAR*& Str, bool UseEscape )
 {
-	TCHAR Buffer[1024];
-	if (FParse::Token(Str, Buffer, UE_ARRAY_COUNT(Buffer), UseEscape))
-	{
-		return Buffer;
-	}
-	else
-	{
-		return TEXT("");
-	}
+	FString Token;
+
+	// Preallocate some memory to avoid constant reallocations.
+	Token.Reserve(1023);
+
+	FParse::Token(Str, Token, UseEscape);
+	
+	Token.Shrink();
+
+	return MoveTemp(Token);
 }
 
 bool FParse::AlnumToken(const TCHAR*& Str, FString& Arg)
 {
-	Arg.Empty();
+	Arg.Reset();
 
 	// Skip preceeding spaces and tabs.
 	while (FChar::IsWhitespace(*Str))
@@ -1025,11 +1032,20 @@ bool FParse::Line(const TCHAR** Stream, TCHAR* Result, int32 MaxLen, bool bExact
 
 bool FParse::Line(const TCHAR** Stream, FString& Result, bool bExact)
 {
+	FStringView View;
+	bool bReturnValue = Line(Stream, View, bExact);
+	Result = View;
+	return bReturnValue;
+}
+
+bool FParse::Line(const TCHAR** Stream, FStringView& Result, bool bExact)
+{
 	bool bGotStream = false;
 	bool bIsQuoted = false;
 	bool bIgnore = false;
 
 	Result.Reset();
+	const TCHAR* StartOfLine = nullptr;
 
 	while (**Stream != TEXT('\0') && **Stream != TEXT('\n') && **Stream != TEXT('\r'))
 	{
@@ -1050,14 +1066,19 @@ bool FParse::Line(const TCHAR** Stream, FString& Result, bool bExact)
 		bGotStream = true;
 
 		// Got stuff.
-		if (!bIgnore)
+		if (!bIgnore && !StartOfLine)
 		{
-			Result.AppendChar(*((*Stream)++));
+			StartOfLine = (*Stream)++;
 		}
 		else
 		{
 			(*Stream)++;
 		}
+	}
+
+	if (StartOfLine)
+	{
+		Result = FStringView(StartOfLine, int32((*Stream) - StartOfLine));
 	}
 
 	if (bExact)

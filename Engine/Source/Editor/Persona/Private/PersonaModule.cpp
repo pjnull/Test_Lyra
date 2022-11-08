@@ -97,6 +97,9 @@
 #include "SkeletalMeshReferenceSectionDetails.h"
 #include "PersonaToolMenuContext.h"
 #include "ToolMenu.h"
+#include "ContentBrowserMenuContexts.h"
+#include "SAssetView.h"
+#include "ToolMenus.h"
 
 IMPLEMENT_MODULE( FPersonaModule, Persona );
 
@@ -154,6 +157,8 @@ void FPersonaModule::StartupModule()
 	FKismetEditorUtilities::RegisterOnBlueprintCreatedCallback(this, UAnimNotifyState::StaticClass(), FKismetEditorUtilities::FOnBlueprintCreated::CreateRaw(this, &FPersonaModule::HandleNewAnimNotifyStateBlueprintCreated));
 
 	GetMutableDefault<UPersonaOptions>()->SetFlags(RF_Transactional);
+
+	RegisterToolMenuExtensions();
 }
 
 void FPersonaModule::ShutdownModule()
@@ -232,6 +237,16 @@ TSharedRef<IPersonaToolkit> FPersonaModule::CreatePersonaToolkit(UPhysicsAsset* 
 TSharedRef<class IAssetFamily> FPersonaModule::CreatePersonaAssetFamily(const UObject* InAsset) const
 {
 	return FPersonaAssetFamilyManager::Get().CreatePersonaAssetFamily(InAsset);
+}
+
+void FPersonaModule::BroadcastAssetFamilyChange() const
+{
+	return FPersonaAssetFamilyManager::Get().BroadcastAssetFamilyChange();
+}
+
+void FPersonaModule::RecordAssetOpened(const FAssetData& InAssetData) const
+{
+	return FPersonaAssetFamilyManager::Get().RecordAssetOpened(InAssetData);
 }
 
 TSharedRef<SWidget> FPersonaModule::CreateAssetFamilyShortcutWidget(const TSharedRef<class FWorkflowCentricApplication>& InHostingApp, const TSharedRef<class IAssetFamily>& InAssetFamily) const
@@ -515,7 +530,7 @@ void FPersonaModule::TestSkeletonCurveNamesForUse(const TSharedRef<IEditableSkel
 		{
 			const FText LoadingStatusUpdate = FText::Format(LOCTEXT("VerifyCurves_LoadingAllAnimations", "Loading all animations for skeleton '{0}'"), FText::FromString(Skeleton.GetName()));
 			{
-				FScopedSlowTask LoadingAnimSlowTask(Animations.Num(), LoadingStatusUpdate);
+				FScopedSlowTask LoadingAnimSlowTask(static_cast<float>(Animations.Num()), LoadingStatusUpdate);
 				LoadingAnimSlowTask.MakeDialog();
 
 				// Loop through all animations to load then, this makes sure smart names are all up to date
@@ -532,7 +547,7 @@ void FPersonaModule::TestSkeletonCurveNamesForUse(const TSharedRef<IEditableSkel
 
 			const FText ProcessingStatusUpdate = FText::Format(LOCTEXT("VerifyCurves_ProcessingCurveUsage", "Looking at curve useage for each skeletal mesh of skeleton '{0}'"), FText::FromString(Skeleton.GetName()));
 			{
-				FScopedSlowTask LoadingSkelMeshSlowTask(SkeletalMeshes.Num(), ProcessingStatusUpdate);
+				FScopedSlowTask LoadingSkelMeshSlowTask(static_cast<float>(SkeletalMeshes.Num()), ProcessingStatusUpdate);
 				LoadingSkelMeshSlowTask.MakeDialog();
 
 				for (int32 MeshIdx = 0; MeshIdx < SkeletalMeshes.Num(); ++MeshIdx)
@@ -581,7 +596,7 @@ void FPersonaModule::TestSkeletonCurveNamesForUse(const TSharedRef<IEditableSkel
 
 			const FText ProcessingAnimStatusUpdate = FText::Format(LOCTEXT("FindUnusedCurves_ProcessingSkeletalMeshes", "Finding animations that reference unused curves on skeleton '{0}'"), FText::FromString(Skeleton.GetName()));
 			{
-				FScopedSlowTask ProcessingAnimationsSlowTask(Animations.Num(), ProcessingAnimStatusUpdate);
+				FScopedSlowTask ProcessingAnimationsSlowTask(static_cast<float>(Animations.Num()), ProcessingAnimStatusUpdate);
 				ProcessingAnimationsSlowTask.MakeDialog();
 
 				for (const FAssetData& Anim : Animations)
@@ -927,7 +942,7 @@ namespace UE::Persona::Private
 					FString TagValue;
 					if (AssetData.GetTagValue("Skeleton", TagValue))
 					{
-						return !InWeakPersonaToolkit.Pin()->GetSkeleton()->IsCompatibleSkeletonByAssetData(AssetData);
+						return !InWeakPersonaToolkit.Pin()->GetSkeleton()->IsCompatibleForEditor(AssetData);
 					}
 				}
 				return true;
@@ -988,7 +1003,7 @@ namespace UE::Persona::Private
 					FString TagValue;
 					if (AssetData.GetTagValue("Skeleton", TagValue))
 					{
-						return !InWeakPersonaToolkit.Pin()->GetSkeleton()->IsCompatibleSkeletonByAssetData(AssetData);
+						return !InWeakPersonaToolkit.Pin()->GetSkeleton()->IsCompatibleForEditor(AssetData);
 					}
 				}
 				return true;
@@ -1646,6 +1661,76 @@ TSharedRef<SWidget> FPersonaModule::CreateBlendSpaceEditWidget(UBlendSpace* InBl
 		.PreviewPosition(InArgs.PreviewPosition)
 		.PreviewFilteredPosition(InArgs.PreviewFilteredPosition)
 		.StatusBarName(InArgs.StatusBarName);
+}
+
+void FPersonaModule::RegisterToolMenuExtensions()
+{
+	// Register content browser menu extensions
+	UToolMenu* ToolMenu = UToolMenus::Get()->ExtendMenu("ContentBrowser.AssetViewOptions");
+	ToolMenu->AddDynamicSection("AnimationAssets", FNewToolMenuDelegate::CreateLambda([](UToolMenu* InMenu)
+	{
+		if(UContentBrowserAssetViewContextMenuContext* MenuContext = InMenu->Context.FindContext<UContentBrowserAssetViewContextMenuContext>())
+		{
+			if(TSharedPtr<SAssetView> AssetView = MenuContext->AssetView.Pin())
+			{
+				// Check whether this asset view is showing animation-related assets
+				TArray<FTopLevelAssetPath> BaseAnimAssetClassPaths =
+				{
+					UAnimationAsset::StaticClass()->GetClassPathName(),
+					UAnimBlueprint::StaticClass()->GetClassPathName(),
+					USkeletalMesh::StaticClass()->GetClassPathName(),
+					USkeleton::StaticClass()->GetClassPathName()
+				};
+				TSet<FTopLevelAssetPath> AnimAssetClassPaths;
+				IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+				AssetRegistry.GetDerivedClassNames(BaseAnimAssetClassPaths, TSet<FTopLevelAssetPath>(), AnimAssetClassPaths);
+
+				auto AssetClassMatches = [&AnimAssetClassPaths](const FTopLevelAssetPath& InPath)
+				{
+					for(const FTopLevelAssetPath& Path : AnimAssetClassPaths)
+					{
+						if(InPath == Path)
+						{
+							return true;
+						}
+					}
+					return false;
+				};
+
+				// Add a menu item to allow incompatible skeletons to be selected if this is selecting animation assets
+				const FARFilter& BackendFilter = AssetView->GetBackendFilter();
+				if(BackendFilter.ClassPaths.ContainsByPredicate(AssetClassMatches))
+				{
+					FToolMenuSection& Section = InMenu->AddSection("AnimationAssets", LOCTEXT("AnimationAssetsSection", "Animation Assets"));
+					Section.AddMenuEntry(
+						"AllowIncompatibleSkeletons",
+						LOCTEXT("AllowIncompatibleSkeletons", "Allow Incompatible Skeletons"),
+						LOCTEXT("AllowIncompatibleSkeletonsTooltip", "Whether to allow animation assets that are incompatible with the current skeleton/skeletal mesh to be selected."),
+						FSlateIcon(),
+						FToolUIActionChoice(
+							FUIAction(
+								FExecuteAction::CreateLambda([WeakAssetView = TWeakPtr<SAssetView>(AssetView)]()
+								{
+									UPersonaOptions* PersonaOptions = GetMutableDefault<UPersonaOptions>();
+									PersonaOptions->bAllowIncompatibleSkeletonSelection = !PersonaOptions->bAllowIncompatibleSkeletonSelection;
+									if(TSharedPtr<SAssetView> AssetView = WeakAssetView.Pin())
+									{
+										AssetView->RequestSlowFullListRefresh();
+									}
+								}),
+								FCanExecuteAction(),
+								FIsActionChecked::CreateLambda([]()
+								{
+									return GetDefault<UPersonaOptions>()->bAllowIncompatibleSkeletonSelection;
+								})
+							)
+						),
+						EUserInterfaceActionType::ToggleButton
+					);
+				}
+			}
+		}
+	}));
 }
 
 #undef LOCTEXT_NAMESPACE

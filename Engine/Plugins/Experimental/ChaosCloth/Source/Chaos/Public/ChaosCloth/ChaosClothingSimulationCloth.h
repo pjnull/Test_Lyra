@@ -14,7 +14,7 @@ namespace Chaos
 	class FClothingSimulationCollider;
 
 	// Cloth simulation node
-	class FClothingSimulationCloth final
+	class CHAOSCLOTH_API FClothingSimulationCloth final
 	{
 	public:
 		enum EMassMode
@@ -27,7 +27,9 @@ namespace Chaos
 		typedef FClothConstraints::ETetherMode ETetherMode;
 
 		FClothingSimulationCloth(
+PRAGMA_DISABLE_DEPRECATION_WARNINGS  // TODO: CHAOS_IS_CLOTHINGSIMULATIONMESH_ABSTRACT
 			FClothingSimulationMesh* InMesh,
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			TArray<FClothingSimulationCollider*>&& InColliders,
 			uint32 InGroupId,
 			EMassMode InMassMode,
@@ -72,8 +74,15 @@ namespace Chaos
 			bool bInUseSelfIntersections,
 			bool bInUseLegacyBackstop,
 			bool bInUseLODIndexOverride,
-			int32 InLODIndexOverride);
+			int32 InLODIndexOverride,
+			const TVec2<FRealSingle>& EdgeDampingRatio = TVec2<FRealSingle>(0.f),
+			const TVec2<FRealSingle>& BendDampingRatio = TVec2<FRealSingle>(0.f));
 		~FClothingSimulationCloth();
+
+		FClothingSimulationCloth(const FClothingSimulationCloth&) = delete;
+		FClothingSimulationCloth(FClothingSimulationCloth&&) = delete;
+		FClothingSimulationCloth& operator=(const FClothingSimulationCloth&) = delete;
+		FClothingSimulationCloth& operator=(FClothingSimulationCloth&&) = delete;
 
 		uint32 GetGroupId() const { return GroupId; }
 		uint32 GetLODIndex(const FClothingSimulationSolver* Solver) const { return LODIndices.FindChecked(Solver); }
@@ -101,8 +110,10 @@ namespace Chaos
 		// ---- End of the animatable property setters ----
 
 		// ---- Node property getters/setters
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS  // TODO: CHAOS_IS_CLOTHINGSIMULATIONMESH_ABSTRACT
 		FClothingSimulationMesh* GetMesh() const { return Mesh; }
 		void SetMesh(FClothingSimulationMesh* InMesh);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		const TArray<FClothingSimulationCollider*>& GetColliders() const { return Colliders; }
 		void SetColliders(TArray<FClothingSimulationCollider*>&& InColliders);
@@ -156,53 +167,21 @@ namespace Chaos
 		int32 GetOffset(const FClothingSimulationSolver* Solver, int32 InLODIndex) const;
 
 	private:
-		struct FLODData
-		{
-			// Input mesh
-			const int32 NumParticles;
-			const TConstArrayView<uint32> Indices;
-			const TArray<TConstArrayView<FRealSingle>> WeightMaps;
-			const TArray<TConstArrayView<TTuple<int32, int32, FRealSingle>>> Tethers;
-
-			// Per Solver data
-			struct FSolverData
-			{
-				int32 Offset;
-				FTriangleMesh TriangleMesh;  // TODO: Triangle Mesh shouldn't really be solver dependent (ie not use an offset)
-			};
-			TMap<FClothingSimulationSolver*, FSolverData> SolverData;
-
-			// Stats
-			int32 NumKinenamicParticles;
-			int32 NumDynammicParticles;
-
-			FLODData(
-				int32 InNumParticles,
-				const TConstArrayView<uint32>& InIndices,
-				const TArray<TConstArrayView<FRealSingle>>& InWeightMaps,
-				const TArray<TConstArrayView<TTuple<int32, int32, FRealSingle>>>& InTethers);
-
-			void Add(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, int32 LODIndex);
-			void Remove(FClothingSimulationSolver* Solver);
-
-			void Update(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth);
-
-			void Enable(FClothingSimulationSolver* Solver, bool bEnable) const;
-
-			void ResetStartPose(FClothingSimulationSolver* Solver) const;
-
-			void UpdateNormals(FClothingSimulationSolver* Solver) const;
-		};
+		struct FLODData;
 
 		// Cloth parameters
+PRAGMA_DISABLE_DEPRECATION_WARNINGS  // TODO: CHAOS_IS_CLOTHINGSIMULATIONMESH_ABSTRACT
 		FClothingSimulationMesh* Mesh;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		TArray<FClothingSimulationCollider*> Colliders;
 		uint32 GroupId;
 		EMassMode MassMode;
 		FRealSingle MassValue;
 		FRealSingle MinPerParticleMass;
 		TVec2<FRealSingle> EdgeStiffness;
+		TVec2<FRealSingle> EdgeDampingRatio;
 		TVec2<FRealSingle> BendingStiffness;
+		TVec2<FRealSingle> BendingDampingRatio;
 		FRealSingle BucklingRatio;
 		TVec2<FRealSingle> BucklingStiffness;
 		bool bUseBendingElements;
@@ -251,7 +230,7 @@ namespace Chaos
 		FRigidTransform3 ReferenceSpaceTransform;  // TODO: Add override in the style of LODIndexOverride
 
 		// LOD data
-		TArray<FLODData> LODData;
+		TArray<TUniquePtr<FLODData>> LODData;
 		TMap<FClothingSimulationSolver*, int32> LODIndices;
 
 		// Stats

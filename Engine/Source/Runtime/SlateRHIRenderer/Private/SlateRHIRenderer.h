@@ -237,6 +237,7 @@ public:
 	virtual void InvalidateAllViewports() override;
 
 	virtual void PrepareToTakeScreenshot(const FIntRect& Rect, TArray<FColor>* OutColorData, SWindow* ScreenshotWindow) override;
+	virtual void PrepareToTakeHDRScreenshot(const FIntRect& Rect, TArray<FLinearColor>* OutColorData, SWindow* ScreenshotWindow) override;
 
 	virtual void SetWindowRenderTarget(const SWindow& Window, class IViewportRenderTargetProvider* Provider) override;
 
@@ -267,6 +268,8 @@ private:
 	 * have already been used on the game thread at the time they were released.
 	 */
 	void CleanUpdatableTextures();
+
+	virtual void OnVirtualDesktopSizeChanged(const FDisplayMetrics& NewDisplayMetric);
 
 private:
 	/** A mapping of SWindows to their RHI implementation */
@@ -301,9 +304,11 @@ private:
 
 	bool bIsStandaloneStereoOnlyDevice;
 	bool bTakingAScreenShot;
+	bool bUpdateHDRDisplayInformation;
 	FIntRect ScreenshotRect;
 	FViewportInfo* ScreenshotViewportInfo;
 	TArray<FColor>* OutScreenshotData;
+	TArray<FLinearColor>* OutHDRScreenshotData;
 
 	/** These are state management variables for Scenes on the game thread. A similar copy exists on the RHI Rendering Policy for the rendering thread.*/
 	TArray<FSceneInterface*, TInlineAllocator<4>> ActiveScenes;

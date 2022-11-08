@@ -35,6 +35,7 @@ public:
 	virtual void EndUserInteraction() const override;
 	virtual void MoveTo(const FVector2D& NewPosition, FNodeSet& NodeFilter, bool bMarkDirty = true) override;
 	virtual void AddPin( const TSharedRef<SGraphPin>& PinToAdd ) override;
+	virtual void CreateStandardPinWidget(UEdGraphPin* CurPin) override;
 	virtual void SetDefaultTitleAreaWidget(TSharedRef<SOverlay> DefaultTitleAreaWidget) override
 	{
 		TitleAreaWidget = DefaultTitleAreaWidget;
@@ -52,6 +53,9 @@ public:
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 	virtual bool IsHidingPinWidgets() const override { return UseLowDetailNodeContent(); }
 	virtual bool UseLowDetailPinNames() const override;
+	virtual void UpdateGraphNode() override;
+	void UpdateStandardNode();
+	void UpdateCompactNode();
 
 	void CreateAggregateAddPinButton();
 
@@ -76,6 +80,7 @@ private:
 	FReply HandleAddArrayElement(FString InModelPinPath);
 
 	void HandleNodeTitleDirtied();
+	void HandleNodePinsChanged();
 
 	FText GetInstructionCountText() const;
 	FText GetInstructionDurationText() const;
@@ -87,6 +92,7 @@ private:
 	const FSlateBrush * GetExpanderImage(int32 InPinInfoIndex, bool bLeft, bool bHovered) const;
 	FReply OnExpanderArrowClicked(int32 InPinInfoIndex);
 	void HandleModifiedEvent(ERigVMGraphNotifType InNotifType, URigVMGraph* InGraph, UObject* InSubject);
+	void UpdatePinTreeView();
 
 	/** Cached widget title area */
 	TSharedPtr<SOverlay> TitleAreaWidget;
@@ -121,7 +127,34 @@ private:
 		bool bExpanded;
 		bool bAutoHeight;
 	};
+
+	
+	/**
+	 * Simple tagging metadata
+	 */
+	class FPinInfoMetaData : public ISlateMetaData
+	{
+	public:
+		SLATE_METADATA_TYPE(FPinInfoMetaData, ISlateMetaData)
+
+		FPinInfoMetaData(const FString& InCPPType, const FString& InBoundVariableName)
+		: CPPType(InCPPType)
+		, BoundVariableName(InBoundVariableName)
+		{}
+
+		FString CPPType;
+		FString BoundVariableName;
+	};
 	
 	TArray<FPinInfo> PinInfos;
 	TWeakObjectPtr<URigVMNode> ModelNode;
+
+	// Pins to keep after calling HandleNodePinsChanged. We recycle these pins in
+	// CreateStandardPinWidget.
+	TMap<const UEdGraphPin *, TSharedRef<SGraphPin>> PinsToKeep;
+
+	// Delayed pin deletion. To deal with the fact that pin deletion cannot occur until we
+	// have re-generated the pin list. SControlRigGraphNode has already relinquished them
+	// but we still have a pointer to them in our pin widget.
+	TSet<UEdGraphPin *> PinsToDelete;
 };

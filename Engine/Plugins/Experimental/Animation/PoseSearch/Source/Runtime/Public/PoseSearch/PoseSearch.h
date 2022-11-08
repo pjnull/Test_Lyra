@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Async/ParallelFor.h"
 #include "BonePose.h"
 #include "CoreMinimal.h"
 #include "Containers/RingBuffer.h"
@@ -43,6 +44,18 @@ struct FPoseSearchDatabaseDerivedData;
 class UAnimNotifyState_PoseSearchBase;
 class UPoseSearchSchema;
 class FBlake3;
+
+#ifndef UE_POSE_SEARCH_FORCE_SINGLE_THREAD
+#define UE_POSE_SEARCH_FORCE_SINGLE_THREAD 0
+#endif
+
+#if UE_POSE_SEARCH_FORCE_SINGLE_THREAD
+constexpr EParallelForFlags ParallelForFlags = EParallelForFlags::ForceSingleThread;
+#else
+constexpr EParallelForFlags ParallelForFlags = EParallelForFlags::None;
+#endif // UE_POSE_SEARCH_FORCE_SINGLE_THREAD
+
+
 
 namespace UE::PoseSearch
 {
@@ -141,7 +154,6 @@ enum class EPoseSearchMirrorOption : int32
 	Invalid = Num UMETA(Hidden)
 };
 
-
 //////////////////////////////////////////////////////////////////////////
 // Common structs
 
@@ -189,10 +201,8 @@ struct POSESEARCH_API FAssetSamplingContext
 	// Time delta used for computing pose derivatives
 	static constexpr float FiniteDelta = 1 / 60.0f;
 
-	FBoneContainer BoneContainer;
-
 	// Mirror data table pointer copied from Schema for convenience
-	TObjectPtr<UMirrorDataTable> MirrorDataTable = nullptr;
+	TObjectPtr<const UMirrorDataTable> MirrorDataTable;
 
 	// Compact pose format of Mirror Bone Map
 	TCustomBoneIndexArray<FCompactPoseBoneIndex, FCompactPoseBoneIndex> CompactPoseMirrorBones;
@@ -201,7 +211,7 @@ struct POSESEARCH_API FAssetSamplingContext
 	// Only initialized and used when a mirroring table is specified
 	TCustomBoneIndexArray<FQuat, FCompactPoseBoneIndex> ComponentSpaceRefRotations;
 
-	void Init(const UPoseSearchSchema* Schema);
+	void Init(const UMirrorDataTable* InMirrorDataTable, const FBoneContainer& BoneContainer);
 	FTransform MirrorTransform(const FTransform& Transform) const;
 };
 
@@ -241,6 +251,91 @@ public:
 	virtual void ExtractPoseSearchNotifyStates(float Time, TArray<UAnimNotifyState_PoseSearchBase*>& NotifyStates) const = 0;
 
 	virtual const UAnimationAsset* GetAsset() const = 0;
+
+	virtual void Process() = 0;
+};
+
+struct POSESEARCH_API FSequenceSampler : public IAssetSampler
+{
+public:
+	struct FInput
+	{
+		TWeakObjectPtr<const UAnimSequence> Sequence;
+		int32 RootDistanceSamplingRate = 60;
+		FPoseSearchExtrapolationParameters ExtrapolationParameters;
+	} Input;
+
+	void Init(const FInput& Input);
+	virtual void Process() override;
+
+	virtual float GetPlayLength() const override { return Input.Sequence->GetPlayLength(); }
+	virtual bool IsLoopable() const override;
+
+	virtual float GetTimeFromRootDistance(float Distance) const override;
+
+	virtual float GetTotalRootDistance() const override { return TotalRootDistance; }
+	virtual FTransform GetTotalRootTransform() const override { return TotalRootTransform; }
+
+	virtual void ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const override;
+	virtual float ExtractRootDistance(float Time) const override;
+	virtual FTransform ExtractRootTransform(float Time) const override;
+	virtual void ExtractPoseSearchNotifyStates(float Time, TArray<class UAnimNotifyState_PoseSearchBase*>& NotifyStates) const override;
+	virtual const UAnimationAsset* GetAsset() const override;
+
+private:
+	float TotalRootDistance = 0.0f;
+	FTransform TotalRootTransform = FTransform::Identity;
+	TArray<float> AccumulatedRootDistance;
+
+	void ProcessRootDistance();
+};
+
+struct POSESEARCH_API FBlendSpaceSampler : public IAssetSampler
+{
+public:
+	struct FInput
+	{
+		FBoneContainer BoneContainer;
+		TWeakObjectPtr<const UBlendSpace> BlendSpace;
+		int32 RootDistanceSamplingRate = 60;
+		int32 RootTransformSamplingRate = 60;
+		FPoseSearchExtrapolationParameters ExtrapolationParameters;
+		FVector BlendParameters;
+	} Input;
+
+	void Init(const FInput& Input);
+	virtual void Process() override;
+
+	virtual float GetPlayLength() const override { return PlayLength; }
+	virtual bool IsLoopable() const override;
+
+	virtual float GetTimeFromRootDistance(float Distance) const override;
+
+	virtual float GetTotalRootDistance() const override { return TotalRootDistance; }
+	virtual FTransform GetTotalRootTransform() const override { return TotalRootTransform; }
+
+	virtual void ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const override;
+	virtual float ExtractRootDistance(float Time) const override;
+	virtual FTransform ExtractRootTransform(float Time) const override;
+	virtual void ExtractPoseSearchNotifyStates(float Time, TArray<class UAnimNotifyState_PoseSearchBase*>& NotifyStates) const override;
+
+	virtual const UAnimationAsset* GetAsset() const override;
+
+private:
+	float PlayLength = 0.0f;
+	float TotalRootDistance = 0.0f;
+	FTransform TotalRootTransform = FTransform::Identity;
+	TArray<float> AccumulatedRootDistance;
+	TArray<FTransform> AccumulatedRootTransform;
+
+	void ProcessPlayLength();
+	void ProcessRootDistance();
+	void ProcessRootTransform();
+
+	// Extracts the pre-computed blend space root transform. ProcessRootTransform must be run first.
+	FTransform ExtractBlendSpaceRootTrackTransform(float Time) const;
+	FTransform ExtractBlendSpaceRootMotion(float StartTime, float DeltaTime, bool bAllowLooping) const;
+	FTransform ExtractBlendSpaceRootMotionFromRange(float StartTrackPosition, float EndTrackPosition) const;
 };
 
 /**
@@ -266,9 +361,20 @@ struct FAssetIndexingContext
  */
 struct FAssetIndexingOutput
 {
-	// Channel data should be written to this array of feature vector builders
-	// Size is EndPoseIdx - BeginPoseIdx and PoseVectors[0] contains data for BeginPoseIdx
-	const TArrayView<FPoseSearchFeatureVectorBuilder> PoseVectors;
+	FAssetIndexingOutput(const int32 InSchemaCardinality, TArrayView<float> InFeatureVectorTable)
+	: SchemaCardinality(InSchemaCardinality)
+	, FeatureVectorTable(InFeatureVectorTable)
+	{
+	}
+
+	TArrayView<float> GetPoseVector(int32 VectorIdx)
+	{
+		return MakeArrayView(&FeatureVectorTable[VectorIdx * SchemaCardinality], SchemaCardinality);
+	}
+
+private:
+	const int32 SchemaCardinality;
+	TArrayView<float> FeatureVectorTable;
 };
 
 class POSESEARCH_API IAssetIndexer
@@ -327,11 +433,23 @@ public:
 
 } // namespace UE::PoseSearch
 
+class POSESEARCH_API IPoseFilter
+{
+public:
+	virtual ~IPoseFilter() {}
+
+	// if true this filter will be evaluated
+	virtual bool IsPoseFilterActive() const { return false; }
+	
+	// if it returns false the pose candidate will be discarded
+	virtual bool IsPoseValid(TConstArrayView<float> PoseValues, TConstArrayView<float> QueryValues, int32 PoseIdx, const FPoseSearchPoseMetadata& Metadata) const { return true; }
+};
+
 //////////////////////////////////////////////////////////////////////////
 // Feature channels interface
 
 UCLASS(Abstract, BlueprintType, EditInlineNew)
-class POSESEARCH_API UPoseSearchFeatureChannel : public UObject, public IBoneReferenceSkeletonProvider
+class POSESEARCH_API UPoseSearchFeatureChannel : public UObject, public IBoneReferenceSkeletonProvider, public IPoseFilter
 {
 	GENERATED_BODY()
 
@@ -358,15 +476,14 @@ public:
 	virtual bool BuildQuery(UE::PoseSearch::FSearchContext& SearchContext, FPoseSearchFeatureVectorBuilder& InOutQuery) const PURE_VIRTUAL(UPoseSearchFeatureChannel::BuildQuery, return false;);
 
 	// Draw this channel's data for the given pose vector
-	virtual void DebugDraw(const UE::PoseSearch::FDebugDrawParams& DrawParams, TArrayView<const float> PoseVector) const PURE_VIRTUAL(UPoseSearchFeatureChannel::DebugDraw, );
+	virtual void DebugDraw(const UE::PoseSearch::FDebugDrawParams& DrawParams, TConstArrayView<float> PoseVector) const PURE_VIRTUAL(UPoseSearchFeatureChannel::DebugDraw, );
 
 #if WITH_EDITOR
 	virtual void ComputeCostBreakdowns(UE::PoseSearch::ICostBreakDownData& CostBreakDownData, const UPoseSearchSchema* Schema) const;
 #endif
 
 	// Used during data normalization. If a feature has less than this amount of deviation from the mean across all poses in a database, then it will not be normalized.
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (ClampMin = "0.0001"))
-	float MinimumMeanDeviation = 1.0f;
+	virtual float GetMinimumMeanDeviation() const { return 0.1f; }
 
 private:
 	// IBoneReferenceSkeletonProvider interface
@@ -376,14 +493,14 @@ private:
 	friend class ::UPoseSearchSchema;
 
 	UPROPERTY()
-	int32 ChannelIdx = -1;
+	int32 ChannelIdx = INDEX_NONE;
 
 protected:
 	UPROPERTY()
-	int32 ChannelDataOffset = -1;
+	int32 ChannelDataOffset = INDEX_NONE;
 
 	UPROPERTY()
-	int32 ChannelCardinality = -1;
+	int32 ChannelCardinality = INDEX_NONE;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -418,10 +535,10 @@ struct FPoseSearchSchemaColorPreset
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category = "Colors")
+	UPROPERTY(EditAnywhere, Category = "Colors", meta = (ExcludeFromHash))
 	FLinearColor Query = FLinearColor::Blue;
 
-	UPROPERTY(EditAnywhere, Category = "Colors")
+	UPROPERTY(EditAnywhere, Category = "Colors", meta = (ExcludeFromHash))
 	FLinearColor Result = FLinearColor::Yellow;
 };
 
@@ -435,10 +552,10 @@ class POSESEARCH_API UPoseSearchSchema : public UDataAsset, public IBoneReferenc
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Schema")
-	TObjectPtr<USkeleton> Skeleton = nullptr;
+	TObjectPtr<USkeleton> Skeleton;
 
 	UPROPERTY(EditAnywhere, meta = (ClampMin = "1", ClampMax = "240"), Category = "Schema")
-	int32 SampleRate = 10;
+	int32 SampleRate = 30;
 
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = "Schema")
 	TArray<TObjectPtr<UPoseSearchFeatureChannel>> Channels;
@@ -475,7 +592,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Schema")
 	float MirrorMismatchCostBias = 0.f;
 
-	UPROPERTY(EditAnywhere, Category = "Schema")
+	UPROPERTY(EditAnywhere, Category = "Schema", meta = (ExcludeFromHash))
 	TArray<FPoseSearchSchemaColorPreset> ColorPresets;
 	
 	bool IsValid () const;
@@ -483,6 +600,20 @@ public:
 	int32 GetNumBones () const { return BoneIndices.Num(); }
 
 	float GetSamplingInterval() const { return 1.0f / SampleRate; }
+
+	template<typename ChannelType>
+	const ChannelType* FindFirstChannelOfType() const
+	{
+		for (const TObjectPtr<UPoseSearchFeatureChannel>& ChannelPtr : Channels)
+		{
+			if (const ChannelType* Channel = Cast<const ChannelType>(ChannelPtr.Get()))
+			{
+				return Channel;
+			}
+		}
+		return nullptr;
+	}
+
 
 	// UObject
 	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
@@ -526,6 +657,10 @@ struct POSESEARCH_API FPoseSearchPoseMetadata
 	// @todo: consider float16
 	UPROPERTY()
 	float ContinuingPoseCostAddend = 0.0f;
+
+	// @todo: consider int16
+	UPROPERTY()
+	int32 AssetIndex = INDEX_NONE;
 };
 
 /**
@@ -555,26 +690,26 @@ public:
 
 	// Default to Sequence for now for backward compatibility but
 	// at some point we might want to change this to Invalid.
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	ESearchIndexAssetType Type = ESearchIndexAssetType::Sequence;
 
 	// Index of the source asset in search index's container (i.e. UPoseSearchDatabase)
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	int32 SourceAssetIdx = INDEX_NONE;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	bool bMirrored = false;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	FVector BlendParameters = FVector::Zero();
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	FFloatInterval SamplingInterval;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	int32 FirstPoseIdx = INDEX_NONE;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	int32 NumPoses = 0;
 
 	bool IsPoseInRange(int32 PoseIdx) const
@@ -592,29 +727,29 @@ struct POSESEARCH_API FPoseSearchIndex
 {
 	GENERATED_BODY()
 
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	int32 NumPoses = 0;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	TArray<float> Values;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	TArray<float> PCAValues;
 
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	float PCAExplainedVariance = 0.f;
 	
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	TArray<float> Deviation;
 #endif // WITH_EDITORONLY_DATA
 
 	UE::PoseSearch::FKDTree KDTree;
 
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	TArray<float> PCAProjectionMatrix;
 
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	TArray<float> Mean;
 
 	// we store weights square roots to reduce numerical errors when CompareFeatureVectors 
@@ -622,20 +757,23 @@ struct POSESEARCH_API FPoseSearchIndex
 	// instead of
 	// ((VA - VB).square() * VW).sum()
 	// since (VA - VB).square() could lead to big numbers, and VW being multiplied by the variance of the dataset
-	UPROPERTY(Category = Info, VisibleAnywhere) 
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	TArray<float> WeightsSqrt;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
 	TArray<FPoseSearchPoseMetadata> PoseMetadata;
 
-	UPROPERTY()
-	TObjectPtr<const UPoseSearchSchema> Schema = nullptr;
+	UPROPERTY(meta = (NeverInHash))
+	EPoseSearchPoseFlags OverallFlags = EPoseSearchPoseFlags::None;
 
-	UPROPERTY()
+	UPROPERTY(meta = (NeverInHash))
+	TObjectPtr<const UPoseSearchSchema> Schema;
+
+	UPROPERTY(meta = (NeverInHash))
 	TArray<FPoseSearchIndexAsset> Assets;
 
 	// minimum of the database metadata CostAddend: it represents the minimum cost of any search for the associated database (we'll skip the search in case the search result total cost is already less than MinCostAddend)
-	UPROPERTY(Category = Info, VisibleAnywhere)
+	UPROPERTY(Category = Info, VisibleAnywhere, meta = (NeverInHash))
 	float MinCostAddend = -MAX_FLT;
 
 	bool IsValid() const;
@@ -643,16 +781,16 @@ struct POSESEARCH_API FPoseSearchIndex
 	bool IsEmpty() const;
 
 	TConstArrayView<float> GetPoseValues(int32 PoseIdx) const;
+	TConstArrayView<float> GetPoseValuesSafe(int32 PoseIdx) const;
 
-	const FPoseSearchIndexAsset* FindAssetForPose(int32 PoseIdx) const;
-	float GetAssetTime(int32 PoseIdx, const FPoseSearchIndexAsset* Asset) const;
+	const FPoseSearchIndexAsset& GetAssetForPose(int32 PoseIdx) const;
+	const FPoseSearchIndexAsset* GetAssetForPoseSafe(int32 PoseIdx) const;
+
+	float GetAssetTime(int32 PoseIdx) const;
 
 	void Reset();
 
-	// individual cost addends calculation methods
-	float ComputeMirrorMismatchAddend(int32 PoseIdx, UE::PoseSearch::FSearchContext& SearchContext) const;
-	float ComputeNotifyAddend(int32 PoseIdx) const;
-	float ComputeContinuingPoseCostAddend(int32 PoseIdx, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags) const;
+	FPoseSearchCost ComparePoses(int32 PoseIdx, EPoseSearchBooleanRequest QueryMirrorRequest, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags, TConstArrayView<float> QueryValues) const;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -678,7 +816,7 @@ struct POSESEARCH_API FPoseSearchDatabaseSequence : public FPoseSearchDatabaseAn
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, Category="Sequence")
-	TObjectPtr<UAnimSequence> Sequence = nullptr;
+	TObjectPtr<UAnimSequence> Sequence;
 
 	UPROPERTY(EditAnywhere, Category = "Sequence")
 	bool bEnabled = true;
@@ -694,14 +832,14 @@ struct POSESEARCH_API FPoseSearchDatabaseSequence : public FPoseSearchDatabaseAn
 	// for one shot anims with past sampling. When past sampling is used without a lead in sequence,
 	// the sampling range of the main sequence will be clamped if necessary.
 	UPROPERTY(EditAnywhere, Category="Sequence")
-	TObjectPtr<UAnimSequence> LeadInSequence = nullptr;
+	TObjectPtr<UAnimSequence> LeadInSequence;
 
 	// Used for sampling future pose information at the end of the main sequence.
 	// This setting is intended for transitions between cycles. It is optional and only used
 	// for one shot anims with future sampling. When future sampling is used without a follow up sequence,
 	// the sampling range of the main sequence will be clamped if necessary.
 	UPROPERTY(EditAnywhere, Category="Sequence")
-	TObjectPtr<UAnimSequence> FollowUpSequence = nullptr;
+	TObjectPtr<UAnimSequence> FollowUpSequence;
 
 	virtual UAnimationAsset* GetAnimationAsset() const override { return Sequence; }
 	virtual bool IsLooping() const override { return Sequence->bLoop; }
@@ -717,7 +855,7 @@ struct POSESEARCH_API FPoseSearchDatabaseBlendSpace : public FPoseSearchDatabase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, Category = "BlendSpace")
-	TObjectPtr<UBlendSpace> BlendSpace = nullptr;
+	TObjectPtr<UBlendSpace> BlendSpace;
 
 	UPROPERTY(EditAnywhere, Category = "BlendSpace")
 	bool bEnabled = true;
@@ -728,28 +866,22 @@ struct POSESEARCH_API FPoseSearchDatabaseBlendSpace : public FPoseSearchDatabase
 	// If to use the blendspace grid locations as parameter sample locations.
 	// When enabled, NumberOfHorizontalSamples and NumberOfVerticalSamples are ignored.
 	UPROPERTY(EditAnywhere, Category = "BlendSpace")
-	bool bUseGridForSampling = true;
+	bool bUseGridForSampling = false;
 
 	UPROPERTY(EditAnywhere, Category = "BlendSpace", meta = (EditCondition = "!bUseGridForSampling", EditConditionHides, ClampMin = "1", UIMin = "1", UIMax = "25"))
-	int32 NumberOfHorizontalSamples = 5;
+	int32 NumberOfHorizontalSamples = 9;
 
 	UPROPERTY(EditAnywhere, Category = "BlendSpace", meta = (EditCondition = "!bUseGridForSampling", EditConditionHides, ClampMin = "1", UIMin = "1", UIMax = "25"))
-	int32 NumberOfVerticalSamples = 5;
+	int32 NumberOfVerticalSamples = 2;
 
 	virtual UAnimationAsset* GetAnimationAsset() const override;
 	virtual bool IsLooping() const override;
 #if WITH_EDITOR
 	virtual void BuildDerivedDataKey(UE::PoseSearch::FDerivedDataKeyBuilder& KeyBuilder) override;
 #endif
-public:
 
-	void GetBlendSpaceParameterSampleRanges(
-		int32& HorizontalBlendNum,
-		int32& VerticalBlendNum,
-		float& HorizontalBlendMin,
-		float& HorizontalBlendMax,
-		float& VerticalBlendMin,
-		float& VerticalBlendMax) const;
+	void GetBlendSpaceParameterSampleRanges(int32& HorizontalBlendNum, int32& VerticalBlendNum) const;
+	FVector BlendParameterForSampleRanges(int32 HorizontalBlendIndex, int32 VerticalBlendIndex) const;
 };
 
 USTRUCT()
@@ -801,11 +933,10 @@ public:
 };
 
 /**
-* Helper object for writing features into a float buffer according to a feature vector layout.
-* Keeps track of which features are present, allowing the feature vector to be built up piecemeal.
+* float buffer of features according to a UPoseSearchSchema layout.
 * FFeatureVectorBuilder is used to build search queries at runtime and for adding samples during search index construction.
 */
-USTRUCT(BlueprintType, Category = "Animation|Pose Search")
+USTRUCT()
 struct POSESEARCH_API FPoseSearchFeatureVectorBuilder
 {
 	GENERATED_BODY()
@@ -813,23 +944,15 @@ struct POSESEARCH_API FPoseSearchFeatureVectorBuilder
 public:
 	void Init(const UPoseSearchSchema* Schema);
 	void Reset();
-	void ResetFeatures();
 
 	const UPoseSearchSchema* GetSchema() const { return Schema.Get(); }
 
 	TArray<float>& EditValues() { return Values; }
-	TArrayView<const float> GetValues() const { return Values; }
-
-	void CopyFromSearchIndex(const FPoseSearchIndex& SearchIndex, int32 PoseIdx);
-
-	bool IsInitialized() const;
-	bool IsInitializedForSchema(const UPoseSearchSchema* Schema) const;
-	bool IsCompatible(const FPoseSearchFeatureVectorBuilder& OtherBuilder) const;
+	TConstArrayView<float> GetValues() const { return Values; }
 
 private:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<const UPoseSearchSchema> Schema = nullptr;
-
 	TArray<float> Values;
 };
 
@@ -907,9 +1030,7 @@ struct FSearchResult
 	// lerp value to find AssetTime from PrevPoseIdx -> AssetTime -> NextPoseIdx, within range [-0.5, 0.5]
 	float LerpValue = 0.f;
 
-	// @todo: it should be a weak pointer
-	const FPoseSearchIndexAsset* SearchIndexAsset = nullptr;
-	TWeakObjectPtr<const UPoseSearchDatabase> Database = nullptr;
+	TWeakObjectPtr<const UPoseSearchDatabase> Database;
 	FPoseSearchFeatureVectorBuilder ComposedQuery;
 
 	// cost of the current pose with the query from database in the result, if possible
@@ -932,6 +1053,8 @@ struct FSearchResult
 	bool IsValid() const;
 
 	void Reset();
+
+	const FPoseSearchIndexAsset* GetSearchIndexAsset(bool bMandatory = false) const;
 };
 
 } // namespace UE::PoseSearch
@@ -954,7 +1077,7 @@ class POSESEARCH_API UPoseSearchDatabase : public UPoseSearchSearchableAsset
 public:
 	// Motion Database Config asset to use with this database.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Database", DisplayName="Config")
-	TObjectPtr<const UPoseSearchSchema> Schema = nullptr;
+	TObjectPtr<const UPoseSearchSchema> Schema;
 
 	UPROPERTY(EditAnywhere, Category = "Database")
 	FPoseSearchExtrapolationParameters ExtrapolationParameters;
@@ -977,40 +1100,39 @@ public:
 	TArray<FPoseSearchDatabaseBlendSpace> BlendSpaces;
 
 	UPROPERTY(EditAnywhere, Category = "Performance")
-	EPoseSearchMode PoseSearchMode = EPoseSearchMode::BruteForce;
+	EPoseSearchMode PoseSearchMode = EPoseSearchMode::PCAKDTree;
 
 	UPROPERTY(EditAnywhere, Category = "Performance", meta = (EditCondition = "PoseSearchMode != EPoseSearchMode::BruteForce", EditConditionHides, ClampMin = "1", ClampMax = "64", UIMin = "1", UIMax = "64"))
 	int32 NumberOfPrincipalComponents = 4;
 
 	UPROPERTY(EditAnywhere, Category = "Performance", meta = (EditCondition = "PoseSearchMode != EPoseSearchMode::BruteForce", EditConditionHides, ClampMin = "1", ClampMax = "256", UIMin = "1", UIMax = "256"))
-	int32 KDTreeMaxLeafSize = 8;
+	int32 KDTreeMaxLeafSize = 16;
 	
 	UPROPERTY(EditAnywhere, Category = "Performance", meta = (EditCondition = "PoseSearchMode != EPoseSearchMode::BruteForce", EditConditionHides, ClampMin = "1", ClampMax = "600", UIMin = "1", UIMax = "600"))
-	int32 KDTreeQueryNumNeighbors = 100;
+	int32 KDTreeQueryNumNeighbors = 200;
 
 	// if true, this database search will be skipped if cannot decrease the pose cost, and poses will not be listed into the PoseSearchDebugger
 	UPROPERTY(EditAnywhere, Category = "Performance")
-	bool bSkipSearchIfPossible = false;
+	bool bSkipSearchIfPossible = true;
 
 	virtual ~UPoseSearchDatabase();
 
 	const FPoseSearchIndex* GetSearchIndex() const;
-	const FPoseSearchIndex* GetSearchIndexSafe() const;
+	const FPoseSearchIndex* GetSearchIndexSafe(bool bVerboseLogging = true) const;
 	
 	bool GetSkipSearchIfPossible() const;
 	bool IsValidForIndexing() const;
 	bool IsValidForSearch() const;
 	bool IsValidPoseIndex(int32 PoseIdx) const;
 
-	float GetAssetTime(int32 PoseIdx, const FPoseSearchIndexAsset* SearchIndexAsset = nullptr) const;
-	int32 GetPoseIndexFromTime(float AssetTime, const FPoseSearchIndexAsset* SearchIndexAsset) const;
-	bool GetPoseIndicesAndLerpValueFromTime(float Time, const FPoseSearchIndexAsset* SearchIndexAsset, int32& PrevPoseIdx, int32& PoseIdx, int32& NextPoseIdx, float& LerpValue) const;
+	int32 GetPoseIndexFromTime(float AssetTime, const FPoseSearchIndexAsset& SearchIndexAsset) const;
+	bool GetPoseIndicesAndLerpValueFromTime(float Time, const FPoseSearchIndexAsset& SearchIndexAsset, int32& PrevPoseIdx, int32& PoseIdx, int32& NextPoseIdx, float& LerpValue) const;
 
-	const FPoseSearchDatabaseAnimationAssetBase& GetAnimationSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const;
-	const FPoseSearchDatabaseSequence& GetSequenceSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const;
-	const FPoseSearchDatabaseBlendSpace& GetBlendSpaceSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const;
-	const bool IsSourceAssetLooping(const FPoseSearchIndexAsset* SearchIndexAsset) const;
-	const FString GetSourceAssetName(const FPoseSearchIndexAsset* SearchIndexAsset) const;
+	const FPoseSearchDatabaseAnimationAssetBase& GetAnimationSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const;
+	const FPoseSearchDatabaseSequence& GetSequenceSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const;
+	const FPoseSearchDatabaseBlendSpace& GetBlendSpaceSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const;
+	const bool IsSourceAssetLooping(const FPoseSearchIndexAsset& SearchIndexAsset) const;
+	const FString GetSourceAssetName(const FPoseSearchIndexAsset& SearchIndexAsset) const;
 	int32 GetNumberOfPrincipalComponents() const;
 	
 	// UObject
@@ -1079,8 +1201,6 @@ public:
 
 	void BuildQuery(UE::PoseSearch::FSearchContext& SearchContext, FPoseSearchFeatureVectorBuilder& OutQuery) const;
 
-	FPoseSearchCost ComparePoses(UE::PoseSearch::FSearchContext& SearchContext, int32 PoseIdx, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags, TConstArrayView<float> QueryValues) const;
-
 protected:
 	UE::PoseSearch::FSearchResult SearchPCAKDTree(UE::PoseSearch::FSearchContext& SearchContext) const;
 	UE::PoseSearch::FSearchResult SearchBruteForce(UE::PoseSearch::FSearchContext& SearchContext) const;
@@ -1097,15 +1217,15 @@ class POSESEARCH_API UPoseSearchSequenceMetaData : public UAnimMetaData
 public:
 
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	TObjectPtr<const UPoseSearchSchema> Schema = nullptr;
+	TObjectPtr<const UPoseSearchSchema> Schema;
 
 	UPROPERTY(EditAnywhere, Category = "Settings")
-	FFloatInterval SamplingRange = FFloatInterval(0.0f, 0.0f);
+	FFloatInterval SamplingRange = FFloatInterval(0.f, 0.f);
 
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FPoseSearchExtrapolationParameters ExtrapolationParameters;
 
-	UPROPERTY()
+	UPROPERTY(meta = (ExcludeFromHash))
 	FPoseSearchIndex SearchIndex;
 
 	bool IsValidForIndexing() const;
@@ -1113,12 +1233,8 @@ public:
 
 	UE::PoseSearch::FSearchResult Search(UE::PoseSearch::FSearchContext& SearchContext) const;
 
-protected:
-	FPoseSearchCost ComparePoses(int32 PoseIdx, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags, TConstArrayView<float> QueryValues) const;
-
 public: // UObject
 	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
-
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -1140,8 +1256,9 @@ enum class EPoseCandidateFlags : uint8
 	DiscardedBy_PoseJumpThresholdTime = 1 << 3,
 	DiscardedBy_PoseReselectHistory = 1 << 4,
 	DiscardedBy_BlockTransition = 1 << 5,
+	DiscardedBy_PoseFilter = 1 << 6,
 
-	AnyDiscardedMask = DiscardedBy_PoseJumpThresholdTime | DiscardedBy_PoseReselectHistory | DiscardedBy_BlockTransition,
+	AnyDiscardedMask = DiscardedBy_PoseJumpThresholdTime | DiscardedBy_PoseReselectHistory | DiscardedBy_BlockTransition | DiscardedBy_PoseFilter,
 };
 ENUM_CLASS_FLAGS(EPoseCandidateFlags);
 
@@ -1151,18 +1268,23 @@ class POSESEARCH_API FFeatureVectorHelper
 public:
 	enum { EncodeQuatCardinality = 6 };
 	static void EncodeQuat(TArrayView<float> Values, int32& DataOffset, const FQuat& Quat);
-	static void EncodeQuat(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue);
-	static FQuat DecodeQuat(TArrayView<const float> Values, int32& DataOffset);
+	static void EncodeQuat(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue);
+	static FQuat DecodeQuat(TConstArrayView<float> Values, int32& DataOffset);
 
 	enum { EncodeVectorCardinality = 3 };
 	static void EncodeVector(TArrayView<float> Values, int32& DataOffset, const FVector& Vector);
-	static void EncodeVector(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue, bool bNormalize = false);
-	static FVector DecodeVector(TArrayView<const float> Values, int32& DataOffset);
+	static void EncodeVector(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue, bool bNormalize = false);
+	static FVector DecodeVector(TConstArrayView<float> Values, int32& DataOffset);
 
 	enum { EncodeVector2DCardinality = 2 };
 	static void EncodeVector2D(TArrayView<float> Values, int32& DataOffset, const FVector2D& Vector2D);
-	static void EncodeVector2D(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue);
-	static FVector2D DecodeVector2D(TArrayView<const float> Values, int32& DataOffset);
+	static void EncodeVector2D(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue);
+	static FVector2D DecodeVector2D(TConstArrayView<float> Values, int32& DataOffset);
+
+	enum { EncodeFloatCardinality = 1 };
+	static void EncodeFloat(TArrayView<float> Values, int32& DataOffset, const float Value);
+	static void EncodeFloat(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue);
+	static float DecodeFloat(TConstArrayView<float> Values, int32& DataOffset);
 
 	// populates MeanDeviations[DataOffset] ... MeanDeviations[DataOffset + Cardinality] with a single value the mean deviation calculated from a centered matrix
 	static void ComputeMeanDeviations(float MinMeanDeviation, const Eigen::MatrixXd& CenteredPoseMatrix, Eigen::VectorXd& MeanDeviations, int32& DataOffset, int32 Cardinality);
@@ -1171,9 +1293,11 @@ public:
 	static void SetMeanDeviations(float Deviation, Eigen::VectorXd& MeanDeviations, int32& DataOffset, int32 Cardinality);
 
 private:
-	static FQuat DecodeQuatInternal(TArrayView<const float> Values, int32 DataOffset);
-	static FVector DecodeVectorInternal(TArrayView<const float> Values, int32 DataOffset);
-	static FVector2D DecodeVector2DInternal(TArrayView<const float> Values, int32 DataOffset);
+	static FQuat DecodeQuatInternal(TConstArrayView<float> Values, int32 DataOffset);
+	static FVector DecodeVectorInternal(TConstArrayView<float> Values, int32 DataOffset);
+	static FVector2D DecodeVector2DInternal(TConstArrayView<float> Values, int32 DataOffset);
+	static float DecodeFloatInternal(TConstArrayView<float> Values, int32 DataOffset);
+
 };
 
 /**
@@ -1228,7 +1352,7 @@ struct FHistoricalPoseIndex
 		return HashCombineFast(::GetTypeHash(Index.PoseIndex), GetTypeHash(Index.DatabaseKey));
 	}
 
-	int32 PoseIndex = -1;
+	int32 PoseIndex = INDEX_NONE;
 	FObjectKey DatabaseKey;
 };
 
@@ -1296,7 +1420,7 @@ private:
 		FPoseSearchFeatureVectorBuilder FeatureVectorBuilder;
 	};
 
-	TArray<FCachedQuery> CachedQueries;
+	TArray<FCachedQuery, TInlineAllocator<8>> CachedQueries;
 
 	float CurrentBestTotalCost = MAX_flt;
 
@@ -1353,7 +1477,7 @@ public:
 //////////////////////////////////////////////////////////////////////////
 // Main PoseSearch API
 
-POSESEARCH_API void DrawFeatureVector(const FDebugDrawParams& DrawParams, TArrayView<const float> PoseVector);
+POSESEARCH_API void DrawFeatureVector(const FDebugDrawParams& DrawParams, TConstArrayView<float> PoseVector);
 POSESEARCH_API void DrawFeatureVector(const FDebugDrawParams& DrawParams, int32 PoseIdx);
 POSESEARCH_API void DrawSearchIndex(const FDebugDrawParams& DrawParams);
 POSESEARCH_API void CompareFeatureVectors(TConstArrayView<float> A, TConstArrayView<float> B, TConstArrayView<float> WeightsSqrt, TArrayView<float> Result);
@@ -1396,7 +1520,7 @@ struct POSESEARCH_API FPoseSearchDatabaseSetEntry
 
 public:
 	UPROPERTY(EditAnywhere, Category = Settings)
-	TObjectPtr<UPoseSearchSearchableAsset> Searchable = nullptr;
+	TObjectPtr<UPoseSearchSearchableAsset> Searchable;
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FGameplayTag Tag;

@@ -21,13 +21,14 @@ from PySide2.QtWidgets import QWidgetAction, QMenu
 from switchboard import config
 from switchboard import config_osc as osc
 from switchboard import p4_utils
+from switchboard import ugs_utils
 from switchboard import recording
 from switchboard import resources  # noqa
 from switchboard import switchboard_application
 from switchboard import switchboard_utils
 from switchboard import switchboard_widgets as sb_widgets
 from switchboard.add_config_dialog import AddConfigDialog
-from switchboard.config import CONFIG, DEFAULT_MAP_TEXT, SETTINGS
+from switchboard.config import CONFIG, DEFAULT_MAP_TEXT, SETTINGS, EngineSyncMethod
 from switchboard.device_list_widget import DeviceListWidget, DeviceWidgetHeader
 from switchboard.devices.device_base import DeviceStatus
 from switchboard.devices.device_manager import DeviceManager
@@ -660,7 +661,7 @@ class SwitchboardDialog(QtCore.QObject):
     def set_config_hooks(self):
         CONFIG.P4_PROJECT_PATH.signal_setting_changed.connect(lambda: self.p4_refresh_project_cl())
         CONFIG.P4_ENGINE_PATH.signal_setting_changed.connect(lambda: self.p4_refresh_engine_cl())
-        CONFIG.BUILD_ENGINE.signal_setting_changed.connect(lambda: self.p4_refresh_engine_cl())
+        CONFIG.ENGINE_SYNC_METHOD.signal_setting_changed.connect(lambda: self.p4_refresh_engine_cl())
         CONFIG.P4_ENABLED.signal_setting_changed.connect(lambda _, enabled: self.toggle_p4_controls(enabled))
         CONFIG.MAPS_PATH.signal_setting_changed.connect(lambda: self.refresh_levels())
         CONFIG.MAPS_FILTER.signal_setting_changed.connect(lambda: self.refresh_levels())
@@ -1762,9 +1763,22 @@ class SwitchboardDialog(QtCore.QObject):
     def p4_refresh_project_cl(self):
         if not CONFIG.P4_ENABLED.get_value():
             return
-        LOGGER.info("Refreshing p4 project changelists")
-        working_dir = os.path.dirname(CONFIG.UPROJECT_PATH.get_value())
-        changelists = p4_utils.p4_latest_changelist(CONFIG.P4_PROJECT_PATH.get_value(), working_dir)
+
+        sync_method = CONFIG.ENGINE_SYNC_METHOD.get_value()
+
+        changelists = None
+        # If we're syncing 'Precompiled Binaries', then that implies that we should be using UGS:
+        if sync_method == EngineSyncMethod.Sync_PCBs.value or sync_method == EngineSyncMethod.Sync_From_UGS.value:
+            LOGGER.info("Using UnrealGameSync to refresh project changelists.")
+            changelists = ugs_utils.latest_chagelists(Path(CONFIG.UPROJECT_PATH.get_value()), client=CONFIG.SOURCE_CONTROL_WORKSPACE.get_value())
+            if not changelists:
+                LOGGER.error("UnrealGameSync failed to get the project's latest changelists. Falling back to using p4 commands directly.")
+
+        if not changelists:
+            LOGGER.info("Refreshing p4 project changelists")
+            working_dir = os.path.dirname(CONFIG.UPROJECT_PATH.get_value())
+            changelists = p4_utils.p4_latest_changelist(CONFIG.P4_PROJECT_PATH.get_value(), working_dir)
+            
         self.window.project_cl_combo_box.clear()
 
         if changelists:
@@ -1777,7 +1791,7 @@ class SwitchboardDialog(QtCore.QObject):
             return
         self.window.engine_cl_combo_box.clear()
         # if engine is built from source, refresh the engine cl dropdown
-        if CONFIG.BUILD_ENGINE.get_value():
+        if CONFIG.ENGINE_SYNC_METHOD.get_value() == EngineSyncMethod.Build_Engine.value:
             LOGGER.info("Refreshing p4 engine changelists")
             self.window.engine_cl_label.setEnabled(True)
             self.window.engine_cl_combo_box.setEnabled(True)

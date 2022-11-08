@@ -467,8 +467,7 @@ void RenderLightingCacheWithPreshadingCS(
 	}
 
 	// Build shadow ray
-	FDeferredLightData LightData = LoadLightData(LightType, VolumetricScatteringIntensity);
-
+	const FDeferredLightData LightData = InitDeferredLightFromUniforms(LightType, VolumetricScatteringIntensity);
 #if DIM_LIGHTING_CACHE_MODE == LIGHTING_CACHE_TRANSMITTANCE
 	float3 L = LightData.Direction;
 	float3 ToLight = L * GetMaxShadowTraceDistance();
@@ -596,7 +595,7 @@ void RenderSingleScatteringWithPreshadingCS(
 			DIM_APPLY_SHADOW_TRANSMITTANCE
 		);
 
-		FDeferredLightData LightData = LoadLightData(LightType, VolumetricScatteringIntensity);
+		const FDeferredLightData LightData = InitDeferredLightFromUniforms(LightType, VolumetricScatteringIntensity);
 		uint StepCount = CalcStepCount(RayMarchingContext);
 
 		RayMarchSingleScattering(

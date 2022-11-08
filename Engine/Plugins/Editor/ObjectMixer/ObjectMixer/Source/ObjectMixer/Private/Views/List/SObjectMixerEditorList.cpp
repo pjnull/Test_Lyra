@@ -18,11 +18,13 @@
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Editor.h"
 #include "Editor/UnrealEdEngine.h"
+#include "EditorActorFolders.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "IPlacementModeModule.h"
 #include "LevelEditor.h"
 #include "LevelEditorMenuContext.h"
 #include "LevelEditorViewport.h"
+#include "ObjectMixerEditorModule.h"
 #include "ObjectMixerEditorSerializedData.h"
 #include "ScopedTransaction.h"
 #include "Selection.h"
@@ -108,14 +110,7 @@ void SObjectMixerEditorList::Construct(const FArguments& InArgs, TSharedRef<FObj
 					{
 						if (GCurrentLevelEditingViewportClient)
 						{
-							AActor* Actor = Cast<AActor>(Row->GetObject());
-
-							if (!Actor)
-							{
-								Actor = Row->GetObject()->GetTypedOuter<AActor>();
-							}
-
-							if (Actor)
+							if (const AActor* Actor = Row->GetSelfOrOuterAsActor())
 							{
 								FVector Origin;
 								FVector Extents;
@@ -170,6 +165,11 @@ SObjectMixerEditorList::~SObjectMixerEditorList()
 	TreeViewPtr.Reset();
 }
 
+UWorld* SObjectMixerEditorList::GetWorld() const
+{
+	return FObjectMixerEditorModule::Get().GetWorld();
+}
+
 void SObjectMixerEditorList::RebuildList()
 {
 	bIsRebuildRequested = false;
@@ -200,6 +200,16 @@ void SObjectMixerEditorList::RequestRebuildList(const FString& InItemToScrollTo)
 	bIsRebuildRequested = true;
 }
 
+void SObjectMixerEditorList::OnRenameCommand()
+{
+	if (GetSelectedTreeViewItemCount() == 1)
+	{
+		const FObjectMixerEditorListRowPtr TreeViewItem = GetSelectedTreeViewItems()[0];
+
+		PendingRenameItem = FTreeItemUniqueIdentifier(TreeViewItem);
+	}
+}
+
 TArray<FObjectMixerEditorListRowPtr> SObjectMixerEditorList::GetSelectedTreeViewItems() const
 {
 	return TreeViewPtr->GetSelectedItems();
@@ -208,6 +218,11 @@ TArray<FObjectMixerEditorListRowPtr> SObjectMixerEditorList::GetSelectedTreeView
 int32 SObjectMixerEditorList::GetSelectedTreeViewItemCount() const
 {
 	return TreeViewPtr->GetSelectedItems().Num();
+}
+
+void SObjectMixerEditorList::SetTreeViewItemSelected(FObjectMixerEditorListRowPtr Item, const bool bNewSelected)
+{
+	TreeViewPtr->SetItemSelection(Item, bNewSelected);
 }
 
 void SObjectMixerEditorList::SyncEditorSelectionToListSelection()
@@ -244,11 +259,161 @@ void SObjectMixerEditorList::SyncEditorSelectionToListSelection()
 	}
 }
 
+void SObjectMixerEditorList::OnRequestNewFolder(TOptional<FFolder> ExplicitParentFolder)
+{
+	const FScopedTransaction Transaction(LOCTEXT("UndoAction_CreateFolder", "Create Folder"));
+
+	UWorld* World = GetWorld();
+	FFolder NewFolderPath;
+	const TArray<FObjectMixerEditorListRowPtr>& SelectedTreeItems = TreeViewPtr->GetSelectedItems();
+	if (ExplicitParentFolder.IsSet())
+	{
+		NewFolderPath =
+			FActorFolders::Get().GetDefaultFolderName(*World, ExplicitParentFolder.GetValue());
+	}
+	else
+	{
+		// Explicit folder not provided - try to find an appropriate parent folder based on selection
+		if (SelectedTreeItems.Num())
+		{
+			FFolder FoundParent;
+			int32 FolderCount = 0;
+
+			// Check for a folder row first. It's possible for a root folder to be selected.
+			// If that's the case, it won't have a parent folder but we won't want to move it to a selected actor's direct folder.
+			// For this reason, we only check selected actors if there are no folders selected or there is no folder match
+			const TSharedPtr<FObjectMixerEditorListRow>* FolderMatch = Algo::FindByPredicate(
+				SelectedTreeItems,
+				[&FoundParent, &FolderCount](const FObjectMixerEditorListRowPtr& Other)
+				{
+					if (Other->GetRowType() == FObjectMixerEditorListRow::Folder)
+					{
+						FolderCount++;
+						FoundParent = Other->GetFolder().GetParent();
+					}
+
+					return !FoundParent.IsNone();
+				}
+			);
+
+			// If no folder row found, try actors
+			if (FolderCount == 0 || !FolderMatch)
+			{
+				const TSharedPtr<FObjectMixerEditorListRow>* ActorMatch = Algo::FindByPredicate(
+					SelectedTreeItems,
+					[&FoundParent](const FObjectMixerEditorListRowPtr& Other)
+					{
+						if (const AActor* Actor = Other->GetSelfOrOuterAsActor())
+						{
+							FoundParent = Actor->GetFolder();
+						}
+
+						return !FoundParent.IsNone();
+					}
+				);
+			}
+
+			if (!FoundParent.IsNone())
+			{
+				NewFolderPath =
+				   FActorFolders::Get().GetDefaultFolderName(*World, FoundParent);
+			}
+		}
+	}
+
+	// Fallback
+	if (NewFolderPath.IsNone())
+	{
+		NewFolderPath = FActorFolders::Get().GetDefaultFolderForSelection(*World);
+	}
+
+	if (FActorFolders::Get().CreateFolder(*World, NewFolderPath))
+	{
+		if (SelectedTreeItems.Num())
+		{
+			TArray<AActor*> ActorsToMove;
+			TSet<FFolder> FoldersToMove;
+			for (const FObjectMixerEditorListRowPtr& SelectedRow : SelectedTreeItems)
+			{
+				if (SelectedRow->GetRowType() == FObjectMixerEditorListRow::MatchingObject ||
+					SelectedRow->GetRowType() == FObjectMixerEditorListRow::ContainerObject)
+				{
+					if (FObjectMixerEditorListRowPtr PinnedParent = SelectedRow->GetDirectParentRow().Pin();
+						PinnedParent->GetRowType() == FObjectMixerEditorListRow::Folder &&
+						SelectedTreeItems.Contains(PinnedParent))
+					{
+						// If the selected item's parent is a folder and it's selected, just move the folder.
+						// It will take the selected objects along with it.
+						const FFolder& ParentFolder = SelectedRow->GetFolder();
+
+						if (!ParentFolder.IsNone())
+						{
+							FoldersToMove.Add(ParentFolder);
+						}
+					}
+					else if (AActor* Actor = SelectedRow->GetSelfOrOuterAsActor())
+					{
+						ActorsToMove.Add(Actor);
+					}
+				}
+				else if (SelectedRow->GetRowType() == FObjectMixerEditorListRow::Folder)
+				{
+					FoldersToMove.Add(SelectedRow->GetFolder());
+				}
+			}
+
+			if (FoldersToMove.Num())
+			{
+				for (const FFolder& Folder : FoldersToMove)
+				{
+					OnRequestMoveFolder(Folder, NewFolderPath);
+				}
+			}
+
+			if (ActorsToMove.Num())
+			{				
+				for (AActor* Actor : ActorsToMove)
+				{
+					Actor->Modify();
+					Actor->SetFolderPath_Recursively(NewFolderPath.GetPath());
+
+					if (AActor* AttachParent = Actor->GetAttachParentActor())
+					{
+						if (!ActorsToMove.Contains(AttachParent))
+						{
+							AttachParent->Modify();
+							FDetachmentTransformRules DetachmentRules(EDetachmentRule::KeepWorld, false);
+							Actor->DetachFromActor(DetachmentRules);
+						}
+					}
+				}
+			}
+		}
+
+		// Set new folder row to be renamed on next frame
+		PendingRenameItem.RowName = NewFolderPath.GetPath().ToString();
+	}
+}
+
+void SObjectMixerEditorList::OnRequestMoveFolder(const FFolder& FolderToMove, const FFolder& TargetNewParentFolder)
+{
+	if (UWorld* EditorWorld = GetWorld())
+	{
+		if (FolderToMove.GetParent() != TargetNewParentFolder)
+		{
+			check(TargetNewParentFolder.GetRootObject() == FolderToMove.GetRootObject());
+			// Get unique name
+			const FFolder NewPath = FActorFolders::Get().GetFolderName(*EditorWorld, TargetNewParentFolder, FolderToMove.GetLeafName());
+			FActorFolders::Get().RenameFolderInWorld(*EditorWorld, FolderToMove, NewPath);
+		}
+	}
+}
+
 void SObjectMixerEditorList::SetSelectedTreeViewItemActorsEditorVisible(const bool bNewIsVisible, const bool bIsRecursive)
 {
-	for (const TSharedPtr<FObjectMixerEditorListRow>& SelectedItem : TreeViewPtr->GetSelectedItems())
+	for (const FObjectMixerEditorListRowPtr& SelectedItem : TreeViewPtr->GetSelectedItems())
 	{
-		SelectedItem->SetObjectVisibility(bNewIsVisible, bIsRecursive);
+		SelectedItem->SetCurrentEditorObjectVisibility(bNewIsVisible, bIsRecursive);
 	}
 }
 
@@ -269,24 +434,123 @@ void SObjectMixerEditorList::SetTreeViewItems(const TArray<FObjectMixerEditorLis
 	TreeViewPtr->RequestListRefresh();
 }
 
-TSet<TWeakPtr<FObjectMixerEditorListRow>> SObjectMixerEditorList::GetSoloRows()
+TSet<TWeakPtr<FObjectMixerEditorListRow>> SObjectMixerEditorList::GetSoloRows() const
 {
-	return GetListModelPtr().Pin()->GetSoloRows();
-}
+	TSet<TWeakPtr<FObjectMixerEditorListRow>> SoloRows;
+	
+	using LambdaType = void(*)(const FObjectMixerEditorListRowPtr&, TSet<TWeakPtr<FObjectMixerEditorListRow>>&);
+	static LambdaType GetSoloRowsRecursively =
+		[](const FObjectMixerEditorListRowPtr& InRow, TSet<TWeakPtr<FObjectMixerEditorListRow>>& SoloRows)
+	{
+		if (InRow.IsValid())
+		{
+			if (InRow->GetRowSoloState())
+			{
+				SoloRows.Add(InRow);
+			}
+			
+			for (const FObjectMixerEditorListRowPtr& Child : InRow->GetChildRows())
+			{
+				GetSoloRowsRecursively(Child, SoloRows);
+			}
+		}
+	};
 
-void SObjectMixerEditorList::AddSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow)
-{
-	GetListModelPtr().Pin()->AddSoloRow(InRow);
-}
+	for (const FObjectMixerEditorListRowPtr& RootRow : TreeViewRootObjects)
+	{
+		GetSoloRowsRecursively(RootRow, SoloRows);
+	}
 
-void SObjectMixerEditorList::RemoveSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow)
-{
-	GetListModelPtr().Pin()->RemoveSoloRow(InRow);
+	return SoloRows;
 }
 
 void SObjectMixerEditorList::ClearSoloRows()
 {
-	GetListModelPtr().Pin()->ClearSoloRows();
+	using LambdaType = void(*)(const FObjectMixerEditorListRowPtr&);
+	static LambdaType ClearSoloRowsRecursively = [](const FObjectMixerEditorListRowPtr& InRow)
+	{
+		if (InRow.IsValid())
+		{
+			InRow->SetRowSoloState(false);
+			
+			for (const FObjectMixerEditorListRowPtr& Child : InRow->GetChildRows())
+			{
+				ClearSoloRowsRecursively(Child);
+			}
+		}
+	};
+
+	for (const FObjectMixerEditorListRowPtr& RootRow : TreeViewRootObjects)
+	{
+		ClearSoloRowsRecursively(RootRow);
+	}
+}
+
+bool SObjectMixerEditorList::IsListInSoloState() const
+{
+	using LambdaType = bool(*)(const FObjectMixerEditorListRowPtr&);
+	static LambdaType GetSoloRowsRecursively = [](const FObjectMixerEditorListRowPtr& InRow)
+	{
+		if (InRow.IsValid())
+		{
+			if (InRow->GetRowSoloState())
+			{
+				return true;
+			}
+			
+			for (const FObjectMixerEditorListRowPtr& Child : InRow->GetChildRows())
+			{
+				if (GetSoloRowsRecursively(Child))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	};
+
+	for (const FObjectMixerEditorListRowPtr& RootRow : TreeViewRootObjects)
+	{
+		if (GetSoloRowsRecursively(RootRow))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void SObjectMixerEditorList::EvaluateAndSetEditorVisibilityPerRow()
+{
+	using LambdaType = void(*)(const FObjectMixerEditorListRowPtr&, const bool);
+	static LambdaType EvaluateEditorVisibilityRecursively =
+		[](const FObjectMixerEditorListRowPtr& InRow, const bool bIsListInSoloState)
+	{
+		if (InRow.IsValid())
+		{
+			bool bShouldBeVisible = !InRow->IsUserSetHiddenInEditor();
+
+			if (bIsListInSoloState)
+			{
+				bShouldBeVisible = InRow->GetRowSoloState();
+			}
+
+			InRow->SetCurrentEditorObjectVisibility(bShouldBeVisible);
+			
+			for (const FObjectMixerEditorListRowPtr& Child : InRow->GetChildRows())
+			{
+				EvaluateEditorVisibilityRecursively(Child, bIsListInSoloState);
+			}
+		}
+	};
+	
+	const bool bIsListInSoloState = IsListInSoloState();
+
+	for (const FObjectMixerEditorListRowPtr& RootRow : TreeViewRootObjects)
+	{
+		EvaluateEditorVisibilityRecursively(RootRow, bIsListInSoloState);
+	}
 }
 
 FText SObjectMixerEditorList::GetSearchTextFromSearchInputField() const
@@ -315,7 +579,7 @@ void SObjectMixerEditorList::ExecuteListViewSearchOnAllRows(
 	// unquoted search equivalent to a match-any-of search
 	SearchString.ParseIntoArray(Tokens, TEXT("|"), true);
 	
-	for (const TSharedPtr<FObjectMixerEditorListRow>& ChildRow : TreeViewRootObjects)
+	for (const FObjectMixerEditorListRowPtr& ChildRow : TreeViewRootObjects)
 	{
 		if (!ensure(ChildRow.IsValid()))
 		{
@@ -339,7 +603,7 @@ bool SObjectMixerEditorList::DoesTreeViewHaveVisibleChildren() const
 {
 	if (TreeViewPtr.IsValid())
 	{
-		for (const TSharedPtr<FObjectMixerEditorListRow>& Header : TreeViewRootObjects)
+		for (const FObjectMixerEditorListRowPtr& Header : TreeViewRootObjects)
 		{
 			const EVisibility HeaderVisibility = Header->GetDesiredRowWidgetVisibility();
 			
@@ -353,7 +617,7 @@ bool SObjectMixerEditorList::DoesTreeViewHaveVisibleChildren() const
 	return false;
 }
 
-bool SObjectMixerEditorList::IsTreeViewItemExpanded(const TSharedPtr<FObjectMixerEditorListRow>& Row) const
+bool SObjectMixerEditorList::IsTreeViewItemExpanded(const FObjectMixerEditorListRowPtr& Row) const
 {
 	if (TreeViewPtr.IsValid())
 	{
@@ -363,7 +627,7 @@ bool SObjectMixerEditorList::IsTreeViewItemExpanded(const TSharedPtr<FObjectMixe
 	return false;
 }
 
-void SObjectMixerEditorList::SetTreeViewItemExpanded(const TSharedPtr<FObjectMixerEditorListRow>& RowToExpand, const bool bNewExpansion) const
+void SObjectMixerEditorList::SetTreeViewItemExpanded(const FObjectMixerEditorListRowPtr& RowToExpand, const bool bNewExpansion) const
 {
 	if (TreeViewPtr.IsValid())
 	{
@@ -499,6 +763,41 @@ FListViewColumnInfo* SObjectMixerEditorList::GetColumnInfoByPropertyName(const F
 		});
 }
 
+void SObjectMixerEditorList::ExecuteRenameOnPending()
+{
+	using LambdaType = const FObjectMixerEditorListRowPtr*(*)(const TArray<FObjectMixerEditorListRowPtr>&, const FTreeItemUniqueIdentifier&);
+		
+	static LambdaType RecursivelyFindByUniqueIdentifier = [](
+		const TArray<FObjectMixerEditorListRowPtr>& InObjects, const FTreeItemUniqueIdentifier& InUniqueIdentifier)
+	{
+		for (const FObjectMixerEditorListRowPtr& TreeViewItem : InObjects)
+		{
+			FTreeItemUniqueIdentifier TreeItemUniqueIdentifier(TreeViewItem);
+
+			if (InUniqueIdentifier == TreeItemUniqueIdentifier)
+			{
+				return &TreeViewItem;
+			}
+
+			if (const FObjectMixerEditorListRowPtr* FoundItem = RecursivelyFindByUniqueIdentifier(
+				TreeViewItem->GetChildRows(), InUniqueIdentifier))
+			{
+				return FoundItem;
+			}
+		}
+
+		const FObjectMixerEditorListRowPtr* Nulled = nullptr;
+		return Nulled;
+	};
+
+	if (const FObjectMixerEditorListRowPtr* FoundItem = RecursivelyFindByUniqueIdentifier(TreeViewRootObjects, PendingRenameItem))
+	{
+		(*FoundItem)->CallOnRenameCommandDelegate();
+	}
+
+	PendingRenameItem.Reset();
+}
+
 void SObjectMixerEditorList::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime,
 	const float InDeltaTime)
 {
@@ -507,6 +806,9 @@ void SObjectMixerEditorList::Tick(const FGeometry& AllottedGeometry, const doubl
 	if (bIsRebuildRequested)
 	{
 		RebuildList();
+		
+		// Early out so we have widgets to act upon next frame
+		return;
 	}
 
 	if (bIsEditorToListSelectionSyncRequested)
@@ -518,6 +820,11 @@ void SObjectMixerEditorList::Tick(const FGeometry& AllottedGeometry, const doubl
 	{
 		bShouldPauseSyncSelection = false;
 		bIsEditorToListSelectionSyncRequested = false;
+	}
+
+	if (PendingRenameItem.IdentifiesAnyRow())
+	{
+		ExecuteRenameOnPending();
 	}
 }
 
@@ -880,34 +1187,32 @@ void SObjectMixerEditorList::SetAllGroupsCollapsed()
 
 void SObjectMixerEditorList::CacheTreeState(const TArray<TWeakPtr<IObjectMixerEditorListFilter>>& InFilterCombo)
 {
-	struct Local
+	using LambdaType = void(*)(const TArray<FObjectMixerEditorListRowPtr>&,
+			TArray<FTreeItemStateCache>*,
+			TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>>);
+	
+	static LambdaType RecursivelyCacheTreeState = [](
+		const TArray<FObjectMixerEditorListRowPtr>& InObjects,
+		TArray<FTreeItemStateCache>* TreeItemStateCache,
+		TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>> InTreeViewPtr)
 	{
-		static void RecursivelyCacheTreeState(
-			const TArray<FObjectMixerEditorListRowPtr>& InObjects,
-			TArray<FTreeItemStateCache>* TreeItemStateCache,
-			TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>> TreeViewPtr)
+		for (const FObjectMixerEditorListRowPtr& TreeViewItem : InObjects)
 		{
-			for (const TSharedPtr<FObjectMixerEditorListRow>& TreeViewItem : InObjects)
+			FTreeItemUniqueIdentifier UniqueIdentifier(TreeViewItem);
+
+			if (!UniqueIdentifier.RowName.IsEmpty())
 			{
-				UObject* RowObject = TreeViewItem->GetObject();
-				const FString RowName =
-					TreeViewItem->GetRowType() == FObjectMixerEditorListRow::Folder ?
-						TreeViewItem->GetFolderPath().ToString() : TreeViewItem->GetDisplayName().ToString();
-
-				if (!RowName.IsEmpty())
-				{
-					TreeItemStateCache->Add(
-						{
-							RowObject ? RowObject->GetUniqueID() : -1,
-							RowName,
-							TreeViewPtr->IsItemExpanded(TreeViewItem), 
-							TreeViewPtr->IsItemSelected(TreeViewItem)
-						}
-					);
-				}
-
-				RecursivelyCacheTreeState(TreeViewItem->GetChildRows(), TreeItemStateCache, TreeViewPtr);
+				TreeItemStateCache->Add(
+					{
+						UniqueIdentifier,
+						InTreeViewPtr->IsItemExpanded(TreeViewItem),
+						InTreeViewPtr->IsItemSelected(TreeViewItem),
+						TreeViewItem->GetVisibilityRules()
+					}
+				);
 			}
+
+			RecursivelyCacheTreeState(TreeViewItem->GetChildRows(), TreeItemStateCache, InTreeViewPtr);
 		}
 	};
 
@@ -921,59 +1226,54 @@ void SObjectMixerEditorList::CacheTreeState(const TArray<TWeakPtr<IObjectMixerEd
 
 	if (Match)
 	{
-		Local::RecursivelyCacheTreeState(TreeViewRootObjects, &Match->Caches, TreeViewPtr);
+		RecursivelyCacheTreeState(TreeViewRootObjects, &Match->Caches, TreeViewPtr);
 	}
 	else
 	{
 		TArray<FTreeItemStateCache> NewCache;
-		Local::RecursivelyCacheTreeState(TreeViewRootObjects, &NewCache, TreeViewPtr);
+		RecursivelyCacheTreeState(TreeViewRootObjects, &NewCache, TreeViewPtr);
 		FilterComboToStateCaches.Add({InFilterCombo, MoveTemp(NewCache)});
 	}
 }
 
 void SObjectMixerEditorList::RestoreTreeState(const TArray<TWeakPtr<IObjectMixerEditorListFilter>>& InFilterCombo, const bool bFlushCache)
 {
-	struct Local
+	using LambdaType = void(*)(const TArray<FObjectMixerEditorListRowPtr>&,
+			TArray<FTreeItemStateCache>*,
+			TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>>,
+			const bool);
+	
+	static LambdaType RecursivelyRestoreTreeState = [](
+		const TArray<FObjectMixerEditorListRowPtr>& InObjects,
+		TArray<FTreeItemStateCache>* TreeItemStateCache,
+		TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>> InTreeViewPtr,
+		const bool bExpandByDefault)
 	{
-		static void RecursivelyRestoreTreeState(
-			const TArray<FObjectMixerEditorListRowPtr>& InObjects,
-			TArray<FTreeItemStateCache>* TreeItemStateCache,
-			TSharedPtr<STreeView<FObjectMixerEditorListRowPtr>> TreeViewPtr,
-			const bool bExpandByDefault)
+		for (const FObjectMixerEditorListRowPtr& TreeViewItem : InObjects)
 		{
-			for (const TSharedPtr<FObjectMixerEditorListRow>& TreeViewItem : InObjects)
+			const FTreeItemUniqueIdentifier TreeItemUniqueIdentifier(TreeViewItem);
+			
+			if (const FTreeItemStateCache* StateCachePtr = Algo::FindByPredicate(
+				*TreeItemStateCache,
+				[&TreeItemUniqueIdentifier](const FTreeItemStateCache& Other)
+				{
+					
+					return Other.UniqueIdentifier == TreeItemUniqueIdentifier;
+				}
+			))
 			{
-				if (const FTreeItemStateCache* StateCachePtr = Algo::FindByPredicate(
-					*TreeItemStateCache,
-					[TreeViewItem](const FTreeItemStateCache& Other)
-					{
-						if (Other.UniqueId != -1)
-						{
-							if (const UObject* RowObject = TreeViewItem->GetObject())
-							{
-								return Other.UniqueId == RowObject->GetUniqueID();
-							}
-						}
-
-						const FString RowName =
-							TreeViewItem->GetRowType() == FObjectMixerEditorListRow::Folder ?
-								TreeViewItem->GetFolderPath().ToString() : TreeViewItem->GetDisplayName().ToString();
-
-						return Other.RowName.Equals(RowName);
-					}
-				))
-				{
-					TreeViewPtr->SetItemExpansion(TreeViewItem, StateCachePtr->bIsExpanded);
-					TreeViewPtr->SetItemSelection(TreeViewItem, StateCachePtr->bIsSelected);
-				}
-				else
-				{
-					TreeViewPtr->SetItemExpansion(TreeViewItem, bExpandByDefault);
-				}
-
-				RecursivelyRestoreTreeState(
-					TreeViewItem->GetChildRows(), TreeItemStateCache, TreeViewPtr, bExpandByDefault);
+				InTreeViewPtr->SetItemExpansion(TreeViewItem, StateCachePtr->bIsExpanded);
+				InTreeViewPtr->SetItemSelection(TreeViewItem, StateCachePtr->bIsSelected);
+				
+				TreeViewItem->SetVisibilityRules(StateCachePtr->VisibilityRules);
 			}
+			else
+			{
+				InTreeViewPtr->SetItemExpansion(TreeViewItem, bExpandByDefault);
+			}
+
+			RecursivelyRestoreTreeState(
+				TreeViewItem->GetChildRows(), TreeItemStateCache, InTreeViewPtr, bExpandByDefault);
 		}
 	};
 	
@@ -987,7 +1287,7 @@ void SObjectMixerEditorList::RestoreTreeState(const TArray<TWeakPtr<IObjectMixer
 	{
 		if (FilterComboToStateCaches[CachesItr].FilterCombo == InFilterCombo)
 		{
-			Local::RecursivelyRestoreTreeState(
+			RecursivelyRestoreTreeState(
 			  TreeViewRootObjects, &FilterComboToStateCaches[CachesItr].Caches, TreeViewPtr, bExpandByDefault);
 
 			if (bFlushCache)
@@ -1179,7 +1479,7 @@ void CreateFolderRowsForTopLevelRow(
 
 		while (!BaseActorFolder.IsNone())
 		{
-			TSharedPtr<FObjectMixerEditorListRow> FolderRow;
+			FObjectMixerEditorListRowPtr FolderRow;
 			
 			if (const FObjectMixerEditorListRowPtr* Match = FolderMap.Find(BaseActorFolder.GetPath()))
 			{
@@ -1189,7 +1489,7 @@ void CreateFolderRowsForTopLevelRow(
 			{
 				FolderRow =
 					MakeShared<FObjectMixerEditorListRow>(
-						BaseActorFolder.GetPath(), FObjectMixerEditorListRow::Folder, InListView,
+						BaseActorFolder, FObjectMixerEditorListRow::Folder, InListView,
 						FText::FromName(BaseActorFolder.GetLeafName()));
 
 				FolderMap.Add(BaseActorFolder.GetPath(), FolderRow.ToSharedRef());
@@ -1230,8 +1530,7 @@ void SObjectMixerEditorList::GenerateTreeView()
 
 	BuildPerformanceCacheAndGenerateHeaderIfNeeded();
 
-	check(GEditor);
-	const UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
+	const UWorld* EditorWorld = GetWorld();
 	
 	TSet<UObject*> AllMatchingObjects;
 
@@ -1287,7 +1586,7 @@ void SObjectMixerEditorList::FindVisibleTreeViewObjects()
 {
 	VisibleTreeViewObjects.Empty();
 
-	for (const TSharedPtr<FObjectMixerEditorListRow>& Row : TreeViewRootObjects)
+	for (const FObjectMixerEditorListRowPtr& Row : TreeViewRootObjects)
 	{
 		if (Row->ShouldRowWidgetBeVisible())
 		{
@@ -1307,7 +1606,6 @@ void SObjectMixerEditorList::SelectedTreeItemsToSelectedInLevelEditor()
 	if (GEditor && !bShouldPauseSyncSelection)
 	{
 		bShouldPauseSyncSelection = true;
-		TArray<AActor*> ActorsToSelect;
 		const TArray<FObjectMixerEditorListRowPtr>& SelectedTreeItems = TreeViewPtr->GetSelectedItems();
 		
 		if (SelectedTreeItems.Num() == 0)
@@ -1316,19 +1614,13 @@ void SObjectMixerEditorList::SelectedTreeItemsToSelectedInLevelEditor()
 		}
 		else
 		{
-			for (const TSharedPtr<FObjectMixerEditorListRow>& SelectedRow : SelectedTreeItems)
+			TArray<AActor*> ActorsToSelect;
+			for (const FObjectMixerEditorListRowPtr& SelectedRow : SelectedTreeItems)
 			{
 				if (SelectedRow->GetRowType() == FObjectMixerEditorListRow::MatchingObject ||
 					SelectedRow->GetRowType() == FObjectMixerEditorListRow::ContainerObject)
 				{
-					AActor* Actor = Cast<AActor>(SelectedRow->GetObject());
-
-					if (!Actor)
-					{
-						Actor = SelectedRow->GetObject()->GetTypedOuter<AActor>();
-					}
-
-					if (Actor)
+					if (AActor* Actor = SelectedRow->GetSelfOrOuterAsActor())
 					{
 						ActorsToSelect.Add(Actor);
 					}

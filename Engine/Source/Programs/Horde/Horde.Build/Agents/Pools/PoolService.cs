@@ -21,9 +21,9 @@ namespace Horde.Build.Agents.Pools
 	public class PoolService
 	{
 		/// <summary>
-		/// The database service instance
+		/// The globals service instance
 		/// </summary>
-		readonly MongoService _mongoService;
+		readonly GlobalsService _globalsService;
 
 		/// <summary>
 		/// Collection of pool documents
@@ -43,12 +43,12 @@ namespace Horde.Build.Agents.Pools
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		/// <param name="mongoService"></param>
+		/// <param name="globalsService"></param>
 		/// <param name="pools">Collection of pool documents</param>
 		/// <param name="clock"></param>
-		public PoolService(MongoService mongoService, IPoolCollection pools, IClock clock)
+		public PoolService(GlobalsService globalsService, IPoolCollection pools, IClock clock)
 		{
-			_mongoService = mongoService;
+			_globalsService = globalsService;
 			_pools = pools;
 			_clock = clock;
 		}
@@ -64,6 +64,8 @@ namespace Horde.Build.Agents.Pools
 		/// <param name="conformInterval">Interval between conforms. Set to zero to disable.</param>
 		/// <param name="scaleOutCooldown">Cooldown time between scale-out events</param>
 		/// <param name="scaleInCooldown">Cooldown time between scale-in events</param>
+		/// <param name="sizeStrategies">Pool sizing strategies</param>
+		/// <param name="fleetManagers">Fleet managers</param>
 		/// <param name="sizeStrategy">Pool sizing strategy</param>
 		/// <param name="leaseUtilizationSettings">Settings for lease utilization strategy</param>
 		/// <param name="jobQueueSettings">Settings for job queue strategy</param>
@@ -79,6 +81,8 @@ namespace Horde.Build.Agents.Pools
 			TimeSpan? conformInterval = null,
 			TimeSpan? scaleOutCooldown = null,
 			TimeSpan? scaleInCooldown = null,
+			List<PoolSizeStrategyInfo>? sizeStrategies = null,
+			List<FleetManagerInfo>? fleetManagers = null,
 			PoolSizeStrategy? sizeStrategy = null,
 			LeaseUtilizationSettings? leaseUtilizationSettings = null,
 			JobQueueSettings? jobQueueSettings = null,
@@ -95,6 +99,8 @@ namespace Horde.Build.Agents.Pools
 				conformInterval,
 				scaleOutCooldown,
 				scaleInCooldown,
+				sizeStrategies,
+				fleetManagers,
 				sizeStrategy,
 				leaseUtilizationSettings,
 				jobQueueSettings,
@@ -126,6 +132,8 @@ namespace Horde.Build.Agents.Pools
 		/// <param name="scaleOutCooldown">Cooldown time between scale-out events</param>
 		/// <param name="scaleInCooldown">Cooldown time between scale-in events</param>
 		/// <param name="sizeStrategy">New pool sizing strategy for the pool</param>
+		/// <param name="newSizeStrategies">New pool sizing strategies for the pool</param>
+		/// <param name="newFleetManagers">New fleet managers for the pool</param>
 		/// <param name="leaseUtilizationSettings">Settings for lease utilization-based strategy</param>
 		/// <param name="jobQueueSettings">Settings for job queue-based strategy</param>
 		/// <param name="computeQueueAwsMetricSettings">Settings for compute queue AWS metric strategy</param>
@@ -143,6 +151,8 @@ namespace Horde.Build.Agents.Pools
 			TimeSpan? scaleOutCooldown = null,
 			TimeSpan? scaleInCooldown = null,
 			PoolSizeStrategy? sizeStrategy = null,
+			List<PoolSizeStrategyInfo>? newSizeStrategies = null,
+			List<FleetManagerInfo>? newFleetManagers = null,
 			LeaseUtilizationSettings? leaseUtilizationSettings = null,
 			JobQueueSettings? jobQueueSettings = null,
 			ComputeQueueAwsMetricSettings? computeQueueAwsMetricSettings = null,
@@ -162,6 +172,8 @@ namespace Horde.Build.Agents.Pools
 					scaleOutCooldown: scaleOutCooldown,
 					scaleInCooldown: scaleInCooldown,
 					sizeStrategy: sizeStrategy,
+					newSizeStrategies: newSizeStrategies,
+					newFleetManagers: newFleetManagers,
 					leaseUtilizationSettings: leaseUtilizationSettings,
 					jobQueueSettings: jobQueueSettings,
 					computeQueueAwsMetricSettings: computeQueueAwsMetricSettings,
@@ -237,7 +249,7 @@ namespace Horde.Build.Agents.Pools
 		/// <returns>List of workspaces</returns>
 		public async Task<HashSet<AgentWorkspace>> GetWorkspacesAsync(IAgent agent, DateTime validAtTime)
 		{
-			bool bAddAutoSdkWorkspace = false;
+			bool addAutoSdkWorkspace = false;
 			HashSet<AgentWorkspace> workspaces = new HashSet<AgentWorkspace>();
 
 			Dictionary<PoolId, IPool> poolMapping = await GetPoolLookupAsync(validAtTime);
@@ -247,13 +259,13 @@ namespace Horde.Build.Agents.Pools
 				if (poolMapping.TryGetValue(poolId, out pool))
 				{
 					workspaces.UnionWith(pool.Workspaces);
-					bAddAutoSdkWorkspace |= pool.UseAutoSdk;
+					addAutoSdkWorkspace |= pool.UseAutoSdk;
 				}
 			}
 
-			if (bAddAutoSdkWorkspace)
+			if (addAutoSdkWorkspace)
 			{
-				Globals globals = await _mongoService.GetGlobalsAsync();
+				IGlobals globals = await _globalsService.GetAsync();
 				workspaces.UnionWith(agent.GetAutoSdkWorkspaces(globals, workspaces.ToList()));
 			}
 

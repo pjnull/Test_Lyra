@@ -53,9 +53,6 @@ void FIKRetargetEditor::InitAssetEditor(
 	
 	FPersonaModule& PersonaModule = FModuleManager::LoadModuleChecked<FPersonaModule>("Persona");
 	PersonaToolkit = PersonaModule.CreatePersonaToolkit(InAsset, PersonaToolkitArgs);
-	
-	TSharedRef<IAssetFamily> AssetFamily = PersonaModule.CreatePersonaAssetFamily(InAsset);
-	AssetFamily->RecordAssetOpened(FAssetData(InAsset));
 
 	const bool bCreateDefaultStandaloneMenu = true;
 	const bool bCreateDefaultToolbar = true;
@@ -382,7 +379,7 @@ void FIKRetargetEditor::SetupAnimInstance()
 	
 	// configure SOURCE anim instance (will only output retarget pose)
 	EditorController->SourceAnimInstance->ConfigureAnimInstance(ERetargetSourceOrTarget::Source, Asset, nullptr);
-	// configure TARGET anim instance (will output retarget pose AND retarget pose from source skel mesh component)
+	// configure TARGET anim instance (will output retarget pose AND retargeted pose from source skel mesh component)
 	EditorController->TargetAnimInstance->ConfigureAnimInstance(ERetargetSourceOrTarget::Target, Asset, EditorController->SourceSkelMeshComponent);
 
 	EditorController->SourceSkelMeshComponent->PreviewInstance = EditorController->SourceAnimInstance.Get();
@@ -435,35 +432,13 @@ void FIKRetargetEditor::OnFinishedChangingDetails(const FPropertyChangedEvent& P
 		EditorController->ClearOutputLog();
 		EditorController->BindToIKRigAssets(AssetController->GetAsset());
 		EditorController->AssetController->CleanChainMapping();
-		EditorController->AssetController->AutoMapChains();
+		constexpr bool bForceRemap = false;
+		EditorController->AssetController->AutoMapChains(EAutoMapChainType::Fuzzy, bForceRemap);
 	}
 
 	// if either the source or target meshes are possibly modified, update scene components, anim instance and UI
 	if (bTargetIKRigChanged || bSourceIKRigChanged || bTargetPreviewChanged || bSourcePreviewChanged)
 	{
-		EditorController->ClearOutputLog();
-		
-		// set the source and target skeletal meshes on the component
-		// NOTE: this must be done AFTER setting the AnimInstance so that the correct root anim node is loaded
-		USkeletalMesh* SourceMesh = EditorController->GetSkeletalMesh(ERetargetSourceOrTarget::Source);
-		USkeletalMesh* TargetMesh = EditorController->GetSkeletalMesh(ERetargetSourceOrTarget::Target);
-		EditorController->SourceSkelMeshComponent->SetSkeletalMesh(SourceMesh);
-		EditorController->TargetSkelMeshComponent->SetSkeletalMesh(TargetMesh);
-
-		// reset bone selections in case of incompatible indices
-		EditorController->ClearSelection();
-	
-		// apply mesh to the preview scene
-		TSharedRef<IPersonaPreviewScene> PreviewScene = GetPersonaToolkit()->GetPreviewScene();
-		if (PreviewScene->GetPreviewMesh() != SourceMesh)
-		{
-			PreviewScene->SetPreviewMeshComponent(EditorController->SourceSkelMeshComponent);
-			PreviewScene->SetPreviewMesh(SourceMesh);
-			EditorController->SourceSkelMeshComponent->bCanHighlightSelectedSections = false;
-		}
-	
-		SetupAnimInstance();
-
 		AssetController->BroadcastNeedsReinitialized();
 	}
 }

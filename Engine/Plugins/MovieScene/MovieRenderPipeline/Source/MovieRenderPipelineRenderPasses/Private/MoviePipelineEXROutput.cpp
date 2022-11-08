@@ -14,13 +14,15 @@
 #include "ImageWriteQueue.h"
 #include "MoviePipeline.h"
 #include "MoviePipelineImageQuantization.h"
-#include "MoviePipelineMasterConfig.h"
+#include "MoviePipelinePrimaryConfig.h"
 #include "IOpenExrRTTIModule.h"
 #include "Modules/ModuleManager.h"
 #include "MoviePipelineUtils.h"
+#include "ColorSpace.h"
 
 THIRD_PARTY_INCLUDES_START
 #include "OpenEXR/ImfChannelList.h"
+#include "OpenEXR/ImfStandardAttributes.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MoviePipelineEXROutput)
 
@@ -163,6 +165,16 @@ bool FEXRImageWriteTask::WriteToDisk()
 
 		// Insert our key-value pair metadata (if any, can be an arbitrary set of key/value pairs)
 		AddFileMetadata(Header);
+
+		// Write the working color space into EXR chromaticities
+		const UE::Color::FColorSpace& WCS = UE::Color::FColorSpace::GetWorking();
+		Imf::Chromaticities Chromaticities = {
+			IMATH_NAMESPACE::V2f((float)WCS.GetRedChromaticity().X, (float)WCS.GetRedChromaticity().Y),
+			IMATH_NAMESPACE::V2f((float)WCS.GetGreenChromaticity().X, (float)WCS.GetGreenChromaticity().Y),
+			IMATH_NAMESPACE::V2f((float)WCS.GetBlueChromaticity().X, (float)WCS.GetBlueChromaticity().Y),
+			IMATH_NAMESPACE::V2f((float)WCS.GetWhiteChromaticity().X, (float)WCS.GetWhiteChromaticity().Y),
+		};
+		Imf::addChromaticities(Header, Chromaticities);
 
 		FExrMemStreamOut OutputFile; 
 		
@@ -401,7 +413,7 @@ void UMoviePipelineImageSequenceOutput_EXR::OnReceiveImageDataImpl(FMoviePipelin
 	FModuleManager::Get().LoadModule(RTTIExtensionModuleName);
 
 
-	UMoviePipelineOutputSetting* OutputSettings = GetPipeline()->GetPipelineMasterConfig()->FindSetting<UMoviePipelineOutputSetting>();
+	UMoviePipelineOutputSetting* OutputSettings = GetPipeline()->GetPipelinePrimaryConfig()->FindSetting<UMoviePipelineOutputSetting>();
 	check(OutputSettings);
 
 	// EXR only supports one resolution per file, but in certain scenarios we can get layers with different resolutions. To solve this, we're

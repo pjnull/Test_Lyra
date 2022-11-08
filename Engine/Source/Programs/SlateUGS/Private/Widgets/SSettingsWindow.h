@@ -13,14 +13,13 @@ namespace UGSCore
 	struct FUserSettings;
 }
 
-class SSettingsWindow : public SWindow
+class SSettingsWindow final: public SWindow
 {
 public:
 	SLATE_BEGIN_ARGS(SSettingsWindow) {}
-		SLATE_ARGUMENT(UGSTab*, Tab)
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments& InArgs);
+	void Construct(const FArguments& InArgs, UGSTab* InTab);
 
 private:
 	/** Handle the check box enable or disabling for AfterSync settings */
@@ -33,9 +32,12 @@ private:
 	void HandleOpenSolutionChanged(ECheckBoxState InCheck);
 	ECheckBoxState HandleGetOpenSolutionChecked() const;
 
+	void HandleSyncCompiledEditor(ECheckBoxState InCheck);
+	ECheckBoxState HandleGetSyncCompiledEditor() const;
+
 	FReply OnOkClicked();
 	FReply OnCancelClicked();
 
-	UGSTab* Tab;
+	UGSTab* Tab = nullptr;
 	TSharedPtr<UGSCore::FUserSettings> UserSettings;
 };

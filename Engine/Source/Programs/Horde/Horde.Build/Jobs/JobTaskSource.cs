@@ -185,7 +185,7 @@ namespace Horde.Build.Jobs
 			}
 		}
 
-		readonly MongoService _mongoService;
+		readonly GlobalsService _globalsService;
 		readonly StreamService _streamService;
 		readonly ILogFileService _logFileService;
 		readonly IAgentCollection _agentsCollection;
@@ -196,7 +196,6 @@ namespace Horde.Build.Jobs
 		readonly IUgsMetadataCollection _ugsMetadataCollection;
 		readonly PerforceLoadBalancer _perforceLoadBalancer;
 		readonly IOptionsMonitor<ServerSettings> _settings;
-		readonly ICommitService _commitService;
 		readonly ILogger<JobTaskSource> _logger;
 		readonly ITicker _ticker;
 
@@ -237,9 +236,9 @@ namespace Horde.Build.Jobs
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public JobTaskSource(MongoService mongoService, IAgentCollection agents, IJobCollection jobs, IJobStepRefCollection jobStepRefs, IGraphCollection graphs, IPoolCollection pools, IUgsMetadataCollection ugsMetadataCollection, StreamService streamService, ILogFileService logFileService, PerforceLoadBalancer perforceLoadBalancer, ICommitService commitService, IClock clock, IOptionsMonitor<ServerSettings> settings, ILogger<JobTaskSource> logger)
+		public JobTaskSource(GlobalsService globalsService, IAgentCollection agents, IJobCollection jobs, IJobStepRefCollection jobStepRefs, IGraphCollection graphs, IPoolCollection pools, IUgsMetadataCollection ugsMetadataCollection, StreamService streamService, ILogFileService logFileService, PerforceLoadBalancer perforceLoadBalancer, IClock clock, IOptionsMonitor<ServerSettings> settings, ILogger<JobTaskSource> logger)
 		{
-			_mongoService = mongoService;
+			_globalsService = globalsService;
 			_agentsCollection = agents;
 			_jobs = jobs;
 			_jobStepRefs = jobStepRefs;
@@ -251,7 +250,6 @@ namespace Horde.Build.Jobs
 			_perforceLoadBalancer = perforceLoadBalancer;
 			_ticker = clock.AddTicker<JobTaskSource>(s_refreshInterval, TickAsync, logger);
 			_settings = settings;
-			_commitService = commitService;
 			_logger = logger;
 
 			OnLeaseStartedProperties.Add(nameof(ExecuteJobTask.JobId), x => new JobId(x.JobId)).Add(nameof(ExecuteJobTask.BatchId), x => SubResourceId.Parse(x.BatchId)).Add(nameof(ExecuteJobTask.LogId), x => new LogId(x.LogId));
@@ -418,7 +416,7 @@ namespace Horde.Build.Jobs
 
 					// Validate the agent type and workspace settings
 					IJobStepBatch batch = newJob.Batches[batchIdx];
-					if (!stream.AgentTypes.TryGetValue(graph.Groups[batch.GroupIdx].AgentType, out AgentType? agentType))
+					if (!stream.Config.AgentTypes.TryGetValue(graph.Groups[batch.GroupIdx].AgentType, out AgentConfig? agentType))
 					{
 						newJob = await SkipBatchAsync(newJob, batch.Id, graph, JobStepBatchError.UnknownAgentType);
 					}
@@ -440,31 +438,28 @@ namespace Horde.Build.Jobs
 					}
 					else
 					{
-						TemplateRef? templateRef;
+						ITemplateRef? templateRef;
 						if (stream.Templates.TryGetValue(newJob.TemplateId, out templateRef))
 						{							
 							if (templateRef.StepStates != null)
 							{
 								for (int i = 0; i < templateRef.StepStates.Count; i++)
 								{
-									TemplateStepState state = templateRef.StepStates[i];
-									if (state.PausedByUserId != null)
-									{
-										IJobStep? step = batch.Steps.FirstOrDefault(x => graph.Groups[batch.GroupIdx].Nodes[x.NodeIdx].Name.Equals(state.Name, StringComparison.Ordinal));
+									ITemplateStep state = templateRef.StepStates[i];
 
-										if (step != null)
+									IJobStep? step = batch.Steps.FirstOrDefault(x => graph.Groups[batch.GroupIdx].Nodes[x.NodeIdx].Name.Equals(state.Name, StringComparison.Ordinal));
+									if (step != null)
+									{
+										JobId jobId = newJob.Id;
+										newJob = await _jobs.TryUpdateStepAsync(newJob, graph, batch.Id, step.Id, JobStepState.Skipped, newError: JobStepError.Paused);
+										if (newJob == null)
 										{
-											JobId jobId = newJob.Id;
-											newJob = await _jobs.TryUpdateStepAsync(newJob, graph, batch.Id, step.Id, JobStepState.Skipped, newError: JobStepError.Paused);
-											if (newJob == null)
-											{
-												_logger.LogError("Job {JobId} failed to update step {StepName} pause state", jobId, state.Name);
-												break;
-											}
-											else
-											{
-												_logger.LogInformation("Job {JobId} step {StepName} has been skipped due to being paused", jobId, state.Name);
-											}
+											_logger.LogError("Job {JobId} failed to update step {StepName} pause state", jobId, state.Name);
+											break;
+										}
+										else
+										{
+											_logger.LogInformation("Job {JobId} step {StepName} has been skipped due to being paused", jobId, state.Name);
 										}
 									}
 								}
@@ -669,8 +664,8 @@ namespace Horde.Build.Jobs
 						INodeGroup group = graph.Groups[batch.GroupIdx];
 
 						// Get the requirements for the new queue item
-						AgentType? agentType;
-						if (stream.AgentTypes.TryGetValue(group.AgentType, out agentType))
+						AgentConfig? agentType;
+						if (stream.Config.AgentTypes.TryGetValue(group.AgentType, out agentType))
 						{
 							(AgentWorkspace, bool)? result;
 							if (stream.TryGetAgentWorkspace(agentType, out result))
@@ -765,8 +760,10 @@ namespace Horde.Build.Jobs
 			// The next time to try assigning to another agent
 			DateTime backOffTime = DateTime.UtcNow + TimeSpan.FromMinutes(1.0);
 
+			// Allocate a log ID but hold off creating the actual log file until the lease has been accepted
+			LogId logId = LogId.GenerateNewId();
+			
 			// Try to update the job with this agent id
-			LogId logId = (await _logFileService.CreateLogFileAsync(job.Id, agent.SessionId, LogType.Json)).Id;
 			IJob? newJob = await _jobs.TryAssignLeaseAsync(item._job, item._batchIdx, item._poolId, agent.Id, agent.SessionId!.Value, leaseId, logId);
 			if (newJob != null)
 			{
@@ -785,7 +782,7 @@ namespace Horde.Build.Jobs
 				leaseName.Append(CultureInfo.InvariantCulture, $" - {job.Name}");
 
 				// Get the global settings
-				Globals globals = await _mongoService.GetGlobalsAsync();
+				IGlobals globals = await _globalsService.GetAsync();
 
 				// Encode the payload
 				ExecuteJobTask? task = await CreateExecuteJobTaskAsync(item._stream, job, batch, agent, item._workspace, item._useAutoSdk, logId);
@@ -798,6 +795,7 @@ namespace Horde.Build.Jobs
 					if (waiter.LeaseSource.TrySetResult(lease))
 					{
 						_logger.LogDebug("Assigned lease {LeaseId} to agent {AgentId}", leaseId, agent.Id);
+						await _logFileService.CreateLogFileAsync(job.Id, agent.SessionId, LogType.Json, logId);
 						return lease;
 					}
 				}
@@ -837,7 +835,7 @@ namespace Horde.Build.Jobs
 			return null;
 		}
 
-		async Task<ExecuteJobTask?> CreateExecuteJobTaskAsync(IStream stream, IJob job, IJobStepBatch batch, IAgent agent, AgentWorkspace workspace, bool bUseAutoSdk, LogId logId)
+		async Task<ExecuteJobTask?> CreateExecuteJobTaskAsync(IStream stream, IJob job, IJobStepBatch batch, IAgent agent, AgentWorkspace workspace, bool useAutoSdk, LogId logId)
 		{
 			// Get the lease name
 			StringBuilder leaseName = new StringBuilder($"{stream.Name} - ");
@@ -852,7 +850,7 @@ namespace Horde.Build.Jobs
 			leaseName.Append(CultureInfo.InvariantCulture, $" - {job.Name}");
 
 			// Get the global settings
-			Globals globals = await _mongoService.GetGlobalsAsync();
+			IGlobals globals = await _globalsService.GetAsync();
 
 			// Encode the payload
 			ExecuteJobTask task = new ExecuteJobTask();
@@ -863,13 +861,13 @@ namespace Horde.Build.Jobs
 
 			List<HordeCommon.Rpc.Messages.AgentWorkspace> workspaces = new List<HordeCommon.Rpc.Messages.AgentWorkspace>();
 
-			PerforceCluster? cluster = globals.FindPerforceCluster(workspace.Cluster);
+			PerforceCluster? cluster = globals.Config.FindPerforceCluster(workspace.Cluster);
 			if (cluster == null)
 			{
 				return null;
 			}
 
-			AgentWorkspace? autoSdkWorkspace = bUseAutoSdk ? agent.GetAutoSdkWorkspace(cluster) : null;
+			AgentWorkspace? autoSdkWorkspace = useAutoSdk ? agent.GetAutoSdkWorkspace(cluster) : null;
 			if (autoSdkWorkspace != null)
 			{
 				if (!await agent.TryAddWorkspaceMessage(autoSdkWorkspace, cluster, _perforceLoadBalancer, workspaces))
@@ -1038,7 +1036,7 @@ namespace Horde.Build.Jobs
 					{
 						error = JobStepBatchError.ExecutionError;
 					}
-
+					
 					IGraph graph = await _graphs.GetAsync(job.GraphHash);
 					job = await _jobs.TryFailBatchAsync(job, batchIdx, graph, error);
 
@@ -1046,11 +1044,11 @@ namespace Horde.Build.Jobs
 					{
 						if (batch.Error != JobStepBatchError.None)
 						{
-							logger.LogInformation("Failed job {JobId}, batch {BatchId} with error {Error}", job.Id, batch.Id, batch.Error);
+							logger.LogInformation("Failed lease {LeaseId}, job {JobId}, batch {BatchId} with error {Error}", leaseId, job.Id, batch.Id, batch.Error);
 						}
 						if (runningStepIdx != -1)
 						{
-							await _jobStepRefs.UpdateAsync(job, batch, batch.Steps[runningStepIdx], graph);
+							await _jobStepRefs.UpdateAsync(job, batch, batch.Steps[runningStepIdx], graph, logger);
 						}
 						break;
 					}

@@ -6651,16 +6651,22 @@ void FHeaderParser::ParseRigVMMethodParameters(FUnrealStructDefinitionInfo& Stru
 	// validate the property types for this struct
 	for (FUnrealPropertyDefinitionInfo* PropertyDef : TUHTFieldRange<FUnrealPropertyDefinitionInfo>(StructDef))
 	{
+		FRigVMParameter Parameter;
 		FString MemberCPPType;
 		FString ExtendedCPPType;
 		MemberCPPType = PropertyDef->GetCPPType(&ExtendedCPPType);
 
 		if (ExtendedCPPType.IsEmpty() && MemberCPPType.StartsWith(TEnumAsByteText))
 		{
+			Parameter.CastType = MemberCPPType;
 			MemberCPPType = MemberCPPType.LeftChop(1).RightChop(12);
+			Parameter.bIsEnumAsByte = true;
+		}
+		else
+		{
+			Parameter.bIsEnumAsByte = false;
 		}
 
-		FRigVMParameter Parameter;
 		Parameter.Name = PropertyDef->GetName();
 		Parameter.Type = MemberCPPType + ExtendedCPPType;
 		Parameter.bConstant = PropertyDef->HasMetaData(NAME_ConstantText);

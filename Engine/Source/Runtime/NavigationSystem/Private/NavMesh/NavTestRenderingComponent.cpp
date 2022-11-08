@@ -230,7 +230,7 @@ void FNavTestSceneProxy::GatherPathStep()
 
 			FNodeDebugData NewNodeData;
 
-			float DisplayedCost = FLT_MAX; 
+			FVector::FReal DisplayedCost = TNumericLimits<FVector::FReal>::Max();
 			switch (NavTestActor->CostDisplayMode)
 			{
 			case ENavCostDisplay::TotalCost:

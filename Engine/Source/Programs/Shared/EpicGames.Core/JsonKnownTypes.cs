@@ -12,7 +12,7 @@ namespace EpicGames.Core
 	/// Sets a name used to discriminate between classes derived from a base class
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Class)]
-	public class JsonDiscriminatorAttribute : Attribute
+	public sealed class JsonDiscriminatorAttribute : Attribute
 	{
 		/// <summary>
 		/// Name to use to discriminate between different classes
@@ -33,7 +33,7 @@ namespace EpicGames.Core
 	/// Marks a class as the base class of a hierarchy, allowing any known subclasses to be serialized for it.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Class)]
-	public class JsonKnownTypesAttribute : Attribute
+	public sealed class JsonKnownTypesAttribute : Attribute
 	{
 		/// <summary>
 		/// Array of derived classes
@@ -120,13 +120,13 @@ namespace EpicGames.Core
 				}
 
 				Type? targetType;
-				if (!_discriminatorToType.TryGetValue(element.GetString(), out targetType))
+				if (!_discriminatorToType.TryGetValue(element.GetString()!, out targetType))
 				{
 					throw new JsonException($"Invalid '{TypePropertyName}' field ('{element.GetString()}') for serializing {typeToConvert.Name}");
 				}
 
 				string text = document.RootElement.GetRawText();
-				T result = (T)JsonSerializer.Deserialize(text, targetType, options);
+				T result = (T)JsonSerializer.Deserialize(text, targetType, options)!;
 				return result;
 			}
 		}

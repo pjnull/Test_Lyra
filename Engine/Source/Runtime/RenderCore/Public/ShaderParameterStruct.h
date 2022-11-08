@@ -117,16 +117,15 @@ extern RENDERCORE_API void EmitNullShaderParameterFatalError(const TShaderRef<FS
 
 /** Validates that all resource parameters of a shader are set. */
 #if DO_CHECK
-extern RENDERCORE_API void ValidateShaderParameters(const TShaderRef<FShader>& Shader, const FShaderParametersMetadata* ParametersMetadata, const void* Parameters);
+extern RENDERCORE_API void ValidateShaderParameters(const TShaderRef<FShader>& Shader, const FShaderParametersMetadata* ParametersMetadata, const void* ParametersData);
 #else
-FORCEINLINE void ValidateShaderParameters(const TShaderRef<FShader>& Shader, const FShaderParametersMetadata* ParametersMetadata, const void* Parameters) {}
+FORCEINLINE void ValidateShaderParameters(const TShaderRef<FShader>& Shader, const FShaderParametersMetadata* ParametersMetadata, const void* ParametersData) {}
 #endif
 
 template<typename TShaderClass>
 FORCEINLINE void ValidateShaderParameters(const TShaderRef<TShaderClass>& Shader, const typename TShaderClass::FParameters& Parameters)
 {
-	const typename TShaderClass::FParameters* ParameterPtr = &Parameters;
-	return ValidateShaderParameters(Shader, TShaderClass::FParameters::FTypeInfo::GetStructMetadata(), ParameterPtr);
+	return ValidateShaderParameters(Shader, TShaderClass::FParameters::FTypeInfo::GetStructMetadata(), &Parameters);
 }
 
 /** Unset compute shader UAVs. */
@@ -173,21 +172,21 @@ RENDERCORE_API void SetShaderParameters(
 	FRHIComputeShader* ShaderRHI,
 	const FShaderParameterBindings& Bindings,
 	const FShaderParametersMetadata* ParametersMetadata,
-	const uint8* Base);
+	const void* ParametersData);
 
 RENDERCORE_API void SetShaderParameters(
 	FRHICommandList& RHICmdList,
 	FRHIGraphicsShader* ShaderRHI,
 	const FShaderParameterBindings& Bindings,
 	const FShaderParametersMetadata* ParametersMetadata,
-	const uint8* Base);
+	const void* ParametersData);
 
 RENDERCORE_API void SetShaderParameters(
 	FRHICommandList& RHICmdList,
 	FRHIComputeShader* ShaderRHI,
 	const FShaderParameterBindings& Bindings,
 	const FShaderParametersMetadata* ParametersMetadata,
-	const uint8* Base);
+	const void* ParametersData);
 
 template<typename TRHICmdList, typename TShaderClass, typename TShaderRHI>
 inline void SetShaderParameters(
@@ -200,12 +199,8 @@ inline void SetShaderParameters(
 	ValidateShaderParameters(Shader, ParametersMetadata, &Parameters);
 
 	// TODO(RDG): Once all shader sets their parameter through this, can refactor RHI so all shader parameters get sets through a single RHI function call.
-	const FShaderParameterBindings& Bindings = Shader->Bindings;
 
-	const typename TShaderClass::FParameters* ParametersPtr = &Parameters;
-	const uint8* Base = reinterpret_cast<const uint8*>(ParametersPtr);
-
-	SetShaderParameters(RHICmdList, ShaderRHI, Bindings, ParametersMetadata, Base);
+	SetShaderParameters(RHICmdList, ShaderRHI, Shader->Bindings, ParametersMetadata, &Parameters);
 }
 
 template<typename TRHICmdList, typename TShaderClass, typename TShaderRHI>
@@ -220,23 +215,20 @@ inline void SetShaderParameters(TRHICmdList& RHICmdList, const TShaderRef<TShade
 RENDERCORE_API void SetShaderParameters(
 	FRayTracingShaderBindingsWriter& RTBindingsWriter,
 	const FShaderParameterBindings& Bindings,
-	const FRHIUniformBufferLayout* RootUniformBufferLayout,
-	const uint8* Base);
+	const FShaderParametersMetadata* ParametersMetadata,
+	const void* ParametersData);
 
 /** Set shader's parameters from its parameters struct. */
 template<typename TShaderClass>
 void SetShaderParameters(FRayTracingShaderBindingsWriter& RTBindingsWriter, const TShaderRef<TShaderClass>& Shader, const typename TShaderClass::FParameters& Parameters)
 {
-	ValidateShaderParameters(Shader, Parameters);
+	const FShaderParametersMetadata* ParametersMetadata = TShaderClass::FParameters::FTypeInfo::GetStructMetadata();
 
-	const FShaderParameterBindings& Bindings = Shader->Bindings;
+	ValidateShaderParameters(Shader, ParametersMetadata, &Parameters);
 
-	checkf(Bindings.Parameters.Num() == 0, TEXT("Ray tracing shader should use SHADER_USE_ROOT_PARAMETER_STRUCT() to passdown the cbuffer layout to the shader compiler."));
+	checkf(Shader->Bindings.Parameters.Num() == 0, TEXT("Ray tracing shader should use SHADER_USE_ROOT_PARAMETER_STRUCT() to passdown the cbuffer layout to the shader compiler."));
 
-	const typename TShaderClass::FParameters* ParametersPtr = &Parameters;
-	const uint8* Base = reinterpret_cast<const uint8*>(ParametersPtr);
-
-	SetShaderParameters(RTBindingsWriter, Bindings, TShaderClass::FParameters::FTypeInfo::GetStructMetadata()->GetLayoutPtr(), Base);
+	SetShaderParameters(RTBindingsWriter, Shader->Bindings, ParametersMetadata, &Parameters);
 }
 
 #endif // RHI_RAYTRACING

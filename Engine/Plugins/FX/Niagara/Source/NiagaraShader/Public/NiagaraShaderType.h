@@ -89,18 +89,24 @@ public:
 		int32 InTotalPermutationCount,
 		ConstructSerializedType InConstructSerializedRef,
 		ConstructCompiledType InConstructCompiledRef,
-		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ShouldCompilePermutationType InShouldCompilePermutationRef,
+		GetRayTracingPayloadTypeType InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ValidateCompiledResultType InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 		uint32 InTypeSize,
 		const FShaderParametersMetadata* InRootParametersMetadata = nullptr
 	)
 		: FShaderType(EShaderTypeForDynamicCast::Niagara, InTypeLayout, InName, InSourceFilename, InFunctionName, SF_Compute, InTotalPermutationCount,
 			InConstructSerializedRef,
 			InConstructCompiledRef,
-			InModifyCompilationEnvironmentRef,
 			InShouldCompilePermutationRef,
+			InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+			InModifyCompilationEnvironmentRef,
 			InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 			InTypeSize,
 			InRootParametersMetadata
 		)
@@ -108,6 +114,7 @@ public:
 		check(InTotalPermutationCount == 1);
 	}
 
+#if WITH_EDITOR
 	/**
 	 * Enqueues a compilation for a new shader of this type.
 	 * @param Script - The script to link the shader with.
@@ -132,6 +139,7 @@ public:
 		const FShaderCompileJob& CurrentJob,
 		const FString& InDebugDescription
 		) const;
+#endif // WITH_EDITOR
 
 	/**
 	 * Checks if the shader type should be cached for a particular platform and script.
@@ -144,11 +152,18 @@ public:
 		return ShouldCompilePermutation(FNiagaraShaderPermutationParameters(Platform, Script));
 	}
 
+#if WITH_EDITOR
 	/** Adds include statements for uniform buffers that this shader type references, and builds a prefix for the shader file with the include statements. */
-	void AddReferencedUniformBufferIncludes(FShaderCompilerEnvironment& OutEnvironment, FString& OutSourceFilePrefix, EShaderPlatform Platform) const;
+	void AddUniformBufferIncludesToEnvironment(FShaderCompilerEnvironment& OutEnvironment, EShaderPlatform Platform) const;
 
-	void CacheUniformBufferIncludes(TMap<const TCHAR*, FCachedUniformBufferDeclaration>& Cache, EShaderPlatform Platform) const;
+	UE_DEPRECATED(5.2, "AddReferencedUniformBufferIncludes has moved to AddUniformBufferIncludesToEnvironment and no longer takes a prefix argument.")
+	inline void AddReferencedUniformBufferIncludes(FShaderCompilerEnvironment& OutEnvironment, FString& OutSourceFilePrefix, EShaderPlatform Platform) const
+	{
+		AddUniformBufferIncludesToEnvironment(OutEnvironment, Platform);
+	}
 
+	UE_DEPRECATED(5.2, "CacheUniformBufferIncludes should no longer be used.")
+	inline void CacheUniformBufferIncludes(TMap<const TCHAR*, FCachedUniformBufferDeclaration>& Cache, EShaderPlatform Platform) const;
 
 protected:
 
@@ -161,4 +176,5 @@ protected:
 	{
 		ModifyCompilationEnvironment(FNiagaraShaderPermutationParameters(Platform, Script), Environment);
 	}
+#endif // WITH_EDITOR
 };

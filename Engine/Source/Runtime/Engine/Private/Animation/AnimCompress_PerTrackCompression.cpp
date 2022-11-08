@@ -67,7 +67,7 @@ protected:
 		bReallyNeedsFrameTable = false;
 		ActualCompressionMode = ACF_None;
 		ActualKeyFlags = 0;
-		CompressedBytes.Empty();
+		CompressedBytes.Reset();
 	}
 
 	/**
@@ -829,6 +829,9 @@ public:
 		Reset();
 		bReallyNeedsFrameTable = Params.bIncludeKeyTable && (TranslationData.PosKeys.Num() > 1) && (TranslationData.PosKeys.Num() < Params.NumberOfKeys);
 
+		const int32 MaxSize = TranslationData.Times.Num() * sizeof(FVector3f);
+		CompressedBytes.Reset(MaxSize);
+
 		switch (InCompressionType)
 		{
 		case ACF_Identity:
@@ -862,6 +865,9 @@ public:
 	{
 		Reset();
 		bReallyNeedsFrameTable = Params.bIncludeKeyTable && (RotationData.RotKeys.Num() > 1) && (RotationData.RotKeys.Num() < Params.NumberOfKeys);
+
+		const int32 MaxSize = RotationData.Times.Num() * sizeof(FQuat4f);
+		CompressedBytes.Reset(MaxSize);
 
 		switch (InCompressionType)
 		{

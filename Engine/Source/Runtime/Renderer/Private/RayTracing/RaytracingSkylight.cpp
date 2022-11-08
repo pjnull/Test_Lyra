@@ -233,6 +233,11 @@ class FRayTracingSkyLightRGS : public FGlobalShader
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
 	}
 
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::RayTracingMaterial;
+	}
+
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER(uint32, UpscaleFactor)
 		SHADER_PARAMETER_SRV(RaytracingAccelerationStructure, TLAS)

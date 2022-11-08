@@ -19,6 +19,9 @@ using Serilog;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Exceptions;
+using Serilog.Exceptions.Core;
+using Serilog.Exceptions.Grpc.Destructurers;
 using Serilog.Formatting.Json;
 using Serilog.Sinks.SystemConsole.Themes;
 
@@ -43,7 +46,7 @@ namespace Horde.Build
 				{
 					theme = AnsiConsoleTheme.Code;
 				}
-				return sinkConfig.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:w3}] {Indent}{Message:l}{NewLine}{Exception}", theme: theme, restrictedToMinimumLevel: LogEventLevel.Debug);
+				return sinkConfig.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:w3}] {Indent}{Message:l}{NewLine}{Exception}", theme: theme, restrictedToMinimumLevel: settings.ConsoleLogLevel);
 			}
 		}
 
@@ -102,17 +105,19 @@ namespace Horde.Build
 
 	class Program
 	{
-		public static SemVer Version => _version;
+		public static SemVer Version => s_version;
+
+		public static string DeploymentEnvironment { get; } = GetEnvironment();
 
 		public static DirectoryReference AppDir { get; } = GetAppDir();
 
-		public static DirectoryReference DataDir { get; } = GetDefaultDataDir();
+		public static DirectoryReference DataDir { get; } = GetDataDir();
 
-		public static FileReference UserConfigFile { get; } = FileReference.Combine(GetDefaultDataDir(), "Horde.json");
+		public static FileReference UserConfigFile { get; } = FileReference.Combine(DataDir, "Horde.json");
 
 		public static Type[] ConfigSchemas = FindSchemaTypes();
 
-		static SemVer _version;
+		static SemVer s_version;
 
 		static Type[] FindSchemaTypes()
 		{
@@ -132,24 +137,16 @@ namespace Horde.Build
 			FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location);
 			if (String.IsNullOrEmpty(versionInfo.ProductVersion))
 			{
-				_version = SemVer.Parse("0.0.0");
+				s_version = SemVer.Parse("0.0.0");
 			}
 			else
 			{
-				_version = SemVer.Parse(versionInfo.ProductVersion);
+				s_version = SemVer.Parse(versionInfo.ProductVersion);
 			}
 
 			CommandLineArguments arguments = new CommandLineArguments(args);
 
-			IConfiguration config = new ConfigurationBuilder()
-				.SetBasePath(AppDir.FullName)
-				.AddJsonFile("appsettings.json", optional: false) 
-				.AddJsonFile("appsettings.Build.json", optional: true) // specific settings for builds (installer/dockerfile)
-				.AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true) // environment variable overrides, also used in k8s setups with Helm
-				.AddJsonFile("appsettings.User.json", optional: true)
-				.AddJsonFile(UserConfigFile.FullName, optional: true, reloadOnChange: true)
-				.AddEnvironmentVariables()
-				.Build();
+			IConfiguration config = CreateConfig(UserConfigFile);
 
 			ServerSettings hordeSettings = new ServerSettings();
 			config.GetSection("Horde").Bind(hordeSettings);
@@ -165,6 +162,9 @@ namespace Horde.Build
 			Serilog.Log.Logger = new LoggerConfiguration()
 				.WithHordeConfig(hordeSettings)
 				.Enrich.FromLogContext()
+				.Enrich.WithExceptionDetails(new DestructuringOptionsBuilder()
+					.WithDefaultDestructurers()
+					.WithDestructurers(new[] { new RpcExceptionDestructurer() }))
 				.WriteTo.Console(hordeSettings)
 				.WriteTo.File(Path.Combine(logDir.FullName, "Log.txt"), outputTemplate: "[{Timestamp:HH:mm:ss} {Level:w3}] {Indent}{Message:l}{NewLine}{Exception} [{SourceContext}]", rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 20 * 1024 * 1024, retainedFileCountLimit: 10)
 				.WriteTo.File(new JsonFormatter(renderMessage: true), Path.Combine(logDir.FullName, "Log.json"), rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 20 * 1024 * 1024, retainedFileCountLimit: 10)
@@ -195,6 +195,20 @@ namespace Horde.Build
 		public static IHostBuilder CreateHostBuilder(string[] args) => ServerCommand.CreateHostBuilderForTesting(args);
 
 		/// <summary>
+		/// Gets the current environment
+		/// </summary>
+		/// <returns></returns>
+		static string GetEnvironment()
+		{
+			string? environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+			if (String.IsNullOrEmpty(environment))
+			{
+				environment = "Production";
+			}
+			return environment;
+		}
+
+		/// <summary>
 		/// Get the application directory
 		/// </summary>
 		/// <returns></returns>
@@ -207,8 +221,16 @@ namespace Horde.Build
 		/// Gets the default directory for storing application data
 		/// </summary>
 		/// <returns>The default data directory</returns>
-		static DirectoryReference GetDefaultDataDir()
+		static DirectoryReference GetDataDir()
 		{
+			IConfiguration config = CreateConfig(null);
+
+			string? dataDir = config.GetSection("Horde").GetValue(typeof(string), nameof(ServerSettings.DataDir)) as string;
+			if (dataDir != null)
+			{
+				return DirectoryReference.Combine(GetAppDir(), dataDir);
+			}
+
 			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 			{
 				DirectoryReference? dir = DirectoryReference.GetSpecialFolder(Environment.SpecialFolder.CommonApplicationData);
@@ -218,6 +240,28 @@ namespace Horde.Build
 				}
 			}
 			return DirectoryReference.Combine(GetAppDir(), "Data");
+		}
+
+		/// <summary>
+		/// Constructs a configuration object for the current environment
+		/// </summary>
+		/// <param name="userConfigFile"></param>
+		/// <returns></returns>
+		static IConfiguration CreateConfig(FileReference? userConfigFile)
+		{
+			IConfigurationBuilder builder = new ConfigurationBuilder()
+				.SetBasePath(AppDir.FullName)
+				.AddJsonFile("appsettings.json", optional: false)
+				.AddJsonFile("appsettings.Build.json", optional: true) // specific settings for builds (installer/dockerfile)
+				.AddJsonFile($"appsettings.{DeploymentEnvironment}.json", optional: true) // environment variable overrides, also used in k8s setups with Helm
+				.AddJsonFile("appsettings.User.json", optional: true);
+
+			if (userConfigFile != null)
+			{
+				builder = builder.AddJsonFile(userConfigFile.FullName, optional: true, reloadOnChange: true);
+			}
+
+			return builder.AddEnvironmentVariables().Build();
 		}
 
 		/// <summary>
@@ -265,10 +309,7 @@ namespace Horde.Build
 				}
 
 				// note: this isn't great, though we need it early in server startup, and this is only hit on first server boot where the grpc cert isn't generated/set 
-				if (settings.ServerPrivateCert == null)
-				{
-					settings.ServerPrivateCert = privateCertFile.ToString();
-				}				
+				settings.ServerPrivateCert ??= privateCertFile.ToString();
 			}
 		}
 	}

@@ -6,6 +6,7 @@
 #include "Iris/Core/IrisProfiler.h"
 #include "Iris/Core/IrisDebugging.h"
 #include "Net/Core/Trace/NetTrace.h"
+#include "Net/Core/Trace/NetDebugName.h"
 #include "Iris/DataStream/DataStream.h"
 #include "Iris/ReplicationSystem/DeltaCompression/DeltaCompressionBaselineManager.h"
 #include "Iris/ReplicationSystem/NetHandleManager.h"
@@ -151,9 +152,11 @@ void FReplicationReader::Init(const FReplicationParameters& InParameters)
 	ReplicationBridge = Parameters.ReplicationSystem->GetReplicationBridge();
 
 	// Find out if there's a PartialNetObjectAttachmentHandler so we can re-assemble split blobs
-	if (const UNetBlobHandler* Handler = ReplicationSystemInternal->GetNetBlobManager().GetPartialNetObjectAttachmentHandler())
+	if (const UPartialNetObjectAttachmentHandler* Handler = ReplicationSystemInternal->GetNetBlobManager().GetPartialNetObjectAttachmentHandler())
 	{
-		Attachments.SetPartialNetBlobType(Handler->GetNetBlobType());
+		FNetObjectAttachmentsReaderInitParams InitParams;
+		InitParams.PartialNetObjectAttachmentHandler = Handler;
+		Attachments.Init(InitParams);
 	}
 
 	if (const UNetBlobHandler* Handler = ReplicationSystemInternal->GetNetBlobManager().GetNetObjectBlobHandler())
@@ -374,15 +377,10 @@ void FReplicationReader::ReadObject(FNetSerializationContext& Context)
 #endif
 
 	const FNetHandle IncompleteHandle = ReadNetHandleId(Reader);
-	const bool bTearOff = Reader.ReadBool();
-
-	bool bSubObjectPendingDestroy = false;
-	const bool bSubObjectPendingEndReplication = Reader.ReadBool();
-	if (bSubObjectPendingEndReplication)
-	{
-		UE_NET_TRACE_SCOPE(SubObjectPendingDestroy, Reader, Context.GetTraceCollector(), ENetTraceVerbosity::Trace);
-		bSubObjectPendingDestroy = Reader.ReadBool();
-	}
+	
+	// Read replicated destroy header if necessary
+	const bool bReadReplicatedDestroyHeader = !IsObjectIndexForOOBAttachment(IncompleteHandle.GetId());
+	const uint32 ReplicatedDestroyHeaderFlags = bReadReplicatedDestroyHeader ? Reader.ReadBits(ReplicatedDestroyHeaderFlags_BitCount) : ReplicatedDestroyHeaderFlags_None;
 
 	const bool bHasState = Reader.ReadBool();
 	uint32 NewBaselineIndex = FDeltaCompressionBaselineManager::InvalidBaselineIndex;
@@ -487,7 +485,7 @@ void FReplicationReader::ReadObject(FNetSerializationContext& Context)
 			InternalIndex = NetHandleManager->GetInternalIndex(IncompleteHandle);
 
 			// If this is a subobject that is being destroyed this was no error as we send destroy info for unconfirmed objects
-			if (!bSubObjectPendingEndReplication)
+			if (!!(ReplicatedDestroyHeaderFlags & ReplicatedDestroyHeaderFlags_EndReplication))
 			{
 				bHasErrors = InternalIndex == FNetHandleManager::InvalidInternalIndex;
 			}
@@ -508,9 +506,10 @@ void FReplicationReader::ReadObject(FNetSerializationContext& Context)
 		FDispatchObjectInfo& Info = ObjectsToDispatch[ObjectsToDispatchCount];
 		Info = FDispatchObjectInfo();
 
-		Info.bDestroy = bTearOff || bSubObjectPendingDestroy;
-		Info.bTearOff = bTearOff;
-		Info.bDeferredEndReplication = bTearOff || bSubObjectPendingEndReplication;
+		// Update info based on ReplicatedDestroyHeader
+		Info.bDestroy = !!(ReplicatedDestroyHeaderFlags & (ReplicatedDestroyHeaderFlags_TearOff | ReplicatedDestroyHeaderFlags_DestroyInstance));
+		Info.bTearOff = !!(ReplicatedDestroyHeaderFlags & ReplicatedDestroyHeaderFlags_TearOff);
+		Info.bDeferredEndReplication = !!(ReplicatedDestroyHeaderFlags & (ReplicatedDestroyHeaderFlags_TearOff | ReplicatedDestroyHeaderFlags_EndReplication));
 
 		if (bHasState)
 		{
@@ -1314,7 +1313,7 @@ void FReplicationReader::ProcessHugeObjectAttachment(FNetSerializationContext& C
 	FNetBitStreamReader HugeObjectReader;
 	HugeObjectReader.InitBits(NetObjectBlob.GetRawData().GetData(), NetObjectBlob.GetRawDataBitCount());
 	FNetSerializationContext HugeObjectSerializationContext = Context.MakeSubContext(&HugeObjectReader);
-	HugeObjectSerializationContext.SetNetTraceCollector(HugeObjectTraceCollector);
+	HugeObjectSerializationContext.SetTraceCollector(HugeObjectTraceCollector);
 
 	UE_NET_TRACE_NAMED_SCOPE(HugeObjectTraceScope, HugeObjectState, HugeObjectReader, HugeObjectTraceCollector, ENetTraceVerbosity::Trace);
 

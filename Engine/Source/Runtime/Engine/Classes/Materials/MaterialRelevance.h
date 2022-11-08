@@ -17,13 +17,14 @@ struct ENGINE_API FMaterialRelevance
 		struct
 		{
 			uint16 ShadingModelMask;
+			uint8 StrataBSDFCountMask;
 			uint8 bOpaque : 1;
 			uint8 bMasked : 1;
 			uint8 bDistortion : 1;
 			uint8 bHairStrands : 1;
 			uint8 bTwoSided : 1;
 			uint8 bSeparateTranslucency : 1; // Translucency After DOF
-			uint8 bSeparateTranslucencyModulate : 1;
+			uint8 bTranslucencyModulate : 1;
 			uint8 bPostMotionBlurTranslucency : 1;
 			uint8 bNormalTranslucency : 1;
 			uint8 bUsesSceneColorCopy : 1;

@@ -71,6 +71,11 @@ namespace UnrealBuildTool
 		public readonly bool bUseCPPWinRT;
 
 		/// <summary>
+		/// Allow use of Clang linker
+		/// </summary>
+		public readonly bool bAllowClangLinker;
+
+		/// <summary>
 		/// The path to the linker for linking executables
 		/// </summary>
 		public readonly FileReference CompilerPath;
@@ -124,6 +129,7 @@ namespace UnrealBuildTool
 			this.WindowsSdkVersion = Params.WindowsSdkVersion;
 			this.RedistDir = Params.RedistDir;
 			this.bUseCPPWinRT = Params.bUseCPPWinRT;
+			this.bAllowClangLinker = Params.bAllowClangLinker;
 
 			// Get the compiler and linker paths from the Toolchain directory
 			CompilerPath = GetCompilerToolPath(Compiler, Architecture, CompilerDir);
@@ -211,13 +217,13 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Gets the path to the linker.
 		/// </summary>
-		static FileReference GetLinkerToolPath(WindowsCompiler Compiler, WindowsArchitecture Architecture, DirectoryReference CompilerDir, DirectoryReference ToochainDir)
+		FileReference GetLinkerToolPath(WindowsCompiler Compiler, WindowsArchitecture Architecture, DirectoryReference CompilerDir, DirectoryReference ToochainDir)
 		{
-			if (Compiler == WindowsCompiler.Clang && WindowsPlatform.bAllowClangLinker)
+			if (Compiler == WindowsCompiler.Clang && bAllowClangLinker)
 			{
 				return FileReference.Combine(CompilerDir, "bin", "lld-link.exe");
 			}
-			else if (Compiler == WindowsCompiler.Intel && WindowsPlatform.bAllowIntelLinker)
+			else if (Compiler == WindowsCompiler.Intel && bAllowClangLinker)
 			{
 				return FileReference.Combine(CompilerDir, "windows", "bin", "intel64", "xilink.exe");
 			}
@@ -228,14 +234,14 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Gets the path to the library linker.
 		/// </summary>
-		static FileReference GetLibraryLinkerToolPath(WindowsCompiler Compiler, WindowsArchitecture Architecture, DirectoryReference CompilerDir, DirectoryReference ToochainDir)
+		FileReference GetLibraryLinkerToolPath(WindowsCompiler Compiler, WindowsArchitecture Architecture, DirectoryReference CompilerDir, DirectoryReference ToochainDir)
 		{
-			if (Compiler == WindowsCompiler.Clang && WindowsPlatform.bAllowClangLinker)
+			if (Compiler == WindowsCompiler.Clang && bAllowClangLinker)
 			{
 				// @todo: lld-link is not currently working for building .lib
 				//return FileReference.Combine(CompilerDir, "bin", "lld-link.exe");
 			}
-			else if (Compiler == WindowsCompiler.Intel && WindowsPlatform.bAllowIntelLinker)
+			else if (Compiler == WindowsCompiler.Intel && bAllowClangLinker)
 			{
 				return FileReference.Combine(CompilerDir, "windows", "bin", "intel64", "xilib.exe");
 			}
@@ -349,7 +355,7 @@ namespace UnrealBuildTool
 			if (Compiler == WindowsCompiler.Intel)
 			{
 				IncludePaths.Add(DirectoryReference.Combine(CompilerDir, "windows", "compiler", "include"));
-				LibraryPaths.Add(DirectoryReference.Combine(CompilerDir, "windows", "compiler", "lib", "intel64"));
+				LibraryPaths.Add(DirectoryReference.Combine(CompilerDir, "windows", "compiler", "lib", "intel64_win"));
 			}
 		}
 
@@ -365,12 +371,13 @@ namespace UnrealBuildTool
 		/// <param name="WindowsSdkVersion">Version of the Windows SDK to use</param>
 		/// <param name="SuppliedSdkDirectoryForVersion">If specified, this is the SDK directory to use, otherwise, attempt to look up via registry. If specified, the WindowsSdkVersion is used directly</param>
 		/// <param name="bUseCPPWinRT">Include the CPP/WinRT language projection</param>
+		/// <param name="bAllowClangLinker">Allow use of Clang linker</param>
 		/// <param name="Logger">Logger for output</param>
 		/// <returns>New environment object with paths for the given settings</returns>
 		[SupportedOSPlatform("windows")]
-		public static VCEnvironment Create(WindowsCompiler Compiler, WindowsCompiler ToolChain, UnrealTargetPlatform Platform, WindowsArchitecture Architecture, string? CompilerVersion, string? WindowsSdkVersion, string? SuppliedSdkDirectoryForVersion, bool bUseCPPWinRT, ILogger Logger)
+		public static VCEnvironment Create(WindowsCompiler Compiler, WindowsCompiler ToolChain, UnrealTargetPlatform Platform, WindowsArchitecture Architecture, string? CompilerVersion, string? WindowsSdkVersion, string? SuppliedSdkDirectoryForVersion, bool bUseCPPWinRT, bool bAllowClangLinker, ILogger Logger)
 		{
-			return Create( new VCEnvironmentParameters(Compiler, ToolChain, Platform, Architecture, CompilerVersion, WindowsSdkVersion, SuppliedSdkDirectoryForVersion, bUseCPPWinRT, Logger), Logger );
+			return Create( new VCEnvironmentParameters(Compiler, ToolChain, Platform, Architecture, CompilerVersion, WindowsSdkVersion, SuppliedSdkDirectoryForVersion, bUseCPPWinRT, bAllowClangLinker, Logger), Logger );
 		}
 
 		/// <summary>
@@ -426,6 +433,9 @@ namespace UnrealBuildTool
 		/// <summary>Include the CPP/WinRT language projection</summary>
 		public bool bUseCPPWinRT;
 
+		/// <summary>Allow use of Clang linker</summary>
+		public bool bAllowClangLinker;
+
 		/// <summary>
 		/// Creates VC environment construction parameters with the given settings
 		/// </summary>
@@ -437,10 +447,11 @@ namespace UnrealBuildTool
 		/// <param name="WindowsSdkVersion">Version of the Windows SDK to use</param>
 		/// <param name="SuppliedSdkDirectoryForVersion">If specified, this is the SDK directory to use, otherwise, attempt to look up via registry. If specified, the WindowsSdkVersion is used directly</param>
 		/// <param name="bUseCPPWinRT">Include the CPP/WinRT language projection</param>
+		/// <param name="bAllowClangLinker">Allow use of Clang linker</param>
 		/// <param name="Logger">Logger for output</param>
 		/// <returns>Creation parameters for VC environment</returns>
 		[SupportedOSPlatform("windows")]
-		public VCEnvironmentParameters (WindowsCompiler Compiler, WindowsCompiler ToolChain, UnrealTargetPlatform Platform, WindowsArchitecture Architecture, string? CompilerVersion, string? WindowsSdkVersion, string? SuppliedSdkDirectoryForVersion, bool bUseCPPWinRT, ILogger Logger)
+		public VCEnvironmentParameters (WindowsCompiler Compiler, WindowsCompiler ToolChain, UnrealTargetPlatform Platform, WindowsArchitecture Architecture, string? CompilerVersion, string? WindowsSdkVersion, string? SuppliedSdkDirectoryForVersion, bool bUseCPPWinRT, bool bAllowClangLinker, ILogger Logger)
 		{
 			// Get the compiler version info
 			VersionNumber? SelectedCompilerVersion;
@@ -507,6 +518,7 @@ namespace UnrealBuildTool
 			this.WindowsSdkVersion = SelectedWindowsSdkVersion;
 			this.RedistDir = SelectedRedistDir;
 			this.bUseCPPWinRT = bUseCPPWinRT;
+			this.bAllowClangLinker = bAllowClangLinker;
 		}
 	}
 }

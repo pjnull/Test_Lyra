@@ -229,10 +229,6 @@ export type StreamData = GetStreamResponse & {
 
 }
 
-export type TemplateData = GetTemplateResponse & {
-	ref?: GetTemplateRefResponse;
-}
-
 export type JobData = GetJobResponse & {
 	graphRef?: GetGraphResponse;
 }
@@ -950,19 +946,6 @@ export type CreateLabelRequest = {
 	includedNodes: string[];
 }
 
-/** Query selecting the base changelist to use */
-export type ChangeQueryRequest = {
-
-	/** The template id to query */
-	templateId?: string;
-
-	/** The target to query	*/
-	target?: string;
-
-	/** Whether to match a job that produced warnings */
-	outcomes?: JobStepOutcome[];
-}
-
 
 /**Parameters required to create a job */
 export type CreateJobRequest = {
@@ -979,8 +962,8 @@ export type CreateJobRequest = {
 	/** The changelist number to build. Can be null for latest. */
 	change?: number;
 
-	/** Parameters to use when selecting the change to execute at. */
-	changeQuery?: ChangeQueryRequest;
+	/// List of change queries to evaluate
+	changeQueries?: ChangeQueryConfig[];
 
 	/** The preflight changelist number */
 	preflightChange?: number;
@@ -1910,13 +1893,61 @@ export type UpdateStepStateRequest = {
 
 }
 
-/**Information about a template in this stream */
-export type GetTemplateRefResponse = {
 
-	/** The name of the template */
+/// Response describing a template
+export type GetTemplateResponseBase = {
+		
+	/// Name of the template
 	name: string;
 
-	/**Unique id of this template ref */
+	/// Default priority for this job
+	priority?: Priority;
+	
+	/// Whether to allow preflights of this template
+	allowPreflights: boolean;
+	
+	/// Whether to always update issues on jobs using this template
+	updateIssues: boolean;
+	
+	/// The initial agent type to parse the BuildGraph script on
+	initialAgentType?: string;
+	
+	/// Path to a file within the stream to submit to generate a new changelist for jobs
+	submitNewChange?: string;
+	
+	/// Parameters for the job.
+	arguments: string[];
+	
+	/// List of parameters for this template
+	parameters: ParameterData[];
+}
+
+/// Query selecting the base changelist to use
+export type ChangeQueryConfig = {
+	
+	/// Name of this query, for display on the dashboard.
+	name?: string;
+	
+	/// Condition to evaluate before deciding to use this query. May query tags in a preflight.	
+	condition?: any;
+		
+	/// The template id to query	
+	templateId?: string;
+	
+	/// The target to query	
+	target?: string;
+	
+	/// Whether to match a job that produced warnings	
+	outcomes?: JobStepOutcome[];
+	
+	/// Finds the last commit with this tag	
+	commitTag?: any;
+}
+
+/**Information about a template in this stream */
+export type GetTemplateRefResponse = GetTemplateResponseBase & {
+
+	/**Unique id of this template ref, (sanitized name) */
 	id: string;
 
 	/**Hash of the template definition */
@@ -1927,19 +1958,19 @@ export type GetTemplateRefResponse = {
 
 	/** Step state for template in stream */
 	stepStates?: GetTemplateStepStateResponse[];
+
+	/** List of queries for the default changelist */
+	defaultChange?: ChangeQueryConfig[];
+
 }
 
 /** Specifies defaults for running a preflight */
-export type DefaultPreflightRequest = {
+export type DefaultPreflightConfig = {
 
 	/** The template id to query */
 	templateId?: string;
 
-	/** Query for the change to use */
-	change?: ChangeQueryRequest;
-
-	/**  The last successful job type to use for the base changelist (DEPRECATED!)*/
-	changeTemplateId?: string;
+	change?: ChangeQueryConfig;
 }
 
 
@@ -1975,11 +2006,8 @@ export type GetStreamResponse = {
 	/**List of tabs to display for this stream*/
 	tabs: GetStreamTabResponse[];
 
-	/**  Default template to use for preflights (deprecated)*/
-	defaultPreflightTemplate?: string;
-
 	/** Default template for running preflights */
-	defaultPreflight?: DefaultPreflightRequest;
+	defaultPreflight?: DefaultPreflightConfig;
 
 	/**Map of agent name to type */
 	agentTypes: { [key: string]: GetAgentTypeResponse };
@@ -2182,41 +2210,6 @@ export type BoolParameterData = ParameterData & {
 
 }
 
-
-/**Response describing a template */
-export type GetTemplateResponse = {
-
-	/**Unique id of the template */
-	id: string;
-
-	/**Name of the template */
-	name: string;
-
-	/**Default priority for this job */
-	priority?: Priority;
-
-	/**Whether to allow preflights of this template */
-	allowPreflights: boolean;
-
-	/**Whether to always update issues on jobs that use this template */
-	updateIssues: boolean;
-
-	/**List of node groups for this job */
-	groups: CreateGroupRequest[];
-
-	/**List of template aggregates */
-	aggregates: CreateAggregateRequest[];
-
-	/**Parameters for the job. */
-	arguments: string[];
-
-	/**List of parameters for this template */
-	parameters: ParameterData[];
-
-	/**Custom permissions for this object */
-	acl?: GetAclResponse;
-}
-
 /** Information about a commit */
 export type GetChangeSummaryResponse = {
 
@@ -2231,7 +2224,6 @@ export type GetChangeSummaryResponse = {
 
 
 }
-
 
 /**Information about a device attached to this agent */
 export type GetDeviceCapabilitiesResponse = {
@@ -2914,6 +2906,9 @@ export type GetIssueResponse = {
 	/** The UTC time when the issue was quarantined */
 	quarantineTimeUtc?: Date | string;
 
+	/** User info for who force closed the issue */
+	forceClosedByUserInfo?: GetThinUserInfoResponse;
+
 }
 
 /**Request an issue to be updated */
@@ -2957,6 +2952,9 @@ export type UpdateIssueRequest = {
 
 	/** Id of user quarantining issue */
 	quarantinedById?: string;
+
+	/** Id of user force closing the issue */
+	forceClosedById?: string;
 
 }
 
@@ -3231,6 +3229,9 @@ export type GetDeviceResponse = {
 
 	/// The last time the device was checked out
 	checkOutTime?: Date | string;
+
+	/// The time the device checkout will expire
+	checkOutExpirationTime?: Date | string;
 
 	/** Id of the user which last modified this device */
 	modifiedByUser?: string;
@@ -3863,7 +3864,7 @@ export type StreamConfig = {
 	defaultPreflightTemplate?: string;
 
 	/// Default template for running preflights
-	defaultPreflight?: DefaultPreflightRequest;
+	defaultPreflight?: DefaultPreflightConfig;
 
 	/// <summary>
 	/// List of tabs to show for the new stream
@@ -4167,5 +4168,120 @@ export type GetNoticeResponse = {
 
 	/** User id who created the notice, otherwise null if a system message */
 	createdByUser?: GetThinUserInfoResponse;
+
+}
+
+// Device telemetry
+
+export type DevicePoolTelemetryQuery = {
+	minCreateTime?: string;
+	maxCreateTime?: string;
+	index?: number;
+	count?: number;
+};
+
+export type DeviceTelemetryQuery = {
+	deviceIds?: string[];
+	poolId?: string;
+	platformId?: string;
+	minCreateTime?: string;
+	maxCreateTime?: string;
+	index?: number;
+	count?: number;
+};
+
+export type GetDevicePoolReservationTelemetryResponse = {
+	
+	/** Device id for reservation */
+	deviceId: string;
+
+	/** Job id associated with reservation */
+	jobId?: string; 
+
+	/** The step id of reservation */
+	stepId?: string; 
+
+	/** The name of the job holding reservation */
+	jobName?: string; 
+
+	/** The name of the step holding reservation */
+	stepName?: string;
+
+}
+
+/** Device pool telemetry respponse */
+export type GetDevicePlatformTelemetryResponse = {
+
+	/** The corresponding platform id */
+	platformId: string;
+
+	/** Available device ids of this platform */
+	available?: string[];
+
+	/** Device ids in maintenance state */
+	maintenance?: string[];
+
+	/** Device ids in problem state */
+	problem?: string[];
+
+	/** Device ids in disabled state */
+	disabled?: string[];
+
+	/** Stream id => reserved devices of this platform */
+	reserved?: Record<string, GetDevicePoolReservationTelemetryResponse[]>;
+}
+
+
+/** Device telemetry respponse */
+export type GetDevicePoolTelemetryResponse = {
+
+	/** The UTC time the telemetry data was created */
+	createTimeUtc: Date | string;
+
+
+	/** Individual pool id -> telemetry data points */
+	telemetry: Record<string, GetDevicePlatformTelemetryResponse[]>;
+}
+
+/// Device telemetry respponse
+export type GetTelemetryInfoResponse = {
+
+	/// The UTC time the telemetry data was created	
+	createTimeUtc: Date | string;
+	
+	/// The stream id which utilized device	
+	streamId?: string;
+	
+	/// The job id which utilized device	
+	jobId?: string;
+	
+	/// The job's step id	
+	stepId?: string;
+
+	/// The job name which utilized device	
+	jobName?: string;
+	
+	/// The job's step name
+	stepName?: string;
+
+	/// If this telemetry has a reservation, the start time of the reservation	
+	reservationStartUtc?: Date | string;
+
+	/// If this telemetry has a reservation, the finish time of the reservation
+	reservationFinishUtc?: Date | string;
+	
+	/// If this telemetry marks a detected device issue, the time of the issue	
+	problemTimeUtc?: Date | string;
+}
+
+
+/// Device telemetry respponse
+export type GetDeviceTelemetryResponse = {
+
+	/// The device id for the telemetry data
+	deviceId: string;
+
+	/// Individual telemetry data points	
+	telemetry: GetTelemetryInfoResponse[];
 
 }

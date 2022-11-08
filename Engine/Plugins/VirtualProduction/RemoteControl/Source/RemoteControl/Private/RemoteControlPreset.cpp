@@ -109,7 +109,7 @@ namespace
 				ObjectName = FieldOwner->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) ? FieldOwner->GetClass()->GetName() : FieldOwner->GetName();
 			}
 
-			OutputName = *FString::Printf(TEXT("%s (%s)"), *FieldName, *ObjectName);
+			OutputName = *FString::Printf(TEXT("%s"), *FieldName);
 		}
 		return OutputName;
 	}
@@ -1245,22 +1245,6 @@ FName URemoteControlPreset::GetEntityName(const FName InDesiredName, UObject* In
 	
 	if (DesiredName == NAME_None)
 	{
-		FString ObjectName;
-#if WITH_EDITOR
-		if (AActor* Actor = Cast<AActor>(InObject))
-		{
-			ObjectName = Actor->GetActorLabel();
-		}
-		else if(UActorComponent* Component = Cast<UActorComponent>(InObject))
-		{
-			ObjectName = Component->GetOwner()->GetActorLabel();
-		}
-		else
-#endif
-		{
-			ObjectName = InObject->GetName();
-		}
-
 		FProperty* Property = InFieldPath.GetResolvedData().Field;
 		check(Property);
 
@@ -1272,7 +1256,7 @@ FName URemoteControlPreset::GetEntityName(const FName InDesiredName, UObject* In
 		FieldPath = InFieldPath.GetFieldName().ToString();
 #endif
 			
-		DesiredName = *FString::Printf(TEXT("%s (%s)"), *FieldPath, *ObjectName);
+		DesiredName = *FString::Printf(TEXT("%s"), *FieldPath);
 	}
 
 	return DesiredName;

@@ -58,6 +58,7 @@ public:
 		
 		alignas(16) uint8 PacketBuffer[MaxPacketSize];
 		uint32 BitCount;
+		uint32 PacketId;
 	};
 
 	struct FConnectionInfo
@@ -72,7 +73,7 @@ public:
 	};
 
 public:
-	explicit FReplicationSystemTestNode(bool bIsServer);
+	explicit FReplicationSystemTestNode(bool bIsServer, const TCHAR* Name);
 	~FReplicationSystemTestNode();
 
 	template<typename T>
@@ -118,7 +119,7 @@ public:
 	UTestReplicatedIrisObject* CreateObject(const UTestReplicatedIrisObject::FComponents& Components);
 	UTestReplicatedIrisObject* CreateSubObject(FNetHandle Owner, const UTestReplicatedIrisObject::FComponents& Components);
 	UTestReplicatedIrisObject* CreateObjectWithDynamicState(uint32 NumComponents, uint32 NumIrisComponents, uint32 NumDynamicStateComponents);
-	void DestroyObject(UReplicatedTestObject*);
+	void DestroyObject(UReplicatedTestObject*, EEndReplicationFlags EndReplicationFlags = EEndReplicationFlags::Destroy);
 
 	// Connection
 	uint32 AddConnection();
@@ -142,6 +143,8 @@ public:
 
 	FConnectionInfo& GetConnectionInfo(uint32 ConnectionId) { return Connections[ConnectionId - 1]; }
 
+	uint32 GetNetTraceId() const;
+
 public:
 	UReplicationSystem* ReplicationSystem;
 	UReplicatedTestObjectBridge* ReplicationBridge;
@@ -149,12 +152,14 @@ public:
 
 private:
 	TArray<FConnectionInfo> Connections;
+	uint32 PacketId = 0U;
 };
 
 class FReplicationSystemTestClient : public FReplicationSystemTestNode
 {
 public:
-	explicit FReplicationSystemTestClient(uint32 ReplicationSystemId);
+	FReplicationSystemTestClient(uint32 ReplicationSystemId, const TCHAR* Name);
+
 	uint32 ConnectionIdOnServer;
 	uint32 LocalConnectionId;
 };
@@ -162,7 +167,7 @@ public:
 class FReplicationSystemTestServer : public FReplicationSystemTestNode
 {
 public:
-	explicit FReplicationSystemTestServer();
+	explicit FReplicationSystemTestServer(const TCHAR* Name);
 
 	// Send data and deliver to the client if bDeliver is true
 	bool SendAndDeliverTo(FReplicationSystemTestClient* Client, bool bDeliver);

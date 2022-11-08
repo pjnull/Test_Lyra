@@ -225,7 +225,8 @@ struct FBinkMediaPlayerModule : IModuleInterface, FTickableGameObject
 	}
 
 #if BINKPLUGIN_UE4_EDITOR
-	void Initialize(TSharedPtr<SWindow> InRootWindow, bool bIsNewProjectWindow) {
+	void Initialize(TSharedPtr<SWindow> InRootWindow, bool bIsRunningStartupDialog)
+	{
 		// This overrides the 
 		FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 		PropertyModule.RegisterCustomClassLayout("MoviePlayerSettings", FOnGetDetailCustomizationInstance::CreateStatic(&FBinkMoviePlayerSettingsDetails::MakeInstance));

@@ -917,7 +917,7 @@ bool UUnrealEdEngine::DeleteActors(const TArray<AActor*>& InActorsToDelete, UWor
 
 			if (bWarnAboutSoftReferences)
 			{
-				FScopedSlowTask SlowTask(ActorsToDeletePaths.Num(), LOCTEXT("ComputeActorSoftReferences", "Computing References"));
+				FScopedSlowTask SlowTask(static_cast<float>(ActorsToDeletePaths.Num()), LOCTEXT("ComputeActorSoftReferences", "Computing References"));
 				SlowTask.MakeDialogDelayed(1.0f);
 
 				FAssetToolsModule& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
@@ -1187,6 +1187,7 @@ bool UUnrealEdEngine::DeleteActors(const TArray<AActor*>& InActorsToDelete, UWor
 		{
 			InSelectionSet->DeselectElement(ActorHandle, SelectionOptions);
 		}
+		UEngineElementsLibrary::UnregisterActorElement(Actor);
 
 		// Modify the level.  Each level is modified only once.
 		// @todo DB: Shouldn't this be calling UWorld::ModifyLevel?

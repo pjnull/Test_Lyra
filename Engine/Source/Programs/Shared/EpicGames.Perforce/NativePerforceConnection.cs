@@ -36,6 +36,9 @@ namespace EpicGames.Perforce
 			public string? _password;
 
 			[MarshalAs(UnmanagedType.LPStr)]
+			public string? _hostName;
+
+			[MarshalAs(UnmanagedType.LPStr)]
 			public string? _clientName;
 
 			[MarshalAs(UnmanagedType.LPStr)]
@@ -71,10 +74,7 @@ namespace EpicGames.Perforce
 		static extern IntPtr Client_Create(NativeSettings? settings, NativeWriteBuffer writeBuffer, IntPtr onBufferReadyFnPtr);
 
 		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
-		static extern void Client_Login(IntPtr client, [MarshalAs(UnmanagedType.LPStr)] string password);
-
-		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
-		static extern void Client_Command(IntPtr client, [MarshalAs(UnmanagedType.LPStr)] string command, int numArgs, IntPtr[] args, byte[]? inputData, int inputLength, bool interceptIo);
+		static extern void Client_Command(IntPtr client, [MarshalAs(UnmanagedType.LPStr)] string command, int numArgs, IntPtr[] args, byte[]? inputData, int inputLength, byte[]? promptResponse, bool interceptIo);
 
 		[DllImport(NativeDll, CallingConvention = CallingConvention.Cdecl)]
 		static extern void Client_Destroy(IntPtr client);
@@ -259,7 +259,10 @@ namespace EpicGames.Perforce
 			}
 		}
 
+		static int s_nextUniqueId;
+
 		IntPtr _client;
+		readonly int _uniqueId;
 		readonly PinnedBuffer[] _buffers;
 		readonly OnBufferReadyFn _onBufferReadyInst;
 		readonly IntPtr _onBufferReadyFnPtr;
@@ -298,6 +301,8 @@ namespace EpicGames.Perforce
 			Settings = settings;
 			Logger = logger;
 
+			_uniqueId = Interlocked.Increment(ref s_nextUniqueId);
+
 			_buffers = new PinnedBuffer[bufferCount];
 			for (int idx = 0; idx < bufferCount; idx++)
 			{
@@ -313,6 +318,8 @@ namespace EpicGames.Perforce
 			_backgroundThread = new Thread(BackgroundThreadProc);
 			_backgroundThread.IsBackground = true;
 			_backgroundThread.Start();
+
+			logger.LogTrace("Created Perforce connection {ConnectionId} (server: {ServerAndPort}, user: {UserName}, client: {ClientName})", _uniqueId, settings.ServerAndPort, settings.UserName, settings.ClientName);
 		}
 
 		/// <summary>
@@ -332,7 +339,18 @@ namespace EpicGames.Perforce
 		/// Check whether the native client is supported on the current platform
 		/// </summary>
 		/// <returns></returns>
-		public static bool IsSupported() => !(RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && RuntimeInformation.OSArchitecture == Architecture.Arm64);
+		public static bool IsSupported()
+		{
+			if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+			{
+				return RuntimeInformation.OSArchitecture != Architecture.Arm64;
+			}
+			else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+			{
+				return RuntimeInformation.OSArchitecture != Architecture.Arm64;
+			}
+			return true;
+		}
 
 		void GetNextWriteBuffer(NativeWriteBuffer nativeWriteBuffer, int minSize)
 		{
@@ -369,6 +387,11 @@ namespace EpicGames.Perforce
 		/// <inheritdoc/>
 		void Dispose(bool disposing)
 		{
+			if (disposing)
+			{
+				Logger.LogTrace("Disposing Perforce connection {ConnectionId}", _uniqueId);
+			}
+
 			if (_backgroundThread != null)
 			{
 				_requests.Add(null);
@@ -431,6 +454,7 @@ namespace EpicGames.Perforce
 				nativeSettings._serverAndPort = Settings.ServerAndPort;
 				nativeSettings._userName = Settings.UserName;
 				nativeSettings._password = Settings.Password;
+				nativeSettings._hostName = Settings.HostName;
 				nativeSettings._clientName = Settings.ClientName;
 				nativeSettings._appName = Settings.AppName;
 				nativeSettings._appVersion = Settings.AppVersion;
@@ -509,7 +533,7 @@ namespace EpicGames.Perforce
 		}
 
 		/// <inheritdoc/>
-		public Task<IPerforceOutput> CommandAsync(string command, IReadOnlyList<string> arguments, IReadOnlyList<string>? fileArguments, byte[]? inputData, bool interceptIo)
+		public IPerforceOutput Command(string command, IReadOnlyList<string> arguments, IReadOnlyList<string>? fileArguments, byte[]? inputData, string? promptResponse, bool interceptIo)
 		{
 			byte[]? specData = null;
 			if (inputData != null)
@@ -524,12 +548,15 @@ namespace EpicGames.Perforce
 			}
 
 			Response response = new Response(this);
-			_requests.Add((() => ExecCommand(command, allArguments, specData, interceptIo), response));
-			return Task.FromResult<IPerforceOutput>(response);
+			_requests.Add((() => ExecCommand(command, allArguments, specData, promptResponse, interceptIo), response));
+			return response;
 		}
 
-		private void ExecCommand(string command, List<string> args, byte[]? specData, bool interceptIo)
+		private void ExecCommand(string command, List<string> args, byte[]? inputData, string? promptResponse, bool interceptIo)
 		{
+			Stopwatch timer = Stopwatch.StartNew();
+			Logger.LogTrace("Conn {ConnectionId}: {Command} {Args}", _uniqueId, command, String.Join(" ", args));
+
 			List<IntPtr> nativeArgs = new List<IntPtr>();
 			try
 			{
@@ -542,7 +569,14 @@ namespace EpicGames.Perforce
 					nativeArgs.Add(nativeArg);
 				}
 
-				Client_Command(_client, command, nativeArgs.Count, nativeArgs.ToArray(), specData, specData?.Length ?? 0, interceptIo);
+				byte[]? promptResponseBytes = null;
+				if (promptResponse != null)
+				{
+					promptResponseBytes = new byte[Encoding.UTF8.GetByteCount(promptResponse) + 1];
+					Encoding.UTF8.GetBytes(promptResponse, promptResponseBytes);
+				}
+
+				Client_Command(_client, command, nativeArgs.Count, nativeArgs.ToArray(), inputData, inputData?.Length ?? 0, promptResponseBytes, interceptIo);
 			}
 			finally
 			{
@@ -551,14 +585,8 @@ namespace EpicGames.Perforce
 					Marshal.FreeHGlobal(nativeArgs[idx]);
 				}
 			}
-		}
 
-		/// <inheritdoc/>
-		public Task<IPerforceOutput> LoginCommandAsync(string password, CancellationToken cancellationToken = default)
-		{
-			Response response = new Response(this);
-			_requests.Add((() => Client_Login(_client, password), response), cancellationToken);
-			return Task.FromResult<IPerforceOutput>(response);
+			Logger.LogTrace("Conn {ConnectionId}: Request completed in {Time}ms", _uniqueId, timer.ElapsedMilliseconds);
 		}
 
 		/// <summary>

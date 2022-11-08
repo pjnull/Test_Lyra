@@ -1167,7 +1167,7 @@ void UEditorEngine::Init(IEngineLoop* InEngineLoop)
 			TEXT("AnimationSettings")
 		};
 
-		FScopedSlowTask ModuleSlowTask(UE_ARRAY_COUNT(ModuleNames));
+		FScopedSlowTask ModuleSlowTask((float)UE_ARRAY_COUNT(ModuleNames));
 		for (const TCHAR* ModuleName : ModuleNames)
 		{
 			ModuleSlowTask.EnterProgressFrame(1);
@@ -2067,6 +2067,7 @@ void UEditorEngine::Tick( float DeltaSeconds, bool bIdleMode )
 			if (!bAllWindowsHidden || GCurrentLevelEditingViewportClient->WantsDrawWhenAppIsHidden())
 			{
 				bool bAllowNonRealtimeViewports = true;
+				GCurrentLevelEditingViewportClient->SetIsCurrentLevelEditingFocus(true);
 				bool bWasNonRealtimeViewportDraw = UpdateSingleViewportClient(GCurrentLevelEditingViewportClient, bAllowNonRealtimeViewports, bUpdateLinkedOrthoViewports);
 				if (GCurrentLevelEditingViewportClient->IsLevelEditorClient())
 				{
@@ -2095,6 +2096,7 @@ void UEditorEngine::Tick( float DeltaSeconds, bool bIdleMode )
 					{
 						//if we haven't drawn a non-realtime viewport OR not one of the main viewports
 						bool bAllowNonRealtimeViewports = (!bEditorFrameNonRealtimeViewportDrawn) || !(ViewportClient->IsLevelEditorClient());
+						ViewportClient->SetIsCurrentLevelEditingFocus(false);
 						bool bWasNonRealtimeViewportDrawn = UpdateSingleViewportClient(ViewportClient, bAllowNonRealtimeViewports, bUpdateLinkedOrthoViewports);
 						if (ViewportClient->IsLevelEditorClient())
 						{
@@ -2319,7 +2321,9 @@ bool UEditorEngine::UpdateSingleViewportClient(FEditorViewportClient* InViewport
 	// otherwise content for editor view can be streamed out if there are other views (ex: thumbnails)
 	if (InViewportClient->IsPerspective())
 	{
-		IStreamingManager::Get().AddViewInformation( InViewportClient->GetViewLocation(), InViewportClient->Viewport->GetSizeXY().X, InViewportClient->Viewport->GetSizeXY().X / FMath::Tan(FMath::DegreesToRadians(InViewportClient->ViewFOV * 0.5f)) );
+		float XSize = static_cast<float>(InViewportClient->Viewport->GetSizeXY().X);
+
+		IStreamingManager::Get().AddViewInformation( InViewportClient->GetViewLocation(), XSize, XSize / FMath::Tan(FMath::DegreesToRadians(InViewportClient->ViewFOV * 0.5f)) );
 	}
 	
 	// Only allow viewports to be drawn if we are not throttling for slate UI responsiveness or if the viewport client requested a redraw

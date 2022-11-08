@@ -293,6 +293,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Control Rig Blueprint")
 	void RequestAutoVMRecompilation();
 
+	UFUNCTION(BlueprintCallable, Category = "Control Rig Blueprint")
+	void SetAutoVMRecompile(bool bAutoRecompile) { bAutoRecompileVM = bAutoRecompile; }
+
 	void IncrementVMRecompileBracket();
 	void DecrementVMRecompileBracket();
 
@@ -392,11 +395,13 @@ public:
 
 protected:
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	TObjectPtr<URigVMGraph> Model_DEPRECATED;
 
 	UPROPERTY()
 	TObjectPtr<URigVMFunctionLibrary> FunctionLibrary_DEPRECATED;
+#endif
 
 	UPROPERTY()
 	FRigVMClient RigVMClient;
@@ -472,10 +477,10 @@ public:
 	TArray<TSoftObjectPtr<UControlRigShapeLibrary>> ShapeLibraries;
 
 	const FControlRigShapeDefinition* GetControlShapeByName(const FName& InName) const;
-#endif
 
 	UPROPERTY(transient, DuplicateTransient, meta = (DisplayName = "VM Statistics", DisplayAfter = "VMCompileSettings"))
 	FRigVMStatistics Statistics_DEPRECATED;
+#endif
 
 	UPROPERTY(EditAnywhere, Category = "Drawing")
 	FControlRigDrawContainer DrawContainer;
@@ -503,8 +508,10 @@ public:
 
 public:
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FRigHierarchyContainer HierarchyContainer_DEPRECATED;
+#endif
 
 	UPROPERTY(BlueprintReadOnly, Category = "Hierarchy")
 	TObjectPtr<URigHierarchy> Hierarchy;
@@ -598,6 +605,7 @@ private:
 	void PatchPropagateToChildren();
 	void PatchParameterNodesOnLoad();
 	void PatchTemplateNodesWithPreferredPermutation();
+	void PatchLinksWithCast();
 
 	TMap<FName, int32> AddedMemberVariableMap;
 	TArray<FBPVariableDescription> LastNewVariables;

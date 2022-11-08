@@ -1119,7 +1119,6 @@ void SDMXMVRFixtureList::OnPasteItems()
 		}
 
 		RequestListRefresh();
-		AdoptSelectionFromFixturePatchSharedData();
 	}
 }
 
@@ -1138,7 +1137,6 @@ void SDMXMVRFixtureList::OnDuplicateItems()
 	FDMXMVRFixtureListItem::DuplicateItems(WeakDMXEditor, SelectedItems);
 
 	RequestListRefresh();
-	AdoptSelectionFromFixturePatchSharedData();
 }
 
 bool SDMXMVRFixtureList::CanDeleteItems() const

@@ -64,7 +64,7 @@ protected:
 	bool IsSomethingSelected() const;
 	bool GetTransformAtFirstSectionStart(FTransform& OutWorld, FTransform& OutParent) const;
 	bool IsRootSelected(UMovieSceneSkeletalAnimationSection* Section) const;
-
+	
 protected:
 	/** Interrogator that is an gc object */
 	UE::MovieScene::FSystemInterrogator InterrogationLinker;

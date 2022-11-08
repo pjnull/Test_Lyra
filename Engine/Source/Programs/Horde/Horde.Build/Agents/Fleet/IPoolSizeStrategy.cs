@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Horde.Build.Agents.Pools;
 
@@ -60,7 +59,7 @@ namespace Horde.Build.Agents.Fleet
 	/// <summary>
 	/// Class for specifying and grouping data together required for calculating pool size
 	/// </summary>
-	public class PoolSizeData
+	public class PoolSizeResult
 	{
 		/// <summary>
 		/// Pool being resized
@@ -78,9 +77,9 @@ namespace Horde.Build.Agents.Fleet
 		public int? DesiredAgentCount  { get; }
 		
 		/// <summary>
-		/// Human-readable text describing the status of the pool (data the sizing is based on etc)
+		/// Log-friendly metadata object describing the output of the size calculation through key/values
 		/// </summary>
-		public string StatusMessage { get; }
+		public IReadOnlyDictionary<string, object>? Status { get; }
 
 		/// <summary>
 		/// Constructor
@@ -88,13 +87,13 @@ namespace Horde.Build.Agents.Fleet
 		/// <param name="pool"></param>
 		/// <param name="agents"></param>
 		/// <param name="desiredAgentCount"></param>
-		/// <param name="statusMessage"></param>
-		public PoolSizeData(IPool pool, List<IAgent> agents, int? desiredAgentCount, string statusMessage = "N/A")
+		/// <param name="status"></param>
+		public PoolSizeResult(IPool pool, List<IAgent> agents, int? desiredAgentCount, IReadOnlyDictionary<string, object>? status = null)
 		{
 			Pool = pool;
 			Agents = agents;
 			DesiredAgentCount = desiredAgentCount;
-			StatusMessage = statusMessage;
+			Status = status;
 		}
 
 		/// <summary>
@@ -104,11 +103,11 @@ namespace Horde.Build.Agents.Fleet
 		/// <param name="pool"></param>
 		/// <param name="agents"></param>
 		/// <param name="desiredAgentCount"></param>
-		/// <param name="statusMessage"></param>
+		/// <param name="status"></param>
 		/// <returns>A new copy</returns>
-		public PoolSizeData Copy(IPool? pool = null, List<IAgent>? agents = null, int? desiredAgentCount = null, string? statusMessage = null)
+		public PoolSizeResult Copy(IPool? pool = null, List<IAgent>? agents = null, int? desiredAgentCount = null, IReadOnlyDictionary<string, object>? status = null)
 		{
-			return new PoolSizeData(pool ?? Pool, agents ?? Agents, desiredAgentCount ?? DesiredAgentCount, statusMessage ?? StatusMessage);
+			return new PoolSizeResult(pool ?? Pool, agents ?? Agents, desiredAgentCount ?? DesiredAgentCount, status);
 		}
 	}
 	
@@ -120,9 +119,10 @@ namespace Horde.Build.Agents.Fleet
 		/// <summary>
 		/// Calculate the adequate number of agents to be online for given pools
 		/// </summary>
-		/// <param name="pools">Pools including attached agents</param>
-		/// <returns></returns>
-		Task<List<PoolSizeData>> CalcDesiredPoolSizesAsync(List<PoolSizeData> pools);
+		/// <param name="pool">Pool to calculate size for</param>
+		/// <param name="agents">Available agents</param>
+		/// <returns>A result containing the desired agent count</returns>
+		Task<PoolSizeResult> CalculatePoolSizeAsync(IPool pool, List<IAgent> agents);
 		
 		/// <summary>
 		/// Name of the strategy
@@ -137,10 +137,9 @@ namespace Horde.Build.Agents.Fleet
 	public class NoOpPoolSizeStrategy : IPoolSizeStrategy
 	{
 		/// <inheritdoc/>
-		public Task<List<PoolSizeData>> CalcDesiredPoolSizesAsync(List<PoolSizeData> pools)
+		public Task<PoolSizeResult> CalculatePoolSizeAsync(IPool pool, List<IAgent> agents)
 		{
-			List<PoolSizeData> result = pools.Select(x => new PoolSizeData(x.Pool, x.Agents, x.Agents.Count, "(no-op)")).ToList();
-			return Task.FromResult(result);
+			return Task.FromResult(new PoolSizeResult(pool, agents, agents.Count));
 		}
 
 		/// <inheritdoc/>

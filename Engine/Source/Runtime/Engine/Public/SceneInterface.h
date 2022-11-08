@@ -19,6 +19,7 @@ class FMaterialShaderMap;
 class FPrimitiveSceneInfo;
 class FRenderResource;
 class FRenderTarget;
+class FLightSceneProxy;
 class FRectLightSceneProxy;
 class FSkyLightSceneProxy;
 class FTexture;
@@ -38,6 +39,7 @@ class FInstanceCullingManager;
 class FSceneViewStateInterface;
 struct FHairStrandsInstance;
 struct FLightRenderParameters;
+class FSparseVolumeTextureViewerSceneProxy;
 
 enum EBasePassDrawListType
 {
@@ -193,7 +195,7 @@ public:
 	 * Updates the contents of the given sky capture by rendering the scene. 
 	 * This must be called on the game thread.
 	 */
-	virtual void UpdateSkyCaptureContents(const USkyLightComponent* CaptureComponent, bool bCaptureEmissiveOnly, UTextureCube* SourceCubemap, FTexture* OutProcessedTexture, float& OutAverageBrightness, FSHVectorRGB3& OutIrradianceEnvironmentMap, TArray<FFloat16Color>* OutRadianceMap) {}
+	virtual void UpdateSkyCaptureContents(const USkyLightComponent* CaptureComponent, bool bCaptureEmissiveOnly, UTextureCube* SourceCubemap, FTexture* OutProcessedTexture, float& OutAverageBrightness, FSHVectorRGB3& OutIrradianceEnvironmentMap, TArray<FFloat16Color>* OutRadianceMap, FLinearColor* SpecifiedCubemapColorScale) {}
 
 	virtual void AllocateAndCaptureFrameSkyEnvMap(FRDGBuilder& GraphBuilder, FSceneRenderer& SceneRenderer, FViewInfo& MainView, bool bShouldRenderSkyAtmosphere, bool bShouldRenderVolumetricCloud, FInstanceCullingManager& InstanceCullingManager) {}
 	virtual void ValidateSkyLightRealTimeCapture(FRDGBuilder& GraphBuilder, const FViewInfo& View, FRDGTextureRef SceneColorTexture) {}
@@ -306,6 +308,9 @@ public:
 	virtual FSkyAtmosphereRenderSceneInfo* GetSkyAtmosphereSceneInfo() = 0;
 	virtual const FSkyAtmosphereRenderSceneInfo* GetSkyAtmosphereSceneInfo() const = 0;
 
+	virtual void AddSparseVolumeTextureViewer(FSparseVolumeTextureViewerSceneProxy* SVTV) = 0;
+	virtual void RemoveSparseVolumeTextureViewer(FSparseVolumeTextureViewerSceneProxy* SVTV) = 0;
+
 	/**
 	 * Adds the unique volumetric cloud component to the scene
 	 *
@@ -332,6 +337,14 @@ public:
 	 * @param Proxy - the hair strands proxy
 	 */
 	virtual void RemoveHairStrands(FHairStrandsInstance* Proxy) = 0;
+
+	/**
+	 * Return the IES profile index corresponding to the local light proxy
+	 *
+	 * @param Proxy - the local light proxy
+	 * @param Out - the light parameters which will be filled with the IES profile  index information
+	 */
+	virtual void GetLightIESAtlasSlot(const FLightSceneProxy* Proxy, FLightRenderParameters* Out) = 0;
 
 	/**
 	 * Return the rect. light atlas slot information corresponding to the rect light proxy

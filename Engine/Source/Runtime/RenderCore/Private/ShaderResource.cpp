@@ -25,6 +25,7 @@
 #include "Misc/MemStack.h"
 #include "ShaderCompilerCore.h"
 #include "Compression/OodleDataCompression.h"
+#include "RHIResources.h"	// Access to FRHIRayTracingShader::RayTracingPayloadType requires this
 
 #if WITH_EDITORONLY_DATA
 #include "Interfaces/IShaderFormat.h"
@@ -165,46 +166,49 @@ class FRayTracingShaderLibrary
 public:
 	uint32 AddShader(FRHIRayTracingShader* Shader)
 	{
+		const int32 PayloadIndex = FMath::CountTrailingZeros(Shader->RayTracingPayloadType);
 		FScopeLock Lock(&CS);
 
-		if (UnusedIndicies.Num() != 0)
+		if (UnusedIndicies[PayloadIndex].Num() != 0)
 		{
-			uint32 Index = UnusedIndicies.Pop(false);
-			checkSlow(Shaders[Index] == nullptr);
-			Shaders[Index] = Shader;
+			uint32 Index = UnusedIndicies[PayloadIndex].Pop(false);
+			checkSlow(Shaders[PayloadIndex][Index] == nullptr);
+			Shaders[PayloadIndex][Index] = Shader;
 			return Index;
 		}
 		else
 		{
-			Shaders.Add(Shader);
-			return Shaders.Num() - 1;
+			return Shaders[PayloadIndex].Add(Shader);
 		}
 	}
 
-	void RemoveShader(uint32 Index)
+	void RemoveShader(uint32 Index, FRHIRayTracingShader* Shader)
 	{
 		if (Index != ~0u)
 		{
+			const int32 PayloadIndex = FMath::CountTrailingZeros(Shader->RayTracingPayloadType);
 			FScopeLock Lock(&CS);
-			UnusedIndicies.Push(Index);
-			Shaders[Index] = nullptr;
+			checkSlow(Shaders[PayloadIndex][Index] == Shader);
+			UnusedIndicies[PayloadIndex].Push(Index);
+			Shaders[PayloadIndex][Index] = nullptr;
 		}
 	}
 
 	void GetShaders(TArray<FRHIRayTracingShader*>& OutShaders, FRHIRayTracingShader* DefaultShader)
 	{
+		const int32 PayloadIndex = FMath::CountTrailingZeros(DefaultShader->RayTracingPayloadType);
 		FScopeLock Lock(&CS);
-		OutShaders = Shaders;
+		OutShaders = Shaders[PayloadIndex];
 
-		for (uint32 Index : UnusedIndicies)
+		for (uint32 Index : UnusedIndicies[PayloadIndex])
 		{
 			OutShaders[Index] = DefaultShader;
 		}
 	}
 
 private:
-	TArray<uint32> UnusedIndicies;
-	TArray<FRHIRayTracingShader*> Shaders;
+	TArray<uint32> UnusedIndicies[32];
+	TArray<FRHIRayTracingShader*> Shaders[32];
 	FCriticalSection CS;
 };
 
@@ -257,8 +261,7 @@ FShaderMapResourceCode::FShaderMapResourceCode(const FShaderMapResourceCode& Oth
 	ShaderEntries = Other.ShaderEntries;
 
 #if WITH_EDITORONLY_DATA
-	PlatformDebugData = Other.PlatformDebugData;
-	PlatformDebugDataHashes = Other.PlatformDebugDataHashes;
+	ShaderEditorOnlyDataEntries = Other.ShaderEditorOnlyDataEntries;
 #endif // WITH_EDITORONLY_DATA
 }
 
@@ -296,30 +299,24 @@ int32 FShaderMapResourceCode::FindShaderIndex(const FSHAHash& InHash) const
 	return Algo::BinarySearch(ShaderHashes, InHash);
 }
 
-void FShaderMapResourceCode::AddShaderCompilerOutput(const FShaderCompilerOutput& Output)
-{
-#if WITH_EDITORONLY_DATA
-	AddPlatformDebugData(Output.PlatformDebugData);
-
-	for (const FShaderCompilerError& Error : Output.Errors)
-	{
-		CompilerWarnings.Add(Error.GetErrorString());
-	}
-#endif
-	AddShaderCode(Output.Target.GetFrequency(), Output.OutputHash, Output.ShaderCode);
-}
-
-void FShaderMapResourceCode::AddShaderCode(EShaderFrequency InFrequency, const FSHAHash& InHash, const FShaderCode& InCode)
+void FShaderMapResourceCode::AddShaderCompilerOutput(const FShaderCompilerOutput& Output, const FString& DebugName)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FShaderMapResourceCode::AddShaderCode);
 
+	const FSHAHash& InHash = Output.OutputHash;
+	const FShaderCode& InCode = Output.ShaderCode;
 	const int32 Index = Algo::LowerBound(ShaderHashes, InHash);
 	if (Index >= ShaderHashes.Num() || ShaderHashes[Index] != InHash)
 	{
 		ShaderHashes.Insert(InHash, Index);
 
+#if WITH_EDITORONLY_DATA
+		// Output.Errors contains warnings in the case any exist (no errors since if there were the job would have failed)
+		AddEditorOnlyData(Index, DebugName, Output.PlatformDebugData, Output.Errors);
+#endif
+
 		FShaderEntry& Entry = ShaderEntries.InsertDefaulted_GetRef(Index);
-		Entry.Frequency = InFrequency;
+		Entry.Frequency = Output.Target.GetFrequency();
 		const TArray<uint8>& ShaderCode = InCode.GetReadAccess();
 
 		FName ShaderCompressionFormat = GetShaderCompressionFormat();
@@ -379,42 +376,54 @@ void FShaderMapResourceCode::AddShaderCode(EShaderFrequency InFrequency, const F
 
 		Entry.Code = ShaderCode;
 	}
+#if WITH_EDITORONLY_DATA
+	else
+	{
+		// Output.Errors contains warnings in the case any exist (no errors since if there were the job would have failed)
+		// We append the warnings for any additional jobs which resulted in the same bytecode for the sake of determinism in the
+		// results saved to DDC. 
+		AppendWarningsToEditorOnlyData(Index, DebugName, Output.Errors);
+	}
+#endif
 }
 
 #if WITH_EDITORONLY_DATA
-void FShaderMapResourceCode::AddPlatformDebugData(TConstArrayView<uint8> InPlatformDebugData)
+void FShaderMapResourceCode::AddEditorOnlyData(int32 Index, const FString& DebugName, TConstArrayView<uint8> InPlatformDebugData, TConstArrayView<FShaderCompilerError> InCompilerWarnings)
 {
-	if (InPlatformDebugData.Num() == 0)
-	{
-		return;
-	}
+	FShaderEditorOnlyDataEntry& Entry = ShaderEditorOnlyDataEntries.InsertDefaulted_GetRef(Index);
+	Entry.PlatformDebugData = InPlatformDebugData;
 
-	FSHAHash Hash;
-	{
-		FSHA1 Hasher;
-		Hasher.Update(InPlatformDebugData.GetData(), InPlatformDebugData.Num());
-		Hasher.Final();
-		Hasher.GetHash(Hash.Hash);
-	}
+	AppendWarningsToEditorOnlyData(Index, DebugName, InCompilerWarnings);
+}
 
-	const int32 Index = Algo::LowerBound(PlatformDebugDataHashes, Hash);
-	if (Index >= PlatformDebugDataHashes.Num() || PlatformDebugDataHashes[Index] != Hash)
+void FShaderMapResourceCode::AppendWarningsToEditorOnlyData(int32 Index, const FString& DebugName, TConstArrayView<FShaderCompilerError> InCompilerWarnings)
+{
+	FShaderEditorOnlyDataEntry& Entry = ShaderEditorOnlyDataEntries[Index];
+	for (const FShaderCompilerError& Warning : InCompilerWarnings)
 	{
-		PlatformDebugDataHashes.Insert(Hash, Index);
-		PlatformDebugData.EmplaceAt(Index, InPlatformDebugData.GetData(), InPlatformDebugData.Num());
+		FString ModifiedWarning = !DebugName.IsEmpty() ? FString::Printf(TEXT("%s [%s]"), *Warning.GetErrorString(), *DebugName) : Warning.GetErrorString();
+		// Maintain sorted order in Entry.CompilerWarnings & deduplicate
+		const int32 WarningIndex = Algo::LowerBound(Entry.CompilerWarnings, ModifiedWarning);
+		if (WarningIndex >= Entry.CompilerWarnings.Num() || Entry.CompilerWarnings[WarningIndex] != ModifiedWarning)
+		{
+			Entry.CompilerWarnings.Insert(ModifiedWarning, WarningIndex);
+		}
 	}
 }
 
 void FShaderMapResourceCode::LogShaderCompilerWarnings()
 {
-	if (CompilerWarnings.Num() > 0 && GShaderCompilerEmitWarningsOnLoad != 0)
+	if (ShaderEditorOnlyDataEntries.Num() > 0 && GShaderCompilerEmitWarningsOnLoad != 0)
 	{
 		// Emit all the compiler warnings seen whilst serializing/loading this shader to the log.
 		// Since successfully compiled shaders are stored in the DDC, we'll get the compiler warnings
 		// even if we didn't compile the shader this run.
-		for (const FString& CompilerWarning : CompilerWarnings)
+		for (const FShaderEditorOnlyDataEntry& Entry : ShaderEditorOnlyDataEntries)
 		{
-			UE_LOG(LogShaderWarnings, Warning, TEXT("%s"), *CompilerWarning);
+			for (const FString& CompilerWarning : Entry.CompilerWarnings)
+			{
+				UE_LOG(LogShaderWarnings, Warning, TEXT("%s"), *CompilerWarning);
+			}
 		}
 	}
 }
@@ -441,9 +450,7 @@ void FShaderMapResourceCode::Serialize(FArchive& Ar, bool bLoadedByCookedMateria
 	const bool bSerializeEditorOnlyData = !bLoadedByCookedMaterial && (!Ar.IsCooking() || Ar.CookingTarget()->HasEditorOnlyData());
 	if (bSerializeEditorOnlyData)
 	{
-		Ar << PlatformDebugDataHashes;
-		Ar << PlatformDebugData;
-		Ar << CompilerWarnings;
+		Ar << ShaderEditorOnlyDataEntries;
 	}
 #endif // WITH_EDITORONLY_DATA
 	ApplyResourceStats(*this);
@@ -462,29 +469,17 @@ void FShaderMapResourceCode::NotifyShadersCompiled(FName FormatName)
 #if WITH_ENGINE
 	// Notify the platform shader format that this particular shader is being used in the cook.
 	// We discard this data in cooked builds unless Ar.CookingTarget()->HasEditorOnlyData() is true.
-	if (PlatformDebugData.Num())
+	if (ShaderEditorOnlyDataEntries.Num())
 	{
 		if (const IShaderFormat* ShaderFormat = GetTargetPlatformManagerRef().FindShaderFormat(FormatName))
 		{
-			for (const TArray<uint8>& Entry : PlatformDebugData)
+			for (const FShaderEditorOnlyDataEntry& Entry : ShaderEditorOnlyDataEntries)
 			{
-				ShaderFormat->NotifyShaderCompiled(Entry, FormatName);
+				ShaderFormat->NotifyShaderCompiled(Entry.PlatformDebugData, FormatName);
 			}
 		}
 	}
 #endif // WITH_ENGINE
-}
-
-void FShaderMapResourceCode::NotifyShadersCooked(const ITargetPlatform* TargetPlatform)
-{
-#if WITH_ENGINE
-	TArray<FName> ShaderFormatNames;
-	TargetPlatform->GetAllTargetedShaderFormats(ShaderFormatNames);
-	for (FName FormatName : ShaderFormatNames)
-	{
-		NotifyShadersCompiled(FormatName);
-	}
-#endif
 }
 #endif // WITH_EDITORONLY_DATA
 
@@ -562,13 +557,13 @@ void FShaderMapResource::ReleaseRHI()
 				switch (Shader->GetFrequency())
 				{
 				case SF_RayHitGroup:
-					GlobalRayTracingHitGroupLibrary.RemoveShader(IndexInLibrary);
+					GlobalRayTracingHitGroupLibrary.RemoveShader(IndexInLibrary, static_cast<FRHIRayTracingShader*>(Shader));
 					break;
 				case SF_RayCallable:
-					GlobalRayTracingCallableShaderLibrary.RemoveShader(IndexInLibrary);
+					GlobalRayTracingCallableShaderLibrary.RemoveShader(IndexInLibrary, static_cast<FRHIRayTracingShader*>(Shader));
 					break;
 				case SF_RayMiss:
-					GlobalRayTracingMissShaderLibrary.RemoveShader(IndexInLibrary);
+					GlobalRayTracingMissShaderLibrary.RemoveShader(IndexInLibrary, static_cast<FRHIRayTracingShader*>(Shader));
 					break;
 				default:
 					break;
@@ -595,42 +590,69 @@ void FShaderMapResource::BeginCreateAllShaders()
 	});
 }
 
-FRHIShader* FShaderMapResource::CreateShader(int32 ShaderIndex)
-{	
-	check(!RHIShaders[ShaderIndex].load(std::memory_order_acquire));
+FRHIShader* FShaderMapResource::CreateShaderOrCrash(int32 ShaderIndex)
+{
+	FRHIShader* Shader = nullptr;
+	// create before taking the lock. This may cause multiple creations, but it's better
+	// than a potential oversubscription deadlock, since CreateShader can spawn async tasks
+	FRHIShader* CreatedShader = CreateRHIShaderOrCrash(ShaderIndex);	// guaranteed to return non-null
 
-	TRefCountPtr<FRHIShader> RHIShader = CreateRHIShader(ShaderIndex);
-#if RHI_RAYTRACING
-	if (GRHISupportsRayTracing && GRHISupportsRayTracingShaders && RHIShader.IsValid())
 	{
-		switch (RHIShader->GetFrequency())
+		// Most shadermaps have <100 shaders, and less than a half of them can be created. 
+		// However, if this path is often contended, you can slice this lock
+		FScopeLock ScopeLock(&RHIShadersCreationGuard);
+
+		Shader = RHIShaders[ShaderIndex].load(std::memory_order_relaxed);
+		if (UNLIKELY(Shader == nullptr))
 		{
-		case SF_RayHitGroup:
-			RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingHitGroupLibrary.AddShader(static_cast<FRHIRayTracingShader*>(RHIShader.GetReference()));
-			break;
-		case SF_RayCallable:
-			RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingCallableShaderLibrary.AddShader(static_cast<FRHIRayTracingShader*>(RHIShader.GetReference()));
-			break;
-		case SF_RayMiss:
-			RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingMissShaderLibrary.AddShader(static_cast<FRHIRayTracingShader*>(RHIShader.GetReference()));
-			break;
-		default:
-			break;
-		}
-	}
+			Shader = CreatedShader;
+			CreatedShader = nullptr;
+			RHIShaders[ShaderIndex].store(Shader, std::memory_order_release);
+
+#if RHI_RAYTRACING
+			// Registers RT shaders in global "libraries" that track all shaders potentially usable in a scene for adding to RTPSO
+			EShaderFrequency Frequency = Shader->GetFrequency();
+			if (LIKELY(GRHISupportsRayTracing && GRHISupportsRayTracingShaders))
+			{
+				switch (Frequency)
+				{
+					case SF_RayHitGroup:
+						RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingHitGroupLibrary.AddShader(static_cast<FRHIRayTracingShader*>(Shader));
+						break;
+					case SF_RayCallable:
+						RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingCallableShaderLibrary.AddShader(static_cast<FRHIRayTracingShader*>(Shader));
+						break;
+					case SF_RayMiss:
+						RayTracingLibraryIndices[ShaderIndex] = GlobalRayTracingMissShaderLibrary.AddShader(static_cast<FRHIRayTracingShader*>(Shader));
+						break;
+					case SF_RayGen:
+						// NOTE: we do not maintain a library for raygen shaders since the list of rayshaders we care about is usually small and consistent
+						break;
+					default:
+						break;
+				}
+			}
 #endif // RHI_RAYTRACING
 
-	// keep the reference alive (the caller will release)
-	if (RHIShader.IsValid())
-	{
-		RHIShader->AddRef();
+			// When using shader library, shader code is usually preloaded during the material load. Release it
+			// since we won't need it anymore for this shader.
+			ReleasePreloadedShaderCode(ShaderIndex);
+		}
 	}
-	return RHIShader.GetReference();
+
+	if (LIKELY(CreatedShader))
+	{
+		// free redundantly created shader
+		checkSlow(Shader != nullptr);
+		CreatedShader->Release();
+	}
+
+	return Shader;
 }
 
-TRefCountPtr<FRHIShader> FShaderMapResource_InlineCode::CreateRHIShader(int32 ShaderIndex)
+FRHIShader* FShaderMapResource_InlineCode::CreateRHIShaderOrCrash(int32 ShaderIndex)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FShaderMapResource_InlineCode::CreateRHIShader);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FShaderMapResource_InlineCode::CreateRHIShaderOrCrash);
 #if STATS
 	double TimeFunctionEntered = FPlatformTime::Seconds();
 	ON_SCOPE_EXIT
@@ -646,12 +668,10 @@ TRefCountPtr<FRHIShader> FShaderMapResource_InlineCode::CreateRHIShader(int32 Sh
 	// we can't have this called on the wrong platform's shaders
 	if (!ArePlatformsCompatible(GMaxRHIShaderPlatform, GetPlatform()))
 	{
-		if (FPlatformProperties::RequiresCookedData())
-		{
-			UE_LOG(LogShaders, Fatal, TEXT("FShaderMapResource_InlineCode::InitRHI got platform %s but it is not compatible with %s"),
-				*LegacyShaderPlatformToShaderFormat(GetPlatform()).ToString(), *LegacyShaderPlatformToShaderFormat(GMaxRHIShaderPlatform).ToString());
-		}
-		return TRefCountPtr<FRHIShader>();
+		UE_LOG(LogShaders, Fatal, TEXT("FShaderMapResource_InlineCode::InitRHI got platform %s but it is not compatible with %s"),
+			*LegacyShaderPlatformToShaderFormat(GetPlatform()).ToString(), *LegacyShaderPlatformToShaderFormat(GMaxRHIShaderPlatform).ToString());
+		// unreachable
+		return nullptr;
 	}
 
 	FMemStackBase& MemStack = FMemStack::Get();
@@ -671,7 +691,7 @@ TRefCountPtr<FRHIShader> FShaderMapResource_InlineCode::CreateRHIShader(int32 Sh
 	const FSHAHash& ShaderHash = Code->ShaderHashes[ShaderIndex];
 	const EShaderFrequency Frequency = ShaderEntry.Frequency;
 
-	TRefCountPtr<FRHIShader> RHIShader;
+	FRHIShader* RHIShader = nullptr;
 	switch (Frequency)
 	{
 	case SF_Vertex: RHIShader = RHICreateVertexShader(ShaderCodeView, ShaderHash); break;
@@ -692,11 +712,17 @@ TRefCountPtr<FRHIShader> FShaderMapResource_InlineCode::CreateRHIShader(int32 Sh
 		checkNoEntry();
 		break;
 	}
-
-	if (RHIShader)
+	if (UNLIKELY(RHIShader == nullptr))
 	{
-		INC_DWORD_STAT(STAT_Shaders_NumShadersUsedForRendering);
-		RHIShader->SetHash(ShaderHash);
+		UE_LOG(LogShaders, Fatal, TEXT("FShaderMapResource_InlineCode::InitRHI is unable to create a shader (frequency %d)"), static_cast<int32>(Frequency));
+		// unreachable
+		return nullptr;
 	}
+
+	INC_DWORD_STAT(STAT_Shaders_NumShadersUsedForRendering);
+	RHIShader->SetHash(ShaderHash);
+
+	// contract of this function is to return a shader with an already held reference
+	RHIShader->AddRef();
 	return RHIShader;
 }

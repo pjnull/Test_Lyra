@@ -7,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "EngineModule.h"
 #include "Misc/MessageDialog.h"
+#include "Misc/UObjectToken.h"
 #include "Misc/TransactionObjectEvent.h"
 #include "Modules/ModuleManager.h"
 #include "SlateOptMacros.h"
@@ -70,6 +71,7 @@
 #include "Materials/MaterialExpressionReroute.h"
 #include "Materials/MaterialExpressionRuntimeVirtualTextureSample.h"
 #include "Materials/MaterialExpressionRuntimeVirtualTextureSampleParameter.h"
+#include "Materials/MaterialExpressionSparseVolumeTextureSample.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
 #include "Materials/MaterialExpressionStaticComponentMaskParameter.h"
 #include "Materials/MaterialExpressionStaticSwitchParameter.h"
@@ -173,7 +175,7 @@ static TAutoConsoleVariable<int32> CVarMaterialEdUseDevShaders(
 	TEXT("Toggles whether the material editor will use shaders that include extra overhead incurred by the editor. Material editor must be re-opened if changed at runtime."),
 	ECVF_RenderThreadSafe);
 
-static bool Editor_IsStrataEnabled()
+bool Editor_IsStrataEnabled()
 {
 	static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata"));
 	return CVar && CVar->GetValueOnAnyThread() > 0;
@@ -540,6 +542,7 @@ void FMaterialEditor::InitMaterialEditor( const EToolkitMode::Type Mode, const T
 
 	MaterialStatsManager = FMaterialStatsUtils::CreateMaterialStats(this);
 	MaterialStatsManager->SetMaterialDisplayName(OriginalMaterial->GetName());
+	MaterialStatsManager->GetOldStatsListing()->OnMessageTokenClicked().AddSP(this, &FMaterialEditor::OnMessageLogLinkActivated);
 
 	if (!Material->MaterialGraph)
 	{
@@ -1509,6 +1512,11 @@ void FMaterialEditor::CreateInternalWidgets()
 
 	MaterialDetailsView->RegisterInstancedCustomPropertyLayout(
 		UMaterialExpressionRuntimeVirtualTextureSampleParameter::StaticClass(),
+		LayoutExpressionParameterDetails
+		);
+
+	MaterialDetailsView->RegisterInstancedCustomPropertyLayout(
+		UMaterialExpressionSparseVolumeTextureSampleParameter::StaticClass(),
 		LayoutExpressionParameterDetails
 		);
 
@@ -2723,6 +2731,42 @@ bool FMaterialEditor::UpdateOriginalMaterial()
 	return true;
 }
 
+void FMaterialEditor::OnMessageLogLinkActivated(const class TSharedRef<IMessageToken>& Token)
+{
+	const TSharedRef<FUObjectToken> UObjectToken = StaticCastSharedRef<FUObjectToken>(Token);
+	if (UObjectToken->GetObject().IsValid())
+	{
+		UMaterialExpression* Expression = Cast<UMaterialExpression>(UObjectToken->GetObject().Get());
+		if(UObject* MaterialOrFunction = Expression->GetAssetOwner())
+		{
+			UAssetEditorSubsystem* AssetEditor = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+			if(AssetEditor->OpenEditorForAsset(MaterialOrFunction))
+			{
+				FMaterialEditor* TargetEditor = static_cast<FMaterialEditor*>(AssetEditor->FindEditorForAsset(MaterialOrFunction, true));
+				checkf(TargetEditor, TEXT("Could not find Editor for Asset: %s"), *(MaterialOrFunction->GetFName().ToString()));
+
+				FMaterialExpressionCollection& Collection = Expression->Function ? TargetEditor->MaterialFunction->GetEditorOnlyData()->ExpressionCollection
+																		   : TargetEditor->Material->GetEditorOnlyData()->ExpressionCollection;
+
+				for (const TObjectPtr<UMaterialExpression>& EditorExpression : Collection.Expressions)
+				{
+					if (EditorExpression->MaterialExpressionGuid == Expression->MaterialExpressionGuid
+						&& EditorExpression->MaterialExpressionEditorX == Expression->MaterialExpressionEditorX
+						&& EditorExpression->MaterialExpressionEditorY == Expression->MaterialExpressionEditorY
+						&& EditorExpression->GetName() == Expression->GetName())
+					{
+						if (EditorExpression->GraphNode)
+						{
+							TargetEditor->JumpToNode(EditorExpression->GraphNode);
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void FMaterialEditor::UpdateMaterialinfoList_Old()
 {
 	bool bForceDisplay = false;
@@ -2739,7 +2783,9 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 
 		for (int32 i = 0; i < NumFeatureLevels; ++i)
 		{
-			TArray<FString> CompileErrors;
+			TArray<FString>				 CompileErrors;
+			TArray<UMaterialExpression*> FailingExpression;
+
 			ERHIFeatureLevel::Type FeatureLevel = FeatureLevelsToDisplay[i];
 			const FMaterialResource* MaterialResource = MaterialForStats->GetMaterialResource(FeatureLevel);
 
@@ -2761,6 +2807,7 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 							if (NumInputs > 1 || !InputExpression->IsResultMaterialAttributes(0))
 							{
 								CompileErrors.Add(TEXT("Layer graphs only support a single material attributes input."));
+								FailingExpression.Add(nullptr);
 							}
 						}
 						else if (UMaterialExpressionFunctionOutput* OutputExpression = Cast<UMaterialExpressionFunctionOutput>(Expression))
@@ -2769,17 +2816,20 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 							if (NumOutputs > 1 || !OutputExpression->IsResultMaterialAttributes(0))
 							{
 								CompileErrors.Add(TEXT("Layer graphs only support a single material attributes output."));
+								FailingExpression.Add(nullptr);
 							}
 						}
 						else if (UMaterialExpressionMaterialAttributeLayers* RecursiveLayer = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression))
 						{
 							CompileErrors.Add(TEXT("Layer graphs do not support layers within layers."));
+							FailingExpression.Add(nullptr);
 						}
 					}
 
 					if (NumInputs > 1 || NumOutputs < 1)
 					{
 						CompileErrors.Add(TEXT("Layer graphs require a single material attributes output and optionally, a single material attributes input."));
+						FailingExpression.Add(nullptr);
 					}
 				}
 				else if (MaterialFunction->GetMaterialFunctionUsage() == EMaterialFunctionUsage::MaterialLayerBlend)
@@ -2793,6 +2843,7 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 							if (NumInputs > 2 || !InputExpression->IsResultMaterialAttributes(0))
 							{
 								CompileErrors.Add(TEXT("Layer blend graphs only support two material attributes inputs."));
+								FailingExpression.Add(nullptr);
 							}
 						}
 						else if (UMaterialExpressionFunctionOutput* OutputExpression = Cast<UMaterialExpressionFunctionOutput>(Expression))
@@ -2801,17 +2852,20 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 							if (NumOutputs > 1 || !OutputExpression->IsResultMaterialAttributes(0))
 							{
 								CompileErrors.Add(TEXT("Layer blend graphs only support a single material attributes output."));
+								FailingExpression.Add(nullptr);
 							}
 						}
 						else if (UMaterialExpressionMaterialAttributeLayers* RecursiveLayer = Cast<UMaterialExpressionMaterialAttributeLayers>(Expression))
 						{
 							CompileErrors.Add(TEXT("Layer blend graphs do not support layers within layers."));
+							FailingExpression.Add(nullptr);
 						}
 					}
 
 					if (NumOutputs < 1)
 					{
 						CompileErrors.Add(TEXT("Layer blend graphs can have up to two material attributes inputs and a single output."));
+						FailingExpression.Add(nullptr);
 					}
 				}
 				else
@@ -2821,6 +2875,7 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 					if (CurrentResource)
 					{
 						CompileErrors = CurrentResource->GetCompileErrors();
+						FailingExpression = CurrentResource->GetErrorExpressions();
 					}
 
 					bool bFoundFunctionOutput = false;
@@ -2836,12 +2891,14 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 					if (!bFoundFunctionOutput)
 					{
 						CompileErrors.Add(TEXT("Missing a function output"));
+						FailingExpression.Add(nullptr);
 					}
 				}
 			}
 			else
 			{
 				CompileErrors = MaterialResource->GetCompileErrors();
+				FailingExpression = MaterialResource->GetErrorExpressions();
 			}
 
 			// Only show general info if there are no errors and stats are enabled - Stats show for Materials, layers and blends
@@ -2975,6 +3032,10 @@ void FMaterialEditor::UpdateMaterialinfoList_Old()
 				FString ErrorString = FString::Printf(TEXT("[%s] %s"), *FeatureLevelName, *CompileErrors[ErrorIndex]);
 				TempMaterialInfoList.Add(MakeShareable(new FMaterialInfo(ErrorString, FLinearColor::Red)));
 				TSharedRef<FTokenizedMessage> Line = FTokenizedMessage::Create( EMessageSeverity::Error );
+				if(FailingExpression.Num() && ensure(FailingExpression.Num() == CompileErrors.Num()) && FailingExpression[ErrorIndex])
+				{
+					Line->SetMessageLink(FUObjectToken::Create(FailingExpression[ErrorIndex]));
+				}
 				Line->AddToken( FTextToken::Create( FText::FromString( ErrorString ) ) );
 				Messages.Add(Line);
 				bForceDisplay = true;
@@ -3116,7 +3177,7 @@ void FMaterialEditor::UpdateGraphNodeStates()
 				FStaticSwitchParameter SwitchParam;
 				SwitchParam.Value = StaticSwitch->DefaultValue;
 				SwitchParam.ExpressionGUID = StaticSwitch->ExpressionGUID;
-				StaticSwitchSet.EditorOnly.StaticSwitchParameters.Add(SwitchParam);
+				StaticSwitchSet.StaticSwitchParameters.Add(SwitchParam);
 			}
 		}
 	}
@@ -3831,6 +3892,7 @@ void FMaterialEditor::OnConvertObjects()
 				UMaterialExpressionVectorParameter* VectorParameterExpression = Cast<UMaterialExpressionVectorParameter>(CurrentSelectedExpression);
 				UMaterialExpressionTextureObjectParameter* TextureObjectParameterExpression = Cast<UMaterialExpressionTextureObjectParameter>(CurrentSelectedExpression);
 				UMaterialExpressionRuntimeVirtualTextureSample* RuntimeVirtualTextureSampleExpression = Cast<UMaterialExpressionRuntimeVirtualTextureSample>(CurrentSelectedExpression);
+				UMaterialExpressionSparseVolumeTextureSample* SparseVolumeTextureSampleExpression = Cast<UMaterialExpressionSparseVolumeTextureSample>(CurrentSelectedExpression);
 
 				// Setup the class to convert to
 				UClass* ClassToCreate = NULL;
@@ -3873,6 +3935,10 @@ void FMaterialEditor::OnConvertObjects()
 				else if (RuntimeVirtualTextureSampleExpression)
 				{
 					ClassToCreate = UMaterialExpressionRuntimeVirtualTextureSampleParameter::StaticClass();
+				}
+				else if (SparseVolumeTextureSampleExpression)
+				{
+					ClassToCreate = UMaterialExpressionSparseVolumeTextureSampleParameter::StaticClass();
 				}
 				else if (ComponentMaskExpression)
 				{
@@ -3950,6 +4016,13 @@ void FMaterialEditor::OnConvertObjects()
 							NewRuntimeVirtualTextureExpression->VirtualTexture = RuntimeVirtualTextureSampleExpression->VirtualTexture;
 							NewRuntimeVirtualTextureExpression->MaterialType = RuntimeVirtualTextureSampleExpression->MaterialType;
 							NewRuntimeVirtualTextureExpression->MipValueMode = RuntimeVirtualTextureSampleExpression->MipValueMode;
+							NewGraphNode->ReconstructNode();
+						}
+						else if (SparseVolumeTextureSampleExpression)
+						{
+							bNeedsRefresh = true;
+							UMaterialExpressionSparseVolumeTextureSampleParameter* NewSparseVolumeTextureExpression = CastChecked<UMaterialExpressionSparseVolumeTextureSampleParameter>(NewExpression);
+							NewSparseVolumeTextureExpression->SparseVolumeTexture = SparseVolumeTextureSampleExpression->SparseVolumeTexture;
 							NewGraphNode->ReconstructNode();
 						}
 						else if (ComponentMaskExpression)

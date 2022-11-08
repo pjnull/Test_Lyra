@@ -318,12 +318,18 @@ public:
 		UE_NET_TRACE_FRAME_STATSCOUNTER(ReplicationSystemId, ReplicationSystem.CopiedObjectCount, CopiedObjectCount, ENetTraceVerbosity::Trace);
 	}
 
-	void ProcessNetObjectAttachmentSendQueue()
+	void ProcessNetObjectAttachmentSendQueue(FNetBlobManager::EProcessMode ProcessMode)
 	{
 		IRIS_PROFILER_SCOPE(FReplicationSystem_ProcessNetObjectAttachmentSendQueue);
 
 		FNetBlobManager& NetBlobManager = ReplicationSystemInternal.GetNetBlobManager();
-		NetBlobManager.ProcessNetObjectAttachmentSendQueue();
+		NetBlobManager.ProcessNetObjectAttachmentSendQueue(ProcessMode);
+	}
+
+	void ResetNetObjectAttachmentSendQueue()
+	{
+		FNetBlobManager& NetBlobManager = ReplicationSystemInternal.GetNetBlobManager();
+		NetBlobManager.ResetNetObjectAttachmentSendQueue();
 	}
 
 	// send data
@@ -431,6 +437,7 @@ UReplicationSystem::UReplicationSystem()
 : Super()
 , Impl(nullptr)
 , Id(~0U)
+, PIEInstanceID(INDEX_NONE)
 , bIsServer(0)
 , bAllowObjectReplication(0)
 , bDoCollectGarbage(0)
@@ -480,6 +487,9 @@ const UE::Net::Private::FReplicationSystemInternal* UReplicationSystem::GetRepli
 
 void UReplicationSystem::PreSendUpdate(float DeltaSeconds)
 {
+	using namespace UE::Net;
+	using namespace UE::Net::Private;
+
 	IRIS_PROFILER_SCOPE(FReplicationSystem_PreSendUpdate);
 
 #if !UE_BUILD_SHIPPING
@@ -490,14 +500,14 @@ void UReplicationSystem::PreSendUpdate(float DeltaSeconds)
 	}
 #endif
 
-	UE::Net::Private::FReplicationSystemInternal& InternalSys = Impl->ReplicationSystemInternal;
+	FReplicationSystemInternal& InternalSys = Impl->ReplicationSystemInternal;
 
 	// $IRIS TODO. There may be some throttling of connections to tick that we should take into account.
-	const UE::Net::FNetBitArrayView& ReplicatingConnections = MakeNetBitArrayView(Impl->ReplicationSystemInternal.GetConnections().GetValidConnections());
+	const FNetBitArrayView& ReplicatingConnections = MakeNetBitArrayView(Impl->ReplicationSystemInternal.GetConnections().GetValidConnections());
 
 #if UE_NET_IRIS_CSV_STATS && CSV_PROFILER
 	{
-		UE::Net::FNetSendStats& SendStats = InternalSys.GetSendStats();
+		FNetSendStats& SendStats = InternalSys.GetSendStats();
 		SendStats.Reset();
 		SendStats.SetNumberOfReplicatingConnections(ReplicatingConnections.CountSetBits());
 	}
@@ -522,9 +532,12 @@ void UReplicationSystem::PreSendUpdate(float DeltaSeconds)
 		// Copy dirty state data. We need this to happen before both filtering and prioritization
 		Impl->CopyDirtyStateData();
 
+		// We must process all attachments to objects going out of scope before we update the scope
+		Impl->ProcessNetObjectAttachmentSendQueue(FNetBlobManager::EProcessMode::ProcessObjectsGoingOutOfScope);
+
 		// Update filtering and scope for all connections
 		{
-			UE::Net::FNetBitArrayView DirtyObjects = InternalSys.GetDirtyNetObjectTracker().GetDirtyNetObjects();
+			FNetBitArrayView DirtyObjects = InternalSys.GetDirtyNetObjectTracker().GetDirtyNetObjects();
 			Impl->UpdateFiltering(DirtyObjects);
 		}
 
@@ -532,18 +545,19 @@ void UReplicationSystem::PreSendUpdate(float DeltaSeconds)
 		Impl->PropagateDirtyChanges();
 	}
 
-	// Forward attachments to the connections now that we know which objects are in scope
-	Impl->ProcessNetObjectAttachmentSendQueue();
+	// Forward attachments to the connections after scope update
+	Impl->ProcessNetObjectAttachmentSendQueue(FNetBlobManager::EProcessMode::ProcessObjectsInScope);
+	Impl->ResetNetObjectAttachmentSendQueue();
 
 	if (bAllowObjectReplication)
 	{
 		// Update object priorities
-		UE::Net::FNetBitArrayView DirtyObjects = InternalSys.GetDirtyNetObjectTracker().GetDirtyNetObjects();
+		FNetBitArrayView DirtyObjects = InternalSys.GetDirtyNetObjectTracker().GetDirtyNetObjects();
 		Impl->UpdatePrioritization(ReplicatingConnections, DirtyObjects);
 
 		// Delta compression preparations before send
 		{
-			UE::Net::Private::FDeltaCompressionBaselineManagerPreSendUpdateParams UpdateParams;
+			FDeltaCompressionBaselineManagerPreSendUpdateParams UpdateParams;
 			UpdateParams.ChangeMaskCache = &InternalSys.GetChangeMaskCache();
 			InternalSys.GetDeltaCompressionBaselineManager().PreSendUpdate(UpdateParams);
 		}
@@ -1092,21 +1106,6 @@ bool UReplicationSystem::SetReplicationCondition(FNetHandle Handle, UE::Net::ERe
 
 	FReplicationConditionals& Conditionals = Impl->ReplicationSystemInternal.GetConditionals();
 	return Conditionals.SetCondition(ObjectInternalIndex, Condition, bEnable);
-}
-
-bool UReplicationSystem::SetPropertyCustomCondition(FNetHandle Handle, const void* Owner, uint16 RepIndex, bool bEnable)
-{
-	using namespace UE::Net::Private;
-
-	FNetHandleManager& NetHandleManager = Impl->ReplicationSystemInternal.GetNetHandleManager();
-	const uint32 ObjectInternalIndex = NetHandleManager.GetInternalIndex(Handle);
-	if (ObjectInternalIndex == FNetHandleManager::InvalidInternalIndex)
-	{
-		return false;
-	}
-
-	FReplicationConditionals& Conditionals = Impl->ReplicationSystemInternal.GetConditionals();
-	return Conditionals.SetPropertyCustomCondition(ObjectInternalIndex, Owner, RepIndex, bEnable);
 }
 
 void UReplicationSystem::SetDeltaCompressionStatus(FNetHandle Handle, UE::Net::ENetObjectDeltaCompressionStatus Status)

@@ -22,17 +22,17 @@
 #include "InterchangeTexture2DArrayNode.h"
 #include "InterchangeTexture2DFactoryNode.h"
 #include "InterchangeTexture2DNode.h"
-#include "InterchangeTextureCubeFactoryNode.h"
-#include "InterchangeTextureCubeNode.h"
 #include "InterchangeTextureCubeArrayFactoryNode.h"
 #include "InterchangeTextureCubeArrayNode.h"
+#include "InterchangeTextureCubeFactoryNode.h"
+#include "InterchangeTextureCubeNode.h"
 #include "InterchangeTextureFactoryNode.h"
 #include "InterchangeTextureLightProfileFactoryNode.h"
 #include "InterchangeTextureLightProfileNode.h"
 #include "InterchangeTextureNode.h"
 #include "InterchangeTranslatorBase.h"
-#include "InterchangeVolumeTextureNode.h"
 #include "InterchangeVolumeTextureFactoryNode.h"
+#include "InterchangeVolumeTextureNode.h"
 #include "Misc/CoreStats.h"
 #include "Nodes/InterchangeBaseNode.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -523,41 +523,40 @@ namespace UE::Interchange::Private::InterchangeTextureFactory
 			BlockedImage.BlocksData.Reserve(Images.Num());
 
 			bool bMismatchedFormats = false;
+			bool bMismatchedGammaSpace = false;
 			for (int32 Index = 0; Index < Images.Num(); ++Index)
 			{
+				if (BlockedImage.bSRGB != Images[Index].bSRGB)
+				{
+					bMismatchedGammaSpace = true;
+					BlockedImage.bSRGB = false;
+					BlockedImage.Format = TSF_RGBA32F;
+				}
+
 				if (BlockedImage.Format != Images[Index].Format)
 				{
 					bMismatchedFormats = true;
-					break;
+					BlockedImage.Format = FImageCoreUtils::GetCommonSourceFormat(BlockedImage.Format, Images[Index].Format);
 				}
 			}
 
-			if (bMismatchedFormats)
+			if (bMismatchedGammaSpace || bMismatchedFormats)
 			{
-				UE_LOG(LogInterchangeImport, Warning, TEXT("Mismatched UDIM image formats, converting all to BGRA8 or RGBA16F ..."));
-
-				if (FTextureSource::IsHDR(BlockedImage.Format))
-				{
-					BlockedImage.Format = TSF_RGBA16F;
-					BlockedImage.bSRGB = false;
-				}
-				else
-				{
-					BlockedImage.Format = TSF_BGRA8;
-					BlockedImage.bSRGB = true;
-				}
+				UE_LOG(LogInterchangeImport, Warning, TEXT("Mismatched UDIM image %s, converting all to %s/%s ..."), bMismatchedGammaSpace ? TEXT("gamma spaces") : TEXT("pixel formats"),
+					ERawImageFormat::GetName(FImageCoreUtils::ConvertToRawImageFormat(BlockedImage.Format)), BlockedImage.bSRGB ? TEXT("sRGB") : TEXT("Linear"));
 
 				for (UE::Interchange::FImportImage& Image : Images)
 				{
-					if (Image.Format != BlockedImage.Format)
+					if (Image.bSRGB != BlockedImage.bSRGB || Image.Format != BlockedImage.Format)
 					{
 						ERawImageFormat::Type ImageRawFormat = FImageCoreUtils::ConvertToRawImageFormat(Image.Format);
-						FImageView SourceImage(Image.RawData.GetData(), Image.SizeX, Image.SizeY, ImageRawFormat);
-						FImage DestImage(Image.SizeX, Image.SizeY, FImageCoreUtils::ConvertToRawImageFormat(BlockedImage.Format));
+						FImageView SourceImage(Image.RawData.GetData(), Image.SizeX, Image.SizeY, 1, ImageRawFormat, Image.bSRGB ? EGammaSpace::sRGB : EGammaSpace::Linear);
+						FImage DestImage(Image.SizeX, Image.SizeY, FImageCoreUtils::ConvertToRawImageFormat(BlockedImage.Format), BlockedImage.bSRGB ? EGammaSpace::sRGB : EGammaSpace::Linear);
 						FImageCore::CopyImage(SourceImage, DestImage);
 
 						Image.RawData = MakeUniqueBufferFromArray(MoveTemp(DestImage.RawData));
 						Image.Format = BlockedImage.Format;
+						Image.bSRGB = BlockedImage.bSRGB;
 					}
 				}
 			}
@@ -1435,6 +1434,9 @@ namespace UE::Interchange::Private::InterchangeTextureFactory
 			}
 		}
 #endif // WITH_EDITORONLY_DATA
+
+		// at this point the texture is mostly set up
+		// NormalMapIdentification is not run yet
 	}
  }
 
@@ -1572,6 +1574,7 @@ UObject* UInterchangeTextureFactory::CreateAsset(const FCreateAssetParams& Argum
 	}
 
 	// create an asset if it doesn't exist
+	// typically ExistingAsset should already exist, made by CreateEmptyAsset on the main thread
 	UObject* ExistingAsset = StaticFindObject(nullptr, Arguments.Parent, *Arguments.AssetName);
 
 	UTexture* Texture = nullptr;
@@ -1585,7 +1588,8 @@ UObject* UInterchangeTextureFactory::CreateAsset(const FCreateAssetParams& Argum
 	}
 	else if(ExistingAsset->GetClass()->IsChildOf(TextureClass))
 	{
-		//This is a reimport, we are just re-updating the source data
+		//This is a reimport, we are just re-updating the source data  
+		// <- pretty sure this comment is wrong, this is hit in regular imports, because ExistingAsset was previously made by CreateNewAsset
 		Texture = static_cast<UTexture*>(ExistingAsset);
 	}
 
@@ -1673,6 +1677,9 @@ void UInterchangeTextureFactory::PreImportPreCompletedCallback(const FImportPreC
 		UInterchangeFactoryBaseNode* TextureFactoryNode = Arguments.FactoryNode;
 		if (!Arguments.bIsReimport)
 		{
+			// Finalize texture properties, before ApplyAllCustomAttributeToObject :
+			UE::TextureUtilitiesCommon::ApplyDefaultsForNewlyImportedTextures(Texture,Arguments.bIsReimport);
+
 			/** Apply all TextureNode custom attributes to the texture asset */
 			TextureFactoryNode->ApplyAllCustomAttributeToObject(Texture);
 		}
@@ -1690,7 +1697,14 @@ void UInterchangeTextureFactory::PreImportPreCompletedCallback(const FImportPreC
 			CurrentNode->FillAllCustomAttributeFromObject(Texture);
 			//Apply reimport strategy
 			UE::Interchange::FFactoryCommon::ApplyReimportStrategyToAsset(Texture, PreviousNode, CurrentNode, TextureFactoryNode);
+			
+			// ApplyDefaultsForNewlyImportedTextures after ApplyReimportStrategyToAsset
+			//	so we can override values
+			UE::TextureUtilitiesCommon::ApplyDefaultsForNewlyImportedTextures(Texture,Arguments.bIsReimport);
 		}
+
+		// Texture is mostly done setting properties now (exception: FTaskPipelinePostImport NormalmapIdentification)
+		// PostEditChange will be called subseqently, in FTaskPreCompletion::DoTask
 #endif // WITH_EDITOR
 	}
 	else

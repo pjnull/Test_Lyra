@@ -60,9 +60,6 @@ void FIKRigEditorToolkit::InitAssetEditor(
 	const FPersonaModule& PersonaModule = FModuleManager::LoadModuleChecked<FPersonaModule>("Persona");
 	PersonaToolkit = PersonaModule.CreatePersonaToolkit(IKRigAsset, PersonaToolkitArgs);
 
-	const TSharedRef<IAssetFamily> AssetFamily = PersonaModule.CreatePersonaAssetFamily(IKRigAsset);
-	AssetFamily->RecordAssetOpened(FAssetData(IKRigAsset));
-
 	static constexpr bool bCreateDefaultStandaloneMenu = true;
 	static constexpr bool bCreateDefaultToolbar = true;
 	FAssetEditorToolkit::InitAssetEditor(
@@ -220,7 +217,6 @@ void FIKRigEditorToolkit::HandlePreviewSceneCreated(const TSharedRef<IPersonaPre
 	EditorController->AnimInstance = AnimInstance;
 	AnimInstance->SetIKRigAsset(EditorController->AssetController->GetAsset());
 	EditorController->SkelMeshComponent->PreviewInstance = AnimInstance;
-	EditorController->OnIKRigNeedsInitialized(EditorController->AssetController->GetAsset());
 	AnimInstance->InitializeAnimation();
 
 	// set the skeletal mesh on the component

@@ -418,17 +418,19 @@ FMaterialRelevance UMaterialInterface::GetRelevance_Internal(const UMaterial* Ma
 
 		// If dual blending is supported, and we are rendering post-DOF translucency, then we also need to render a second pass to the modulation buffer.
 		// The modulation buffer can also be used for regular modulation shaders after DoF.
-		const bool bMaterialSeparateModulation =
-			(MaterialResource->IsDualBlendingEnabled(GShaderPlatformForFeatureLevel[InFeatureLevel]) || BlendMode == BLEND_Modulate)
-			&& TranslucencyPass == MTP_AfterDOF;
+		const bool bMaterialSeparateModulation = MaterialResource->IsDualBlendingEnabled(GShaderPlatformForFeatureLevel[InFeatureLevel]) || BlendMode == BLEND_Modulate || StrataBlendMode == SBM_ColoredTransmittanceOnly;
+
+		// Encode Strata BSDF into a mask where each bit correspond to a number of BSDF (1-8)
+		const uint8 StrataBSDFCount = FMath::Max(MaterialResource->MaterialGetStrataBSDFCount_GameThread(), uint8(1u));
+		const uint8 StrataBSDFCountMask = 1u << uint8(FMath::Min(StrataBSDFCount - 1, 8));
 
 		MaterialRelevance.bOpaque = !bIsTranslucent;
 		MaterialRelevance.bMasked = IsMasked();
 		MaterialRelevance.bDistortion = MaterialResource->IsDistorted();
 		MaterialRelevance.bHairStrands = IsCompatibleWithHairStrands(MaterialResource, InFeatureLevel);
 		MaterialRelevance.bTwoSided = MaterialResource->IsTwoSided();
-		MaterialRelevance.bSeparateTranslucency = (TranslucencyPass == MTP_AfterDOF) && StrataBlendMode != SBM_ColoredTransmittanceOnly;
-		MaterialRelevance.bSeparateTranslucencyModulate = bMaterialSeparateModulation || StrataBlendMode == SBM_ColoredTransmittanceOnly;
+		MaterialRelevance.bSeparateTranslucency = bIsTranslucent && (TranslucencyPass == MTP_AfterDOF);
+		MaterialRelevance.bTranslucencyModulate = bMaterialSeparateModulation;
 		MaterialRelevance.bPostMotionBlurTranslucency = (TranslucencyPass == MTP_AfterMotionBlur);
 		MaterialRelevance.bNormalTranslucency = bIsTranslucent && (TranslucencyPass == MTP_BeforeDOF);
 		MaterialRelevance.bDisableDepthTest = bIsTranslucent && Material->bDisableDepthTest;		
@@ -445,7 +447,7 @@ FMaterialRelevance UMaterialInterface::GetRelevance_Internal(const UMaterial* Ma
 		MaterialRelevance.bUsesSkyMaterial = Material->bIsSky;
 		MaterialRelevance.bUsesSingleLayerWaterMaterial = bUsesSingleLayerWaterMaterial;
 		MaterialRelevance.bUsesAnisotropy = bUsesAnisotropy;
-
+		MaterialRelevance.StrataBSDFCountMask = StrataBSDFCountMask;
 		return MaterialRelevance;
 	}
 	else
@@ -849,6 +851,17 @@ bool UMaterialInterface::GetRuntimeVirtualTextureParameterValue(const FHashedMat
 	return false;
 }
 
+bool UMaterialInterface::GetSparseVolumeTextureParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, USparseVolumeTexture*& OutValue, bool bOveriddenOnly) const
+{
+	FMaterialParameterMetadata Result;
+	if (GetParameterValue(EMaterialParameterType::SparseVolumeTexture, ParameterInfo, Result, MakeParameterValueFlags(bOveriddenOnly)))
+	{
+		OutValue = Result.Value.SparseVolumeTexture;
+		return true;
+	}
+	return false;
+}
+
 #if WITH_EDITOR
 bool UMaterialInterface::GetTextureParameterChannelNames(const FHashedMaterialParameterInfo& ParameterInfo, FParameterChannelNames& OutValue) const
 {
@@ -935,10 +948,21 @@ bool UMaterialInterface::GetRuntimeVirtualTextureParameterDefaultValue(const FHa
 	return false;
 }
 
+bool UMaterialInterface::GetSparseVolumeTextureParameterDefaultValue(const FHashedMaterialParameterInfo& ParameterInfo, class USparseVolumeTexture*& OutValue) const
+{
+	FMaterialParameterMetadata Result;
+	if (GetParameterDefaultValue(EMaterialParameterType::SparseVolumeTexture, ParameterInfo, Result))
+	{
+		OutValue = Result.Value.SparseVolumeTexture;
+		return true;
+	}
+	return false;
+}
+
 bool UMaterialInterface::GetFontParameterDefaultValue(const FHashedMaterialParameterInfo& ParameterInfo, class UFont*& OutFontValue, int32& OutFontPage) const
 {
 	FMaterialParameterMetadata Result;
-	if (GetParameterDefaultValue(EMaterialParameterType::RuntimeVirtualTexture, ParameterInfo, Result))
+	if (GetParameterDefaultValue(EMaterialParameterType::Font, ParameterInfo, Result))
 	{
 		OutFontValue = Result.Value.Font.Value;
 		OutFontPage = Result.Value.Font.Page;
@@ -1014,6 +1038,11 @@ void UMaterialInterface::GetAllTextureParameterInfo(TArray<FMaterialParameterInf
 void UMaterialInterface::GetAllRuntimeVirtualTextureParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
 {
 	GetAllParameterInfoOfType(EMaterialParameterType::RuntimeVirtualTexture, OutParameterInfo, OutParameterIds);
+}
+
+void UMaterialInterface::GetAllSparseVolumeTextureParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const
+{
+	GetAllParameterInfoOfType(EMaterialParameterType::SparseVolumeTexture, OutParameterInfo, OutParameterIds);
 }
 
 void UMaterialInterface::GetAllFontParameterInfo(TArray<FMaterialParameterInfo>& OutParameterInfo, TArray<FGuid>& OutParameterIds) const

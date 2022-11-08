@@ -336,6 +336,20 @@ enum class EMobileHapticsType : uint8
 	ImpactHeavy,
 };
 
+/** Possible connection states */
+enum class ENetworkConnectionStatus : uint8
+{
+	/** Default state */
+	Unknown = 0,
+	/** No network connection or network device disabled */
+	Disabled,
+	/** Ad-hoc Wifi network or LAN with no external connection */
+	Local,
+	/** Connected to the network */
+	Connected
+};
+CORE_API const TCHAR* LexToString(ENetworkConnectionStatus EnumVal);
+
 enum class ENetworkConnectionType : uint8
 {
 	/**
@@ -766,6 +780,16 @@ struct CORE_API FGenericPlatformMisc
 	}
 
 	static bool SupportsMessaging()
+	{
+		return true;
+	}
+
+	/**
+	 * For platforms that support cache storage functionality, setting a directory for it when it's not available can result in errors.
+	 * This method's purpose is to be overridden in such platforms, with logic that checks if said cache is available.
+	 * In all other platforms without this constraint, it should return true by default.
+	 */
+	static bool IsCacheStorageAvailable()
 	{
 		return true;
 	}
@@ -1485,6 +1509,16 @@ public:
 	}
 
 	/**
+	 * Returns the current status for the network connection
+	 */
+	static ENetworkConnectionStatus GetNetworkConnectionStatus();
+
+	/**
+	 * Updates the current status for the network connection
+	 */
+	static void SetNetworkConnectionStatus(ENetworkConnectionStatus NewNetworkConnectionStatus);
+
+	/**
 	 * Returns whether WiFi connection is currently active
 	 */
 	static ENetworkConnectionType GetNetworkConnectionType()
@@ -1829,6 +1863,8 @@ protected:
 #endif	//#if !UE_BUILD_SHIPPING
 
 	static EDeviceScreenOrientation AllowedDeviceOrientation;
+
+	static ENetworkConnectionStatus CurrentNetworkConnectionStatus;
 
 protected:
 	/**

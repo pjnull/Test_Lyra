@@ -1,12 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MeshGroupPaintTool.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "InteractiveToolManager.h"
 #include "InteractiveGizmoManager.h"
 #include "Drawing/MeshElementsVisualizer.h"
 #include "Async/ParallelFor.h"
 #include "Async/Async.h"
+#include "SceneView.h"
 #include "ToolSetupUtil.h"
 #include "ModelingToolTargetUtil.h"
 #include "MeshWeights.h"

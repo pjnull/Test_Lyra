@@ -44,9 +44,11 @@ struct FCompositeSection : public FAnimLinkableElement
 	UPROPERTY(EditAnywhere, Category=Section)
 	FName SectionName;
 
+#if WITH_EDITORONLY_DATA
 	/** Start Time **/
 	UPROPERTY()
 	float StartTime_DEPRECATED;
+#endif
 
 	/** Should this animation loop. */
 	UPROPERTY(VisibleAnywhere, Category=Section)
@@ -63,7 +65,9 @@ public:
 	FCompositeSection()
 		: FAnimLinkableElement()
 		, SectionName(NAME_None)
+#if WITH_EDITORONLY_DATA
 		, StartTime_DEPRECATED(0.0f)
+#endif
 		, NextSectionName(NAME_None)
 	{
 	}
@@ -102,8 +106,10 @@ struct FBranchingPoint : public FAnimLinkableElement
 	UPROPERTY(EditAnywhere, Category=BranchingPoint)
 	FName EventName;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	float DisplayTime_DEPRECATED = 0.f;
+#endif
 
 	/** An offset from the DisplayTime to the actual time we will trigger the notify, as we cannot always trigger it exactly at the time the user wants */
 	UPROPERTY()
@@ -498,7 +504,7 @@ public:
 	bool SetNextSectionName(FName const & SectionName, FName const & NewNextSectionName);
 	bool SetNextSectionID(int32 const & SectionID, int32 const & NewNextSectionID);
 
-	bool IsValid() const { return (Montage!=NULL); }
+	bool IsValid() const { return (Montage!=nullptr); }
 	bool IsPlaying() const { return IsValid() && bPlaying; }
 	void SetPlaying(bool bInPlaying) { bPlaying = bInPlaying; }
 	bool IsStopped() const { return Blend.GetDesiredValue() == 0.f; }
@@ -620,15 +626,19 @@ class UAnimMontage : public UAnimCompositeBase
 	UPROPERTY(EditAnywhere, Category=BlendOption)
 	FAlphaBlend BlendIn;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	float BlendInTime_DEPRECATED;
+#endif
 
 	/** Blend out option. This is only used when it blends out itself. If it's interrupted by other montages, it will use new montage's BlendIn option to blend out. */
 	UPROPERTY(EditAnywhere, Category=BlendOption)
 	FAlphaBlend BlendOut;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	float BlendOutTime_DEPRECATED;
+#endif
 
 	/** Time from Sequence End to trigger blend out.
 	 * <0 means using BlendOutTime, so BlendOut finishes as Montage ends.
@@ -667,9 +677,11 @@ class UAnimMontage : public UAnimCompositeBase
 	UPROPERTY()
 	TArray<struct FSlotAnimationTrack> SlotAnimTracks;
 
+#if WITH_EDITORONLY_DATA
 	// Remove this when VER_UE4_MONTAGE_BRANCHING_POINT_REMOVAL is removed.
 	UPROPERTY()
 	TArray<struct FBranchingPoint> BranchingPoints_DEPRECATED;
+#endif
 
 	/** If this is on, it will allow extracting root motion translation. DEPRECATED in 4.5 root motion is controlled by anim sequences **/
 	UPROPERTY()
@@ -926,6 +938,9 @@ public:
 	virtual void InvalidateRecursiveAsset() override;
 	virtual bool ContainRecursive(TArray<UAnimCompositeBase*>& CurrentAccumulatedList) override;
 	virtual void SetCompositeLength(float InLength) override;
+#if WITH_EDITOR
+	virtual void PopulateWithExistingModel(TScriptInterface<IAnimationDataModel> ExistingDataModel) override;
+#endif // WITH_EDITOR
 	//~End UAnimCompositeBase Interface
 
 	/** Utility function to create dynamic montage from AnimSequence */

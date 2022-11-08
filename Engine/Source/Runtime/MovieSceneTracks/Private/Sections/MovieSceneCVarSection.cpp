@@ -82,7 +82,7 @@ void UMovieSceneCVarSection::ImportEntityImpl(UMovieSceneEntitySystemLinker* Ent
 
 	OutImportedEntity->AddBuilder(
 		FEntityBuilder()
-		.AddTag(FBuiltInComponentTypes::Get()->Tags.Master)
+		.AddTag(FBuiltInComponentTypes::Get()->Tags.Root)
 		.Add(FBuiltInComponentTypes::Get()->TrackInstance, TrackInstance)
 	);
 }

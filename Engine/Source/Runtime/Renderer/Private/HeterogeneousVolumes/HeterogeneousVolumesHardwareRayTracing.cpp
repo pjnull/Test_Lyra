@@ -6,6 +6,7 @@
 #include "RayTracingDefinitions.h"
 #include "RayTracingInstance.h"
 #include "RayTracingInstanceBufferUtil.h"
+#include "RayTracingPayloadType.h"
 #include "RendererPrivate.h"
 #include "ScenePrivate.h"
 #include "SceneManagement.h"
@@ -295,6 +296,11 @@ class FHeterogeneousVolumesSparseVoxelsHitGroup : public FGlobalShader
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
 	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::SparseVoxel;
+	}
 };
 
 IMPLEMENT_GLOBAL_SHADER(FHeterogeneousVolumesSparseVoxelsHitGroup, "/Engine/Private/HeterogeneousVolumes/HeterogeneousVolumesHardwareRayTracing.usf", "closesthit=SparseVoxelsClosestHitShader anyhit=SparseVoxelsAnyHitShader intersection=SparseVoxelsIntersectionShader", SF_RayHitGroup);
@@ -313,6 +319,11 @@ class FHeterogeneousVolumesSparseVoxelMS : public FGlobalShader
 	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::SparseVoxel;
 	}
 
 	using FParameters = FEmptyShaderParameters;
@@ -385,6 +396,11 @@ class FRenderLightingCacheWithPreshadingRGS : public FGlobalShader
 			OutEnvironment.SetDefine(TEXT("VIRTUAL_SHADOW_MAP"), 1);
 			FVirtualShadowMapArray::SetShaderDefines(OutEnvironment);
 		}
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::SparseVoxel;
 	}
 };
 
@@ -460,6 +476,11 @@ class FRenderSingleScatteringWithPreshadingRGS : public FGlobalShader
 			OutEnvironment.SetDefine(TEXT("VIRTUAL_SHADOW_MAP"), 1);
 			FVirtualShadowMapArray::SetShaderDefines(OutEnvironment);
 		}
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::SparseVoxel;
 	}
 };
 

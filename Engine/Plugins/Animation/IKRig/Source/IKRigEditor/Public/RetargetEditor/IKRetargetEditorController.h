@@ -51,7 +51,7 @@ enum class ERetargetSelectionType : uint8
 
 struct FBoundIKRig
 {
-	FBoundIKRig(UIKRigDefinition* InIKRig, const FIKRetargetEditorController& InController);
+	FBoundIKRig(UIKRigDefinition* InIKRig, FIKRetargetEditorController& InController);
 	void UnBind() const;
 	
 	UIKRigDefinition* IKRig;
@@ -75,7 +75,7 @@ public:
 	/** Bind callbacks to this IK Rig */
 	void BindToIKRigAssets(UIKRetargeter* InAsset);
 	/** callback when IK Rig asset requires reinitialization */
-	void HandleIKRigNeedsInitialized(UIKRigDefinition* ModifiedIKRig) const;
+	void HandleIKRigNeedsInitialized(UIKRigDefinition* ModifiedIKRig);
 	/** callback when IK Rig asset's retarget chain's have been added or removed*/
 	void HandleRetargetChainAdded(UIKRigDefinition* ModifiedIKRig) const;
 	/** callback when IK Rig asset's retarget chain has been renamed */
@@ -83,7 +83,7 @@ public:
 	/** callback when IK Rig asset's retarget chain has been removed */
 	void HandleRetargetChainRemoved(UIKRigDefinition* ModifiedIKRig, const FName& InChainRemoved) const;
 	/** callback when IK Retargeter asset requires reinitialization */
-	void HandleRetargeterNeedsInitialized(UIKRetargeter* Retargeter) const;
+	void HandleRetargeterNeedsInitialized(UIKRetargeter* Retargeter);
 	FDelegateHandle RetargeterReInitDelegateHandle;
 	
 	/** all modifications to the data model should go through this controller */
@@ -206,9 +206,14 @@ public:
 
 	void SetRootSelected(const bool bIsSelected);
 	bool GetRootSelected() const { return bIsRootSelected; };
-	
+
+	/* remove selected elements that no longer exist after swapping input assets */
+	void CleanSelection(ERetargetSourceOrTarget SourceOrTarget);
+	/* set selection to nothing */
 	void ClearSelection(const bool bKeepBoneSelection=false);
 	ERetargetSelectionType GetLastSelectedItemType() const { return LastSelectedItem; };
+
+	bool GetCameraTargetForSelection(FSphere& OutTarget) const; 
 
 	/** ------------------------- END SELECTION -----------------------------*/
 

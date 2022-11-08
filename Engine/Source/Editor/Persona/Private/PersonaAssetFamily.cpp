@@ -8,6 +8,7 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "Styling/AppStyle.h"
 #include "AssetToolsModule.h"
+#include "Preferences/PersonaOptions.h"
 
 #define LOCTEXT_NAMESPACE "PersonaAssetFamily"
 
@@ -44,6 +45,11 @@ FPersonaAssetFamily::FPersonaAssetFamily(const UObject* InFromObject)
 	}
 }
 
+void FPersonaAssetFamily::Initialize()
+{
+	GetMutableDefault<UPersonaOptions>()->RegisterOnUpdateSettings(UPersonaOptions::FOnUpdateSettingsMulticaster::FDelegate::CreateSP(this, &FPersonaAssetFamily::OnSettingsChange));
+}
+
 void FPersonaAssetFamily::GetAssetTypes(TArray<UClass*>& OutAssetTypes) const
 {
 	OutAssetTypes.Reset();
@@ -61,21 +67,8 @@ static void FindAssets(const USkeleton* InSkeleton, TArray<FAssetData>& OutAsset
 	{
 		return;
 	}
-	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-	FARFilter Filter;
-	Filter.bRecursiveClasses = true;
-	Filter.ClassPaths.Add(AssetType::StaticClass()->GetClassPathName());
-	Filter.TagsAndValues.Add(SkeletonTag, FAssetData(InSkeleton).GetExportTextName());
-	
-	// Also include all compatible assets.
-	FString CompatibleTagValue;
-	for (const auto& CompatibleSkeleton : InSkeleton->GetCompatibleSkeletons())
-	{
-		CompatibleTagValue = FString::Format(TEXT("{0}'{1}'"), { *USkeleton::StaticClass()->GetPathName(), *CompatibleSkeleton.ToString() });
-		Filter.TagsAndValues.Add(SkeletonTag, CompatibleTagValue);
-	}
 
-	AssetRegistryModule.Get().GetAssets(Filter, OutAssetData);
+	InSkeleton->GetCompatibleAssets(AssetType::StaticClass(), *SkeletonTag.ToString(), OutAssetData);
 }
 
 FAssetData FPersonaAssetFamily::FindAssetOfType(UClass* InAssetClass) const
@@ -143,13 +136,24 @@ FAssetData FPersonaAssetFamily::FindAssetOfType(UClass* InAssetClass) const
 			}
 			else
 			{
+				// If we have a mesh and it has a physics asset, use it
+				if (Mesh.IsValid())
+				{
+					if (UPhysicsAsset* MeshPhysicsAsset = Mesh->GetPhysicsAsset())
+					{
+						return FAssetData(MeshPhysicsAsset);
+					}
+				}
+
 				TArray<FAssetData> Assets;
 
 				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 				FARFilter Filter;
 				Filter.bRecursiveClasses = true;
 				Filter.ClassPaths.Add(UPhysicsAsset::StaticClass()->GetClassPathName());
-				if(Mesh.IsValid())
+
+				// If we have a mesh, look for a physics asset that has that mesh as its preview mesh
+				if (Mesh.IsValid())
 				{
 					Filter.TagsAndValues.Add(GET_MEMBER_NAME_CHECKED(UPhysicsAsset, PreviewSkeletalMesh), FSoftObjectPath(Mesh.Get()).ToString());
 				}
@@ -173,8 +177,7 @@ void FPersonaAssetFamily::FindAssetsOfType(UClass* InAssetClass, TArray<FAssetDa
 	{
 		if (InAssetClass->IsChildOf<USkeleton>())
 		{
-			// we should always have a skeleton here, this asset family is based on it
-			OutAssets.Add(FAssetData(Skeleton.Get()));
+			Skeleton.Get()->GetCompatibleSkeletonAssets(OutAssets);
 		}
 		else if (InAssetClass->IsChildOf<UAnimationAsset>())
 		{
@@ -194,12 +197,23 @@ void FPersonaAssetFamily::FindAssetsOfType(UClass* InAssetClass, TArray<FAssetDa
 			FARFilter Filter;
 			Filter.bRecursiveClasses = true;
 			Filter.ClassPaths.Add(UPhysicsAsset::StaticClass()->GetClassPathName());
-			if(Mesh != nullptr)
+
+			// If we have a mesh, look for a physics asset that has that mesh as its preview mesh
+			if (Mesh.IsValid())
 			{
 				Filter.TagsAndValues.Add(GET_MEMBER_NAME_CHECKED(UPhysicsAsset, PreviewSkeletalMesh), FSoftObjectPath(Mesh.Get()).ToString());
 			}
 
 			AssetRegistryModule.Get().GetAssets(Filter, OutAssets);
+
+			// If we have a mesh and it has a physics asset, use it but only if its different from the one on the preview mesh
+			if (Mesh.IsValid())
+			{
+				if (UPhysicsAsset* MeshPhysicsAsset = Mesh->GetPhysicsAsset())
+				{
+					OutAssets.AddUnique(FAssetData(MeshPhysicsAsset));
+				}
+			}
 		}
 	}
 }
@@ -311,7 +325,7 @@ bool FPersonaAssetFamily::IsAssetCompatible(const FAssetData& InAssetData) const
 		{
 			if (Skeleton.Get())
 			{
-				return Skeleton.Get()->IsCompatibleSkeletonByAssetData(InAssetData);
+				return Skeleton.Get()->IsCompatibleForEditor(InAssetData);
 			}
 		}
 		else if (Class->IsChildOf<UAnimationAsset>() || Class->IsChildOf<USkeletalMesh>())
@@ -322,7 +336,7 @@ bool FPersonaAssetFamily::IsAssetCompatible(const FAssetData& InAssetData) const
 			{
 				if (Skeleton.Get())
 				{
-					return Skeleton.Get()->IsCompatibleSkeletonByAssetData(InAssetData);
+					return Skeleton.Get()->IsCompatibleForEditor(Result.GetValue());
 				}
 			}
 		}
@@ -334,12 +348,19 @@ bool FPersonaAssetFamily::IsAssetCompatible(const FAssetData& InAssetData) const
 			{
 				if (Skeleton.Get())
 				{
-					return Skeleton.Get()->IsCompatibleSkeletonByAssetString(Result.GetValue());
+					return Skeleton.Get()->IsCompatibleForEditor(Result.GetValue());
 				}
 			}
 		}
 		else if (Class->IsChildOf<UPhysicsAsset>())
 		{
+			// If our mesh is valid and this is the physics asset used on it, we are compatible
+			if (Mesh.IsValid() && InAssetData.GetSoftObjectPath() == FSoftObjectPath(Mesh.Get()->GetPhysicsAsset()))
+			{
+				return true;
+			}
+
+			// Otherwise check if our mesh is the preview mesh of the physics asset
 			FAssetDataTagMapSharedView::FFindTagResult Result = InAssetData.TagsAndValues.FindTag(GET_MEMBER_NAME_CHECKED(UPhysicsAsset, PreviewSkeletalMesh));
 			if (Result.IsSet() && Mesh.IsValid())
 			{
@@ -387,11 +408,7 @@ void FPersonaAssetFamily::RecordAssetOpened(const FAssetData& InAssetData)
 		UClass* Class = InAssetData.GetClass();
 		if (Class)
 		{
-			if (Class->IsChildOf<USkeleton>())
-			{
-				Skeleton = Cast<USkeleton>(InAssetData.GetAsset());
-			}
-			else if (Class->IsChildOf<UAnimationAsset>())
+			if (Class->IsChildOf<UAnimationAsset>())
 			{
 				AnimationAsset = Cast<UAnimationAsset>(InAssetData.GetAsset());
 			}
@@ -476,6 +493,11 @@ void FPersonaAssetFamily::FindCounterpartAssets(const UObject* InAsset, const US
 			OutSkeleton = OutMesh->GetSkeleton();
 		}
 	}
+}
+
+void FPersonaAssetFamily::OnSettingsChange(const UPersonaOptions* InOptions, EPropertyChangeType::Type InChangeType)
+{
+	OnAssetFamilyChanged.Broadcast();
 }
 
 #undef LOCTEXT_NAMESPACE

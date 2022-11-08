@@ -22,6 +22,7 @@ class FRHITexture;
 class FRHIUnorderedAccessView;
 class FShaderParameterMap;
 class FShaderParametersMetadata;
+struct FCachedUniformBufferDeclaration;
 struct FRWBuffer;
 struct FRWBufferStructured;
 struct FShaderCompilerEnvironment;
@@ -29,8 +30,24 @@ struct FShaderCompilerEnvironment;
 enum class EShaderParameterType : uint8;
 DECLARE_INTRINSIC_TYPE_LAYOUT(EShaderParameterType);
 
-RENDERCORE_API void CacheUniformBufferIncludes(TMap<const TCHAR*, struct FCachedUniformBufferDeclaration>& Cache, EShaderPlatform Platform);
+#if WITH_EDITOR
+namespace UE::ShaderParameters
+{
+	/** Creates a shader code declaration of this struct for the given shader platform. */
+	RENDERCORE_API FString CreateUniformBufferShaderDeclaration(const TCHAR* Name, const FShaderParametersMetadata& UniformBufferStruct);
 
+	RENDERCORE_API void AddUniformBufferIncludesToEnvironment(FShaderCompilerEnvironment& OutEnvironment, const TSet<const TCHAR*>& InUniformBufferNames);
+}
+
+UE_DEPRECATED(5.2, "CreateUniformBufferShaderDeclaration has moved to UE::ShaderParameters::CreateUniformBufferShaderDeclaration, does not take a EShaderPlatform argument and now returns the Declaration.")
+inline void CreateUniformBufferShaderDeclaration(const TCHAR* Name, const FShaderParametersMetadata& UniformBufferStruct, EShaderPlatform Platform, FString& OutDeclaration)
+{
+	OutDeclaration = UE::ShaderParameters::CreateUniformBufferShaderDeclaration(Name, UniformBufferStruct);
+}
+
+UE_DEPRECATED(5.2, "CacheUniformBufferIncludes should no longer be used.")
+RENDERCORE_API void CacheUniformBufferIncludes(TMap<const TCHAR*, FCachedUniformBufferDeclaration>& Cache, EShaderPlatform Platform);
+#endif
 
 enum EShaderParameterFlags
 {
@@ -149,9 +166,6 @@ private:
 	LAYOUT_FIELD(FShaderResourceParameter, UAVParameter);
 };
 
-/** Creates a shader code declaration of this struct for the given shader platform. */
-extern RENDERCORE_API void CreateUniformBufferShaderDeclaration(const TCHAR* Name,const FShaderParametersMetadata& UniformBufferStruct, EShaderPlatform Platform, FString& OutDeclaration);
-
 class FShaderUniformBufferParameter
 {
 	DECLARE_EXPORTED_TYPE_LAYOUT(FShaderUniformBufferParameter, RENDERCORE_API, NonVirtual);
@@ -160,7 +174,9 @@ public:
 	:	BaseIndex(0xffff)
 	{}
 
+#if WITH_EDITOR
 	static RENDERCORE_API void ModifyCompilationEnvironment(const TCHAR* ParameterName,const FShaderParametersMetadata& Struct,EShaderPlatform Platform,FShaderCompilerEnvironment& OutEnvironment);
+#endif // WITH_EDITOR
 
 	RENDERCORE_API void Bind(const FShaderParameterMap& ParameterMap,const TCHAR* ParameterName,EShaderParameterFlags Flags = SPF_Optional);
 
@@ -192,10 +208,12 @@ template<typename TBufferStruct>
 class TShaderUniformBufferParameter : public FShaderUniformBufferParameter
 {
 public:
+#if WITH_EDITOR
 	static void ModifyCompilationEnvironment(const TCHAR* ParameterName,EShaderPlatform Platform, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FShaderUniformBufferParameter::ModifyCompilationEnvironment(ParameterName,TBufferStruct::StaticStruct,Platform,OutEnvironment);
 	}
+#endif // WITH_EDITOR
 
 	friend FArchive& operator<<(FArchive& Ar,TShaderUniformBufferParameter& P)
 	{

@@ -1714,7 +1714,7 @@ bool ULandscapeHeightfieldCollisionComponent::RecreateCollision()
 		TRefCountPtr<FHeightfieldGeometryRef> HeightfieldRefLifetimeExtender = HeightfieldRef; // Ensure heightfield data is alive until removed from physics world
 		HeightfieldRef = nullptr; // Ensure data will be recreated
 		HeightfieldGuid = FGuid();
-
+		CachedHeightFieldSamples.Empty();
 		RecreatePhysicsState();
 
 		MarkRenderStateDirty();
@@ -1850,8 +1850,7 @@ bool ULandscapeMeshCollisionComponent::RecreateCollision()
 		TriMeshLifetimeExtender = MeshRef;
 		MeshRef = nullptr; // Ensure data will be recreated
 		MeshGuid = FGuid();
-		CachedHeightFieldSamples.Heights.Empty();
-		CachedHeightFieldSamples.Holes.Empty();
+		CachedHeightFieldSamples.Empty();
 	}
 
 	return Super::RecreateCollision();

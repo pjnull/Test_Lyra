@@ -202,6 +202,7 @@ void UControlRigSkeletalMeshComponent::OnHierarchyModified(ERigHierarchyNotifica
 		case ERigHierarchyNotification::ElementAdded:
 		case ERigHierarchyNotification::ElementRemoved:
 		case ERigHierarchyNotification::ElementRenamed:
+		case ERigHierarchyNotification::ElementReordered:
 		case ERigHierarchyNotification::ParentChanged:
 		case ERigHierarchyNotification::HierarchyReset:
 		{
@@ -253,8 +254,10 @@ void UControlRigSkeletalMeshComponent::OnHierarchyModified_AnyThread(ERigHierarc
     	{
     		return;
     	}
-        const FRigBaseElement* Element = WeakHierarchy.Get()->Find(Key);
-        OnHierarchyModified(InNotif, WeakHierarchy.Get(), Element);
+        if (const FRigBaseElement* Element = WeakHierarchy.Get()->Find(Key))
+        {
+	        OnHierarchyModified(InNotif, WeakHierarchy.Get(), Element);
+        }
 		
     }, TStatId(), NULL, ENamedThreads::GameThread);
 }

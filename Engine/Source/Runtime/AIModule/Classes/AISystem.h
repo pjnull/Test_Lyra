@@ -67,12 +67,6 @@ public:
 	UPROPERTY(globalconfig, EditDefaultsOnly, Category = "Movement")
 	bool bAllowStrafing;
 
-	/** 
-	 * Deprecated: Whether or not to enable Gameplay Tasks for move tasks (always enabled now)
-	 */
-	UPROPERTY(globalconfig, EditDefaultsOnly, Category = "Gameplay Tasks", meta=(DisplayName="DEPRECATED Enable BT AITasks"))
-	bool bEnableBTAITasks;
-
 	/** if enable will make EQS not complaint about using Controllers as queriers. Default behavior (false) will 
 	 *	in places automatically convert controllers to pawns, and complain if code user bypasses the conversion or uses
 	 *	pawn-less controller */
@@ -128,6 +122,8 @@ protected:
 	FBlackboardDataToComponentsMap BlackboardDataToComponentsMap;
 
 	FDelegateHandle ActorSpawnedDelegateHandle;
+
+	FDelegateHandle PawnBeginPlayDelegateHandle;
 
 	/** random number stream to be used by all things AI. WIP */
 	static FRandomStream RandomStream;
@@ -276,5 +272,7 @@ public:
 
 protected:
 	virtual void OnActorSpawned(AActor* SpawnedActor);
+	virtual void OnPawnBeginPlay(APawn* Pawn);
+
 	void LoadDebuggerPlugin();
 };

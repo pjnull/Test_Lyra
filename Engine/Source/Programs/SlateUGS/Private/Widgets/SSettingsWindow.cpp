@@ -5,6 +5,7 @@
 
 #include "UGSCore/UserSettings.h"
 
+#include "Framework/Application/SlateApplication.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Layout/SHeader.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
@@ -14,9 +15,9 @@
 
 // Todo: Make settings only save when the positive action button is hit
 
-void SSettingsWindow::Construct(const FArguments& InArgs)
+void SSettingsWindow::Construct(const FArguments& InArgs, UGSTab* InTab)
 {
-	Tab = InArgs._Tab;
+	Tab = InTab;
 	UserSettings = Tab->GetUserSettings();
 
 	SWindow::Construct(SWindow::FArguments()
@@ -130,6 +131,31 @@ void SSettingsWindow::Construct(const FArguments& InArgs)
 							.Text(LOCTEXT("Other Settings", "Other Settings"))
 						]
 					]
+					+SVerticalBox::Slot()
+					.AutoHeight()
+					.VAlign(VAlign_Top)
+					.HAlign(HAlign_Center)
+					.Padding(0.0f, 10.0f)
+					[
+						SNew(SHorizontalBox)
+						+SHorizontalBox::Slot()
+						[
+							SNew(SCheckBox)
+							.ForegroundColor(FSlateColor::UseForeground())
+							.IsChecked(this, &SSettingsWindow::HandleGetSyncCompiledEditor)
+							.OnCheckStateChanged(this, &SSettingsWindow::HandleSyncCompiledEditor)
+							[
+								SNew(SBox)
+								.VAlign(VAlign_Center)
+								.HAlign(HAlign_Center)
+								.Padding(FMargin(4.0, 2.0))
+								[
+									SNew(STextBlock)
+									.Text(LOCTEXT("EnableSyncPrecompiledEditor", "Sync Precompiled Editor"))
+								]
+							]
+						]
+					]
 				]
 			]
 		]
@@ -155,7 +181,7 @@ void SSettingsWindow::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.HAlign(HAlign_Center)
-					.Text(LOCTEXT("CancelButtonText", "Cancel"))
+					.Text(LOCTEXT("CancelButtonText", "Close")) // Todo: temporary fix, change the text back to "Cancel" when canceling actually cancels changes
 					.OnClicked(this, &SSettingsWindow::OnCancelClicked)
 				]
 			]
@@ -209,6 +235,25 @@ void SSettingsWindow::HandleOpenSolutionChanged(ECheckBoxState InCheck)
 ECheckBoxState SSettingsWindow::HandleGetOpenSolutionChecked() const
 {
 	return UserSettings->bOpenSolutionAfterSync ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+
+void SSettingsWindow::HandleSyncCompiledEditor(ECheckBoxState InCheck)
+{
+	bool bNewValue = InCheck == ECheckBoxState::Checked;
+
+	if (UserSettings->bSyncPrecompiledEditor != bNewValue)
+	{
+		UserSettings->bSyncPrecompiledEditor = bNewValue;
+		UserSettings->Save();
+
+		// If we update this setting, update the build list to refresh filtering
+		Tab->UpdateGameTabBuildList();
+	}
+}
+
+ECheckBoxState SSettingsWindow::HandleGetSyncCompiledEditor() const
+{
+	return UserSettings->bSyncPrecompiledEditor ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 }
 
 FReply SSettingsWindow::OnOkClicked()

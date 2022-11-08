@@ -3,6 +3,10 @@
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
+#pragma warning disable SYSLIB0011
+#pragma warning disable CA2300 // Do not use insecure deserializer BinaryFormatter
+#pragma warning disable CA2301 // Do not use insecure deserializer BinaryFormatter
+
 namespace EpicGames.Core
 {
 	/// <summary>

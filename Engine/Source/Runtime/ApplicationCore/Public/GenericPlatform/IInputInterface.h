@@ -119,6 +119,12 @@ struct FInputDeviceLightColorProperty : public FInputDeviceProperty
 		: FInputDeviceProperty(PropertyName())
 	{}
 
+	FInputDeviceLightColorProperty(bool bInEnable, FColor InColor)
+		: FInputDeviceProperty(PropertyName())
+		, bEnable(bInEnable)
+		, Color(InColor)
+	{}
+
 	static FName PropertyName() { return FName("InputDeviceLightColor"); }
 
 	/** If the light should be enabled or not. */

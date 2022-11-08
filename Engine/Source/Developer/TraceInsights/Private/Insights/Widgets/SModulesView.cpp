@@ -6,15 +6,14 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "SlateOptMacros.h"
 #include "Textures/SlateIcon.h"
+#include "TraceServices/Model/Modules.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 // Insights
-//#include "Insights/InsightsManager.h"
 #include "DesktopPlatformModule.h"
 #include "Insights/InsightsManager.h"
 #include "Insights/InsightsStyle.h"
-#include "Model/ModuleProvider.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1016,7 +1015,7 @@ void SModulesView::UpdateSorting()
 					{
 						return false;
 					}
-					return FCString::Strcmp(A->GetModule()->Name, B->GetModule()->Name) < 0;
+					return FCString::Stricmp(A->GetModule()->Name, B->GetModule()->Name) < 0;
 				});
 		}
 		else
@@ -1031,7 +1030,7 @@ void SModulesView::UpdateSorting()
 					{
 						return true;
 					}
-					return FCString::Strcmp(A->GetModule()->Name, B->GetModule()->Name) > 0;
+					return FCString::Stricmp(A->GetModule()->Name, B->GetModule()->Name) > 0;
 				});
 		}
 	}
@@ -1114,7 +1113,7 @@ void SModulesView::UpdateSorting()
 					{
 						return false;
 					}
-					return FCString::Strcmp(A->GetModule()->StatusMessage, B->GetModule()->StatusMessage) < 0;
+					return FCString::Stricmp(A->GetModule()->StatusMessage, B->GetModule()->StatusMessage) < 0;
 				});
 		}
 		else
@@ -1129,7 +1128,7 @@ void SModulesView::UpdateSorting()
 					{
 						return true;
 					}
-					return FCString::Strcmp(A->GetModule()->StatusMessage, B->GetModule()->StatusMessage) > 0;
+					return FCString::Stricmp(A->GetModule()->StatusMessage, B->GetModule()->StatusMessage) > 0;
 				});
 		}
 	}

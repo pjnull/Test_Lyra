@@ -35,7 +35,6 @@ class FViewElementDrawer;
 class ISceneViewExtension;
 class FSceneViewFamily;
 class FVolumetricFogViewResources;
-class FIESLightProfileResource;
 class ISpatialUpscaler;
 class ITemporalUpscaler;
 
@@ -680,7 +679,6 @@ enum ETranslucencyVolumeCascade
 	VIEW_UNIFORM_BUFFER_MEMBER(FVector2f, BufferToSceneTextureScale) \
 	VIEW_UNIFORM_BUFFER_MEMBER(FVector2f, ResolutionFractionAndInv) \
 	VIEW_UNIFORM_BUFFER_MEMBER(int32, NumSceneColorMSAASamples) \
-	VIEW_UNIFORM_BUFFER_MEMBER(float, SeparateWaterMainDirLightLuminance) \
 	VIEW_UNIFORM_BUFFER_MEMBER(float, PreExposure) \
 	VIEW_UNIFORM_BUFFER_MEMBER(float, OneOverPreExposure) \
 	VIEW_UNIFORM_BUFFER_MEMBER_EX(FVector4f, DiffuseOverrideParameter, EShaderPrecisionModifier::Half) \
@@ -941,6 +939,10 @@ BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT_WITH_CONSTRUCTOR(FViewUniformShaderParamete
 	SHADER_PARAMETER(float, RectLightAtlasMaxMipLevel)
 	SHADER_PARAMETER_TEXTURE(Texture2D<float4>, RectLightAtlasTexture)
 	SHADER_PARAMETER_SAMPLER(SamplerState, RectLightAtlasSampler)
+	// IES atlas
+	SHADER_PARAMETER(FVector4f, IESAtlasSizeAndInvSize)
+	SHADER_PARAMETER_TEXTURE(Texture2DArray<float>, IESAtlasTexture)
+	SHADER_PARAMETER_SAMPLER(SamplerState, IESAtlasSampler)
 	// Landscape
 	SHADER_PARAMETER_SAMPLER(SamplerState, LandscapeWeightmapSampler)
 	SHADER_PARAMETER_SRV(Buffer<uint>, LandscapeIndirection)
@@ -1080,10 +1082,13 @@ public:
 	/** Current Nanite visualization mode */
 	FName CurrentNaniteVisualizationMode;
 
-	/** Current Nanite visualization mode */
+	/** Current Lumen visualization mode */
 	FName CurrentLumenVisualizationMode;
 
-	/** Current Nanite visualization mode */
+	/** Current Strata visualization mode */
+	FName CurrentStrataVisualizationMode;
+
+	/** Current Virtual Shadow Map visualization mode */
 	FName CurrentVirtualShadowMapVisualizationMode;
 
 	/** Current visualize calibration color material name */
@@ -1307,8 +1312,6 @@ public:
 	const ERHIFeatureLevel::Type FeatureLevel;
 
 #if RHI_RAYTRACING
-	FIESLightProfileResource* IESLightProfileResource;
-
 	/** Use to allow ray tracing on this view. */
 	bool bAllowRayTracing = true;
 #endif
@@ -1922,6 +1925,8 @@ public:
 
 	FORCEINLINE bool AllowTranslucencyAfterDOF() const { return bAllowTranslucencyAfterDOF; }
 
+	FORCEINLINE bool AllowStandardTranslucencySeparated() const { return bAllowStandardTranslucencySeparated; }
+
 	FORCEINLINE const ISceneViewFamilyScreenPercentage* GetScreenPercentageInterface() const
 	{
 		return ScreenPercentageInterface;
@@ -2018,6 +2023,9 @@ public:
 		return SecondarySpatialUpscalerInterface;
 	}
 
+	inline bool GetIsInFocus() const				{ return bIsInFocus; }
+	inline void SetIsInFocus(bool bInIsInFocus)		{ bIsInFocus = bInIsInFocus; }
+
 private:
 	/** Interface to handle screen percentage of the views of the family. */
 	ISceneViewFamilyScreenPercentage* ScreenPercentageInterface;
@@ -2032,6 +2040,12 @@ private:
 
 	/** whether the translucency are allowed to render after DOF, if not they will be rendered in standard translucency. */
 	bool bAllowTranslucencyAfterDOF;
+
+	/** whether the pre DOF translucency are allowed to be rendered in separated target from scene to allow for better composition with distortion.*/
+	bool bAllowStandardTranslucencySeparated;
+
+	/** True if this view is the current editing view or the active game view */
+	bool bIsInFocus = true;
 
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	// Only FSceneRenderer can copy a view family.

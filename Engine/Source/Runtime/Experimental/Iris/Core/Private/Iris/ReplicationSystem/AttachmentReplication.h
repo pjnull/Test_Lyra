@@ -7,6 +7,7 @@
 #include "Iris/ReplicationSystem/NetBlob/ReliableNetBlobQueue.h"
 #include "Containers/Map.h"
 
+class UPartialNetObjectAttachmentHandler;
 namespace UE::Net::Private
 {
 	class FNetBlobHandlerManager;
@@ -62,6 +63,8 @@ public:
 
 	bool IsAllSentAndAcked() const;
 
+	bool IsAllReliableSentAndAcked() const;
+
 	void SetUnreliableQueueCapacity(uint32 QueueCapacity);
 
 private:
@@ -108,6 +111,10 @@ public:
 	bool HasUnsentAttachments(ENetObjectAttachmentType Type, uint32 ObjectIndex) const;
 	// Whether all queued attachments have been sent and that all reliable ones have been acked.
 	bool IsAllSentAndAcked(ENetObjectAttachmentType Type, uint32 ObjectIndex) const;
+
+	// Whether all queued reliable attachments have been sent and acked
+	bool IsAllReliableSentAndAcked(ENetObjectAttachmentType Type, uint32 ObjectIndex) const;
+
 	// Whether the queue can be destroyed without causing issues if more attachments are queued to this instance.
 	bool IsSafeToDestroy(ENetObjectAttachmentType Type, uint32 ObjectIndex) const;
 
@@ -133,13 +140,18 @@ private:
 	TUniquePtr<FNetObjectAttachmentSendQueue> SpecialQueues[uint32(ENetObjectAttachmentType::InternalCount)];
 };
 
+struct FNetObjectAttachmentReceiveQueueInitParams
+{
+	const UPartialNetObjectAttachmentHandler* PartialNetObjectAttachmentHandler = nullptr;
+};
+
 class FNetObjectAttachmentReceiveQueue
 {
 public:
 	FNetObjectAttachmentReceiveQueue();
 	~FNetObjectAttachmentReceiveQueue();
 
-	void SetPartialNetBlobType(FNetBlobType InPartialNetBlobType) { PartialNetBlobType = InPartialNetBlobType; }
+	void Init(const FNetObjectAttachmentReceiveQueueInitParams& InitParams);
 
 	bool IsSafeToDestroy() const;
 	bool HasUnprocessed() const;
@@ -170,6 +182,12 @@ private:
 	FDeferredProcessingQueue* DeferredProcessingQueue;
 	uint32 MaxUnreliableCount;
 	FNetBlobType PartialNetBlobType;
+	const UPartialNetObjectAttachmentHandler* PartialNetObjectAttachmentHandler = nullptr;
+};
+
+struct FNetObjectAttachmentsReaderInitParams
+{
+	const UPartialNetObjectAttachmentHandler* PartialNetObjectAttachmentHandler = nullptr;
 };
 
 class FNetObjectAttachmentsReader
@@ -178,7 +196,7 @@ public:
 	FNetObjectAttachmentsReader();
 	~FNetObjectAttachmentsReader();
 
-	void SetPartialNetBlobType(FNetBlobType InPartialNetBlobType) { PartialNetBlobType = InPartialNetBlobType; }
+	void Init(const FNetObjectAttachmentsReaderInitParams& InitParams);
 
 	bool HasUnprocessedAttachments(ENetObjectAttachmentType Type, uint32 ObjectIndex) const;
 
@@ -195,7 +213,7 @@ private:
 
 	TMap<uint32, FNetObjectAttachmentReceiveQueue> ObjectToQueue;
 	TUniquePtr<FNetObjectAttachmentReceiveQueue> SpecialQueues[uint32(ENetObjectAttachmentType::InternalCount)];
-	FNetBlobType PartialNetBlobType;
+	const UPartialNetObjectAttachmentHandler* PartialNetObjectAttachmentHandler = nullptr;
 };
 
 }

@@ -1,9 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using EpicGames.Core;
-using EpicGames.Horde.Storage.Git;
 using EpicGames.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -11,9 +11,10 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace EpicGames.Horde.Storage.Nodes
 {
@@ -52,7 +53,7 @@ namespace EpicGames.Horde.Storage.Nodes
 	/// <summary>
 	/// Entry for a file within a directory node
 	/// </summary>
-	public class FileEntry : TreeNodeRef<FileNode>
+	public sealed class FileEntry : TreeNodeRef<FileNode>
 	{
 		/// <summary>
 		/// Name of this file
@@ -67,7 +68,7 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <summary>
 		/// Length of this entry
 		/// </summary>
-		public long Length => (Node == null) ? _cachedLength : Node.Length;
+		public long Length => (Target == null) ? _cachedLength : Target.Length;
 
 		/// <summary>
 		/// SHA1 hash of this file, with Git prefix
@@ -77,28 +78,50 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <summary>
 		/// Cached length of this node
 		/// </summary>
-		long _cachedLength;
+		readonly long _cachedLength;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public FileEntry(DirectoryNode owner, Utf8String name, FileEntryFlags flags, FileNode node)
-			: base(owner, node)
+		public FileEntry(Utf8String name, FileEntryFlags flags)
+			: this(name, flags, new LeafFileNode())
+		{
+		}
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public FileEntry(Utf8String name, FileEntryFlags flags, FileNode node)
+			: base(node)
 		{
 			Name = name;
 			Flags = flags;
 		}
 
 		/// <summary>
-		/// Constructor
+		/// Deserialize from a buffer
 		/// </summary>
-		public FileEntry(DirectoryNode owner, Utf8String name, FileEntryFlags flags, long length, ITreeBlobRef target)
-			: base(owner, target)
+		/// <param name="reader"></param>
+		public FileEntry(ITreeNodeReader reader)
+			: base(reader)
 		{
-			Name = name;
-			Flags = flags;
-			
-			_cachedLength = length;
+			Name = reader.ReadUtf8String();
+			Flags = (FileEntryFlags)reader.ReadUnsignedVarInt();
+
+			_cachedLength = (long)reader.ReadUnsignedVarInt();
+		}
+
+		/// <summary>
+		/// Serialize this entry
+		/// </summary>
+		/// <param name="writer"></param>
+		public new void Serialize(ITreeNodeWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.WriteUtf8String(Name);
+			writer.WriteUnsignedVarInt((ulong)Flags);
+			writer.WriteUnsignedVarInt((ulong)Length);
 		}
 
 		/// <summary>
@@ -108,11 +131,10 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <param name="options">Options for chunking the data</param>
 		/// <param name="writer">Writer for new node data</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		public async Task AppendAsync(ReadOnlyMemory<byte> data, ChunkingOptions options, ITreeWriter writer, CancellationToken cancellationToken)
+		public async Task AppendAsync(ReadOnlyMemory<byte> data, ChunkingOptions options, TreeWriter writer, CancellationToken cancellationToken)
 		{
 			FileNode node = await ExpandAsync(cancellationToken);
-			Node = await node.AppendAsync(data, options, writer, cancellationToken);
-			MarkAsDirty();
+			Target = await node.AppendAsync(data, options, writer, cancellationToken);
 		}
 
 		/// <summary>
@@ -122,28 +144,37 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <param name="options">Options for chunking the data</param>
 		/// <param name="writer">Writer for new node data</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		public async Task AppendAsync(Stream stream, ChunkingOptions options, ITreeWriter writer, CancellationToken cancellationToken)
+		public async Task AppendAsync(Stream stream, ChunkingOptions options, TreeWriter writer, CancellationToken cancellationToken)
 		{
-			byte[] buffer = new byte[4 * 1024];
-			for (; ; )
-			{
-				int numBytes = await stream.ReadAsync(buffer, cancellationToken);
-				if (numBytes == 0)
-				{
-					break;
-				}
-				await AppendAsync(buffer.AsMemory(0, numBytes), options, writer, cancellationToken);
-			}
+			FileNode node = await ExpandAsync(cancellationToken);
+			Target = await node.AppendAsync(stream, options, writer, cancellationToken);
+		}
+
+		/// <summary>
+		/// Copies the contents of this node and its children to the given output stream
+		/// </summary>
+		/// <param name="outputStream">The output stream to receive the data</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		public async Task CopyToStreamAsync(Stream outputStream, CancellationToken cancellationToken)
+		{
+			FileNode node = await ExpandAsync(cancellationToken);
+			await node.CopyToStreamAsync(outputStream, cancellationToken);
+		}
+
+		/// <summary>
+		/// Extracts the contents of this node to a file
+		/// </summary>
+		/// <param name="file">File to write with the contents of this node</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns></returns>
+		public async Task CopyToFileAsync(FileInfo file, CancellationToken cancellationToken)
+		{
+			FileNode node = await ExpandAsync(cancellationToken);
+			await node.CopyToFileAsync(file, cancellationToken);
 		}
 
 		/// <inheritdoc/>
-		protected override void OnCollapse()
-		{
-			_cachedLength = Node!.Length;
-		}
-
-		/// <inheritdoc/>
-		public override string ToString() => IsDirty() ? $"{Name} (*)" : Name.ToString();
+		public override string ToString() => Name.ToString();
 	}
 
 	/// <summary>
@@ -159,50 +190,55 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <summary>
 		/// Length of this directory tree
 		/// </summary>
-		public long Length => (Node == null) ? _cachedLength : Node.Length;
-
-		/// <summary>
-		/// Optional Git hash for the referenced directory object.
-		/// </summary>
-		public Sha1Hash GitHash { get; set; }
+		public long Length => (Target == null) ? _cachedLength : Target.Length;
 
 		/// <summary>
 		/// Cached value for the length of this tree
 		/// </summary>
-		long _cachedLength;
+		readonly long _cachedLength;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public DirectoryEntry(DirectoryNode owner, Utf8String name, DirectoryNode node)
-			: base(owner, node)
+		public DirectoryEntry(Utf8String name)
+			: this(name, new DirectoryNode())
+		{
+		}
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public DirectoryEntry(Utf8String name, DirectoryNode node)
+			: base(node)
 		{
 			Name = name;
 		}
 
 		/// <summary>
-		/// Constructor
+		/// 
 		/// </summary>
-		public DirectoryEntry(DirectoryNode owner, Utf8String name, long length, ITreeBlobRef target)
-			: base(owner, target)
+		/// <param name="reader"></param>
+		public DirectoryEntry(ITreeNodeReader reader)
+			: base(reader)
 		{
-			Name = name;
+			Name = reader.ReadUtf8String();
+			_cachedLength = (long)reader.ReadUnsignedVarInt();
+		}
 
-			_cachedLength = length;
+		/// <summary>
+		/// Serialize this directory entry to disk
+		/// </summary>
+		/// <param name="writer"></param>
+		public new void Serialize(ITreeNodeWriter writer)
+		{
+			base.Serialize(writer);
+
+			writer.WriteUtf8String(Name);
+			writer.WriteUnsignedVarInt((ulong)Length);
 		}
 
 		/// <inheritdoc/>
-		protected override void OnCollapse()
-		{
-			_cachedLength = Node!.Length;
-			if (_owner is DirectoryNode directoryNode && (directoryNode.Flags & DirectoryFlags.WithGitHashes) != 0)
-			{
-				GitHash = Node!.AsGitTree().GetHash();
-			}
-		}
-
-		/// <inheritdoc/>
-		public override string ToString() => IsDirty() ? $"{Name} (*)" : Name.ToString();
+		public override string ToString() => Name.ToString();
 	}
 
 	/// <summary>
@@ -214,17 +250,11 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// No flags specified
 		/// </summary>
 		None = 0,
-
-		/// <summary>
-		/// Includes hashes for all entries
-		/// </summary>
-		WithGitHashes = 1,
 	}
 
 	/// <summary>
 	/// A directory node
 	/// </summary>
-	[TreeSerializer(typeof(DirectoryNodeSerializer))]
 	public class DirectoryNode : TreeNode
 	{
 		internal const byte TypeId = (byte)'d';
@@ -235,7 +265,7 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <summary>
 		/// Total size of this directory
 		/// </summary>
-		public long Length => Files.Sum(x => x.Length) + Directories.Sum(x => x.Length);
+		public long Length => _nameToFileEntry.Values.Sum(x => x.Length) + _nameToDirectoryEntry.Values.Sum(x => x.Length);
 
 		/// <summary>
 		/// Flags for this directory 
@@ -248,17 +278,92 @@ namespace EpicGames.Horde.Storage.Nodes
 		public IReadOnlyCollection<FileEntry> Files => _nameToFileEntry.Values;
 
 		/// <summary>
+		/// Map of name to file entry
+		/// </summary>
+		public IReadOnlyDictionary<Utf8String, FileEntry> NameToFile => _nameToFileEntry;
+
+		/// <summary>
 		/// All the subdirectories within this directory
 		/// </summary>
 		public IReadOnlyCollection<DirectoryEntry> Directories => _nameToDirectoryEntry.Values;
 
 		/// <summary>
+		/// Map of name to file entry
+		/// </summary>
+		public IReadOnlyDictionary<Utf8String, DirectoryEntry> NameToDirectory => _nameToDirectoryEntry;
+
+		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="flags"></param>
-		public DirectoryNode(DirectoryFlags flags)
+		public DirectoryNode(DirectoryFlags flags = DirectoryFlags.None)
 		{
 			Flags = flags;
+		}
+
+		/// <summary>
+		/// Deserialization constructor
+		/// </summary>
+		/// <param name="reader">Reader to deserialize from</param>
+		public DirectoryNode(ITreeNodeReader reader)
+		{
+			byte typeId = reader.ReadUInt8();
+			if (typeId != TypeId)
+			{
+				throw new InvalidOperationException("Invalid signature byte for directory");
+			}
+
+			Flags = (DirectoryFlags)reader.ReadUnsignedVarInt();
+
+			int fileCount = (int)reader.ReadUnsignedVarInt();
+			_nameToFileEntry.EnsureCapacity(fileCount);
+
+			for (int idx = 0; idx < fileCount; idx++)
+			{
+				FileEntry entry = new FileEntry(reader);
+				_nameToFileEntry[entry.Name] = entry;
+			}
+
+			int directoryCount = (int)reader.ReadUnsignedVarInt();
+			_nameToDirectoryEntry.EnsureCapacity(directoryCount);
+			
+			for (int idx = 0; idx < directoryCount; idx++)
+			{
+				DirectoryEntry entry = new DirectoryEntry(reader);
+				_nameToDirectoryEntry[entry.Name] = entry;
+			}
+		}
+
+		/// <inheritdoc/>
+		public override void Serialize(ITreeNodeWriter writer)
+		{
+			writer.WriteUInt8(TypeId);
+			writer.WriteUnsignedVarInt((ulong)Flags);
+
+			writer.WriteUnsignedVarInt(Files.Count);
+			foreach (FileEntry fileEntry in _nameToFileEntry.Values)
+			{
+				fileEntry.Serialize(writer);
+			}
+
+			writer.WriteUnsignedVarInt(Directories.Count);
+			foreach (DirectoryEntry directoryEntry in _nameToDirectoryEntry.Values)
+			{
+				directoryEntry.Serialize(writer);
+			}
+		}
+
+		/// <inheritdoc/>
+		public override IEnumerable<TreeNodeRef> EnumerateRefs()
+		{
+			foreach (FileEntry fileEntry in _nameToFileEntry.Values)
+			{
+				yield return fileEntry;
+			}
+			foreach (DirectoryEntry directoryEntry in _nameToDirectoryEntry.Values)
+			{
+				yield return directoryEntry;
+			}
 		}
 
 		/// <summary>
@@ -278,16 +383,17 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <returns>True if the entry exists</returns>
 		public bool Contains(Utf8String name) => TryGetFileEntry(name, out _) || TryGetDirectoryEntry(name, out _);
 
-		/// <inheritdoc/>
-		public override IReadOnlyList<TreeNodeRef> GetReferences()
-		{
-			List<TreeNodeRef> refs = new List<TreeNodeRef>();
-			refs.AddRange(Files);
-			refs.AddRange(Directories);
-			return refs;
-		}
-
 		#region File operations
+
+		/// <summary>
+		/// Adds a new file entry to this directory
+		/// </summary>
+		/// <param name="entry">The entry to add</param>
+		public void AddFile(FileEntry entry)
+		{
+			_nameToFileEntry[entry.Name] = entry;
+			MarkAsDirty();
+		}
 
 		/// <summary>
 		/// Adds a new directory with the given name
@@ -297,17 +403,8 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <returns>The new directory object</returns>
 		public FileEntry AddFile(Utf8String name, FileEntryFlags flags)
 		{
-			if (TryGetDirectoryEntry(name, out _))
-			{
-				throw new ArgumentException($"A directory with the name {name} already exists");
-			}
-
-			FileNode newNode = new LeafFileNode();
-
-			FileEntry entry = new FileEntry(this, name, flags, newNode);
-			_nameToFileEntry[name] = entry;
-			MarkAsDirty();
-
+			FileEntry entry = new FileEntry(name, flags);
+			AddFile(entry);
 			return entry;
 		}
 
@@ -321,7 +418,7 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <param name="writer">Writer for new node data</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
 		/// <returns>The new directory object</returns>
-		public async Task<FileEntry> AddFileAsync(Utf8String name, FileEntryFlags flags, Stream stream, ChunkingOptions options, ITreeWriter writer, CancellationToken cancellationToken = default)
+		public async Task<FileEntry> AddFileAsync(Utf8String name, FileEntryFlags flags, Stream stream, ChunkingOptions options, TreeWriter writer, CancellationToken cancellationToken = default)
 		{
 			FileEntry entry = AddFile(name, flags);
 			await entry.AppendAsync(stream, options, writer, cancellationToken);
@@ -443,7 +540,7 @@ namespace EpicGames.Horde.Storage.Nodes
 
 			DirectoryNode node = new DirectoryNode(Flags);
 
-			DirectoryEntry entry = new DirectoryEntry(this, name, node);
+			DirectoryEntry entry = new DirectoryEntry(name, node);
 			_nameToDirectoryEntry.Add(name, entry);
 			MarkAsDirty();
 
@@ -464,6 +561,23 @@ namespace EpicGames.Horde.Storage.Nodes
 		/// <param name="entry">Entry for the directory</param>
 		/// <returns>True if the directory was found</returns>
 		public bool TryGetDirectoryEntry(Utf8String name, [NotNullWhen(true)] out DirectoryEntry? entry) => _nameToDirectoryEntry.TryGetValue(name, out entry);
+
+		/// <summary>
+		/// Attempts to get a directory entry with the given name, and adds one if it does not already exist.
+		/// </summary>
+		/// <param name="name">Name of the directory</param>
+		/// <returns>Directory entry with the given name</returns>
+		public DirectoryEntry FindOrAddDirectoryEntry(Utf8String name)
+		{
+			DirectoryEntry? entry;
+			if (!_nameToDirectoryEntry.TryGetValue(name, out entry))
+			{
+				entry = new DirectoryEntry(name);
+				_nameToDirectoryEntry.Add(name, entry);
+				MarkAsDirty();
+			}
+			return entry;
+		}
 
 		/// <summary>
 		/// Tries to get a directory with the given name
@@ -516,202 +630,100 @@ namespace EpicGames.Horde.Storage.Nodes
 
 		#endregion
 
-		/// <inheritdoc/>
-		public override async Task<ITreeBlob> SerializeAsync(ITreeWriter writer, CancellationToken cancellationToken)
-		{
-			List<ITreeBlobRef> refs = new List<ITreeBlobRef>();
-
-			List<FileEntry> fileEntries = _nameToFileEntry.Values.OrderBy(x => x.Name).ToList();
-			foreach (FileEntry fileEntry in fileEntries)
-			{
-				refs.Add(await fileEntry.CollapseAsync(writer, cancellationToken));
-			}
-
-			List<DirectoryEntry> directoryEntries = _nameToDirectoryEntry.Values.OrderBy(x => x.Name).ToList();
-			foreach (DirectoryEntry directoryEntry in directoryEntries)
-			{
-				refs.Add(await directoryEntry.CollapseAsync(writer, cancellationToken));
-			}
-
-			ReadOnlySequence<byte> data = SerializeData(Flags, fileEntries, directoryEntries);
-			return new NewTreeBlob(data, refs);
-		}
-
-		static ReadOnlySequence<byte> SerializeData(DirectoryFlags flags, List<FileEntry> fileEntries, List<DirectoryEntry> directoryEntries)
-		{
-			// Measure the required size of the write buffer
-			int size = 1;
-			size += VarInt.MeasureUnsigned((ulong)flags);
-			size += VarInt.MeasureUnsigned(fileEntries.Count);
-			foreach (FileEntry fileEntry in fileEntries)
-			{
-				size += (fileEntry.Name.Length + 1) + 1 + VarInt.MeasureUnsigned((ulong)fileEntry.Length);
-			}
-			size += VarInt.MeasureUnsigned(directoryEntries.Count);
-			foreach (DirectoryEntry directoryEntry in directoryEntries)
-			{
-				size += (directoryEntry.Name.Length + 1) + VarInt.MeasureUnsigned((ulong)directoryEntry.Length);
-			}
-			if ((flags & DirectoryFlags.WithGitHashes) != 0)
-			{
-				size += (directoryEntries.Count + fileEntries.Count) * IoHash.NumBytes;
-			}
-
-			// Allocate the buffer and copy the node to it
-			byte[] data = new byte[size];
-			Span<byte> span = data.AsSpan();
-
-			span[0] = TypeId;
-			span = span.Slice(1);
-
-			int directoryFlagBytes = VarInt.WriteUnsigned(span, (ulong)flags);
-			span = span.Slice(directoryFlagBytes);
-
-			int fileCountBytes = VarInt.WriteUnsigned(span, fileEntries.Count);
-			span = span.Slice(fileCountBytes);
-
-			foreach (FileEntry fileEntry in fileEntries)
-			{
-				fileEntry.Name.Span.CopyTo(span);
-				span = span.Slice(fileEntry.Name.Length + 1);
-
-				span[0] = (byte)fileEntry.Flags;
-				span = span.Slice(1);
-
-				int lengthBytes = VarInt.WriteUnsigned(span, fileEntry.Length);
-				span = span.Slice(lengthBytes);
-
-				if ((flags & DirectoryFlags.WithGitHashes) != 0)
-				{
-					fileEntry.GitHash.CopyTo(span);
-					span = span.Slice(Sha1Hash.NumBytes);
-				}
-			}
-
-			int directoryCountBytes = VarInt.WriteUnsigned(span, directoryEntries.Count);
-			span = span.Slice(directoryCountBytes);
-
-			foreach (DirectoryEntry directoryEntry in directoryEntries)
-			{
-				directoryEntry.Name.Span.CopyTo(span);
-				span = span.Slice(directoryEntry.Name.Length + 1);
-
-				int lengthBytes = VarInt.WriteUnsigned(span, directoryEntry.Length);
-				span = span.Slice(lengthBytes);
-
-				if ((flags & DirectoryFlags.WithGitHashes) != 0)
-				{
-					directoryEntry.GitHash.CopyTo(span);
-					span = span.Slice(Sha1Hash.NumBytes);
-				}
-			}
-
-			Debug.Assert(span.Length == 0);
-			return new ReadOnlySequence<byte>(data);
-		}
-
-		/// <summary>
-		/// Deserialize a directory node from data
-		/// </summary>
-		/// <param name="source">The source node to deserialize</param>
-		/// <returns>The deserialized directory node</returns>
-		public static DirectoryNode Deserialize(ITreeBlob source)
-		{
-			ReadOnlySpan<byte> span = source.Data.AsSingleSegment().Span;
-			if (span[0] != TypeId)
-			{
-				throw new InvalidOperationException("Invalid signature byte for directory");
-			}
-
-			span = span.Slice(1);
-
-			DirectoryFlags directoryFlags = (DirectoryFlags)VarInt.ReadUnsigned(span, out int directoryFlagBytes);
-			span = span.Slice(directoryFlagBytes);
-
-			DirectoryNode node = new DirectoryNode(directoryFlags);
-
-			int fileCount = (int)VarInt.ReadUnsigned(span, out int fileCountBytes);
-			span = span.Slice(fileCountBytes);
-
-			int childIdx = 0;
-
-			node._nameToFileEntry.EnsureCapacity(fileCount);
-			for (int idx = 0; idx < fileCount; idx++)
-			{
-				int nameLen = span.IndexOf((byte)0);
-				Utf8String name = new Utf8String(span.Slice(0, nameLen).ToArray());
-				span = span.Slice(nameLen + 1);
-
-				FileEntryFlags flags = (FileEntryFlags)VarInt.ReadUnsigned(span, out int flagBytes);
-				span = span.Slice(flagBytes);
-
-				long length = (long)VarInt.ReadUnsigned(span, out int lengthBytes);
-				span = span.Slice(lengthBytes);
-
-				ITreeBlobRef child = source.Refs[childIdx++];
-				FileEntry entry = new FileEntry(node, name, flags, length, child);
-
-				if ((directoryFlags & DirectoryFlags.WithGitHashes) != 0)
-				{
-					entry.GitHash = new Sha1Hash(span);
-					span = span.Slice(Sha1Hash.NumBytes);
-				}
-
-				node._nameToFileEntry[name] = entry;
-			}
-
-			int directoryCount = (int)VarInt.ReadUnsigned(span, out int directoryCountBytes);
-			span = span.Slice(directoryCountBytes);
-
-			node._nameToDirectoryEntry.EnsureCapacity(directoryCount);
-			for (int idx = 0; idx < directoryCount; idx++)
-			{
-				int nameLen = span.IndexOf((byte)0);
-				Utf8String name = new Utf8String(span.Slice(0, nameLen).ToArray());
-				span = span.Slice(nameLen + 1);
-
-				long length = (long)VarInt.ReadUnsigned(span, out int lengthBytes);
-				span = span.Slice(lengthBytes);
-
-				ITreeBlobRef child = source.Refs[childIdx++];
-				DirectoryEntry entry = new DirectoryEntry(node, name, length, child);
-
-				if ((directoryFlags & DirectoryFlags.WithGitHashes) != 0)
-				{
-					entry.GitHash = new Sha1Hash(span);
-					span = span.Slice(Sha1Hash.NumBytes);
-				}
-
-				node._nameToDirectoryEntry[name] = entry;
-			}
-
-			Debug.Assert(span.Length == 0);
-			return node;
-		}
-
 		/// <summary>
 		/// Adds files from a directory on disk
 		/// </summary>
 		/// <param name="directoryInfo"></param>
 		/// <param name="options">Options for chunking file content</param>
 		/// <param name="writer">Writer for new node data</param>
-		/// <param name="logger"></param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
 		/// <returns></returns>
-		public async Task CopyFromDirectoryAsync(DirectoryInfo directoryInfo, ChunkingOptions options, ITreeWriter writer, ILogger logger, CancellationToken cancellationToken)
+		public async Task CopyFromDirectoryAsync(DirectoryInfo directoryInfo, ChunkingOptions options, TreeWriter writer, CancellationToken cancellationToken)
+		{
+			// Enumerate all the files below this directory
+			List<(DirectoryNode DirectoryNode, FileInfo FileInfo)> files = new List<(DirectoryNode, FileInfo)>();
+			FindFilesToCopy(directoryInfo, files);
+			await CopyFromDirectoryAsync(files, options, writer, cancellationToken);
+		}
+
+		/// <summary>
+		/// Adds files from a directory on disk
+		/// </summary>
+		/// <param name="files"></param>
+		/// <param name="options">Options for chunking file content</param>
+		/// <param name="writer">Writer for new node data</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns></returns>
+		public static async Task CopyFromDirectoryAsync(List<(DirectoryNode DirectoryNode, FileInfo FileInfo)> files, ChunkingOptions options, TreeWriter writer, CancellationToken cancellationToken)
+		{
+			const int MaxWriters = 32;
+			const long MinSizePerWriter = 1024 * 1024;
+
+			// Compute the total size
+			long totalSize = files.Sum(x => x.Item2.Length);
+			long chunkSize = Math.Max(MinSizePerWriter, totalSize / MaxWriters);
+
+			List<Task> tasks = new List<Task>();
+			long currentSize = 0;
+			long targetSize = chunkSize;
+			FileEntry[] fileEntries = new FileEntry[files.Count];
+
+			// Split it into separate writers
+			for (int minIdx = 0; minIdx < files.Count; )
+			{
+				currentSize += files[minIdx].FileInfo.Length;
+
+				int maxIdx = minIdx + 1;
+				while (maxIdx < files.Count && currentSize + files[maxIdx].FileInfo.Length <= targetSize)
+				{
+					currentSize += files[maxIdx].FileInfo.Length;
+					maxIdx++;
+				}
+
+				int minIdxCopy = minIdx;
+				tasks.Add(Task.Run(() => CopyFilesAsync(files, minIdxCopy, maxIdx, fileEntries, options, writer, cancellationToken), cancellationToken));
+
+				targetSize += chunkSize;
+				minIdx = maxIdx;
+			}
+
+			// Wait for them all to finish
+			await Task.WhenAll(tasks);
+
+			// Update the directory with all the output entries
+			for (int idx = 0; idx < files.Count; idx++)
+			{
+				files[idx].DirectoryNode.AddFile(fileEntries[idx]);
+			}
+		}
+
+		void FindFilesToCopy(DirectoryInfo directoryInfo, List<(DirectoryNode, FileInfo)> files)
 		{
 			foreach (DirectoryInfo subDirectoryInfo in directoryInfo.EnumerateDirectories())
 			{
-				logger.LogInformation("Adding {Directory}", subDirectoryInfo.FullName);
-				DirectoryNode subDirectoryNode = AddDirectory(subDirectoryInfo.Name);
-				await subDirectoryNode.CopyFromDirectoryAsync(subDirectoryInfo, options, writer, logger, cancellationToken);
+				AddDirectory(subDirectoryInfo.Name).FindFilesToCopy(subDirectoryInfo, files);
 			}
 			foreach (FileInfo fileInfo in directoryInfo.EnumerateFiles())
 			{
-				logger.LogInformation("Adding {File}", fileInfo.FullName);
-				using Stream stream = fileInfo.OpenRead();
-				await AddFileAsync(fileInfo.Name, 0, stream, options, writer, cancellationToken);
+				files.Add((this, fileInfo));
 			}
+		}
+
+		static async Task CopyFilesAsync(List<(DirectoryNode DirectoryNode, FileInfo FileInfo)> files, int minIdx, int maxIdx, FileEntry[] entries, ChunkingOptions options, TreeWriter baseWriter, CancellationToken cancellationToken)
+		{
+			TreeWriter writer = new TreeWriter(baseWriter);
+			for(int idx = minIdx; idx < maxIdx; idx++)
+			{
+				FileInfo fileInfo = files[idx].FileInfo;
+
+				FileEntry fileEntry = new FileEntry(fileInfo.Name, FileEntryFlags.None);
+				using (Stream stream = fileInfo.OpenRead())
+				{
+					await fileEntry.AppendAsync(stream, options, writer, cancellationToken);
+				}
+				entries[idx] = fileEntry;
+			}
+			await writer.FlushAsync(cancellationToken);
 		}
 
 		/// <summary>
@@ -726,41 +738,20 @@ namespace EpicGames.Horde.Storage.Nodes
 			directoryInfo.Create();
 
 			List<Task> tasks = new List<Task>();
-			foreach (FileEntry fileEntry in Files)
+			foreach (FileEntry fileEntry in _nameToFileEntry.Values)
 			{
 				FileInfo fileInfo = new FileInfo(Path.Combine(directoryInfo.FullName, fileEntry.Name.ToString()));
 				FileNode fileNode = await fileEntry.ExpandAsync(cancellationToken);
-				logger.LogInformation("Writing {File}", fileInfo.FullName);
 				tasks.Add(Task.Run(() => fileNode.CopyToFileAsync(fileInfo, cancellationToken), cancellationToken));
 			}
-			foreach (DirectoryEntry directoryEntry in Directories)
+			foreach (DirectoryEntry directoryEntry in _nameToDirectoryEntry.Values)
 			{
 				DirectoryInfo subDirectoryInfo = directoryInfo.CreateSubdirectory(directoryEntry.Name.ToString());
 				DirectoryNode subDirectoryNode = await directoryEntry.ExpandAsync(cancellationToken);
-				logger.LogInformation("Writing {Dir}", subDirectoryInfo.FullName);
 				tasks.Add(Task.Run(() => subDirectoryNode.CopyToDirectoryAsync(subDirectoryInfo, logger, cancellationToken), cancellationToken));
 			}
 
 			await Task.WhenAll(tasks);
-		}
-
-		/// <summary>
-		/// Creates a Git tree object for this directory
-		/// </summary>
-		/// <returns>Tree object</returns>
-		public GitTree AsGitTree()
-		{
-			GitTree tree = new GitTree();
-			foreach (FileEntry fileEntry in _nameToFileEntry.Values)
-			{
-				tree.Entries.Add(new GitTreeEntry(GitFileMode.File, fileEntry.Name, fileEntry.GitHash));
-			}
-			foreach (DirectoryEntry directoryEntry in _nameToDirectoryEntry.Values)
-			{
-				tree.Entries.Add(new GitTreeEntry(GitFileMode.Tree, directoryEntry.Name, directoryEntry.GitHash));
-			}
-			tree.Entries.SortBy(x => x.Name);
-			return tree;
 		}
 	}
 
@@ -770,7 +761,7 @@ namespace EpicGames.Horde.Storage.Nodes
 	public class DirectoryNodeSerializer : TreeNodeSerializer<DirectoryNode>
 	{
 		/// <inheritdoc/>
-		public override DirectoryNode Deserialize(ITreeBlob blob) => DirectoryNode.Deserialize(blob);
+		public override DirectoryNode Deserialize(ITreeNodeReader reader) => new DirectoryNode(reader);
 	}
 
 	/// <summary>

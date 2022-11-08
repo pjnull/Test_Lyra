@@ -79,10 +79,10 @@ void FDefaultWorkingColorSpaceUniformBuffer::Update(const UE::Color::FColorSpace
 	Parameters.ToXYZ = Transpose<float>(InColorSpace.GetRgbToXYZ());
 	Parameters.FromXYZ = Transpose<float>(InColorSpace.GetXYZToRgb());
 
-	Parameters.ToAP1 = Transpose<float>(FColorSpaceTransform(InColorSpace, FColorSpace(EColorSpace::ACESAP1), EChromaticAdaptationMethod::Bradford));
+	Parameters.ToAP1 = Transpose<float>(FColorSpaceTransform(InColorSpace, FColorSpace(EColorSpace::ACESAP1)));
 	Parameters.FromAP1 = Parameters.ToAP1.Inverse();
 	
-	Parameters.ToAP0 = Transpose<float>(FColorSpaceTransform(InColorSpace, FColorSpace(EColorSpace::ACESAP0), EChromaticAdaptationMethod::Bradford));
+	Parameters.ToAP0 = Transpose<float>(FColorSpaceTransform(InColorSpace, FColorSpace(EColorSpace::ACESAP0)));
 
 	Parameters.bIsSRGB = InColorSpace.IsSRGB();
 
@@ -350,6 +350,7 @@ void FMeshElementCollector::AddMesh(int32 ViewIndex, FMeshBatch& MeshBatch)
 void FDynamicPrimitiveUniformBuffer::Set(
 	const FMatrix& LocalToWorld,
 	const FMatrix& PreviousLocalToWorld,
+	const FVector& ActorPositionWS,
 	const FBoxSphereBounds& WorldBounds,
 	const FBoxSphereBounds& LocalBounds,
 	const FBoxSphereBounds& PreSkinnedLocalBounds,
@@ -364,7 +365,7 @@ void FDynamicPrimitiveUniformBuffer::Set(
 		.Defaults()
 			.LocalToWorld(LocalToWorld)
 			.PreviousLocalToWorld(PreviousLocalToWorld)
-			.ActorWorldPosition(WorldBounds.Origin)
+			.ActorWorldPosition(ActorPositionWS)
 			.WorldBounds(WorldBounds)
 			.LocalBounds(LocalBounds)
 			.PreSkinnedLocalBounds(PreSkinnedLocalBounds)
@@ -375,6 +376,20 @@ void FDynamicPrimitiveUniformBuffer::Set(
 		.Build()
 	);
 	UniformBuffer.InitResource();
+}
+
+void FDynamicPrimitiveUniformBuffer::Set(
+	const FMatrix& LocalToWorld,
+	const FMatrix& PreviousLocalToWorld,
+	const FBoxSphereBounds& WorldBounds,
+	const FBoxSphereBounds& LocalBounds,
+	const FBoxSphereBounds& PreSkinnedLocalBounds,
+	bool bReceivesDecals,
+	bool bHasPrecomputedVolumetricLightmap,
+	bool bOutputVelocity,
+	const FCustomPrimitiveData* CustomPrimitiveData)
+{
+	Set(LocalToWorld, PreviousLocalToWorld, WorldBounds.Origin, WorldBounds, LocalBounds, PreSkinnedLocalBounds, bReceivesDecals, bHasPrecomputedVolumetricLightmap, bOutputVelocity, CustomPrimitiveData);
 }
 
 void FDynamicPrimitiveUniformBuffer::Set(
@@ -870,6 +885,11 @@ FViewUniformShaderParameters::FViewUniformShaderParameters()
 	RectLightAtlasSizeAndInvSize = FVector4f(1, 1, 1, 1);
 	RectLightAtlasTexture = GBlackTextureWithSRV->TextureRHI;
 	RectLightAtlasSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+
+	// IES atlas
+	IESAtlasSizeAndInvSize = FVector4f(1, 1, 1, 1);
+	IESAtlasTexture = GBlackTextureWithSRV->TextureRHI;
+	IESAtlasSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
 
 	// Subsurface profiles/pre-intregrated
 	SSProfilesTextureSizeAndInvSize = FVector4f(1.f,1.f,1.f,1.f);

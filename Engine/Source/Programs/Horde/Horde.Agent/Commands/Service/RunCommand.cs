@@ -1,27 +1,16 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
-using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading.Tasks;
-using Datadog.Trace;
-using Datadog.Trace.Configuration;
-using Datadog.Trace.OpenTracing;
 using EpicGames.Core;
-using EpicGames.Horde.Storage;
-using Horde.Agent.Services;
-using Horde.Agent.Utility;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTracing;
-using OpenTracing.Util;
-using Polly;
+using Serilog.Events;
 
 namespace Horde.Agent.Modes.Service
 {
-	using ITracer = OpenTracing.ITracer;
 
 	/// <summary>
 	/// 
@@ -30,16 +19,20 @@ namespace Horde.Agent.Modes.Service
 	class RunCommand : Command
 	{
 		/// <summary>
-		/// Override for the server to use
+		/// Log verbosity level (use normal Serilog levels such as debug, warning or info)
 		/// </summary>
-		[CommandLine("-Server=")]
-		string? Server { get; set; } = null;
+		[CommandLine("-LogLevel")]
+		public string LogLevelStr { get; set; } = "information";
+
+		readonly DefaultServices _defaultServices;
 
 		/// <summary>
-		/// Override the working directory
+		/// Constructor
 		/// </summary>
-		[CommandLine("-WorkingDir=")]
-		string? WorkingDir { get; set; } = null;
+		public RunCommand(DefaultServices defaultServices)
+		{
+			_defaultServices = defaultServices;
+		}
 
 		/// <summary>
 		/// Runs the service indefinitely
@@ -47,6 +40,16 @@ namespace Horde.Agent.Modes.Service
 		/// <returns>Exit code</returns>
 		public override async Task<int> ExecuteAsync(ILogger logger)
 		{
+			if (Enum.TryParse(LogLevelStr, true, out LogEventLevel logEventLevel))
+			{
+				Logging.LogLevelSwitch.MinimumLevel = logEventLevel;
+			}
+			else
+			{
+				Console.WriteLine($"Unable to parse log level: {LogLevelStr}");
+				return 0;
+			}
+			
 			IHostBuilder hostBuilder = Host.CreateDefaultBuilder();
 
 			// Attempt to setup this process as a Windows service. A race condition inside Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService
@@ -62,22 +65,12 @@ namespace Horde.Agent.Modes.Service
 			hostBuilder = hostBuilder
 				.ConfigureAppConfiguration(builder =>
 				{
-					Dictionary<string, string> overrides = new Dictionary<string, string>();
-					if (Server != null)
-					{
-						overrides.Add($"{AgentSettings.SectionName}:{nameof(AgentSettings.Server)}", Server);
-					}
-					if (WorkingDir != null)
-					{
-						overrides.Add($"{AgentSettings.SectionName}:{nameof(AgentSettings.WorkingDir)}", WorkingDir);
-					}
-					builder.AddInMemoryCollection(overrides);
+					builder.AddConfiguration(_defaultServices.Configuration);
 				})
 				.ConfigureLogging(builder =>
 				{
+					// We add our logger through ConfigureServices, inherited from _defaultServices
 					builder.ClearProviders();
-					builder.AddProvider(new Logging.HordeLoggerProvider());
-					builder.AddFilter<Logging.HordeLoggerProvider>(null, LogLevel.Trace);
 				})
 				.ConfigureServices((hostContext, services) =>
 				{
@@ -87,38 +80,10 @@ namespace Horde.Agent.Modes.Service
 						options.ShutdownTimeout = TimeSpan.FromSeconds(30);
 					});
 
-					IConfigurationSection configSection = hostContext.Configuration.GetSection(AgentSettings.SectionName);
-					services.AddOptions<AgentSettings>().Configure(options => configSection.Bind(options)).ValidateDataAnnotations();
-
-					AgentSettings settings = new AgentSettings();
-					configSection.Bind(settings);
-
-					ServerProfile serverProfile = settings.GetCurrentServerProfile();
-					ConfigureTracing(serverProfile.Environment, Program.Version);
-
-					Logging.SetEnv(serverProfile.Environment);
-
-					services.AddHttpClient(Program.HordeServerClientName, config =>
+					foreach (ServiceDescriptor descriptor in _defaultServices.Descriptors)
 					{
-						config.BaseAddress = serverProfile.Url;
-						config.DefaultRequestHeaders.Add("Accept", "application/json");
-						config.Timeout = TimeSpan.FromSeconds(300); // Need to make sure this doesn't cancel any long running gRPC streaming calls (eg. session update)
-					})
-					.ConfigurePrimaryHttpMessageHandler(() =>
-					{
-						HttpClientHandler handler = new HttpClientHandler();
-						handler.ServerCertificateCustomValidationCallback += (sender, cert, chain, errors) => CertificateHelper.CertificateValidationCallBack(logger, sender, cert, chain, errors, serverProfile);
-						return handler;
-					})
-					.AddTransientHttpErrorPolicy(builder =>
-					{
-						return builder.WaitAndRetryAsync(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) });
-					});
-
-					services.AddHordeStorage(settings => configSection.GetCurrentServerProfile().GetSection(nameof(serverProfile.Storage)).Bind(settings));
-
-					services.AddSingleton<GrpcService>();
-					services.AddHostedService<WorkerService>();
+						services.Add(descriptor);
+					}
 				});
 
 			try
@@ -131,20 +96,6 @@ namespace Horde.Agent.Modes.Service
 			}
 
 			return 0;
-		}
-
-		static void ConfigureTracing(string environment, string version)
-		{
-			TracerSettings settings = TracerSettings.FromDefaultSources();
-			settings.Environment = environment;
-			settings.ServiceName = "hordeagent";
-			settings.ServiceVersion = version;
-			settings.LogsInjectionEnabled = true;
-
-			Tracer.Configure(settings);
-
-			ITracer openTracer = OpenTracingTracerFactory.WrapTracer(Tracer.Instance);
-			GlobalTracer.Register(openTracer);
 		}
 	}
 }

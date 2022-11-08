@@ -58,6 +58,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FTargetChainSettings Settings;
 
+#if WITH_EDITORONLY_DATA
 	/** Deprecated properties from before FTargetChainSettings / profile refactor  (July 2022)*/
 	UPROPERTY()
 	bool CopyPoseUsingFK_DEPRECATED = true;
@@ -94,6 +95,7 @@ public:
 	UPROPERTY()
 	float UnplantCriticalDamping_DEPRECATED = 1.0f;
 	/** END deprecated properties */
+#endif
 
 	// pointer to editor for details customization
 	#if WITH_EDITOR
@@ -122,6 +124,7 @@ public:
 	#endif
 
 private:
+#if WITH_EDITORONLY_DATA
 	/** Deprecated properties from before FTargetRootSettings / profile refactor */
 	UPROPERTY()
 	bool RetargetRootTranslation_DEPRECATED = true;
@@ -136,6 +139,7 @@ private:
 	UPROPERTY()
 	FRotator StaticRotationOffset_DEPRECATED = FRotator::ZeroRotator;
 	/** END deprecated properties */
+#endif
 };
 
 
@@ -417,7 +421,7 @@ public:
 	
 	/** The visual size of the bones in the viewport (saved between sessions). This is set from the viewport Character>Bones menu*/
 	UPROPERTY()
-	float BoneDrawSize = 8.0f;
+	float BoneDrawSize = 1.0f;
 	
 private:
 

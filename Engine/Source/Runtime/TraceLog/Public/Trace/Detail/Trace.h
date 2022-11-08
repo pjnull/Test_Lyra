@@ -6,6 +6,8 @@
 
 #if UE_TRACE_ENABLED
 
+#include "Misc/Launder.h"
+
 #include <type_traits>
 
 namespace UE {
@@ -149,7 +151,7 @@ class FChannel;
 #define TRACE_PRIVATE_LOG_PRELUDE(EnterFunc, LoggerName, EventName, ChannelsExpr, ...) \
 	if (TRACE_PRIVATE_CHANNELEXPR_IS_ENABLED(ChannelsExpr)) \
 		if (auto LogScope = F##LoggerName##EventName##Fields::LogScopeType::EnterFunc<F##LoggerName##EventName##Fields>(__VA_ARGS__)) \
-			if (const auto& __restrict EventName = *(F##LoggerName##EventName##Fields*)(&LogScope)) \
+			if (const auto& __restrict EventName = *UE_LAUNDER((F##LoggerName##EventName##Fields*)(&LogScope))) \
 				((void)EventName),
 
 #define TRACE_PRIVATE_LOG_EPILOG() \
@@ -191,13 +193,13 @@ class FChannel;
 	false
 
 #define TRACE_PRIVATE_EVENT_DEFINE(LoggerName, EventName) \
-	int8* LoggerName##EventName##DummyPtr = nullptr;\
+	int8* LoggerName##EventName##DummyPtr = nullptr;
 
 #define TRACE_PRIVATE_EVENT_BEGIN(LoggerName, EventName, ...) \
 	TRACE_PRIVATE_EVENT_BEGIN_IMPL(LoggerName, EventName)
 
 #define TRACE_PRIVATE_EVENT_BEGIN_EXTERN(LoggerName, EventName, ...) \
-	extern int8* LoggerName##EventName##DummyPtr;\
+	extern int8* LoggerName##EventName##DummyPtr; \
 	TRACE_PRIVATE_EVENT_BEGIN_IMPL(LoggerName, EventName)
 
 #define TRACE_PRIVATE_EVENT_BEGIN_IMPL(LoggerName, EventName) \
@@ -239,6 +241,6 @@ class FChannel;
 
 #define TRACE_PRIVATE_LOG_DEFINITION(LoggerName, EventName, Id, ChannelsExpr, ...) \
 	UE::Trace::MakeEventRef(Id, 0); \
-	TRACE_PRIVATE_LOG(LoggerName, EventName, ChannelsExpr, ##__VA_ARGS__) \
+	TRACE_PRIVATE_LOG(LoggerName, EventName, ChannelsExpr, ##__VA_ARGS__)
 
 #endif // UE_TRACE_ENABLED

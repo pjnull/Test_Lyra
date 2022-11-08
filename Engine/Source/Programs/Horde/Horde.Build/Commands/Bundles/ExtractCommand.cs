@@ -22,8 +22,8 @@ namespace Horde.Build.Commands.Bundles
 		[CommandLine("-OutputDir=", Required = true)]
 		public DirectoryReference OutputDir { get; set; } = null!;
 
-		protected readonly IConfiguration _configuration;
-		protected readonly ILoggerProvider _loggerProvider;
+		readonly IConfiguration _configuration;
+		readonly ILoggerProvider _loggerProvider;
 
 		public ExtractCommand(IConfiguration configuration, ILoggerProvider loggerProvider)
 		{
@@ -35,9 +35,9 @@ namespace Horde.Build.Commands.Bundles
 		{
 			using ServiceProvider serviceProvider = Startup.CreateServiceProvider(_configuration, _loggerProvider);
 
-			ITreeStore store = serviceProvider.GetRequiredService<ITreeStore<ReplicationService>>();
+			IStorageClient store = serviceProvider.GetRequiredService<IStorageClient<ReplicationService>>();
 
-			ReplicationNode node = await store.ReadTreeAsync<ReplicationNode>(RefName);
+			ReplicationNode node = await store.ReadNodeAsync<ReplicationNode>(RefName);
 			DirectoryNode root = await node.Contents.ExpandAsync();
 			await root.CopyToDirectoryAsync(OutputDir.ToDirectoryInfo(), logger, CancellationToken.None);
 

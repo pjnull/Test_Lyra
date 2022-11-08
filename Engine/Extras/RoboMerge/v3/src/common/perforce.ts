@@ -16,7 +16,7 @@ const RETRY_ERROR_MESSAGES = [
 ]
 
 const INTEGRATION_FAILURE_REGEXES: [RegExp, string][] = [
-	[/^(.*[\\\/])(.*) - can't \w+ exclusive file already opened$/, 'partial_integrate'],
+	[/^(.*[\\\/])(.*) - can't \w+ exclusive file already opened/, 'partial_integrate'],
 	[/Move\/delete\(s\) must be integrated along with matching move\/add\(s\)/, 'split_move'],
 ]
 
@@ -225,7 +225,7 @@ export interface Change {
 	isUserRequest?: boolean;
 	ignoreExcludedAuthors?: boolean
 	forceCreateAShelf?: boolean
-	sendNoShelfEmail?: boolean // Used for requesting stomps for internal RM usage, such as stomp changes
+	sendNoShelfNotification?: boolean // Used for requesting stomps for internal RM usage, such as stomp changes
 	commandOverride?: string
 	accumulateCommandOverride?: boolean
 
@@ -485,11 +485,17 @@ export class PerforceContext {
 
 	/** get a single change in the format of changes() */
 	async getChange(path_in: string, changenum: number, status?: ChangelistStatus) {
-		const list = await this.changes(`${path_in}@${changenum},${changenum}`, -1, 1, status)
+		const list = await this.changes(`${path_in}@${changenum},${changenum}`, -1, 1, status) as Change[]
 		if (list.length <= 0) {
 			throw new Error(`Could not find changelist ${changenum} in ${path_in}`);
 		}
-		return <Change>list[0];
+		if (list.length > 1 || list[0].change !== changenum) {
+			// log for now
+			this.logger.error('p4.getChange unexpected result' +
+				list.map(change => `\n    ${change.change}: user ${change.user}, workspace ${change.client}`).join('')
+			)
+		}
+		return list[0]
 	}
 
 	/**
@@ -705,7 +711,7 @@ export class PerforceContext {
 
 	// Create a new workspace for Robomerge GraphBot
 	async newGraphBotWorkspace(name: string, extraParams: any, edgeServer?: {id: string, address: string}) {
-		return this.newWorkspace(name, {Root: '/src/' + name, ...extraParams}, edgeServer);
+		return this.newWorkspace(name, {Root: getRootDirectoryForBranch(name), ...extraParams}, edgeServer);
 	}
 
 	// Create a new workspace for Robomerge to read branchspecs from
@@ -1365,7 +1371,7 @@ export class PerforceContext {
 			options.env = {};
 			for (let key in process.env)
 				options.env[key] = process.env[key];
-			options.env.PWD = path.resolve(options.cwd);
+			options.env.PWD = path.resolve(options.cwd.toString());
 		}
 
 		const doExecFile = function(retries: number): Promise<string> {

@@ -134,8 +134,8 @@ void FAnimModel_AnimMontage::OnSetEditableTime(int32 TimeIndex, double Time, boo
 			AnimMontage->Modify();
 	
 			FCompositeSection& Section = AnimMontage->CompositeSections[TimeIndex];
-			Section.SetTime(Time);
-			Section.Link(AnimMontage, Time);
+			Section.SetTime(static_cast<float>(Time));
+			Section.Link(AnimMontage, static_cast<float>(Time));
 
 			SortSections();
 			RefreshNotifyTriggerOffsets();
@@ -146,7 +146,7 @@ void FAnimModel_AnimMontage::OnSetEditableTime(int32 TimeIndex, double Time, boo
 		}
 	}
 
-	OnSectionTimeDragged.ExecuteIfBound(TimeIndex, Time, bIsDragging);
+	OnSectionTimeDragged.ExecuteIfBound(TimeIndex, static_cast<float>(Time), bIsDragging);
 }
 
 void FAnimModel_AnimMontage::OnMontageModified()
@@ -225,14 +225,14 @@ void FAnimModel_AnimMontage::RecalculateSequenceLength()
 	{
 		AnimMontage->InvalidateRecursiveAsset();
 
-		float NewSequenceLength = CalculateSequenceLengthOfEditorObject();
-		if (NewSequenceLength != AnimMontage->GetPlayLength())
+		const float CurrentCalculatedLength = CalculateSequenceLengthOfEditorObject();
+		if(!FMath::IsNearlyEqual(CurrentCalculatedLength, AnimMontage->GetPlayLength(), UE_KINDA_SMALL_NUMBER))
 		{
-			ClampToEndTime(NewSequenceLength);
+			ClampToEndTime(CurrentCalculatedLength);
 
 			RefreshSectionTimes();
 
-			AnimMontage->SetCompositeLength(NewSequenceLength);
+			AnimMontage->SetCompositeLength(CurrentCalculatedLength);
 
 			// Reset view if we changed length (note: has to be done after ->SetCompositeLength)!
 			UpdateRange();
@@ -312,7 +312,7 @@ void FAnimModel_AnimMontage::ToggleSectionTimingDisplay()
 	bSectionTimingEnabled = !bSectionTimingEnabled;
 }
 
-void FAnimModel_AnimMontage::OnDataModelChanged(const EAnimDataModelNotifyType& NotifyType, UAnimDataModel* Model, const FAnimDataModelNotifPayload& PayLoad)
+void FAnimModel_AnimMontage::OnDataModelChanged(const EAnimDataModelNotifyType& NotifyType, IAnimationDataModel* Model, const FAnimDataModelNotifPayload& PayLoad)
 {
 	NotifyCollector.Handle(NotifyType);
 

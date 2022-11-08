@@ -51,7 +51,6 @@
 #include "PrecomputedVolumetricLightmap.h"
 #include "RayTracing/RaytracingOptions.h"
 #if RHI_RAYTRACING
-#include "RayTracing/RayTracingIESLightProfiles.h"
 #include "RayTracing/RayTracingScene.h"
 #endif
 #include "Nanite/Nanite.h"
@@ -94,6 +93,7 @@ class FLumenSceneData;
 class FVirtualShadowMapArrayCacheManager;
 struct FHairStrandsInstance;
 struct FPathTracingState;
+class FSparseVolumeTextureViewerSceneProxy;
 
 /** Holds information about a single primitive's occlusion. */
 class FPrimitiveOcclusionHistory
@@ -983,9 +983,6 @@ public:
 	// Keeps track of the internal path tracer state
 	TPimplPtr<FPathTracingState> PathTracingState;
 	uint32 PathTracingInvalidationCounter = 0;
-
-	// IES light profiles
-	FIESLightProfileResource IESLightProfileResources;
 
 	// Ray Traced Reflection Imaginary GBuffer Data containing a pseudo-geometric representation of the reflected surface(s)
 	TRefCountPtr<IPooledRenderTarget> ImaginaryReflectionGBufferA;
@@ -1937,15 +1934,13 @@ struct FDistanceFieldReadRequest
 	const uint8* AlwaysLoadedDataPtr = nullptr;
 
 	// Inputs of read request
-	const FByteBulkData* BulkData = nullptr;
+	const FBulkData* BulkData = nullptr;
 	uint32 BulkOffset = 0;
 	uint32 BulkSize = 0;
 
 	// Outputs of read request
-	uint8* ReadOutputDataPtr = nullptr;
-	FIoRequest Request;
-	IAsyncReadFileHandle* AsyncHandle = nullptr;
-	IAsyncReadRequest* AsyncRequest = nullptr;
+	FBulkDataBatchReadRequest RequestHandle;
+	FIoBuffer RequestBuffer;
 };
 
 struct FDistanceFieldAsyncUpdateParameters
@@ -1959,7 +1954,6 @@ struct FDistanceFieldAsyncUpdateParameters
 
 	TArray<FDistanceFieldReadRequest> NewReadRequests;
 	TArray<FDistanceFieldReadRequest> ReadRequestsToUpload;
-	TArray<FDistanceFieldReadRequest> ReadRequestsToCleanUp;
 };
 
 /** Scene data used to manage distance field object buffers on the GPU. */
@@ -2118,8 +2112,7 @@ private:
 	void ProcessReadRequests(
 		TArray<FDistanceFieldAssetMipId>& AssetDataUploads,
 		TArray<FDistanceFieldAssetMipId>& DistanceFieldAssetMipAdds,
-		TArray<FDistanceFieldReadRequest>& ReadRequestsToUpload,
-		TArray<FDistanceFieldReadRequest>& ReadRequestsToCleanUp);
+		TArray<FDistanceFieldReadRequest>& ReadRequestsToUpload);
 
 	FRDGTexture* ResizeBrickAtlasIfNeeded(FRDGBuilder& GraphBuilder, FGlobalShaderMap* GlobalShaderMap);
 
@@ -2131,7 +2124,7 @@ private:
 	
 	void UploadAllAssetData(FRDGBuilder& GraphBuilder, FRDGBuffer* AssetDataBufferRDG);
 
-	void AsyncUpdate(FDistanceFieldAsyncUpdateParameters UpdateParameters);
+	void AsyncUpdate(FDistanceFieldAsyncUpdateParameters&& UpdateParameters);
 
 	void GenerateStreamingRequests(
 		FRDGBuilder& GraphBuilder, 
@@ -3015,6 +3008,8 @@ public:
 	/** Used to track the order that skylights were enabled in. */
 	TArray<FVolumetricCloudSceneProxy*> VolumetricCloudStack;
 
+	TArray<FSparseVolumeTextureViewerSceneProxy*> SparseVolumeTextureViewers;
+
 	/** Global Field Manager */
 	class FPhysicsFieldSceneProxy* PhysicsField = nullptr;
 
@@ -3148,7 +3143,7 @@ public:
 	virtual void UpdatePlanarReflectionContents(UPlanarReflectionComponent* CaptureComponent, FSceneRenderer& MainSceneRenderer) override;
 	virtual void AllocateReflectionCaptures(const TArray<UReflectionCaptureComponent*>& NewCaptures, const TCHAR* CaptureReason, bool bVerifyOnlyCapturing, bool bCapturingForMobile, bool bInsideTick) override;
 	virtual void ResetReflectionCaptures(bool bOnlyIfOOM) override;
-	virtual void UpdateSkyCaptureContents(const USkyLightComponent* CaptureComponent, bool bCaptureEmissiveOnly, UTextureCube* SourceCubemap, FTexture* OutProcessedTexture, float& OutAverageBrightness, FSHVectorRGB3& OutIrradianceEnvironmentMap, TArray<FFloat16Color>* OutRadianceMap) override; 
+	virtual void UpdateSkyCaptureContents(const USkyLightComponent* CaptureComponent, bool bCaptureEmissiveOnly, UTextureCube* SourceCubemap, FTexture* OutProcessedTexture, float& OutAverageBrightness, FSHVectorRGB3& OutIrradianceEnvironmentMap, TArray<FFloat16Color>* OutRadianceMap, FLinearColor* SpecifiedCubemapColorScale) override;
 	virtual void AllocateAndCaptureFrameSkyEnvMap(FRDGBuilder& GraphBuilder, FSceneRenderer& SceneRenderer, FViewInfo& MainView, bool bShouldRenderSkyAtmosphere, bool bShouldRenderVolumetricCloud, FInstanceCullingManager& InstanceCullingManager) override;
 	virtual void ValidateSkyLightRealTimeCapture(FRDGBuilder& GraphBuilder, const FViewInfo& View, FRDGTextureRef SceneColorTexture) override;
 	virtual void AddPrecomputedLightVolume(const class FPrecomputedLightVolume* Volume) override;
@@ -3172,12 +3167,16 @@ public:
 	virtual void AddHairStrands(FHairStrandsInstance* Proxy) override;
 	virtual void RemoveHairStrands(FHairStrandsInstance* Proxy) override;
 
+	virtual void GetLightIESAtlasSlot(const FLightSceneProxy* Proxy, FLightRenderParameters* Out) override;
 	virtual void GetRectLightAtlasSlot(const FRectLightSceneProxy* Proxy, FLightRenderParameters* Out) override;
 
 	virtual void AddSkyAtmosphere(FSkyAtmosphereSceneProxy* SkyAtmosphereSceneProxy, bool bStaticLightingBuilt) override;
 	virtual void RemoveSkyAtmosphere(FSkyAtmosphereSceneProxy* SkyAtmosphereSceneProxy) override;
 	virtual FSkyAtmosphereRenderSceneInfo* GetSkyAtmosphereSceneInfo() override { return SkyAtmosphere; }
 	virtual const FSkyAtmosphereRenderSceneInfo* GetSkyAtmosphereSceneInfo() const override { return SkyAtmosphere; }
+
+	virtual void AddSparseVolumeTextureViewer(FSparseVolumeTextureViewerSceneProxy* SVTV) override;
+	virtual void RemoveSparseVolumeTextureViewer(FSparseVolumeTextureViewerSceneProxy* SVTV) override;
 
 	virtual void SetPhysicsField(class FPhysicsFieldSceneProxy* PhysicsFieldSceneProxy) override;
 	virtual void ResetPhysicsField() override;

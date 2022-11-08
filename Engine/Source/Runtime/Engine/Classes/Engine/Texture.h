@@ -53,48 +53,6 @@ struct FPropertyChangedEvent;
 namespace UE::DerivedData { struct FValueId; }
 #endif
 
-UENUM()
-enum TextureFilter
-{
-	TF_Nearest UMETA(DisplayName="Nearest"),
-	TF_Bilinear UMETA(DisplayName="Bi-linear"),
-	TF_Trilinear UMETA(DisplayName="Tri-linear"),
-	/** Use setting from the Texture Group. */
-	TF_Default UMETA(DisplayName="Default (from Texture Group)"),
-	TF_MAX,
-};
-
-UENUM()
-enum TextureAddress
-{
-	TA_Wrap UMETA(DisplayName="Wrap"),
-	TA_Clamp UMETA(DisplayName="Clamp"),
-	TA_Mirror UMETA(DisplayName="Mirror"),
-	TA_MAX,
-};
-
-UENUM()
-enum ETextureMipCount
-{
-	TMC_ResidentMips,
-	TMC_AllMips,
-	TMC_AllMipsBiased,
-	TMC_MAX,
-};
-
-// TextureCompressionQuality is used for ASTC
-UENUM()
-enum ETextureCompressionQuality
-{
-	TCQ_Default = 0		UMETA(DisplayName="Default"),
-	TCQ_Lowest = 1		UMETA(DisplayName="Lowest (ASTC 12x12)"),
-	TCQ_Low = 2			UMETA(DisplayName="Low (ASTC 10x10)"),
-	TCQ_Medium = 3		UMETA(DisplayName="Medium (ASTC 8x8)"),
-	TCQ_High= 4			UMETA(DisplayName="High (ASTC 6x6)"),
-	TCQ_Highest = 5		UMETA(DisplayName="Highest (ASTC 4x4)"),
-	TCQ_MAX,
-};
-
 USTRUCT()
 struct FTextureSourceBlock
 {
@@ -1213,8 +1171,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Texture, meta=(ClampMin = "0", ClampMax = "1.0", EditCondition="bDoScaleMipsForAlphaCoverage"), AdvancedDisplay)
 	FVector4 AlphaCoverageThresholds = FVector4(0,0,0,0);
 
-	/** Whether to use newer & faster mip generation filter, same quality but produces slightly different results from previous implementation */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, AdvancedDisplay)
+	/** Use faster mip generation filter, usually the same result but occasionally causes color shift in high contrast areas. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, meta=(DisplayName = "Use Fast MipGen Filter"), AdvancedDisplay)
 	bool bUseNewMipFilter = false;
 
 	/** When true the texture's border will be preserved during mipmap generation. */
@@ -1263,7 +1221,7 @@ public:
 
 	/**
 	 * default 1, high values result in a stronger effect e.g 1, 2, 4, 8
-	 * this is no slider because the texture update would not be fast enough
+	 * this is not a slider because the texture update would not be fast enough
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Compositing, AdvancedDisplay)
 	float CompositePower;
@@ -1292,7 +1250,7 @@ public:
 	UPROPERTY(transient, duplicatetransient, NonTransactional)
 	int32 LevelIndex = INDEX_NONE;
 
-	/** A bias to the index of the top mip level to use. */
+	/** A bias to the index of the top mip level to use.  That is, number of mip levels to drop when cooking. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=LevelOfDetail, meta=(DisplayName="LOD Bias"), AssetRegistrySearchable)
 	int32 LODBias;
 
@@ -1312,7 +1270,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=LevelOfDetail, meta=(DisplayName="Texture Group"), AssetRegistrySearchable)
 	TEnumAsByte<enum TextureGroup> LODGroup;
 
-	/** Downscale source texture, applied only to textures without mips 
+	/** Downscale source texture, applied only to 2d textures without mips 
 	 * 0.0 - use scale value from texture group
 	 * 1.0 - do not scale texture
 	 * > 1.0 - scale texure
@@ -1325,11 +1283,14 @@ public:
 	ETextureDownscaleOptions DownscaleOptions;
 
 	
-	/** This should be unchecked if using alpha channels individually as masks. */
+	/** Whether Texture and its source are in SRGB Gamma color space.  Can only be used with 8-bit and compressed formats.  This should be unchecked if using alpha channels individually as masks. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, meta=(DisplayName="sRGB"), AssetRegistrySearchable)
 	uint8 SRGB:1;
 
 #if WITH_EDITORONLY_DATA
+	/* Normalize colors in Normal Maps after mip generation for better and sharper quality; recommended on if not required to match legacy behavior. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, meta=(DisplayName="Normalize after making mips", EditCondition="CompressionSettings==1"), AdvancedDisplay)
+	uint8 bNormalizeNormals:1;
 
 	/** A flag for using the simplified legacy gamma space e.g pow(color,1/2.2) for converting from FColor to FLinearColor, if we're doing sRGB. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Texture, meta=(DisplayName="sRGB Use Legacy Gamma", EditCondition="SRGB"), AdvancedDisplay)
@@ -1385,13 +1346,15 @@ protected:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Instanced, Category = Texture)
 	TArray<TObjectPtr<UAssetUserData>> AssetUserData;
 
-private:
-
+public:
 #if WITH_EDITOR
-	/** Used to mark texture streamable state when cooking. */
-	TOptional<bool> bCookedIsStreamable;
+	/** Used to record texture streamable state when cooking.
+	This a per-platform bool to record whether the PlatformData being cooked made streamable mips.
+	Key is TargetPlatform->PlatformName */
+	TMap<FString,bool> DidSerializeStreamingMipsForPlatform;
 #endif
 
+private:
 	/** The texture's resource, can be NULL */
 	class FTextureResource*	PrivateResource;
 	/** Value updated and returned by the render-thread to allow
@@ -1452,7 +1415,25 @@ public:
 	virtual class FTextureResource* CreateResource() PURE_VIRTUAL(UTexture::CreateResource,return NULL;);
 
 	/** Cache the combined LOD bias based on texture LOD group and LOD bias. */
-	ENGINE_API void UpdateCachedLODBias();
+	UE_DEPRECATED(5.2, "UpdateCachedLODBias does nothing, remove call")
+	ENGINE_API void UpdateCachedLODBias()
+	{
+		// no longer cached, now does nothing
+	}
+	
+	ENGINE_API int32 GetCachedLODBias() const override
+	{
+		// this is the combined LOD Bias with cinematic bias
+		return CalculateLODBias(true);
+	}
+
+	/**
+	* Calculate the combined LOD bias based on texture LOD group and LOD bias.
+	*   CalculateLODBias(true) >= CalculateLODBias(false)
+	*   CalculateLODBias(true) == CalculateLODBias(false) + NumCinematicMipLevels , except when a clamp was applied
+	* @return	LOD bias
+	*/
+	ENGINE_API int32 CalculateLODBias(bool bWithCinematicMipBias) const;
 
 	/**
 	 * @return The material value type of this texture.
@@ -1590,6 +1571,11 @@ public:
 		
 	/** Ensure settings are valid after import or edit; this is called by PostEditChange. */
 	ENGINE_API virtual void ValidateSettingsAfterImportOrEdit(bool * pRequiresNotifyMaterials = nullptr);
+
+	/* Change the Oodle Texture Sdk Version used to encode this texture to latest.
+	*  You should do this any time the texture is modified, such as on reimport, since the bits are changing anyway.
+	*/
+	ENGINE_API virtual void UpdateOodleTextureSdkVersionToLatest(void);
 #endif // WITH_EDITOR
 
 	ENGINE_API EGammaSpace GetGammaSpace() const
@@ -1792,7 +1778,7 @@ public:
 
 #if WITH_EDITOR
 	/** Called by ULevel::MarkNoStreamableTexturesPrimitiveComponents when cooking level.
-	Checks bCookedIsStreamable.  Return false for VT. */
+	* Return false for VT. */
 	bool IsCandidateForTextureStreamingOnPlatformDuringCook(const ITargetPlatform* InTargetPlatform) const;
 
 	/** Get the largest allowed dimension of non-VT texture
@@ -1823,7 +1809,6 @@ protected:
 	/** Notify any loaded material instances that the texture has changed. */
 	ENGINE_API void NotifyMaterials(const ENotifyMaterialsEffectOnShaders EffectOnShaders = ENotifyMaterialsEffectOnShaders::Default);
 
-	virtual bool GetStreamableRenderResourceState(FTexturePlatformData* InPlatformData, FStreamableRenderResourceState& OutState) const { return false; }
 #endif //WITH_EDITOR
 
 	void BeginFinalReleaseResource();

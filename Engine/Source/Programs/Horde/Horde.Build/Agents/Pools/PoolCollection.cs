@@ -43,7 +43,9 @@ namespace Horde.Build.Agents.Pools
 			public TimeSpan? ScaleOutCooldown { get; set; }
 			public TimeSpan? ScaleInCooldown { get; set; }
 			public PoolSizeStrategy? SizeStrategy { get; set; }
-			PoolSizeStrategy IPool.SizeStrategy => SizeStrategy ?? defaultStrategy!.Value;
+			PoolSizeStrategy IPool.SizeStrategy => SizeStrategy ?? s_defaultStrategy!.Value;
+			public List<PoolSizeStrategyInfo> SizeStrategies { get; set; } = new ();
+			public List<FleetManagerInfo> FleetManagers { get; set; } = new ();
 			public LeaseUtilizationSettings? LeaseUtilizationSettings { get; set; }
 			public JobQueueSettings? JobQueueSettings { get; set; }
 			public ComputeQueueAwsMetricSettings? ComputeQueueAwsMetricSettings { get; set; }
@@ -51,7 +53,9 @@ namespace Horde.Build.Agents.Pools
 
 			// Read-only wrappers
 			IReadOnlyList<AgentWorkspace> IPool.Workspaces => Workspaces;
-			IReadOnlyDictionary<string, string> IPool.Properties => Properties;			
+			IReadOnlyDictionary<string, string> IPool.Properties => Properties;
+			IReadOnlyList<PoolSizeStrategyInfo> IPool.SizeStrategies => SizeStrategies;
+			IReadOnlyList<FleetManagerInfo> IPool.FleetManagers => FleetManagers;
 
 			public PoolDocument()
 			{
@@ -74,6 +78,8 @@ namespace Horde.Build.Agents.Pools
 				ScaleOutCooldown = other.ScaleOutCooldown;
 				ScaleInCooldown = other.ScaleInCooldown;
 				SizeStrategy = other.SizeStrategy;
+				SizeStrategies.AddRange(other.SizeStrategies);
+				FleetManagers.AddRange(other.FleetManagers);
 				LeaseUtilizationSettings = other.LeaseUtilizationSettings;
 				JobQueueSettings = other.JobQueueSettings;
 				ComputeQueueAwsMetricSettings = other.ComputeQueueAwsMetricSettings;
@@ -86,7 +92,7 @@ namespace Horde.Build.Agents.Pools
 		/// </summary>
 		readonly IMongoCollection<PoolDocument> _pools;
 
-		static PoolSizeStrategy? defaultStrategy;
+		static PoolSizeStrategy? s_defaultStrategy;
 
 		/// <summary>
 		/// Constructor
@@ -96,7 +102,7 @@ namespace Horde.Build.Agents.Pools
 		public PoolCollection(MongoService mongoService, IOptions<ServerSettings> serverSettings)
 		{
 			_pools = mongoService.GetCollection<PoolDocument>("Pools");
-			defaultStrategy = serverSettings.Value.DefaultAgentPoolSizeStrategy;
+			s_defaultStrategy = serverSettings.Value.DefaultAgentPoolSizeStrategy;
 		}
 
 		/// <inheritdoc/>
@@ -110,6 +116,8 @@ namespace Horde.Build.Agents.Pools
 			TimeSpan? conformInterval,
 			TimeSpan? scaleOutCooldown,
 			TimeSpan? scaleInCooldown,
+			List<PoolSizeStrategyInfo>? sizeStrategies,
+			List<FleetManagerInfo>? fleetManagers,
 			PoolSizeStrategy? sizeStrategy,
 			LeaseUtilizationSettings? leaseUtilizationSettings,
 			JobQueueSettings? jobQueueSettings,
@@ -138,6 +146,9 @@ namespace Horde.Build.Agents.Pools
 			pool.LeaseUtilizationSettings = leaseUtilizationSettings;
 			pool.JobQueueSettings = jobQueueSettings;
 			pool.ComputeQueueAwsMetricSettings = computeQueueAwsMetricSettings;
+			if (sizeStrategies != null) { pool.SizeStrategies = sizeStrategies; }
+			if (fleetManagers != null) { pool.FleetManagers = fleetManagers; }
+			
 			await _pools.InsertOneAsync(pool);
 			return pool;
 		}
@@ -228,6 +239,8 @@ namespace Horde.Build.Agents.Pools
 			TimeSpan? scaleOutCooldown,
 			TimeSpan? scaleInCooldown, 
 			PoolSizeStrategy? sizeStrategy,
+			List<PoolSizeStrategyInfo>? newSizeStrategies,
+			List<FleetManagerInfo>? newFleetManagers,
 			LeaseUtilizationSettings? leaseUtilizationSettings,
 			JobQueueSettings? jobQueueSettings, 
 			ComputeQueueAwsMetricSettings? computeQueueAwsMetricSettings, 
@@ -329,7 +342,14 @@ namespace Horde.Build.Agents.Pools
 			{
 				transaction.Set(x => x.SizeStrategy, null);
 			}
-
+			if (newSizeStrategies != null)
+			{
+				transaction.Set(x => x.SizeStrategies, newSizeStrategies);				
+			}
+			if (newFleetManagers != null)
+			{
+				transaction.Set(x => x.FleetManagers, newFleetManagers);				
+			}
 			if (leaseUtilizationSettings != null)
 			{
 				transaction.Set(x => x.LeaseUtilizationSettings, leaseUtilizationSettings);

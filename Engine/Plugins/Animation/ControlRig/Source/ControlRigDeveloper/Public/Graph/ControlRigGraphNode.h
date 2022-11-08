@@ -44,8 +44,9 @@ private:
 	TWeakObjectPtr<URigVMNode> CachedModelNode;
 
 	UPROPERTY(transient)
-	TMap<FString, TWeakObjectPtr<URigVMPin>> CachedModelPins;
+	TMap<FString, TWeakObjectPtr<URigVMPin>> PinPathToModelPin;
 
+#if WITH_EDITORONLY_DATA
 	/** The property we represent. For template nodes this represents the struct/property type name. */
 	UPROPERTY()
 	FName PropertyName_DEPRECATED;
@@ -64,6 +65,7 @@ private:
 	/** Expanded pins */
 	UPROPERTY()
 	TArray<FString> ExpandedPins_DEPRECATED;
+#endif
 
 	/** Cached dimensions of this node (used for auto-layout) */
 	FVector2D Dimensions;
@@ -76,7 +78,21 @@ private:
 
 public:
 
-	DECLARE_DELEGATE(FNodeTitleDirtied);
+	DECLARE_MULTICAST_DELEGATE(FNodeTitleDirtied);
+	DECLARE_MULTICAST_DELEGATE(FNodePinsChanged);
+	DECLARE_MULTICAST_DELEGATE(FNodePinExpansionChanged);
+
+	struct FPinPair
+	{
+		FPinPair()
+			: InputPin(nullptr)
+			, OutputPin(nullptr)
+		{}
+		UEdGraphPin* InputPin;
+		UEdGraphPin* OutputPin;
+
+		bool IsValid() const { return InputPin != nullptr || OutputPin != nullptr; }
+	};
 
 	UControlRigGraphNode();
 
@@ -103,6 +119,7 @@ public:
 	virtual bool SupportsCommentBubble() const override { return false; }
 	virtual bool IsSelectedInEditor() const;
 	virtual bool ShouldDrawNodeAsControlPointOnly(int32& OutInputPinIndex, int32& OutOutputPinIndex) const override;
+	virtual void BeginDestroy() override;
 
 	virtual bool IsDeprecated() const override;
 	virtual FEdGraphNodeDeprecationResponse GetDeprecationResponse(EEdGraphNodeDeprecationType DeprecationType) const override;
@@ -151,13 +168,40 @@ public:
 	/** Insert a new array element after the element referred to by the property path */
 	void HandleInsertArrayElement(FString InPinPath);
 
-	FNodeTitleDirtied& GetNodeTitleDirtied() { return NodeTitleDirtied; }
-
 	int32 GetInstructionIndex(bool bAsInput) const;
 
 	const FRigVMTemplate* GetTemplate() const;
 
 	void ClearErrorInfo();
+
+	URigVMPin* FindModelPinFromGraphPin(const UEdGraphPin* InGraphPin) const;
+	UEdGraphPin* FindGraphPinFromModelPin(const URigVMPin* InModelPin, bool bAsInput) const;
+
+	/// Synchronize the stored name/value/type on the graph pin with the value stored on the node. 
+	/// If the pin has sub-pins, the value update is done recursively.
+	void SynchronizeGraphPinNameWithModelPin(const URigVMPin* InModelPin, bool bNotify = true);
+	void SynchronizeGraphPinValueWithModelPin(const URigVMPin* InModelPin);
+	void SynchronizeGraphPinTypeWithModelPin(const URigVMPin* InModelPin);
+	void SynchronizeGraphPinExpansionWithModelPin(const URigVMPin* InModelPin);
+	
+	void SyncGraphNodeTitleWithModelNodeTitle();
+	void SyncGraphNodeNameWithModelNodeName(const URigVMNode* InModelNode);
+
+	FNodeTitleDirtied& OnNodeTitleDirtied() { return NodeTitleDirtied; }
+	FNodePinsChanged& OnNodePinsChanged() { return NodePinsChanged; }
+	FNodePinExpansionChanged& OnNodePinExpansionChanged() { return NodePinExpansionChanged; }
+
+	/** Called when there's a drastic change in the pins */
+	bool ModelPinsChanged(bool bForce = false);
+
+	/** Called when a model pin is added after the node creation */
+	bool ModelPinAdded(const URigVMPin* InModelPin);
+
+	/** Called when a model pin is being removed */
+	bool ModelPinRemoved(const URigVMPin* InModelPin);
+
+	/** Returns true if this node is relying on the cast template */
+	bool DrawAsCompactNode() const;
 
 protected:
 
@@ -165,13 +209,14 @@ protected:
 	FLinearColor GetNodeOpacityColor() const;
 
 	/** Helper function for AllocateDefaultPins */
-	void CreateExecutionPins();
-	void CreateInputPins(URigVMPin* InParentPin = nullptr);
-	void CreateInputOutputPins(URigVMPin* InParentPin = nullptr, bool bHidden = false);
-	void CreateOutputPins(URigVMPin* InParentPin = nullptr);
+	void UpdatePinLists();
+	bool CreateGraphPinFromModelPin(const URigVMPin* InModelPin, EEdGraphPinDirection InDirection,  UEdGraphPin* InParentPin = nullptr);
+	void RemoveGraphSubPins(UEdGraphPin *InParentPin, const TArray<UEdGraphPin*>& InPinsToKeep = TArray<UEdGraphPin*>());
+	bool ModelPinAdded_Internal(const URigVMPin* InModelPin);
+	bool ModelPinRemoved_Internal(const URigVMPin* InModelPin);
 
 	/** Copies default values from underlying properties into pin defaults, for editing */
-	void SetupPinDefaultsFromModel(UEdGraphPin* Pin);
+	void SetupPinDefaultsFromModel(UEdGraphPin* Pin, const URigVMPin* InModelPin = nullptr);
 
 	/** Recreate pins when we reconstruct this node */
 	virtual void ReallocatePinsDuringReconstruction(const TArray<UEdGraphPin*>& OldPins);
@@ -194,14 +239,15 @@ protected:
 	UClass* GetControlRigGeneratedClass() const;
 	UClass* GetControlRigSkeletonGeneratedClass() const;
 
-	static FEdGraphPinType GetPinTypeForModelPin(URigVMPin* InModelPin);
+	static FEdGraphPinType GetPinTypeForModelPin(const URigVMPin* InModelPin);
 
 private:
 
 	FORCEINLINE int32 GetNodeTopologyVersion() const { return NodeTopologyVersion; }
 	int32 NodeTopologyVersion;
 
-	void ConfigurePin(UEdGraphPin* EdGraphPin, URigVMPin* ModelPin, bool bHidden, bool bConnectable);
+	static void ConfigurePin(UEdGraphPin* EdGraphPin, const URigVMPin* ModelPin);
+	TArray<URigVMPin*>& PinListForPin(const URigVMPin* InModelPin);
 
 	FLinearColor CachedTitleColor;
 	FLinearColor CachedNodeColor;
@@ -216,23 +262,21 @@ private:
 	TArray<URigVMPin*> OutputPins;
 	TArray<TSharedPtr<FRigVMExternalVariable>> ExternalVariables;
 	
-	struct PinPair
-	{
-		PinPair()
-			: InputPin(nullptr)
-			, OutputPin(nullptr)
-		{}
-		UEdGraphPin* InputPin;
-		UEdGraphPin* OutputPin;
-	};
-	TMap<URigVMPin*, PinPair> CachedPins;
+	TMap<URigVMPin*, FPinPair> CachedPins;
 
 	FNodeTitleDirtied NodeTitleDirtied;
+	FNodePinsChanged NodePinsChanged;
+	FNodePinExpansionChanged NodePinExpansionChanged;
 
 	mutable const FRigVMTemplate* CachedTemplate;
+	mutable TOptional<bool> DrawAsCompactNodeCache;
 
 	friend class SControlRigGraphNode;
 	friend class FControlRigArgumentLayout;
 	friend class FControlRigGraphDetails;
 	friend class UControlRigTemplateNodeSpawner;
+	friend class UControlRigRerouteNodeSpawner;
+	friend class UControlRigArrayNodeSpawner;
+	friend class UControlRigIfNodeSpawner;
+	friend class UControlRigSelectNodeSpawner;
 };

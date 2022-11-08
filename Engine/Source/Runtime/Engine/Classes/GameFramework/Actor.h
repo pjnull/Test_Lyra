@@ -75,6 +75,17 @@ enum class EActorUpdateOverlapsMethod : uint8
 	NeverUpdate
 };
 
+/** Determines how the transform being passed into actor spawning methods interact with the actor's default root component */
+UENUM(BlueprintType)
+enum class ESpawnActorScaleMethod : uint8
+{
+	/** Ignore the default scale in the actor's root component and hard-set it to the value of SpawnTransform Parameter */
+	OverrideRootScale						UMETA(DisplayName = "Override Root Component Scale"),
+	/** Multiply value of the SpawnTransform Parameter with the default scale in the actor's root component */
+	MultiplyWithRoot						UMETA(DisplayName = "Multiply Scale With Root Component Scale"),
+	SelectDefaultAtRuntime					UMETA(Hidden),
+};
+
 #if WITH_EDITORONLY_DATA
 /** Enum defining how actor will be placed in the partition */
 UENUM()
@@ -1687,17 +1698,19 @@ public:
 	 * @param RotationRule				How to handle rotation when attaching.
 	 * @param ScaleRule					How to handle scale when attaching.
 	 * @param bWeldSimulatedBodies		Whether to weld together simulated physics bodies.
+	 * @return							Whether the attachment was successful or not
 	 */
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Attach Actor To Component", ScriptName = "AttachToComponent", bWeldSimulatedBodies = true), Category = "Transformation")
-	void K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
+	bool K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
 
 	/**
 	 * Attaches the RootComponent of this Actor to the supplied component, optionally at a named socket. It is not valid to call this on components that are not Registered.
 	 * @param  Parent					Parent to attach to.
 	 * @param  AttachmentRules			How to handle transforms and welding when attaching.
 	 * @param  SocketName				Optional socket to attach to on the parent.
+	 * @return							Whether the attachment was successful or not
 	 */
-	void AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName = NAME_None);
+	bool AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName = NAME_None);
 
 	/** DEPRECATED - Use AttachToActor() instead */
 	UE_DEPRECATED(4.17, "Use AttachToActor() instead.")
@@ -1709,8 +1722,9 @@ public:
 	 * @param ParentActor				Actor to attach this actor's RootComponent to
 	 * @param AttachmentRules			How to handle transforms and modification when attaching.
 	 * @param SocketName				Socket name to attach to, if any
+	 * @return							Whether the attachment was successful or not
 	 */
-	void AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName = NAME_None);
+	bool AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName = NAME_None);
 
 	/**
 	 * Attaches the RootComponent of this Actor to the supplied actor, optionally at a named socket.
@@ -1720,9 +1734,10 @@ public:
 	 * @param RotationRule				How to handle rotation when attaching.
 	 * @param ScaleRule					How to handle scale when attaching.
 	 * @param bWeldSimulatedBodies		Whether to weld together simulated physics bodies.
+	 * @return							Whether the attachment was successful or not
 	 */
 	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Attach Actor To Actor", ScriptName = "AttachToActor", bWeldSimulatedBodies=true), Category = "Transformation")
-	void K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
+	bool K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies);
 
 	/** DEPRECATED - Use DetachFromActor() instead */
 	UE_DEPRECATED(4.17, "Use DetachFromActor() instead")
@@ -2335,7 +2350,11 @@ public:
 	virtual bool ShouldExport() { return true; }
 
 	/** Called before editor paste, true allow import */
-	virtual bool ShouldImport(FString* ActorPropString, bool IsMovingLevel) { return true; }
+	UE_DEPRECATED(5.2, "Use the override that takes a StringView instead")
+	virtual bool ShouldImport(FString* ActorPropString, bool IsMovingLevel) { return ActorPropString ? ShouldImport(FStringView(*ActorPropString), IsMovingLevel) : ShouldImport(FStringView(), IsMovingLevel); }
+
+	/** Called before editor paste, true allow import */
+	virtual bool ShouldImport(FStringView ActorPropString, bool IsMovingLevel) { return true; }
 
 	/** Called by InputKey when an unhandled key is pressed with a selected actor */
 	virtual void EditorKeyPressed(FKey Key, EInputEvent Event) {}
@@ -2734,10 +2753,10 @@ public:
 	virtual bool IsRelevancyOwnerFor(const AActor* ReplicatedActor, const AActor* ActorOwner, const AActor* ConnectionActor) const;
 
 	/** Called after the actor is spawned in the world.  Responsible for setting up actor for play. */
-	void PostSpawnInitialize(FTransform const& SpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail, bool bDeferConstruction);
+	void PostSpawnInitialize(FTransform const& SpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail, bool bDeferConstruction, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot);
 
 	/** Called to finish the spawning process, generally in the case of deferred spawning */
-	void FinishSpawning(const FTransform& Transform, bool bIsDefaultTransform = false, const FComponentInstanceDataCache* InstanceDataCache = nullptr);
+	void FinishSpawning(const FTransform& Transform, bool bIsDefaultTransform = false, const FComponentInstanceDataCache* InstanceDataCache = nullptr, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::OverrideRootScale);
 
 	/** Called after the actor has run its construction. Responsible for finishing the actor spawn process. */
 	void PostActorConstruction();
@@ -3047,7 +3066,7 @@ public:
 	 *
 	 * @return Returns false if the hierarchy was not error free and we've put the Actor is disaster recovery mode
 	 */
-	bool ExecuteConstruction(const FTransform& Transform, const struct FRotationConversionCache* TransformRotationCache, const class FComponentInstanceDataCache* InstanceDataCache, bool bIsDefaultTransform = false);
+	bool ExecuteConstruction(const FTransform& Transform, const struct FRotationConversionCache* TransformRotationCache, const class FComponentInstanceDataCache* InstanceDataCache, bool bIsDefaultTransform = false, ESpawnActorScaleMethod TransformScaleMethod = ESpawnActorScaleMethod::OverrideRootScale);
 
 	/**
 	 * Called when an instance of this class is placed (in editor) or spawned.
@@ -3286,7 +3305,7 @@ public:
 	 * @return Whether this actor was recently rendered.
 	 */
 	UFUNCTION(Category="Rendering", BlueprintCallable, meta=(DisplayName="Was Actor Recently Rendered", Keywords="scene visible"))
-	bool WasRecentlyRendered(float Tolerance = 0.2) const;
+	bool WasRecentlyRendered(float Tolerance = 0.2f) const;
 
 	/** Returns the most recent time any of this actor's components were rendered */
 	virtual float GetLastRenderTime() const;

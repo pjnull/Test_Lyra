@@ -58,6 +58,7 @@
 #include "VirtualShadowMaps/VirtualShadowMapArray.h"
 #include "Lumen/LumenVisualize.h"
 #include "RectLightTextureManager.h"
+#include "IESTextureManager.h"
 
 bool IsMobileEyeAdaptationEnabled(const FViewInfo& View);
 
@@ -1444,7 +1445,8 @@ void AddPostProcessingPasses(
 		}
 
 		{
-			RectLightAtlas::AddRectLightAtlasDebugPass(GraphBuilder, View, SceneColor.Texture);
+			RectLightAtlas::AddDebugPass(GraphBuilder, View, SceneColor.Texture);
+			IESAtlas::AddDebugPass(GraphBuilder, View, SceneColor.Texture);
 		}
 
 		if (ShaderPrint::IsEnabled(View.ShaderPrintData))
@@ -2262,8 +2264,10 @@ void AddMobilePostProcessingPasses(FRDGBuilder& GraphBuilder, FScene* Scene, con
 			PassSequence.AcceptPass(EPass::SeparateTranslucency);
 			FMobileSeparateTranslucencyInputs SeparateTranslucencyInputs;
 			SeparateTranslucencyInputs.SceneColor = SceneColor;
+			SeparateTranslucencyInputs.SceneDepthAux = SceneDepthAux;
 			SeparateTranslucencyInputs.SceneDepth = SceneDepth;
-
+			SeparateTranslucencyInputs.bRequiresMultiPass = Inputs.bRequiresMultiPass;
+			
 			AddMobileSeparateTranslucencyPass(GraphBuilder, Scene, View, SeparateTranslucencyInputs);
 		}
 

@@ -10,24 +10,419 @@
 
 #include "Customizations/ColorStructCustomization.h"
 #include "Editor.h"
+#include "EditorActorFolders.h"
 #include "Engine/Blueprint.h"
 #include "GameFramework/Actor.h"
 #include "Input/DragAndDrop.h"
 #include "ISinglePropertyView.h"
+#include "ObjectMixerEditorLog.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 #include "PropertyHandle.h"
 #include "ScopedTransaction.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/ComponentEditorUtils.h"
 #include "Styling/AppStyle.h"
 #include "Styling/StyleColors.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Text/SInlineEditableTextBlock.h"
 
 #define LOCTEXT_NAMESPACE "ObjectMixerEditor"
 
 const FText DropFormatText = LOCTEXT("DropFormatText", "{0} {1} {2} {3}");
 const FText MultiDragFormatText = LOCTEXT("MultiDragFormatText", "{0} Items");
+
+class SInlineEditableRowNameCellWidget : public SCompoundWidget
+{
+public:
+	
+	SLATE_BEGIN_ARGS(SObjectMixerEditorListRow)
+	{}
+
+	SLATE_END_ARGS()
+	
+	void Construct(const FArguments& InArgs, TSharedRef<FObjectMixerEditorListRow> InRow, FObjectMixerEditorListRowPtr InHybridChild)
+	{
+		Item = InRow;
+		HybridChild = InHybridChild;
+
+		InRow->OnRenameCommand().BindRaw(this, &SInlineEditableRowNameCellWidget::EnterEditingMode);
+		
+		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
+		
+		HBox->AddSlot()
+		.AutoWidth()
+		[
+			SNew(SImage)
+			.Image(InRow->GetObjectIconBrush())
+			.ColorAndOpacity(FSlateColor::UseForeground())
+		];
+
+		bool bNeedsStandardTextBlock = true;
+		const FText DisplayName = InRow->GetDisplayName(HybridChild.IsValid());
+		const TObjectPtr<UObject> RowObject = InRow->GetObject();
+		const bool bRowObjectIsValid = IsValid(RowObject);
+
+		if (bRowObjectIsValid)
+		{	
+			if (const UClass* ActorClass = RowObject->GetClass())
+			{
+				if (UBlueprint* AsBlueprint = UBlueprint::GetBlueprintFromClass(ActorClass))
+				{					
+					bNeedsStandardTextBlock = false;
+	
+					HBox->AddSlot()
+					.Padding(FMargin(10.0, 0, 0, 0))
+					[
+						SAssignNew(HyperlinkTextBlock, SHyperlinkWithTextHighlight)
+						.Visibility(EVisibility::Visible)
+						.Text(DisplayName)
+						.ToolTipText(LOCTEXT("ClickToEditBlueprint", "Click to edit Blueprint"))
+						.OnNavigate(this, &SInlineEditableRowNameCellWidget::OnClickBlueprintLink, AsBlueprint, RowObject.Get())
+						.HighlightText(this, &SInlineEditableRowNameCellWidget::GetHighlightText)
+						.IsSelected_Raw(this, &SInlineEditableRowNameCellWidget::GetIsSelectedExclusively)
+						.OnTextCommitted(this, &SInlineEditableRowNameCellWidget::OnTextCommitted)
+					];
+				}
+			}
+		}
+
+		if (bNeedsStandardTextBlock)
+		{
+			FText TooltipText = DisplayName;
+
+			if (bRowObjectIsValid)
+			{
+				if (const UObjectMixerObjectFilter* Filter = InRow->GetObjectFilter())
+				{
+					TooltipText = Filter->GetRowTooltipText(RowObject, HybridChild.IsValid());
+				}
+			}
+			
+			HBox->AddSlot()
+			.Padding(FMargin(10.0, 0, 0, 0))
+			[
+				SAssignNew(EditableTextBlock, SInlineEditableTextBlock)
+				.Visibility(EVisibility::Visible)
+				.Justification(ETextJustify::Left)
+				.Text(DisplayName)
+				.ToolTipText(TooltipText)
+				.IsReadOnly(false)
+				.HighlightText(this, &SInlineEditableRowNameCellWidget::GetHighlightText)
+				.IsSelected_Raw(this, &SInlineEditableRowNameCellWidget::GetIsSelectedExclusively)
+				.OnTextCommitted(this, &SInlineEditableRowNameCellWidget::OnTextCommitted)
+			];
+		}
+		
+		ChildSlot
+		[
+			SNew(SBox)
+			.Visibility(EVisibility::SelfHitTestInvisible)
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			.Padding(FMargin(TextBlockLeftPadding, 0.f, 0.f, 0.f))
+			[
+				HBox
+			]
+		];
+	}
+
+	virtual ~SInlineEditableRowNameCellWidget() override
+	{
+		if (const FObjectMixerEditorListRowPtr ItemPin = Item.Pin())
+		{
+			ItemPin->OnRenameCommand().Unbind();
+		}
+		
+		Item.Reset();
+		HybridChild.Reset();
+
+		EditableTextBlock.Reset();
+	}
+
+	void EnterEditingMode() const
+	{
+		if (EditableTextBlock.IsValid())
+		{
+			EditableTextBlock->EnterEditingMode();
+		}
+		else if (HyperlinkTextBlock.IsValid() && HyperlinkTextBlock->EditableTextBlock.IsValid())
+		{
+			HyperlinkTextBlock->EditableTextBlock->EnterEditingMode();
+		}
+	}
+
+private:
+
+	bool IsValidComponentRename(const UActorComponent* ComponentInstance, const FText& InNewText) const
+	{
+		if (!ComponentInstance)
+		{
+			return false;
+		}
+		
+		FText OutErrorMessage;
+		const FString& NewTextStr = InNewText.ToString();
+
+		if (IsValidRename(InNewText, ComponentInstance->GetName()))
+		{
+			AActor* Owner = ComponentInstance->GetOwner();
+
+			if (!Owner)
+			{
+				return false;
+			}
+
+			UBlueprint* Blueprint = nullptr;
+
+			if (const UClass* ActorClass = Owner->GetClass())
+			{
+				Blueprint = UBlueprint::GetBlueprintFromClass(ActorClass);
+				if ( Blueprint )
+				{
+					// Subobject names must conform to UObject naming conventions.
+					if (!FName::IsValidXName(NewTextStr, INVALID_OBJECTNAME_CHARACTERS, &OutErrorMessage))
+					{
+						UE_LOG(LogObjectMixerEditor, Warning, TEXT("%s"), *OutErrorMessage.ToString());
+						return false;
+					}
+			
+					AActor* ExistingNameSearchScope = ComponentInstance->GetOwner();
+			
+					if ((ExistingNameSearchScope == nullptr) && (Blueprint != nullptr))
+					{
+						ExistingNameSearchScope = Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject());
+					}
+
+					if (!FComponentEditorUtils::IsValidVariableNameString(ComponentInstance, NewTextStr))
+					{
+						OutErrorMessage = LOCTEXT("RenameFailed_EngineReservedName", "This name is reserved for engine use.");
+						UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+						return false;
+					}
+					else if (!FComponentEditorUtils::IsComponentNameAvailable(NewTextStr, ExistingNameSearchScope, ComponentInstance) 
+							|| !FComponentEditorUtils::IsComponentNameAvailable(NewTextStr, ComponentInstance->GetOuter(), ComponentInstance ))
+					{
+						OutErrorMessage = LOCTEXT("RenameFailed_ExistingName", "Another component already has the same name.");
+						UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+						return false;
+					}
+				}
+			}
+		
+			TSharedPtr<INameValidatorInterface> NameValidator;
+			if (Blueprint != nullptr)
+			{
+				NameValidator = MakeShareable(new FKismetNameValidator(Blueprint, ComponentInstance->GetFName()));
+			}
+			else
+			{
+				NameValidator = MakeShareable(new FStringSetNameValidator(ComponentInstance->GetName()));
+			}
+
+			if(NameValidator)
+			{
+				EValidatorResult ValidatorResult = NameValidator->IsValid(NewTextStr);
+				if (ValidatorResult == EValidatorResult::AlreadyInUse || ValidatorResult == EValidatorResult::LocallyInUse)
+				{
+					OutErrorMessage = FText::Format(LOCTEXT("RenameFailed_InUse", "'{0}' is in use by another variable or function!"), InNewText);
+					UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+				}
+				else if (ValidatorResult == EValidatorResult::Ok)
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	bool IsValidRename(const FText& NewName, const FString& OldName) const
+	{
+		FText OutErrorMessage;
+
+		if (NewName.IsEmpty())
+		{
+			OutErrorMessage = LOCTEXT("RenameFailed_LeftBlank", "Names cannot be left blank");
+			UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+			return false;
+		}
+
+		if (NewName.ToString().Len() >= NAME_SIZE)
+		{
+			FFormatNamedArguments Arguments;
+			Arguments.Add(TEXT("CharCount"), NAME_SIZE);
+			OutErrorMessage = FText::Format(LOCTEXT("RenameFailed_TooLong", "Names must be less than {CharCount} characters long."), Arguments);
+			UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+			return false;
+		}
+
+		const FString LabelString = NewName.ToString();
+		if (OldName.Equals(LabelString))
+		{
+			OutErrorMessage = LOCTEXT("RenameFailed_SameName", "Old and new names are the same.");
+			UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+			return false;
+		}
+
+		int32 Dummy = 0;
+		if (LabelString.FindChar('/', Dummy) || LabelString.FindChar('\\', Dummy))
+		{
+			OutErrorMessage = LOCTEXT("RenameFailed_InvalidChar", "Names cannot contain / or \\.");
+			UE_LOG(LogObjectMixerEditor, Warning, TEXT("%hs: %s"), __FUNCTION__, *OutErrorMessage.ToString());
+			return false;
+		}
+
+		return true;
+	}
+
+	static void RenameFolder(const FObjectMixerEditorListRowPtr RowPtr, const FString& TextAsString)
+	{
+		const FFolder OldFolder = RowPtr->GetFolder();
+		FName NewPath = OldFolder.GetParent().GetPath();
+		if (NewPath.IsNone())
+		{
+			NewPath = FName(*TextAsString);
+		}
+		else
+		{
+			NewPath = FName(*(NewPath.ToString() / TextAsString));
+		}
+			
+		const FFolder NewFolder(OldFolder.GetRootObject(), NewPath);
+			
+		// Transaction is built into the following method
+		FActorFolders::Get().RenameFolderInWorld(*GEditor->GetEditorWorldContext().World(), OldFolder, NewFolder);
+
+		if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin())
+		{
+			PinnedListView->RequestRebuildList();
+		}
+	}
+
+	void RenameActor(AActor* AsActor, const FText& TrimmedLabel) const
+	{
+		if (AsActor->IsActorLabelEditable() && IsValidRename(TrimmedLabel, AsActor->GetActorLabel()))
+		{
+			const FScopedTransaction Transaction(LOCTEXT("ObjectMixerRenameActorTransaction", "Rename Actor"));
+			AsActor->Modify();
+			FActorLabelUtilities::RenameExistingActor(AsActor, TrimmedLabel.ToString());
+		}
+	}
+
+	bool RenameComponent(UActorComponent* AsComponent, const FText& TrimmedLabel) const
+	{
+		if (IsValidComponentRename(AsComponent, TrimmedLabel))
+		{
+			const FString TextAsString = TrimmedLabel.ToString();
+			
+			const ERenameFlags RenameFlags = REN_DontCreateRedirectors;
+			if(!StaticFindObject(UObject::StaticClass(), AsComponent->GetOuter(), *TextAsString))
+			{
+				const FScopedTransaction Transaction(LOCTEXT("ObjectMixerRenameComponentTransaction", "Rename Component"));
+				AsComponent->Modify();
+				AsComponent->Rename(*TextAsString, nullptr, RenameFlags);
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void OnTextCommitted(const FText& InText, ETextCommit::Type CommitType) const
+	{
+		const FObjectMixerEditorListRowPtr RowPtr = Item.Pin();
+		check(RowPtr);
+		
+		const FText TrimmedLabel = FText::TrimPrecedingAndTrailing(InText);
+		if (TrimmedLabel.IsEmpty())
+		{
+			return;
+		}
+		
+		const FString TextAsString = TrimmedLabel.ToString();
+
+		if (RowPtr->GetRowType() == FObjectMixerEditorListRow::Folder &&
+			IsValidRename(TrimmedLabel, RowPtr->GetFolder().GetLeafName().ToString()))
+		{
+			RenameFolder(RowPtr, TextAsString);
+
+			return;
+		}
+		
+		UObject* RowObject = RowPtr->GetObject();
+
+		if (!RowObject)
+		{
+			return;
+		}
+
+		if (AActor* AsActor = Cast<AActor>(RowObject))
+		{
+			RenameActor(AsActor, TrimmedLabel);
+			
+			if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin())
+			{
+				PinnedListView->RequestRebuildList();
+			}
+		}
+		else if (UActorComponent* AsComponent = Cast<UActorComponent>(RowObject))
+		{
+			if (RenameComponent(AsComponent, TrimmedLabel))
+			{
+				if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin())
+				{
+					PinnedListView->RequestRebuildList();
+				}
+			}
+		}
+	}
+	
+	void OnClickBlueprintLink(UBlueprint* AsBlueprint, UObject* Object) const
+	{
+		if (AsBlueprint)
+		{
+			if (Object)
+			{
+				if (ensure(Object->GetClass()->ClassGeneratedBy == AsBlueprint))
+				{
+					AsBlueprint->SetObjectBeingDebugged(Object);
+				}
+			}
+			// Open the blueprint
+			GEditor->EditObject(AsBlueprint);
+		}
+	}
+
+	FText GetHighlightText() const
+	{
+		const FObjectMixerEditorListRowPtr RowPtr = HybridChild.IsValid() ? HybridChild.Pin() : Item.Pin();
+
+		if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin())
+		{
+			return PinnedListView->GetSearchTextFromSearchInputField();
+		}
+
+		return FText::GetEmpty();
+	}
+
+	bool GetIsSelectedExclusively() const
+	{
+		return Item.Pin()->GetIsSelected() && Item.Pin()->GetSelectedTreeViewItems().Num() == 1;
+	}
+
+	TWeakPtr<FObjectMixerEditorListRow> Item;
+	TWeakPtr<FObjectMixerEditorListRow> HybridChild;
+
+	TSharedPtr<SInlineEditableTextBlock> EditableTextBlock;
+	TSharedPtr<SHyperlinkWithTextHighlight> HyperlinkTextBlock;
+
+	/** The offset applied to text widgets so that the text aligns with the column header text */
+	float TextBlockLeftPadding = 3.0f;
+};
 
 void SObjectMixerEditorListRow::Construct(
 	const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTable,
@@ -161,10 +556,6 @@ TOptional<EItemDropZone> SObjectMixerEditorListRow::HandleCanAcceptDrop(
 			Operation->DraggedItems.Num() == 1 &&
 			Operation->DraggedItems[0]->GetObject() &&
 			Operation->DraggedItems[0]->GetObject()->IsA(UActorComponent::StaticClass())
-		) ||
-		(
-			Operation->DraggedItems.Num() == 1 &&
-			Operation->DraggedItems[0]->GetRowType() == FObjectMixerEditorListRow::Folder
 		)
 	;
 
@@ -225,12 +616,35 @@ FReply SObjectMixerEditorListRow::HandleAcceptDrop(const FDragDropEvent& DragDro
 
 	for (const FObjectMixerEditorListRowPtr& DraggedItem : Operation->DraggedItems)
 	{
-		if (AActor* ObjectAsActor = Cast<AActor>(DraggedItem->GetObject()))
+		if (DraggedItem->GetRowType() == FObjectMixerEditorListRow::Folder)
+		{
+			if (bIsDroppingOnFolderRow)
+			{
+				if (const TSharedPtr<SObjectMixerEditorList> PinnedList = DraggedItem->GetListViewPtr().Pin())
+				{
+						PinnedList->OnRequestMoveFolder(DraggedItem->GetFolder(), TargetItem->GetFolder());
+				}
+			}
+		}
+		else if (AActor* ObjectAsActor = Cast<AActor>(DraggedItem->GetObject()))
 		{
 			if (bIsDroppingOnFolderRow)
 			{
 				ObjectAsActor->Modify();
 				ObjectAsActor->SetFolderPath(TargetItem->GetFolderPath());
+
+				if (AActor* AttachParent = ObjectAsActor->GetAttachParentActor())
+				{
+					if (const FObjectMixerEditorListRowPtr ParentRow = DraggedItem->GetDirectParentRow().Pin(); ParentRow.IsValid())
+					{
+						if (!Operation->DraggedItems.Contains(ParentRow))
+						{
+							AttachParent->Modify();
+							FDetachmentTransformRules DetachmentRules(EDetachmentRule::KeepWorld, false);
+							ObjectAsActor->DetachFromActor(DetachmentRules);
+						}
+					}
+				}
 			}
 			else if (AActor* DropOnObjectAsActor = Cast<AActor>(DropOnObject))
 			{
@@ -275,7 +689,7 @@ bool SObjectMixerEditorListRow::IsVisible() const
 {
 	if (const TSharedPtr<FObjectMixerEditorListRow> PinnedItem = Item.Pin())
 	{
-		return PinnedItem->GetObjectVisibility();
+		return PinnedItem->GetCurrentEditorObjectVisibility();
 	}
 
 	return false;
@@ -303,11 +717,12 @@ FSlateColor SObjectMixerEditorListRow::GetVisibilityIconForegroundColor() const
 FSlateColor SObjectMixerEditorListRow::GetSoloIconForegroundColor() const
 {
 	check(Item.IsValid());
+	const FObjectMixerEditorListRowPtr RowPtr = GetHybridChildOrRowItemIfNull();
 
-	const bool bIsSelected = Item.Pin()->GetIsSelected();
+	const bool bIsSelected = RowPtr->GetIsSelected();
 
 	// make the foreground brush transparent if it is not selected, hovered or solo
-	if (!Item.Pin()->IsThisRowSolo() && !bIsHovered && !bIsSelected)
+	if (!RowPtr->GetRowSoloState() && !bIsHovered && !bIsSelected)
 	{
 		return FLinearColor::Transparent;
 	}
@@ -317,6 +732,49 @@ FSlateColor SObjectMixerEditorListRow::GetSoloIconForegroundColor() const
 	}
 
 	return FSlateColor::UseForeground();
+}
+
+void SObjectMixerEditorListRow::OnClickSoloIcon(const FObjectMixerEditorListRowPtr& RowPtr)
+{
+	check (RowPtr.IsValid());
+							
+	if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin();
+		PinnedListView->GetTreeViewItemCount() > 0)
+	{
+		const bool bNewSolo = !RowPtr->GetRowSoloState();
+								
+		using LambdaType = void(*)(const FObjectMixerEditorListRowPtr&, const bool);
+		
+		static LambdaType SetSoloPerRowRecursively =
+			[](const FObjectMixerEditorListRowPtr& RowPtr, const bool bNewSolo)
+		{
+			if (bNewSolo)
+			{
+				RowPtr->SetUserHiddenInEditor(false);
+			}
+			
+			RowPtr->SetRowSoloState(bNewSolo);
+								
+			for (const FObjectMixerEditorListRowPtr& SelectedItem : RowPtr->GetChildRows())
+			{
+				SetSoloPerRowRecursively(SelectedItem, bNewSolo);
+			}
+		};
+								
+		if (PinnedListView->GetSelectedTreeViewItemCount() > 0 && RowPtr->GetIsSelected())
+		{
+			for (const FObjectMixerEditorListRowPtr& SelectedItem : PinnedListView->GetSelectedTreeViewItems())
+			{
+				SetSoloPerRowRecursively(SelectedItem, bNewSolo);
+			}
+		}
+		else
+		{
+			SetSoloPerRowRecursively(RowPtr, bNewSolo);
+		}
+								
+		PinnedListView->EvaluateAndSetEditorVisibilityPerRow();
+	}
 }
 
 const FSlateBrush* SObjectMixerEditorListRow::GetVisibilityBrush() const
@@ -332,14 +790,70 @@ const FSlateBrush* SObjectMixerEditorListRow::GetVisibilityBrush() const
 const FSlateBrush* SObjectMixerEditorListRow::GetSoloBrush() const
 {
 	check(Item.IsValid());
+	const FObjectMixerEditorListRowPtr RowPtr = GetHybridChildOrRowItemIfNull();
 
-	// make the foreground brush transparent if it is not selected, hovered or solo
-	if (Item.Pin()->IsThisRowSolo())
+	if (RowPtr->GetRowType() == FObjectMixerEditorListRow::Folder)
+	{
+		if (RowPtr->HasAtLeastOneChildThatIsNotSolo())
+		{
+			return SoloOffHoveredBrush;
+		}
+
+		return SoloOnBrush;
+	}
+	
+	if (RowPtr->GetRowSoloState())
 	{
 		return SoloOnBrush;
 	}
 
 	return SoloOffHoveredBrush;
+}
+
+void SObjectMixerEditorListRow::OnClickVisibilityIcon(const FObjectMixerEditorListRowPtr& RowPtr)
+{
+	check (RowPtr.IsValid());
+							
+	if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin();
+		PinnedListView->GetTreeViewItemCount() > 0)
+	{
+		const bool bNewHidden = !RowPtr->IsUserSetHiddenInEditor();
+		const bool bIsListInSoloState = PinnedListView->IsListInSoloState();
+								
+		using LambdaType = void(*)(const FObjectMixerEditorListRowPtr&, const bool, const bool);
+		
+		static LambdaType SetVisibilityPerRowRecursively = [](
+			const FObjectMixerEditorListRowPtr& RowPtr, const bool bNewHidden, const bool bIsListInSoloState)
+		{
+			if (bIsListInSoloState)
+			{
+				RowPtr->SetRowSoloState(!RowPtr->GetRowSoloState());
+			}
+			else
+			{
+				RowPtr->SetUserHiddenInEditor(bNewHidden);
+			}
+								
+			for (const FObjectMixerEditorListRowPtr& SelectedItem : RowPtr->GetChildRows())
+			{
+				SetVisibilityPerRowRecursively(SelectedItem, bNewHidden, bIsListInSoloState);
+			}
+		};
+								
+		if (PinnedListView->GetSelectedTreeViewItemCount() > 0 && RowPtr->GetIsSelected())
+		{
+			for (const FObjectMixerEditorListRowPtr& SelectedItem : PinnedListView->GetSelectedTreeViewItems())
+			{
+				SetVisibilityPerRowRecursively(SelectedItem, bNewHidden, bIsListInSoloState);
+			}
+		}
+		else
+		{
+			SetVisibilityPerRowRecursively(RowPtr, bNewHidden, bIsListInSoloState);
+		}
+								
+		PinnedListView->EvaluateAndSetEditorVisibilityPerRow();
+	}
 }
 
 TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
@@ -356,77 +870,8 @@ TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
 	
 	if (InColumnName.IsEqual(SObjectMixerEditorList::ItemNameColumnName))
 	{
-		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
-		
-		HBox->AddSlot()
-		.AutoWidth()
-		[
-			SNew(SImage)
-			.Image_Lambda([RowPtr]()
-			{
-				return RowPtr->GetObjectIconBrush();
-			})
-			.ColorAndOpacity(FSlateColor::UseForeground())
-		];
-
-		bool bNeedsStandardTextBlock = true;
-		const FText DisplayName = RowPtr->GetDisplayName(bIsHybridRow);
-		
-		if (TObjectPtr<UObject> Object = RowPtr->GetObject())
-		{
-			if (UClass* ActorClass = Object->GetClass())
-			{
-				if (UBlueprint* AsBlueprint = UBlueprint::GetBlueprintFromClass(ActorClass))
-				{					
-					bNeedsStandardTextBlock = false;
-			
-					HBox->AddSlot()
-					.Padding(FMargin(10.0, 0, 0, 0))
-					[
-						SNew(SHyperlinkWithTextHighlight)
-						.Style(FAppStyle::Get(), "Common.GotoBlueprintHyperlink")
-						.Visibility(EVisibility::Visible)
-						.Text(DisplayName)
-						.ToolTipText(LOCTEXT("ClickToEditBlueprint", "Click to edit Blueprint"))
-						.OnNavigate(this, &SObjectMixerEditorListRow::OnClickBlueprintLink, AsBlueprint, Object.Get())
-						.HighlightText(this, &SObjectMixerEditorListRow::GetHighlightText)
-					];
-				}
-			}
-		}
-
-		if (bNeedsStandardTextBlock)
-		{
-			FText TooltipText = DisplayName;
-
-			if (const UObjectMixerObjectFilter* Filter = RowPtr->GetObjectFilter())
-			{
-				if (const TObjectPtr<UObject> Object = RowPtr->GetObject())
-				{
-					TooltipText = Filter->GetRowTooltipText(Object, bIsHybridRow);
-				}
-			}
-			
-			HBox->AddSlot()
-			.Padding(FMargin(10.0, 0, 0, 0))
-			[
-				SNew(STextBlock)
-				.Visibility(EVisibility::SelfHitTestInvisible)
-				.Justification(ETextJustify::Left)
-				.Text(DisplayName)
-				.ToolTipText(TooltipText)
-				.HighlightText(this, &SObjectMixerEditorListRow::GetHighlightText)
-			];
-		}
-		
-		return SNew(SBox)
-				.Visibility(EVisibility::SelfHitTestInvisible)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				.Padding(FMargin(TextBlockLeftPadding, 0.f, 0.f, 0.f))
-				[
-					HBox
-				];
+		return SNew(SInlineEditableRowNameCellWidget,
+			Item.Pin().ToSharedRef(), HybridRowIndex != INDEX_NONE ? GetHybridChildOrRowItemIfNull() : nullptr);
 	}
 
 	if (InColumnName.IsEqual(SObjectMixerEditorList::EditorVisibilityColumnName))
@@ -446,24 +891,10 @@ TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
 					.ColorAndOpacity(this, &SObjectMixerEditorListRow::GetVisibilityIconForegroundColor)
 					.Image_Raw(this, &SObjectMixerEditorListRow::GetVisibilityBrush)
 					.OnMouseButtonDown_Lambda(
-						[RowPtr] (const FGeometry& MyGeometry, const FPointerEvent& Event)
+						[this] (const FGeometry&, const FPointerEvent&)
 						{
-							check (RowPtr);
-
-							FScopedTransaction Transaction( LOCTEXT("VisibilityChanged", "Object Mixer - Visibility Changed") );
-
-							const bool bIsVisible = RowPtr->GetObjectVisibility();
-							
-							if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = RowPtr->GetListViewPtr().Pin();
-								RowPtr->GetIsSelected() && PinnedListView->GetSelectedTreeViewItemCount() > 0)
-							{
-								PinnedListView->SetSelectedTreeViewItemActorsEditorVisible(!bIsVisible);
-
-								return FReply::Handled();
-							}
-
-							// Set Visibility Recursively
-							RowPtr->SetObjectVisibility(!bIsVisible, true);
+							// Pass in actual row item even if hybrid row
+							OnClickVisibilityIcon(Item.Pin());
 
 							return FReply::Handled();
 						}
@@ -489,33 +920,12 @@ TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
 					.ColorAndOpacity(this, &SObjectMixerEditorListRow::GetSoloIconForegroundColor)
 					.Image(this, &SObjectMixerEditorListRow::GetSoloBrush)
 					.OnMouseButtonDown_Lambda(
-						[this] (const FGeometry& MyGeometry, const FPointerEvent& Event)
+						[this] (const FGeometry&, const FPointerEvent&)
 						{
-							check (Item.IsValid());
+							// Pass in actual row item even if hybrid row
+							OnClickSoloIcon(Item.Pin());
 
-							const FObjectMixerEditorListRowPtr PinnedItem = Item.Pin();
-							
-							if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = PinnedItem->GetListViewPtr().Pin();
-								PinnedListView->GetTreeViewItemCount() > 0)
-							{
-								const bool bIsRowSolo = PinnedItem->IsThisRowSolo();
-								for (const TSharedPtr<FObjectMixerEditorListRow>& TreeItem : PinnedListView->GetTreeViewItems())
-								{
-									TreeItem->SetObjectVisibility(bIsRowSolo, true);
-								}
-
-								if (!bIsRowSolo)
-								{
-									PinnedItem->SetObjectVisibility(true, true);
-									PinnedItem->ClearSoloRows();
-								}
-								
-								PinnedItem->SetRowSoloState(!bIsRowSolo);
-
-								return FReply::Handled();
-							}
-
-							return FReply::Unhandled();
+							return FReply::Handled();
 						}
 					)
 				]
@@ -543,13 +953,13 @@ TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
 						RowPtr->PropertyNamesToHandles.Add(PropertyName, Handle);
 						
 						// Simultaneously edit all selected rows with a similar property
-						FSimpleDelegate OnPropertyValueChanged =
-							FSimpleDelegate::CreateRaw(
+						const TDelegate<void(const FPropertyChangedEvent&)> OnPropertyValueChanged =
+							TDelegate<void(const FPropertyChangedEvent&)>::CreateRaw(
 								this,
 								&SObjectMixerEditorListRow::OnPropertyChanged, PropertyName);
 					
-						Handle->SetOnPropertyValueChanged(OnPropertyValueChanged);
-						Handle->SetOnChildPropertyValueChanged(OnPropertyValueChanged);
+						Handle->SetOnPropertyValueChangedWithData(OnPropertyValueChanged);
+						Handle->SetOnChildPropertyValueChangedWithData(OnPropertyValueChanged);
 
 						return SNew(SBox)
 								.Visibility(EVisibility::SelfHitTestInvisible)
@@ -567,39 +977,37 @@ TSharedPtr<SWidget> SObjectMixerEditorListRow::GenerateCells(
 	return nullptr;
 }
 
-void SObjectMixerEditorListRow::OnPropertyChanged(const FName PropertyName) const
+void SObjectMixerEditorListRow::OnPropertyChanged(const FPropertyChangedEvent& Event, const FName PropertyName) const
 {
 	check(Item.IsValid());
-
-	struct Local
+	
+	auto SetValueOnSelectedItems = [](
+		const FString& ValueAsString, const TArray<FObjectMixerEditorListRowPtr>& OtherSelectedItems,
+		const FName& PropertyName, const FObjectMixerEditorListRowPtr PinnedItem,
+		const EPropertyValueSetFlags::Type Flags)
 	{
-		static void SetValueOnSelectedItems(
-			const FString& ValueAsString, const TArray<FObjectMixerEditorListRowPtr>& OtherSelectedItems,
-			const FName& PropertyName, const FObjectMixerEditorListRowPtr PinnedItem)
+		if (!ValueAsString.IsEmpty())
 		{
-			if (!ValueAsString.IsEmpty())
+			FScopedTransaction Transaction(
+				LOCTEXT("OnPropertyChangedTransaction", "Object Mixer - Bulk Edit Selected Row Properties") );
+					
+			for (const TSharedPtr<FObjectMixerEditorListRow>& SelectedRow : OtherSelectedItems)
 			{
-				FScopedTransaction Transaction(
-					LOCTEXT("OnPropertyChangedTransaction", "Object Mixer - Bulk Edit Selected Row Properties") );
-						
-				for (const TSharedPtr<FObjectMixerEditorListRow>& SelectedRow : OtherSelectedItems)
-				{
-					const FObjectMixerEditorListRowPtr SelectedHybridRow = SelectedRow->GetHybridChild();
-					const FObjectMixerEditorListRowPtr RowToUse = SelectedHybridRow.IsValid() ? SelectedHybridRow : SelectedRow;
+				const FObjectMixerEditorListRowPtr SelectedHybridRow = SelectedRow->GetHybridChild();
+				const FObjectMixerEditorListRowPtr RowToUse = SelectedHybridRow.IsValid() ? SelectedHybridRow : SelectedRow;
 
-					if (RowToUse != PinnedItem)
+				if (RowToUse != PinnedItem)
+				{
+					if (const TWeakPtr<IPropertyHandle>* SelectedHandlePtr = RowToUse->PropertyNamesToHandles.Find(PropertyName))
 					{
-						if (const TWeakPtr<IPropertyHandle>* SelectedHandlePtr = RowToUse->PropertyNamesToHandles.Find(PropertyName))
+						if (SelectedHandlePtr->IsValid())
 						{
-							if (SelectedHandlePtr->IsValid())
+							if (UObject* ObjectToModify = RowToUse->GetObject())
 							{
-								if (UObject* ObjectToModify = RowToUse->GetObject())
-								{
-									ObjectToModify->Modify();
-								}
-										
-								SelectedHandlePtr->Pin()->SetValueFromFormattedString(ValueAsString);
+								ObjectToModify->Modify();
 							}
+							
+							SelectedHandlePtr->Pin()->SetValueFromFormattedString(ValueAsString, Flags);
 						}
 					}
 				}
@@ -621,41 +1029,23 @@ void SObjectMixerEditorListRow::OnPropertyChanged(const FName PropertyName) cons
 						if (TSharedPtr<IPropertyHandle> PinnedHandle = HandlePtr->Pin())
 						{
 							PinnedHandle->GetValueAsFormattedString(ValueAsString);
-							Local::SetValueOnSelectedItems(ValueAsString, OtherSelectedItems, PropertyName, PinnedItem);
+
+							const bool bIsInteractiveChange = Event.ChangeType == EPropertyChangeType::Interactive;
+							const EPropertyValueSetFlags::Type Flags =
+								 bIsInteractiveChange ? EPropertyValueSetFlags::InteractiveChange : EPropertyValueSetFlags::DefaultFlags;
+							
+							SetValueOnSelectedItems(ValueAsString, OtherSelectedItems, PropertyName, PinnedItem, Flags);
+
+							if (!bIsInteractiveChange)
+							{
+								PinnedItem->GetListViewPtr().Pin()->RequestRebuildList();
+							}
 						}
 					}
 				}
 			}
 		}
 	}
-}
-
-void SObjectMixerEditorListRow::OnClickBlueprintLink(UBlueprint* AsBlueprint, UObject* Object)
-{
-	if (AsBlueprint)
-	{
-		if (Object)
-		{
-			if (ensure(Object->GetClass()->ClassGeneratedBy == AsBlueprint))
-			{
-				AsBlueprint->SetObjectBeingDebugged(Object);
-			}
-		}
-		// Open the blueprint
-		GEditor->EditObject(AsBlueprint);
-	}
-}
-
-FText SObjectMixerEditorListRow::GetHighlightText() const
-{
-	check (Item.IsValid());
-
-	if (const TSharedPtr<SObjectMixerEditorList> PinnedListView = Item.Pin()->GetListViewPtr().Pin())
-	{
-		return PinnedListView->GetSearchTextFromSearchInputField();
-	}
-
-	return FText::GetEmpty();
 }
 
 #undef LOCTEXT_NAMESPACE

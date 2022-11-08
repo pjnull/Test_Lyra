@@ -175,6 +175,10 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		return this.options.implicitCommands || []
 	}
 
+	get resolver() {
+		return this.options.resolver
+	}
+
 	get isTerminal() {
 		return !!this.options.terminal
 	}
@@ -408,6 +412,10 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			description += '#ROBOMERGE[ALL]: #DISREGARDEXCLUDEDAUTHORS\n'
 		}
 
+		if (target.flags.has('disregardassetblock')) {
+			description += '#ROBOMERGE[ALL]: #DISREGARDASSETBLOCK\n'
+		}
+
 		let flags = '' // not all flags propagate, build them piecemeal
 
 		const thisBotMergeCommands = target.furtherMerges
@@ -528,7 +536,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			case 'no_files': {
 				const msg = `Change ${to_integrate} was not necessary in ${this.targetBranch.name}`
 				const event: AlreadyIntegrated = {change: info, action: target}
-				this.sourceNode.onAlreadyIntegrated(msg, event)
+				this.sourceNode.onAlreadyIntegrated(event)
 
 				// integration not necessary
 				this.edgeBotLogger.info(msg)
@@ -568,7 +576,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		}
 
 		// Send to source node to facilitate notification handling
-		if (this.sourceNode.handleMergeFailure(failure, pending)) {
+		if (await this.sourceNode.handleMergeFailure(failure, pending)) {
 			this.gate.onBlockage()
 		}
 		return new EdgeIntegrationDetails('error', errors.join('\n'))
@@ -615,8 +623,8 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			// the user requested manual merge
 			await this.shelveChangelist(pending)
 
-			if (!pending.change.sendNoShelfEmail) {
-				this.sourceNode.emailShelfRequester(pending)
+			if (!pending.change.sendNoShelfNotification) {
+				await this.sourceNode.notifyShelfRequester(pending)
 			}
 			
 			return new EdgeIntegrationDetails('shelved', pending.newCl)
@@ -652,14 +660,22 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			// or lock a test stream and try to commit
 			// then look for error message in result.message
 			if (!this.options.approval) {
-				failure = { kind: 'Commit failure', description: result.message }
+
+				let summary: string | undefined
+				const match = result.message.match(/.*STDERR:([^]*)STDOUT:/)
+				if (match)
+				{
+					summary = match[1].trim()
+				}
+
+				failure = { kind: 'Commit failure', description: result.message, summary }
 			}
 		}
 
 		// no failure set means the change needs approval
 		if (failure) {
 			await this.handlePostIntegrationFailure(failure, pending)
-			this.sourceNode.handleMergeFailure(failure, pending, true)
+			await this.sourceNode.handleMergeFailure(failure, pending, true)
 		}
 		else {
 			const approval = this.options.approval!
@@ -725,7 +741,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 		const log_str = (target.description || '').trim();
 		this.edgeBotLogger.info(`Submitted CL ${finalCl} to ${this.targetBranch.name}\n    ${log_str.replace(/\n/g, "\n    ")}`);
 
-		if (!isUserAKnownBot(info.author)) {
+		if (info.author != 'robomerge') {
 			// change owner, so users can edit change descriptions later for reconsideration
 			this.edgeBotLogger.info(`Setting owner of CL ${finalCl} to author of change: ${info.author}`);
 			try {
@@ -812,7 +828,7 @@ class EdgeBotImpl extends PerforceStatefulBot {
 
 			pending.newCl = -1
 
-			this.sourceNode._sendError(recipients, `Error merging ${pending.change.source_cl} to ${this.targetBranch.name}`, final_desc)
+			this.sourceNode.sendErrorEmail(recipients, `Error merging ${pending.change.source_cl} to ${this.targetBranch.name}`, final_desc)
 			return
 		}
 
@@ -945,8 +961,8 @@ class EdgeBotImpl extends PerforceStatefulBot {
 			this.pauseState.applyStatus(status)
 		}
 
-		if (this.targetBranch.resolver) {
-			status.resolver = this.targetBranch.resolver
+		if (this.options.resolver) {
+			status.resolver = this.options.resolver
 		}
 		status.disallowSkip = this.options.disallowSkip
 		status.incognitoMode = this.options.incognitoMode
@@ -1092,6 +1108,7 @@ export class EdgeBot
 	get disallowSkip() { return this.impl.disallowSkip }
 	get incognitoMode() { return this.impl.incognitoMode }
 	get excludedAuthors() { return this.impl.excludedAuthors }
+	get resolver() { return this.impl.resolver }
 	get isActive() { return this.impl.isActive }
 	get isAvailable() { return this.impl.isAvailable }
 	get isBlocked() { return this.impl.isBlocked }
@@ -1113,7 +1130,7 @@ export class EdgeBot
 		return this.impl.implicitCommands
 	}
 
-	get ipcControls(): IPCControls {
+	getIPCControls(): IPCControls {
 		return {
 			block: this.block,
 			unblock: this.unblock,

@@ -64,6 +64,7 @@ class UMaterialExpressionMaterialFunctionCall;
 class UMaterialInstance;
 class UMaterialInterface;
 class URuntimeVirtualTexture;
+class USparseVolumeTexture;
 class USubsurfaceProfile;
 class UTexture;
 class UTexture2D;
@@ -109,7 +110,7 @@ template <class ElementType> class TLinkedList;
 // Adds various checks to track FMaterial lifetime, may add some overhead
 #define UE_CHECK_FMATERIAL_LIFETIME PLATFORM_WINDOWS
 
-DECLARE_LOG_CATEGORY_EXTERN(LogMaterial,Log,Verbose);
+DECLARE_LOG_CATEGORY_EXTERN(LogMaterial, Log, All);
 
 /** Creates a string that represents the given quality level. */
 extern void GetMaterialQualityLevelName(EMaterialQualityLevel::Type InMaterialQualityLevel, FString& OutName);
@@ -154,10 +155,15 @@ inline uint32 GetNumComponents(EMaterialValueType Type)
 {
 	switch (Type)
 	{
+	case MCT_UInt:
+	case MCT_UInt1:
 	case MCT_Float:
 	case MCT_Float1: return 1;
+	case MCT_UInt2:
 	case MCT_Float2: return 2;
+	case MCT_UInt3:
 	case MCT_Float3: return 3;
+	case MCT_UInt4:
 	case MCT_Float4: return 4;
 	case MCT_LWCScalar: return 1;
 	case MCT_LWCVector2: return 2;
@@ -177,10 +183,15 @@ inline bool IsFloatNumericType(EMaterialValueType InType)
 	return (InType & MCT_Float) || IsLWCType(InType);
 }
 
+inline bool IsUIntNumericType(EMaterialValueType InType)
+{
+	return (InType & MCT_UInt);
+}
+
 inline bool IsNumericType(EMaterialValueType InType)
 {
 	// 'ShadingModel' is considered an 'int' 
-	return IsFloatNumericType(InType) || InType == MCT_ShadingModel;
+	return IsFloatNumericType(InType) || InType == MCT_ShadingModel || IsUIntNumericType(InType);
 }
 
 inline EMaterialValueType MakeNonLWCType(EMaterialValueType Type)
@@ -299,6 +310,7 @@ struct ENGINE_API FMaterialRenderContext
 
 	void GetTextureParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32 TextureIndex, const UTexture*& OutValue) const;
 	void GetTextureParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32 TextureIndex, const URuntimeVirtualTexture*& OutValue) const;
+	void GetTextureParameterValue(const FHashedMaterialParameterInfo& ParameterInfo, int32 TextureIndex, const USparseVolumeTexture*& OutValue) const;
 	FGuid GetExternalTextureGuid(const FGuid& ExternalTextureGuid, const FName& ParameterName, int32 SourceTextureIndex) const;
 };
 
@@ -327,6 +339,8 @@ public:
 	void GetTextureValues(const FMaterialRenderContext& Context, const FUniformExpressionSet& UniformExpressionSet, UTexture const** OutValues) const;
 	/** Get the URuntimeVirtualTexture object if one was used to initialize this stack. */
 	void GetTextureValue(const FMaterialRenderContext& Context, const FUniformExpressionSet& UniformExpressionSet, const URuntimeVirtualTexture*& OutValue) const;
+	/** Get the USparseVolumeTexture object if one was used to initialize this stack. */
+	void GetTextureValue(const FMaterialRenderContext& Context, const FUniformExpressionSet& UniformExpressionSet, const USparseVolumeTexture * &OutValue) const;
 
 	void Serialize(FArchive& Ar);
 
@@ -557,6 +571,7 @@ public:
 	ENGINE_API void GetGameThreadTextureValue(EMaterialTextureParameterType Type, int32 Index, const UMaterialInterface* MaterialInterface, const FMaterial& Material, UTexture*& OutValue, bool bAllowOverride = true) const;
 	ENGINE_API void GetTextureValue(EMaterialTextureParameterType Type, int32 Index, const FMaterialRenderContext& Context, const FMaterial& Material, const UTexture*& OutValue) const;
 	ENGINE_API void GetTextureValue(int32 Index, const FMaterialRenderContext& Context, const FMaterial& Material, const URuntimeVirtualTexture*& OutValue) const;
+	ENGINE_API void GetTextureValue(int32 Index, const FMaterialRenderContext& Context, const FMaterial& Material, const USparseVolumeTexture*& OutValue) const;
 
 	int32 FindOrAddTextureParameter(EMaterialTextureParameterType Type, const FMaterialTextureParameterInfo& Info);
 	int32 FindOrAddExternalTextureParameter(const FMaterialExternalTextureParameterInfo& Info);
@@ -639,7 +654,9 @@ public:
 		bUsesPerInstanceRandom(false),
 		bUsesVertexInterpolator(false),
 		bHasRuntimeVirtualTextureOutputNode(false),
-		bUsesAnisotropy(false)
+		bUsesAnisotropy(false),
+		StrataMaterialType(0),
+		StrataBSDFCount(0)
 	{}
 
 	ENGINE_API bool IsSceneTextureUsed(ESceneTextureId TexId) const { return (UsedSceneTextures & (1 << TexId)) != 0; }
@@ -742,6 +759,12 @@ public:
 
 	/** true if the material uses non 0 anisotropy value */
 	LAYOUT_BITFIELD(uint8, bUsesAnisotropy, 1);
+
+	/** Strata material type, at compile type (0:simple, 1:single, 2: complex) */
+	LAYOUT_BITFIELD(uint8, StrataMaterialType, 2);
+
+	/** Strata BSDF count, at compile type (0-7) */
+	LAYOUT_BITFIELD(uint8, StrataBSDFCount, 3);
 };
 
 struct FDebugShaderPipelineInfo
@@ -997,18 +1020,6 @@ public:
 		EShaderPlatform Platform);
 #endif
 
-	/**
-	 * Removes all entries in the cache with exceptions based on a shader type
-	 * @param ShaderType - The shader type to flush
-	 */
-	void FlushShadersByShaderType(const FShaderType* ShaderType);
-
-		/**
-	 * Removes all entries in the cache with exceptions based on a shader type
-	 * @param ShaderType - The shader type to flush
-	 */
-	void FlushShadersByShaderPipelineType(const FShaderPipelineType* ShaderPipelineType);
-
 	// Accessors.
 	inline const FHashedName& GetVertexFactoryTypeName() const { return VertexFactoryTypeName; }
 
@@ -1104,14 +1115,9 @@ public:
 	 */
 	static TRefCountPtr<FMaterialShaderMap> FindId(const FMaterialShaderMapId& ShaderMapId, EShaderPlatform Platform);
 
+#if WITH_EDITOR
 	static FMaterialShaderMap* FindCompilingShaderMap(uint32 CompilingId);
 
-#if ALLOW_SHADERMAP_DEBUG_DATA
-	/** Flushes the given shader types from any loaded FMaterialShaderMap's. */
-	static void FlushShaderTypes(TArray<const FShaderType*>& ShaderTypesToFlush, TArray<const FShaderPipelineType*>& ShaderPipelineTypesToFlush, TArray<const FVertexFactoryType*>& VFTypesToFlush);
-#endif
-
-#if WITH_EDITOR
 	/** Gets outdated types from all loaded material shader maps */
 	static void GetAllOutdatedTypes(TArray<const FShaderType*>& OutdatedShaderTypes, TArray<const FShaderPipelineType*>& OutdatedShaderPipelineTypes, TArray<const FVertexFactoryType*>& OutdatedFactoryTypes);
 
@@ -1141,9 +1147,10 @@ public:
 	FMaterialShaderMap();
 	virtual ~FMaterialShaderMap();
 	
+#if WITH_EDITOR
 	FMaterialShaderMap* AcquireFinalizedClone();
 	FMaterialShaderMap* GetFinalizedClone() const;
-
+#endif // WITH_EDITOR
 
 	// ShaderMap interface
 	TShaderRef<FShader> GetShader(FShaderType* ShaderType, int32 PermutationId = 0) const
@@ -1162,6 +1169,7 @@ public:
 
 	uint32 GetMaxNumInstructionsForShader(FShaderType* ShaderType) const { return GetContent()->GetMaxNumInstructionsForShader(*this, ShaderType); }
 
+#if WITH_EDITOR
 	void SubmitCompileJobs(uint32 CompilingShaderMapId,
 		const FMaterial* Material,
 		const TRefCountPtr<FSharedShaderCompilerEnvironment>& MaterialEnvironment,
@@ -1182,7 +1190,6 @@ public:
 		EMaterialShaderPrecompileMode PrecompileMode
 		);
 
-#if WITH_EDITOR
 	/** Sorts the incoming compiled jobs into the appropriate mesh shader maps */
 	void ProcessCompilationResults(const TArray<TRefCountPtr<FShaderCommonCompileJob>>& ICompilationResults, int32& InOutJobIndex, float& TimeBudget);
 #endif
@@ -1205,7 +1212,9 @@ public:
 #endif
 
 #if WITH_EDITOR
-	ENGINE_API const FMemoryImageString *GetShaderSource(FName VertexFactoryName, FName ShaderTypeName) const;
+	ENGINE_API const FMemoryImageString* GetShaderSource(const FVertexFactoryType* VertexFactoryType, const FShaderType* ShaderType, int32 PermutationId) const;
+	UE_DEPRECATED(5.2, "Use the GetShaderSource overload accepting a FVertexFactoryType/FShaderType/permutation ID; this one doesn't correctly account for permutations.")
+	ENGINE_API const FMemoryImageString* GetShaderSource(FName VertexFactoryName, FName ShaderTypeName) const;
 #endif
 
 	/** Builds a list of the shaders in a shader map. */
@@ -1228,24 +1237,6 @@ public:
 	ENGINE_API void AddRef();
 	ENGINE_API void Release();
 
-	/**
-	 * Removes all entries in the cache with exceptions based on a shader type
-	 * @param ShaderType - The shader type to flush
-	 */
-	void FlushShadersByShaderType(const FShaderType* ShaderType);
-
-	/**
-	 * Removes all entries in the cache with exceptions based on a shader pipeline type
-	 * @param ShaderPipelineType - The shader pipeline type to flush
-	 */
-	void FlushShadersByShaderPipelineType(const FShaderPipelineType* ShaderPipelineType);
-
-	/**
-	 * Removes all entries in the cache with exceptions based on a vertex factory type
-	 * @param ShaderType - The shader type to flush
-	 */
-	void FlushShadersByVertexFactoryType(const FVertexFactoryType* VertexFactoryType);
-
 	/** Serializes the shader map. */
 	bool Serialize(FArchive& Ar, bool bInlineShaderResources=true, bool bLoadedByCookedMaterial=false, bool bInlineShaderCode=false);
 
@@ -1256,6 +1247,7 @@ public:
 
 	/** Backs up any FShaders in this shader map to memory through serialization and clears FShader references. */
 	TArray<uint8>* BackupShadersToMemory();
+
 	/** Recreates FShaders from the passed in memory, handling shader key changes. */
 	void RestoreShadersFromMemory(const TArray<uint8>& ShaderData);
 
@@ -1279,16 +1271,20 @@ public:
 	const FMaterialShaderMapId& GetShaderMapId() const { return ShaderMapId; }
 	const FSHAHash& GetShaderContentHash() const { return GetContent()->ShaderContentHash; }
 
+#if WITH_EDITOR
 	uint32 AcquireCompilingId(const TRefCountPtr<FSharedShaderCompilerEnvironment>& InMaterialEnvironment);
 	void ReleaseCompilingId();
 	uint32 GetCompilingId() const { return CompilingId; }
 	const TRefCountPtr<FSharedShaderCompilerEnvironment>& GetPendingCompilerEnvironment() const { return PendingCompilerEnvironment; }
+#endif // WITH_EDITOR
 
 	bool IsCompilationFinalized() const { return bCompilationFinalized; }
 	bool CompiledSuccessfully() const { return bCompiledSuccessfully; }
+#if WITH_EDITOR
 	void SetCompiledSuccessfully(bool bSuccess) { bCompiledSuccessfully = bSuccess; }
 	void AddCompilingDependency(FMaterial* Material);
 	void RemoveCompilingDependency(FMaterial* Material);
+#endif // WITH_EDITOR
 
 #if WITH_EDITORONLY_DATA
 	const TCHAR* GetFriendlyName() const { return *GetContent()->FriendlyName; }
@@ -1311,6 +1307,9 @@ public:
 	bool UsesVelocitySceneTexture() const { return GetContent()->MaterialCompilationOutput.UsesVelocitySceneTexture(); }
 	bool UsesDistanceCullFade() const { return GetContent()->MaterialCompilationOutput.bUsesDistanceCullFade; }
 	bool UsesAnisotropy() const { return GetContent()->MaterialCompilationOutput.bUsesAnisotropy; }
+	uint8 GetStrataMaterialType() const { return GetContent()->MaterialCompilationOutput.StrataMaterialType; }
+	uint8 GetStrataBSDFCount() const { return GetContent()->MaterialCompilationOutput.StrataBSDFCount; }
+	
 #if WITH_EDITOR
 	uint32 GetNumUsedUVScalars() const { return GetContent()->MaterialCompilationOutput.NumUsedUVScalars; }
 	uint32 GetNumUsedCustomInterpolatorScalars() const { return GetContent()->MaterialCompilationOutput.NumUsedCustomInterpolatorScalars; }
@@ -1386,9 +1385,11 @@ private:
 	static FCriticalSection AllMaterialShaderMapsGuard;
 #endif
 
+#if WITH_EDITOR
 	TRefCountPtr<FMaterialShaderMap> FinalizedClone;
 	TRefCountPtr<FSharedShaderCompilerEnvironment> PendingCompilerEnvironment;
 	TArray<TRefCountPtr<FMaterial>> CompilingMaterialDependencies;
+#endif // WITH_EDITOR
 
 	FUniformBufferLayoutRHIRef UniformBufferLayout;
 
@@ -1402,8 +1403,10 @@ private:
 	/** Tracks material resources and their shader maps that need to be compiled but whose compilation is being deferred. */
 	//static TMap<TRefCountPtr<FMaterialShaderMap>, TArray<FMaterial*> > ShaderMapsBeingCompiled;
 
+#if WITH_EDITOR
 	/** Uniquely identifies this shader map during compilation, needed for deferred compilation where shaders from multiple shader maps are compiled together. */
-	uint32 CompilingId;
+	uint32 CompilingId = 0;
+#endif // WITH_EDITOR
 
 	mutable int32 NumRefs;
 
@@ -1424,7 +1427,9 @@ private:
 	/** Indicates whether the shader map should be stored in the shader cache. */
 	uint32 bIsPersistent : 1;
 
+#if WITH_EDITOR
 	FShader* ProcessCompilationResultsForSingleJob(class FShaderCompileJob* SingleJob, const FShaderPipelineType* ShaderPipeline, const FSHAHash& MaterialShaderMapHash);
+#endif
 
 	friend ENGINE_API void DumpMaterialStats( EShaderPlatform Platform );
 	friend class FShaderCompilingManager;
@@ -1649,8 +1654,6 @@ public:
 	 * Minimal initialization constructor.
 	 */
 	FMaterial():
-		GameThreadCompilingShaderMapId(0u),
-		RenderingThreadCompilingShaderMapId(0u),
 		RenderingThreadShaderMap(NULL),
 		QualityLevel(EMaterialQualityLevel::Num),
 		FeatureLevel(ERHIFeatureLevel::Num),
@@ -1807,6 +1810,7 @@ public:
 	virtual bool IsUsedWithGeometryCollections() const { return false; }
 	virtual bool IsUsedWithAPEXCloth() const { return false; }
 	virtual bool IsUsedWithNanite() const { return false; }
+	virtual bool IsUsedWithVolumetricCloud() const { return false; }
 	virtual bool IsUsedWithUI() const { return false; }
 	virtual bool IsUsedWithGeometryCache() const { return false; }
 	virtual bool IsUsedWithWater() const { return false; }
@@ -1856,6 +1860,15 @@ public:
 	virtual FString GetFriendlyName() const = 0;
 	/** Similar to GetFriendlyName, but but avoids historical behavior of the former, returning the exact asset name for material instances instead of just the material. */
 	virtual FString GetAssetName() const { return GetFriendlyName(); }
+
+#if WITH_EDITOR
+	/** Similar to GetAssetName, but appends a hash of the asset path and static switch params (if editoronly data is available)
+	to differentiate materials that would collide when considering name alone. */
+	ENGINE_API FString GetUniqueAssetName(EShaderPlatform Platform) const;
+#else
+	/** GetUniqueAssetName just returns GetAssetName in non-editor builds */
+	FString GetUniqueAssetName(EShaderPlatform Platform) const { return GetAssetName(); }
+#endif
 	virtual bool HasVertexPositionOffsetConnected() const { return false; }
 	virtual bool HasPixelDepthOffsetConnected() const { return false; }
 	virtual uint32 GetMaterialDecalResponse() const { return 0; }
@@ -2035,6 +2048,14 @@ public:
 	ENGINE_API bool MaterialUsesAnisotropy_GameThread() const;
 	ENGINE_API bool MaterialUsesAnisotropy_RenderThread() const;
 
+	/** Get Strata material type (single, single, complex slab). */
+	ENGINE_API uint8 MaterialGetStrataMaterialType_GameThread() const;
+	ENGINE_API uint8 MaterialGetStrataMaterialType_RenderThread() const;
+
+	/** Get Strata material BSDF count. */
+	ENGINE_API uint8 MaterialGetStrataBSDFCount_GameThread() const;
+	ENGINE_API uint8 MaterialGetStrataBSDFCount_RenderThread() const;
+
 	class FMaterialShaderMap* GetGameThreadShaderMap() const 
 	{ 
 		checkSlow(IsInGameThread() || IsInAsyncLoadingThread());
@@ -2089,8 +2110,10 @@ public:
 
 	ENGINE_API bool ShouldCacheShaders(const EShaderPlatform ShaderPlatform, const FMaterialShaderTypes& InTypes, const FVertexFactoryType* InVertexFactoryType) const;
 
+#if WITH_EDITOR
 	ENGINE_API void SubmitCompileJobs_GameThread(EShaderCompileJobPriority Priority);
 	ENGINE_API void SubmitCompileJobs_RenderThread(EShaderCompileJobPriority Priority) const;
+#endif // WITH_EDITOR
 
 	/** Returns a string that describes the material's usage for debugging purposes. */
 	virtual FString GetMaterialUsageDescription() const = 0;
@@ -2238,10 +2261,14 @@ protected:
 
 	bool GetLoadedCookedShaderMapId() const { return bLoadedCookedShaderMapId; }
 
+#if WITH_EDITOR
 	void SetCompilingShaderMap(FMaterialShaderMap* InMaterialShaderMap);
+#endif
 
 private:
+#if WITH_EDITOR
 	bool ReleaseGameThreadCompilingShaderMap();
+#endif
 	void ReleaseRenderThreadCompilingShaderMap();
 
 #if WITH_EDITOR
@@ -2259,13 +2286,13 @@ private:
 
 	TSharedPtr<FMaterialShaderMap::FAsyncLoadContext> CacheShadersPending;
 	TUniqueFunction<bool ()> CacheShadersCompletion;
-#endif // WITH_EDITOR
 
-	uint32 GameThreadCompilingShaderMapId;
-	uint32 RenderingThreadCompilingShaderMapId;
+	uint32 GameThreadCompilingShaderMapId = 0;
+	uint32 RenderingThreadCompilingShaderMapId = 0;
 
 	TRefCountPtr<FSharedShaderCompilerEnvironment> GameThreadPendingCompilerEnvironment;
 	TRefCountPtr<FSharedShaderCompilerEnvironment> RenderingThreadPendingCompilerEnvironment;
+#endif // WITH_EDITOR
 
 	/** 
 	 * Used to prevent submitting the material more than once during CacheMeshDrawCommands unless priority has been increased. 
@@ -2356,6 +2383,7 @@ private:
 	FRWLock PrecachePSOVFLock;
 	TArray<FPrecacheVertexTypeWithParams> PrecachedPSOVertexFactories;
 
+#if WITH_EDITOR
 	/**
 	* Compiles this material for Platform, storing the result in OutShaderMap if the compile was synchronous
 	*/
@@ -2394,6 +2422,7 @@ private:
 		const FUniformExpressionSet& InUniformExpressionSet,
 		FShaderCompilerEnvironment& OutEnvironment
 		) const;
+#endif // WITH_EDITOR
 
 	/** Get the float precision mode for the material and shader taking into account any project wide precision values */
 	static void GetOutputPrecision(EMaterialFloatPrecisionMode FloatPrecisionMode, bool& bFullPrecisionInPS, bool& bFullPrecisionInMaterial);
@@ -2558,6 +2587,7 @@ public:
 	bool GetScalarValue(const FHashedMaterialParameterInfo& ParameterInfo, float* OutValue, const FMaterialRenderContext& Context) const;
 	bool GetTextureValue(const FHashedMaterialParameterInfo& ParameterInfo, const UTexture** OutValue, const FMaterialRenderContext& Context) const;
 	bool GetTextureValue(const FHashedMaterialParameterInfo& ParameterInfo, const URuntimeVirtualTexture** OutValue, const FMaterialRenderContext& Context) const;
+	bool GetTextureValue(const FHashedMaterialParameterInfo& ParameterInfo, const USparseVolumeTexture** OutValue, const FMaterialRenderContext& Context) const;
 	virtual bool GetParameterValue(EMaterialParameterType Type, const FHashedMaterialParameterInfo& ParameterInfo, FMaterialParameterValue& OutValue, const FMaterialRenderContext& Context) const = 0;
 
 	bool IsDeleted() const
@@ -2837,6 +2867,7 @@ public:
 	ENGINE_API virtual bool IsUsedWithLidarPointCloud() const override;
 	ENGINE_API virtual bool IsUsedWithVirtualHeightfieldMesh() const override;
 	ENGINE_API virtual bool IsUsedWithNanite() const override;
+	ENGINE_API virtual bool IsUsedWithVolumetricCloud() const override;
 	ENGINE_API virtual bool IsFullyRough() const override;
 	ENGINE_API virtual bool UseNormalCurvatureToRoughness() const override;
 	ENGINE_API virtual enum EMaterialFloatPrecisionMode GetMaterialFloatPrecisionMode() const override;
@@ -3491,6 +3522,8 @@ struct FMaterialShaderParameters
 			uint64 bIsTranslucencySurface : 1;
 			uint64 bShouldDisableDepthTest : 1;
 			uint64 bHasRenderTracePhysicalMaterialOutput : 1;
+			uint64 bIsUsedWithVolumetricCloud : 1;
+			uint64 bIsMobileSeparateTranslucencyEnabled : 1;
 		};
 	};
 

@@ -25,6 +25,7 @@
 #include "Tasks/Task.h"
 #include "TextureBuildFunction.h"
 #include "HAL/FileManager.h"
+#include "HAL/LowLevelMemTracker.h"
 #include "Misc/WildcardString.h"
 #include "Misc/CommandLine.h"
 
@@ -79,26 +80,10 @@ find them and move them up to DefaultEngine if you want them to be global.
 The INI settings block looks like :
 
 [TextureFormatOodleSettings]
-bForceAllBC23ToBC7=False
 bDebugColor=False
 GlobalLambdaMultiplier=1.0
 
 The sense of the bools is set so that all-false is default behavior.
-
-bForceAllBC23ToBC7 :
-
-If true, all BC2 & 3 (DXT3 and DXT5) is encoded to BC7 instead.
-
-On DX11 games, BC7 usualy has higher quality and takes the same space in memory as BC3.
-
-For example in Unreal, "AutoDXT" selects DXT1 (BC1) for opaque textures and DXT5 (BC3)
-for textures with alpha.  If you turn on this option, the BC3 will change to BC7, so
-"AutoDXT" will now select BC1 for opaque and BC7 for alpha. Note that BC7 with alpha will
-likely introduce color distortion that doesn't exist with DXT5 because DXT5 has the
-alpha and color planes separate, where they are combine with BC7 - so the encoder can try
-and swap color for alpha unlike DXT5.
-
-It is off by default to make default behavior match the old encoders.
 
 bDebugColor :
 
@@ -170,7 +155,7 @@ new texture, it shows the Oodle Texture encoded result in the texture preview.
 
 
 DEFINE_LOG_CATEGORY_STATIC(LogTextureFormatOodle, Log, All);
-
+LLM_DEFINE_TAG(OodleTexture);
 
 /*****************
 * 
@@ -212,6 +197,18 @@ OODEFFUNC typedef OO_S32 (OOEXPLINK t_fp_OodleTex_BC_BytesPerBlock)(OodleTex_BC 
 OODEFFUNC typedef OO_S32 (OOEXPLINK t_fp_OodleTex_PixelFormat_BytesPerPixel)(OodleTex_PixelFormat pf);
 
 OODEFFUNC typedef OodleTex_Err (OOEXPLINK t_fp_OodleTex_LogVersion)(void);
+
+/**
+ * DebugInfo passed to the Jobify callbacks for tracing 
+ */
+struct FOodleJobDebugInfo
+{
+	FStringView DebugTexturePathName;
+	int32 SizeX;
+	int32 SizeY;
+	OodleTex_BC OodleBCN;
+	int RDOLambda;
+};
 
 /**
 * 
@@ -523,7 +520,6 @@ public:
 	};
 
 	FTextureFormatOodleConfig() :
-		bForceAllBC23ToBC7(false),
 		bDebugColor(false),
 		GlobalLambdaMultiplier(1.f)
 	{
@@ -545,7 +541,6 @@ public:
 		// 
 		
 		// Class config variables
-		GConfig->GetBool(IniSection, TEXT("bForceAllBC23ToBC7"), bForceAllBC23ToBC7, GEngineIni);
 		GConfig->GetBool(IniSection, TEXT("bDebugColor"), bDebugColor, GEngineIni);
 		GConfig->GetString(IniSection, TEXT("DebugDumpFilter"), LocalDebugConfig.DebugDumpFilter, GEngineIni);
 		GConfig->GetInt(IniSection, TEXT("LogVerbosity"), LocalDebugConfig.LogVerbosity, GEngineIni);
@@ -590,13 +585,6 @@ public:
 		FCbWriter Writer;
 		Writer.BeginObject("TextureFormatOodleSettings");
 
-		if ((BuildSettings.TextureFormatName == GTextureFormatNameDXT3) ||
-			(BuildSettings.TextureFormatName == GTextureFormatNameDXT5) ||
-			(BuildSettings.TextureFormatName == GTextureFormatNameDXT5n) ||
-			(BuildSettings.TextureFormatName == GTextureFormatNameAutoDXT) )
-		{
-			Writer.AddBool("bForceAllBC23ToBC7", bForceAllBC23ToBC7);
-		}
 		if (bDebugColor)
 		{
 			Writer.AddBool("bDebugColor", bDebugColor);
@@ -634,7 +622,6 @@ public:
 			// some AutoDXT is converted to "DXT1" before it gets here
 			//	(by GetDefaultTextureFormatName if "compress no alpha" is set)
 
-			// if you set bForceAllBC23ToBC7, the DXT5 will change to BC7
 			CompressedPixelFormat = bHasAlpha ? PF_DXT5 : PF_DXT1;
 		}
 		else if (TextureFormatName == GTextureFormatNameDXT5n)
@@ -670,15 +657,6 @@ public:
 				);
 		}
 		
-		// BC7 is just always better than BC2 & BC3
-		//	so anything that came through as BC23, force to BC7 : (AutoDXT-alpha and Normals)
-		// Note that we are using the value from the FormatConfigOverride if we have one, otherwise the default will be the value we have locally
-		if ( InBuildSettings.FormatConfigOverride.FindView("bForceAllBC23ToBC7").AsBool(bForceAllBC23ToBC7) &&
-			(CompressedPixelFormat == PF_DXT3 || CompressedPixelFormat == PF_DXT5 ) )
-		{
-			CompressedPixelFormat = PF_BC7;
-		}
-
 		*OutCompressedPixelFormat = CompressedPixelFormat;
 
 		// Use the DDC2 provided value if it exists.
@@ -755,7 +733,6 @@ public:
 
 private:
 	// the sense of these bools is set so that default behavior = all false
-	bool bForceAllBC23ToBC7; // change BC2 & 3 (aka DXT3 and DXT5) to BC7 
 	bool bDebugColor; // color textures by their BCN, for data discovery
 	// after lambda is set, multiply by this scale factor :
 	//	(multiplies the default and per-Texture overrides)
@@ -1026,7 +1003,8 @@ public:
 		return true;
 	}
 
-	virtual bool CompressImage(FImage& InImage, const FTextureBuildSettings& InBuildSettings, FStringView DebugTexturePathName, const bool bInHasAlpha, FCompressedImage2D& OutImage) const override
+	virtual bool CompressImage(FImage& InImage, const FTextureBuildSettings& InBuildSettings, const FIntVector3& InMip0Dimensions,
+		int32 InMip0NumSlicesNoDepth, FStringView DebugTexturePathName, const bool bInHasAlpha, FCompressedImage2D& OutImage) const override
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Texture.Oodle_CompressImage);
 
@@ -1120,11 +1098,8 @@ public:
 		// for BC6 we just leave that alone
 		// for all others we must convert to 8 bit to get Gamma correction
 		
-		EGammaSpace Gamma = InBuildSettings.GetDestGammaSpace();		
-		// note in unreal if Gamma == Pow22 due to legacy Gamma,
-		//	we still want to encode to sRGB
-		// (CopyTo does that even without this change, but let's make it explicit)
-		if ( Gamma == EGammaSpace::Pow22 ) Gamma = EGammaSpace::sRGB;
+		// Dest Gamma is either sRGB or Linear, never Pow22
+		EGammaSpace Gamma = InBuildSettings.GetDestGammaSpace();
 
 		if ( ( OodleBCN == OodleTex_BC4U || OodleBCN == OodleTex_BC5U || OodleBCN == OodleTex_BC6U ) &&
 			Gamma != EGammaSpace::Linear )
@@ -1181,6 +1156,10 @@ public:
 		FImage ImageCopy;
 		if (bNeedsImageCopy)
 		{
+                        //not sure if we should bill this alloc to OodleTexture or the calling context (TextureCompressor)
+                        //we are freeing the previous Image alloc to replace it with a changed format
+			//LLM_SCOPE_BYTAG(OodleTexture);
+
 			InImage.CopyTo(ImageCopy, ImageFormat, Gamma);
 			
 			// after we copy the image, we can free the source
@@ -1402,6 +1381,20 @@ public:
 		int CurJobifyNumThreads = OodleJobifyNumThreads;
 		void* CurJobifyUserPointer = OodleJobifyUserPointer;
 
+		// CurJobifyUserPointer is not used in the Unreal TaskGraph
+		//	so we can use it to pass a pointer to a debug info struct:
+		FOodleJobDebugInfo LocalDebugInfo;
+		LocalDebugInfo.DebugTexturePathName = DebugTexturePathName;
+		LocalDebugInfo.SizeX = Image.SizeX;
+		LocalDebugInfo.SizeY = Image.SizeY;
+		LocalDebugInfo.OodleBCN = OodleBCN;
+		LocalDebugInfo.RDOLambda = RDOLambda;
+		if ( ! OodleJobifyUseExampleJobify )
+		{
+			check( CurJobifyUserPointer == nullptr );
+			CurJobifyUserPointer = (void *) &LocalDebugInfo;
+		}
+
 		// Have a target number of pixels per job, and clamp the num threads
 		// to avoid generating lots of tiny jobs
 		const int64 TargetPixelsPerJobThread = 128 * 128;
@@ -1529,6 +1522,9 @@ static OO_U64 OODLE_CALLBACK TFO_RunJob(t_fp_Oodle_Job* JobFunction, void* JobDa
 	// reason to suspect something fishy here.
 	//TRACE_CPUPROFILER_EVENT_SCOPE(Texture.Oodle_EncodeBCN_RunJob);
 
+	// DebugInfo to inspect:
+	const FOodleJobDebugInfo * DebugInfo = (FOodleJobDebugInfo *)UserPtr;
+
 	FTask* Task = new FTask;
 	Task->Launch(
 		TEXT("Oodle_EncodeBCN_Task"),
@@ -1549,6 +1545,9 @@ static OO_U64 OODLE_CALLBACK TFO_RunJob(t_fp_Oodle_Job* JobFunction, void* JobDa
 static void OODLE_CALLBACK TFO_WaitJob(OO_U64 JobHandle, void* UserPtr)
 {
 	using namespace UE::Tasks;
+	
+	// DebugInfo to inspect:
+	const FOodleJobDebugInfo * DebugInfo = (FOodleJobDebugInfo *)UserPtr;
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(Texture.Oodle_WaitJob);
 
@@ -1581,6 +1580,8 @@ static void OODLE_CALLBACK TFO_OodleLog(int verboseLevel, const char* file, int 
 
 static void* OODLE_CALLBACK TFO_OodleMallocAligned(OO_SINTa Bytes, OO_S32 Alignment)
 {
+	LLM_SCOPE_BYTAG(OodleTexture);
+
 	void * Ret = FMemory::Malloc(Bytes, Alignment);
 	check( Ret != nullptr );
 	return Ret;

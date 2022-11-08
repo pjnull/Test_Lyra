@@ -353,7 +353,7 @@ void FContextualAnimMovieSceneNotifyTrackEditor::AddNewNotifyTrack()
 	GetMovieSceneSequence().GetViewModel().AnimationModified(*Animation);
 
 	// Create and Initialize MovieSceneTrack
-	UContextualAnimMovieSceneNotifyTrack* MovieSceneTrack = GetMovieSceneSequence().GetMovieScene()->AddMasterTrack<UContextualAnimMovieSceneNotifyTrack>();
+	UContextualAnimMovieSceneNotifyTrack* MovieSceneTrack = GetMovieSceneSequence().GetMovieScene()->AddTrack<UContextualAnimMovieSceneNotifyTrack>();
 	check(MovieSceneTrack);
 
 	MovieSceneTrack->Initialize(*Animation, NewNotifyTrack);

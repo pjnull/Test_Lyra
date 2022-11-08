@@ -25,7 +25,7 @@ namespace UE::Net
 
 UReplicationSystem* FReplicationSystemUtil::GetReplicationSystem(const AActor* Actor)
 {
-	UNetDriver* NetDriver = Actor ? Actor->GetNetDriver() : nullptr;
+	UNetDriver* NetDriver = Actor && Actor->GetWorld() ? Actor->GetNetDriver() : nullptr;
 	return NetDriver ? NetDriver->GetReplicationSystem() : nullptr;
 }
 
@@ -56,12 +56,12 @@ UActorReplicationBridge* FReplicationSystemUtil::GetActorReplicationBridge(const
 
 FNetHandle FReplicationSystemUtil::GetNetHandle(const AActor* Actor)
 {
-	// We really should cache the handle in the actor (or UObject if we can afford it)
-	if (!Actor || !Actor->GetIsReplicated())
+	if (!Actor)
 	{
 		return FNetHandle();
 	}
 
+	// We really should cache the handle in the actor (or UObject if we can afford it)
 	UActorReplicationBridge* Bridge = GetActorReplicationBridge(Actor);
 	return Bridge ? Bridge->GetReplicatedHandle(Actor) : FNetHandle();
 }
@@ -226,7 +226,7 @@ void FReplicationSystemUtil::EndReplication(AActor* Actor, EEndPlayReason::Type 
 
 void FReplicationSystemUtil::EndReplicationForActorComponent(UActorComponent* SubObject)
 {
-	if (UActorReplicationBridge* Bridge = GetActorReplicationBridge(SubObject->GetOwner()))
+	if (UActorReplicationBridge* Bridge = IsValid(SubObject) ? GetActorReplicationBridge(SubObject->GetOwner()) : nullptr)
 	{
 		Bridge->EndReplicationForActorComponent(SubObject);
 	}
@@ -237,47 +237,6 @@ void FReplicationSystemUtil::SetActorComponentNetCondition(const UActorComponent
 	if (UActorReplicationBridge* Bridge = IsValid(ActorComponent) ? GetActorReplicationBridge(ActorComponent->GetOwner()) : nullptr)
 	{
 		Bridge->SetSubObjectNetCondition(Bridge->GetReplicatedHandle(ActorComponent), Condition);
-	}
-}
-
-void FReplicationSystemUtil::SetPropertyCustomCondition(const UObject* Object, uint16 RepIndex, bool bIsActive)
-{
-	// If this is an actor component we can get the proper bridge through its owner, regardless of whether it's a default replicated component or not.
-	if (const UActorComponent* ActorComponent = Cast<UActorComponent>(Object))
-	{
-		const AActor* Owner = ActorComponent->GetOwner();
-		const UActorReplicationBridge* Bridge = GetActorReplicationBridge(Owner);
-		if (Bridge == nullptr)
-		{
-			return;
-		}
-
-		// Try to get a handle for the component. This can fail if we incorporate default components in the protocol for the actor.
-		FNetHandle NetHandle = Bridge->GetReplicatedHandle(Object);
-		if (!NetHandle.IsValid())
-		{
-			NetHandle = Bridge->GetReplicatedHandle(Owner);
-			if (!NetHandle.IsValid())
-			{
-				return;
-			}
-		}
-
-		Net::GetReplicationSystem(NetHandle.GetReplicationSystemId())->SetPropertyCustomCondition(NetHandle, Object, RepIndex, bIsActive);
-	}
-	else if (const AActor* Actor = Cast<AActor>(Object))
-	{
-		FNetHandle NetHandle = GetNetHandle(Actor);
-		if (!NetHandle.IsValid())
-		{
-			return;
-		}
-
-		Net::GetReplicationSystem(NetHandle.GetReplicationSystemId())->SetPropertyCustomCondition(NetHandle, Object, RepIndex, bIsActive);
-	}
-	else
-	{
-		checkf(false, TEXT("Unexpected class %s trying to set custom condition."), ToCStr(Object->GetFName().GetPlainNameString()));
 	}
 }
 

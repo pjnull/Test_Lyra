@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using EpicGames.Core;
 using Horde.Build.Jobs;
@@ -55,7 +54,7 @@ namespace Horde.Build.Issues.Handlers
 			foreach (ILogEventLine line in eventData.Lines)
 			{
 				string? relativePath;
-				if (line.Data.TryGetNestedProperty("properties.asset.relativePath", out relativePath))
+				if (line.Data.TryGetNestedProperty("properties.asset.relativePath", out relativePath) || line.Data.TryGetNestedProperty("properties.asset.$text", out relativePath))
 				{
 					int endIdx = relativePath.LastIndexOfAny(new char[] { '/', '\\' }) + 1;
 					string fileName = relativePath.Substring(endIdx);
@@ -103,7 +102,7 @@ namespace Horde.Build.Issues.Handlers
 			{
 				if (suspect.ContainsContent)
 				{
-					if (suspect.Details.Files.Any(x => fingerprint.Keys.Any(y => x.Path.Contains(y, StringComparison.OrdinalIgnoreCase))))
+					if (suspect.Files.Any(x => fingerprint.Keys.Any(y => x.Contains(y, StringComparison.OrdinalIgnoreCase))))
 					{
 						suspect.Rank += 20;
 					}

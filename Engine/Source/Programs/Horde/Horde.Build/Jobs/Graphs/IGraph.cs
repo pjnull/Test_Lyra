@@ -22,6 +22,16 @@ namespace Horde.Build.Jobs.Graphs
 		public string Name { get; }
 
 		/// <summary>
+		/// References to inputs for this node
+		/// </summary>
+		public IReadOnlyList<NodeOutputRef> Inputs { get; }
+
+		/// <summary>
+		/// List of output names
+		/// </summary>
+		public IReadOnlyList<string> OutputNames { get; }
+
+		/// <summary>
 		/// Indices of nodes which must have succeeded for this node to run
 		/// </summary>
 		public NodeRef[] InputDependencies { get; }
@@ -142,6 +152,38 @@ namespace Horde.Build.Jobs.Graphs
 		{
 			return groups[GroupIdx].Nodes[NodeIdx];
 		}
+	}
+
+	/// <summary>
+	/// Output from a node
+	/// </summary>
+	[DebuggerDisplay("{NodeRef}, Output: {OutputIdx}")]
+	public class NodeOutputRef
+	{
+		/// <summary>
+		/// Node producing the output
+		/// </summary>
+		public NodeRef NodeRef { get; set; }
+
+		/// <summary>
+		/// Index of the output
+		/// </summary>
+		public int OutputIdx { get; set; }
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public NodeOutputRef(NodeRef nodeRef, int outputIdx)
+		{
+			NodeRef = nodeRef;
+			OutputIdx = outputIdx;
+		}
+
+		/// <inheritdoc/>
+		public override bool Equals(object? other) => other is NodeOutputRef otherRef && otherRef.NodeRef == NodeRef && otherRef.OutputIdx == OutputIdx;
+
+		/// <inheritdoc/>
+		public override int GetHashCode() => HashCode.Combine(NodeRef.GetHashCode(), OutputIdx);
 	}
 
 	/// <summary>
@@ -379,6 +421,16 @@ namespace Horde.Build.Jobs.Graphs
 		public string Name { get; set; } = null!;
 
 		/// <summary>
+		/// Input names
+		/// </summary>
+		public List<string>? Inputs { get; set; }
+
+		/// <summary>
+		/// Output names
+		/// </summary>
+		public List<string>? Outputs { get; set; }
+
+		/// <summary>
 		/// List of nodes which must succeed for this node to run
 		/// </summary>
 		public List<string>? InputDependencies { get; set; }
@@ -427,6 +479,8 @@ namespace Horde.Build.Jobs.Graphs
 		/// Constructor
 		/// </summary>
 		/// <param name="name">Name of the node</param>
+		/// <param name="inputs">List of inputs for the node</param>
+		/// <param name="outputs">List of output names for the node</param>
 		/// <param name="inputDependencies">List of nodes which must have completed succesfully for this node to run</param>
 		/// <param name="orderDependencies">List of nodes which must have completed for this node to run</param>
 		/// <param name="priority">Priority of this node</param>
@@ -436,9 +490,11 @@ namespace Horde.Build.Jobs.Graphs
 		/// <param name="credentials">Credentials required for this node to run</param>
 		/// <param name="properties">Properties for the node</param>
 		/// <param name="annotations">User annotations for this node</param>
-		public NewNode(string name, List<string>? inputDependencies = null, List<string>? orderDependencies = null, Priority? priority = null, bool? allowRetry = null, bool? runEarly = null, bool? warnings = null, Dictionary<string, string>? credentials = null, Dictionary<string, string>? properties = null, IReadOnlyNodeAnnotations? annotations = null)
+		public NewNode(string name, List<string>? inputs = null, List<string>? outputs = null, List<string>? inputDependencies = null, List<string>? orderDependencies = null, Priority? priority = null, bool? allowRetry = null, bool? runEarly = null, bool? warnings = null, Dictionary<string, string>? credentials = null, Dictionary<string, string>? properties = null, IReadOnlyNodeAnnotations? annotations = null)
 		{
 			Name = name;
+			Inputs = inputs;
+			Outputs = outputs;
 			InputDependencies = inputDependencies;
 			OrderDependencies = orderDependencies;
 			Priority = priority;

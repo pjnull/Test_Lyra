@@ -11,6 +11,7 @@
 #include "PoseSearch/AnimNode_MotionMatching.h"
 #include "Trace/PoseSearchTraceLogger.h"
 #include "MotionTrajectoryLibrary.h"
+#include "PoseSearch/PoseSearchFeatureChannels.h"
 
 #define LOCTEXT_NAMESPACE "PoseSearchLibrary"
 
@@ -23,6 +24,7 @@ void FMotionMatchingState::Reset()
 	// Set the elapsed time to INFINITY to trigger a search right away
 	ElapsedPoseJumpTime = INFINITY;
 	PoseIndicesHistory.Reset();
+	WantedPlayRate = 1.f;
 }
 
 void FMotionMatchingState::AdjustAssetTime(float AssetTime)
@@ -40,12 +42,12 @@ bool FMotionMatchingState::CanAdvance(float DeltaTime, bool& bOutAdvanceToFollow
 		return false;
 	}
 
-	const FPoseSearchIndexAsset* SearchIndexAsset = GetCurrentSearchIndexAsset();
+	
+	const FPoseSearchIndexAsset* SearchIndexAsset = CurrentSearchResult.GetSearchIndexAsset(true);
 
 	if (SearchIndexAsset->Type == ESearchIndexAssetType::Sequence)
 	{
-		const FPoseSearchDatabaseSequence& DbSequence = 
-			CurrentSearchResult.Database->GetSequenceSourceAsset(SearchIndexAsset);
+		const FPoseSearchDatabaseSequence& DbSequence = CurrentSearchResult.Database->GetSequenceSourceAsset(*SearchIndexAsset);
 		const float AssetLength = DbSequence.Sequence->GetPlayLength();
 
 		float SteppedTime = CurrentSearchResult.AssetTime;
@@ -82,8 +84,7 @@ bool FMotionMatchingState::CanAdvance(float DeltaTime, bool& bOutAdvanceToFollow
 			{
 				bOutAdvanceToFollowUpAsset = true;
 
-				const FPoseSearchIndexAsset* FollowUpSearchIndexAsset =
-					&CurrentSearchResult.Database->GetSearchIndex()->Assets[FollowUpSearchIndexAssetIdx];
+				const FPoseSearchIndexAsset& FollowUpSearchIndexAsset = CurrentSearchResult.Database->GetSearchIndex()->Assets[FollowUpSearchIndexAssetIdx];
 
 				// Follow up asset time will start slightly before the beginning of the sequence as 
 				// this is essentially what the matching time in the corresponding main sequence is.
@@ -93,8 +94,7 @@ bool FMotionMatchingState::CanAdvance(float DeltaTime, bool& bOutAdvanceToFollow
 
 				// There is no correspoding pose index when we switch due to what is mentioned above
 				// so for now we just take whatever pose index is associated with the first frame.
-				OutFollowUpAsset.PoseIdx = CurrentSearchResult.Database->GetPoseIndexFromTime(FollowUpSearchIndexAsset->SamplingInterval.Min, FollowUpSearchIndexAsset);
-				OutFollowUpAsset.SearchIndexAsset = FollowUpSearchIndexAsset;
+				OutFollowUpAsset.PoseIdx = CurrentSearchResult.Database->GetPoseIndexFromTime(FollowUpSearchIndexAsset.SamplingInterval.Min, FollowUpSearchIndexAsset);
 				OutFollowUpAsset.AssetTime = FollowUpAssetTime;
 				return true;
 			}
@@ -102,8 +102,7 @@ bool FMotionMatchingState::CanAdvance(float DeltaTime, bool& bOutAdvanceToFollow
 	}
 	else if (SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace)
 	{
-		const FPoseSearchDatabaseBlendSpace& DbBlendSpace = 
-			CurrentSearchResult.Database->GetBlendSpaceSourceAsset(SearchIndexAsset);
+		const FPoseSearchDatabaseBlendSpace& DbBlendSpace = CurrentSearchResult.Database->GetBlendSpaceSourceAsset(*SearchIndexAsset);
 
 		TArray<FBlendSampleData> BlendSamples;
 		int32 TriangulationIndex = 0;
@@ -150,17 +149,17 @@ static void RequestInertialBlend(const FAnimationUpdateContext& Context, float B
 
 void FMotionMatchingState::JumpToPose(const FAnimationUpdateContext& Context, const FMotionMatchingSettings& Settings, const UE::PoseSearch::FSearchResult& Result)
 {
-	// Remember which pose and sequence we're playing from the database
-	CurrentSearchResult = Result;
-
-	ElapsedPoseJumpTime = 0.0f;
-	
 	// requesting inertial blending only if blendstack is disabled
 	if (Settings.MaxActiveBlends <= 0)
 	{
 		const float JumpBlendTime = ComputeJumpBlendTime(Result, Settings);
 		RequestInertialBlend(Context, JumpBlendTime);
 	}
+
+	// Remember which pose and sequence we're playing from the database
+	CurrentSearchResult = Result;
+
+	ElapsedPoseJumpTime = 0.0f;
 
 	Flags |= EMotionMatchingFlags::JumpedToPose;
 }
@@ -181,18 +180,13 @@ static void TraceMotionMatchingState(
 		return;
 	}
 
-	if (!MotionMatchingState.CurrentSearchResult.IsValid())
-	{
-		return;
-	}
-
 	const float DeltaTime = UpdateContext.GetDeltaTime();
 
-	auto AddUniqueDatabase = [](TArray<FTraceMotionMatchingStateDatabaseEntry>& DatabaseEntries, const UPoseSearchDatabase* Database, const UE::PoseSearch::FSearchContext& SearchContext) -> int32
+	auto AddUniqueDatabase = [](TArray<FTraceMotionMatchingStateDatabaseEntry>& DatabaseEntries, const UPoseSearchDatabase* Database, UE::PoseSearch::FSearchContext& SearchContext) -> int32
 	{
 		const uint64 DatabaseId = FTraceMotionMatchingState::GetIdFromObject(Database);
 
-		int32 DbEntryIdx = -1;
+		int32 DbEntryIdx = INDEX_NONE;
 		for (int32 i = 0; i < DatabaseEntries.Num(); ++i)
 		{
 			if (DatabaseEntries[i].DatabaseId == DatabaseId)
@@ -205,10 +199,11 @@ static void TraceMotionMatchingState(
 		{
 			DbEntryIdx = DatabaseEntries.Add({ DatabaseId });
 
-			const FPoseSearchFeatureVectorBuilder* CachedQuery = SearchContext.GetCachedQuery(Database);
-			check(CachedQuery);
-
-			DatabaseEntries[DbEntryIdx].QueryVector = CachedQuery->GetValues();
+			// if throttling is on, the continuing pose can be valid, but no actual search occurred, so the query will not be cached, and we need to build it
+			FPoseSearchFeatureVectorBuilder FeatureVectorBuilder;
+			FeatureVectorBuilder.Init(Database->Schema);
+			SearchContext.GetOrBuildQuery(Database, FeatureVectorBuilder);
+			DatabaseEntries[DbEntryIdx].QueryVector = FeatureVectorBuilder.GetValues();
 		}
 
 		return DbEntryIdx;
@@ -359,7 +354,7 @@ void UpdateMotionMatchingState(
 			SearchContext.History = &PoseHistoryProvider->GetPoseHistory();
 		}
 
-		if (const FPoseSearchIndexAsset* CurrentIndexAsset = InOutMotionMatchingState.GetCurrentSearchIndexAsset())
+		if (const FPoseSearchIndexAsset* CurrentIndexAsset = InOutMotionMatchingState.CurrentSearchResult.GetSearchIndexAsset())
 		{
 			SearchContext.QueryMirrorRequest =
 				CurrentIndexAsset->bMirrored ?
@@ -406,8 +401,9 @@ void UpdateMotionMatchingState(
 		InOutMotionMatchingState.ElapsedPoseJumpTime += DeltaTime;
 	}
 
+	InOutMotionMatchingState.UpdateWantedPlayRate(SearchContext, Settings);
 	InOutMotionMatchingState.PoseIndicesHistory.Update(InOutMotionMatchingState.CurrentSearchResult, DeltaTime, Settings.PoseReselectHistory);
-	
+
 #if UE_POSE_SEARCH_TRACE_ENABLED
 	// Record debugger details
 	TraceMotionMatchingState(
@@ -420,28 +416,51 @@ void UpdateMotionMatchingState(
 #endif
 }
 
-const FPoseSearchIndexAsset* FMotionMatchingState::GetCurrentSearchIndexAsset() const
+void FMotionMatchingState::UpdateWantedPlayRate(const UE::PoseSearch::FSearchContext& SearchContext, const FMotionMatchingSettings& Settings)
 {
 	if (CurrentSearchResult.IsValid())
 	{
-		return CurrentSearchResult.SearchIndexAsset;
+		if (!FMath::IsNearlyEqual(Settings.PlayRateMin, 1.f, UE_KINDA_SMALL_NUMBER) || !FMath::IsNearlyEqual(Settings.PlayRateMax, 1.f, UE_KINDA_SMALL_NUMBER))
+		{
+			if (const FPoseSearchFeatureVectorBuilder* PoseSearchFeatureVectorBuilder = SearchContext.GetCachedQuery(CurrentSearchResult.Database.Get()))
+			{
+				if (const UPoseSearchFeatureChannel_Trajectory* TrajectoryChannel = CurrentSearchResult.Database->Schema->FindFirstChannelOfType<UPoseSearchFeatureChannel_Trajectory>())
+				{
+					TConstArrayView<float> QueryData = PoseSearchFeatureVectorBuilder->GetValues();
+					TConstArrayView<float> ResultData = CurrentSearchResult.Database->GetSearchIndex()->GetPoseValues(CurrentSearchResult.PoseIdx);
+					float EstimatedSpeedRatio = 1.f;
+					if (TrajectoryChannel->GetEstimatedSpeedRatio(QueryData, ResultData, EstimatedSpeedRatio))
+					{
+						check(Settings.PlayRateMin <= Settings.PlayRateMax);
+						WantedPlayRate = FMath::Clamp(EstimatedSpeedRatio, Settings.PlayRateMin, Settings.PlayRateMax);
+					}
+					else
+					{
+						UE_LOG(LogPoseSearch, Warning,
+							TEXT("Couldn't update the WantedPlayRate in FMotionMatchingState::UpdateWantedPlayRate, because Schema '%s' UPoseSearchFeatureChannel_Trajectory::GetEstimatedSpeedRatio failed to compute, because of missing EPoseSearchTrajectoryFlags::Velocity samples"),
+							*GetNameSafe(CurrentSearchResult.Database->Schema));
+					}
+				}
+				else
+				{
+					UE_LOG(LogPoseSearch, Warning,
+						TEXT("Couldn't update the WantedPlayRate in FMotionMatchingState::UpdateWantedPlayRate, because Schema '%s' couldn't find a UPoseSearchFeatureChannel_Trajectory channel"),
+						*GetNameSafe(CurrentSearchResult.Database->Schema));
+				}
+			}
+		}
 	}
-
-	return nullptr;
 }
 
-float FMotionMatchingState::ComputeJumpBlendTime(
-	const UE::PoseSearch::FSearchResult& Result, 
-	const FMotionMatchingSettings& Settings
-) const
+float FMotionMatchingState::ComputeJumpBlendTime(const UE::PoseSearch::FSearchResult& Result, const FMotionMatchingSettings& Settings) const
 {
-	const FPoseSearchIndexAsset* SearchIndexAsset = GetCurrentSearchIndexAsset();
+	const FPoseSearchIndexAsset* SearchIndexAsset = CurrentSearchResult.GetSearchIndexAsset();
 
 	// Use alternate blend time when changing between mirrored and unmirrored
 	float JumpBlendTime = Settings.BlendTime;
-	if ((SearchIndexAsset != nullptr) && (Settings.MirrorChangeBlendTime > 0.0f))
+	if (SearchIndexAsset && Settings.MirrorChangeBlendTime > 0.0f)
 	{
-		if (Result.SearchIndexAsset->bMirrored != SearchIndexAsset->bMirrored)
+		if (Result.GetSearchIndexAsset(true)->bMirrored != SearchIndexAsset->bMirrored)
 		{
 			JumpBlendTime = Settings.MirrorChangeBlendTime;
 		}

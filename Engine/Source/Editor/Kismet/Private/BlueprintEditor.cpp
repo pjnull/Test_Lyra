@@ -4070,6 +4070,13 @@ void FBlueprintEditor::Compile()
 			CompileOptions |= (EBlueprintCompileOptions::UseDeltaSerializationDuringReinstancing | EBlueprintCompileOptions::SkipNewVariableDefaultsDetection);
 		}
 
+		// If compilation is enabled during PIE/simulation, references to the CDO might be held by a script variable.
+		// Thus, we set the flag to direct the compiler to allow those references to be replaced during reinstancing.
+		if (IsPlayInEditorActive())
+		{
+			CompileOptions |= EBlueprintCompileOptions::IncludeCDOInReferenceReplacement;
+		}
+
 		FKismetEditorUtilities::CompileBlueprint(BlueprintObj, CompileOptions, &LogResults);
 
 		LogResults.EndEvent();
@@ -5365,6 +5372,9 @@ void FBlueprintEditor::OnAddParentNode()
 			UEdGraph* TargetGraph = FunctionFromNode.Node->GetGraph();
 			if (ValidParent && TargetGraph)
 			{
+				const FScopedTransaction Transaction(LOCTEXT("AddParentNode", "Add Parent Node"));
+				TargetGraph->Modify();
+
 				FGraphNodeCreator<UK2Node_CallParentFunction> FunctionNodeCreator(*TargetGraph);
 				UK2Node_CallParentFunction* ParentFunctionNode = FunctionNodeCreator.CreateNode();
 				ParentFunctionNode->SetFromFunction(ValidParent);

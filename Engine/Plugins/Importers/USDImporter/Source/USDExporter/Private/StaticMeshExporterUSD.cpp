@@ -229,7 +229,6 @@ bool UStaticMeshExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type, F
 						UExporter::CurrentFilename,
 						bIsAssetLayer,
 						Options->MeshAssetOptions.bUsePayload,
-						Options->MeshAssetOptions.bRemoveUnrealMaterials,
 						ExportTask->bReplaceIdentical,
 						Options->bReExportIdenticalAssets,
 						ExportTask->bAutomated
@@ -323,7 +322,6 @@ bool UStaticMeshExporterUsd::ExportBinary( UObject* Object, const TCHAR* Type, F
 			AssetStage.GetRootLayer().GetRealPath(),
 			bIsAssetLayer,
 			Options->MeshAssetOptions.bUsePayload,
-			Options->MeshAssetOptions.bRemoveUnrealMaterials,
 			ExportTask->bReplaceIdentical,
 			Options->bReExportIdenticalAssets,
 			ExportTask->bAutomated

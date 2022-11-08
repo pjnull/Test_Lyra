@@ -10,10 +10,10 @@ namespace AnimationCore
 	// Implementation of the FABRIK IK Algorithm
 	// Please see http://andreasaristidou.com/publications/FABRIK.pdf for more details
 
-	bool SolveFabrik(TArray<FFABRIKChainLink>& InOutChain, const FVector& TargetPosition, float MaximumReach, float Precision, int32 MaxIterations)
+	bool SolveFabrik(TArray<FFABRIKChainLink>& InOutChain, const FVector& TargetPosition, double MaximumReach, double Precision, int32 MaxIterations)
 	{
 		bool bBoneLocationUpdated = false;
-		float const RootToTargetDistSq = FVector::DistSquared(InOutChain[0].Position, TargetPosition);
+		double const RootToTargetDistSq = FVector::DistSquared(InOutChain[0].Position, TargetPosition);
 		int32 const NumChainLinks = InOutChain.Num();
 
 		// FABRIK algorithm - bone translation calculation
@@ -33,7 +33,7 @@ namespace AnimationCore
 			int32 const TipBoneLinkIndex = NumChainLinks - 1;
 
 			// Check distance between tip location and effector location
-			float Slop = FVector::Dist(InOutChain[TipBoneLinkIndex].Position, TargetPosition);
+			double Slop = FVector::Dist(InOutChain[TipBoneLinkIndex].Position, TargetPosition);
 			if (Slop > Precision)
 			{
 				// Set tip bone at end effector location.

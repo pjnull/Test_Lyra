@@ -12,6 +12,7 @@
 #include "Trace/Trace.inl"
 #include "UObject/Object.h"
 #include "UObject/Class.h"
+#include "UObject/Package.h"
 #include "UObject/UObjectAnnotation.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 #include "UObject/WeakObjectPtr.h"
@@ -219,6 +220,11 @@ UObject* FObjectTrace::GetObjectFromId(uint64 Id)
 	FObjectIdAnnotation FindAnnotation;
 	// Id used for annotation map doesn't include the parent id in the upper bits, so zero those first
 	FindAnnotation.Id = Id & 0x00000000FFFFFFFFll;
+	if (FindAnnotation.IsDefault())
+	{
+		return nullptr;
+	}
+	
 	return GObjectIdAnnotations.Find(FindAnnotation);
 }
 

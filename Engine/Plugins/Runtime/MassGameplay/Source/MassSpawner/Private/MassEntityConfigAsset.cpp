@@ -11,6 +11,8 @@
 #include "Engine/World.h"
 #if WITH_EDITOR
 #include "Editor.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 #endif // WITH_EDITOR
 
 #define LOCTEXT_NAMESPACE "Mass"
@@ -52,9 +54,20 @@ void UMassEntityConfigAsset::ValidateEntityConfig()
 	{
 		if (Config.ValidateEntityTemplate(*EditorWorld, *this))
 		{
+			const FText InfoText = LOCTEXT("MassEntityConfigAssetNoErrorsDetected", "There were no error detected during validation of the EntityConfigAsset");
+			
 			FMessageLog EditorInfo("LogMass");
-			EditorInfo.Info(LOCTEXT("MassEntityConfigAssetNoErrorsDetected", "There were no error detected during validation of the EntityConfigAsset"));
-			EditorInfo.Notify(LOCTEXT("MassEntityConfigAssetNoErrorsDetected", "There were no error detected during validation of the EntityConfigAsset"), EMessageSeverity::Info, true /*bForce*/);
+			EditorInfo.Info(InfoText);
+
+			FNotificationInfo Info(InfoText);
+			Info.bFireAndForget = true;
+			Info.bUseThrobber = false;
+			Info.FadeOutDuration = 0.5f;
+			Info.ExpireDuration = 5.0f;
+			if (TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info))
+			{
+				Notification->SetCompletionState(SNotificationItem::CS_Success);
+			}
 		}
 	}
 }
@@ -84,10 +97,10 @@ const FMassEntityTemplate& FMassEntityConfig::GetOrCreateEntityTemplate(const UW
 	BuildContext.BuildFromTraits(CombinedTraits, World);
 	Template.SetTemplateName(ConfigOwner.GetName());
 
-	if (ensureMsgf(!Template.IsEmpty(), TEXT("Need at least one fragment to create an Archetype")))
-	{
-		TemplateRegistry.InitializeEntityTemplate(Template);
-	}
+	// It is ok to have an empty template, 
+    // but be aware there will be an error if you try to create an entity with it
+    // as there will be no archetype associated with this template...
+	TemplateRegistry.InitializeEntityTemplate(Template);
 
 	return Template;
 }

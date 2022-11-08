@@ -71,24 +71,31 @@ public:
 		int32 InTotalPermutationCount,
 		ConstructSerializedType InConstructSerializedRef,
 		ConstructCompiledType InConstructCompiledRef,
-		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ShouldCompilePermutationType InShouldCompilePermutationRef,
+		GetRayTracingPayloadTypeType InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ValidateCompiledResultType InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 		uint32 InTypeSize,
 		const FShaderParametersMetadata* InRootParametersMetadata = nullptr
 		):
 		FShaderType(EShaderTypeForDynamicCast::OCIO, InTypeLayout, InName, InSourceFilename, InFunctionName, SF_Pixel, InTotalPermutationCount,
 			InConstructSerializedRef,
 			InConstructCompiledRef,
-			InModifyCompilationEnvironmentRef,
 			InShouldCompilePermutationRef,
+			InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+			InModifyCompilationEnvironmentRef,
 			InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 			InTypeSize,
 			InRootParametersMetadata)
 	{
 		check(InTotalPermutationCount == 1);
 	}
 
+#if WITH_EDITOR
 	/**
 	 * Enqueues a compilation for a new shader of this type.
 	 * @param InColorTransform - The ColorTransform to link the shader with.
@@ -111,6 +118,7 @@ public:
 		const FShaderCompileJob& CurrentJob,
 		const FString& InDebugDescription
 		) const;
+#endif // WITH_EDITOR
 
 	/**
 	 * Checks if the shader type should be cached for a particular platform and color transform.
@@ -123,7 +131,7 @@ public:
 		return ShouldCompilePermutation(FOpenColorIOShaderPermutationParameters(GetFName(), InPlatform, InColorTransform));
 	}
 
-
+#if WITH_EDITOR
 protected:
 	/**
 	 * Sets up the environment used to compile an instance of this shader type.
@@ -134,4 +142,5 @@ protected:
 	{
 		ModifyCompilationEnvironment(FOpenColorIOShaderPermutationParameters(GetFName(), InPlatform, InColorTransform), OutEnvironment);
 	}
+#endif // WITH_EDITOR
 };

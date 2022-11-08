@@ -75,6 +75,12 @@ struct CONTROLRIG_API FControlRigObjectVersion
 		// Converted library nodes to templates
 		LibraryNodeTemplates,
 
+		// Controls to be able specify space switch targets
+		RestrictSpaceSwitchingForControls,
+
+		// Controls to be able specify which channels should be visible in sequencer
+		ControlTransformChannelFiltering,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1

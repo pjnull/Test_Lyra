@@ -27,17 +27,31 @@ FName UFKControlRig::GetControlName(const FName& InName, const ERigElementType& 
 {
 	if (InName != NAME_None)
 	{
-		const FString& PostFix = [InType]()
+		check(InType == ERigElementType::Bone || InType == ERigElementType::Curve);
+		static thread_local TMap<FName, FName> NameToControlMappings[2];
+		TMap<FName, FName>& NameToControlMapping = NameToControlMappings[InType == ERigElementType::Bone ? 0 : 1];
+		if (const FName* CachedName = NameToControlMapping.Find(InName))
 		{
+			return *CachedName;
+		}
+		else
+		{
+			static thread_local FStringBuilderBase ScratchString;		
+
+			// ToString performs ScratchString.Reset() internally
+			InName.ToString(ScratchString);
+
 			if (InType == ERigElementType::Curve)
 			{
-				return TEXT("_CURVE");
+				static const TCHAR* CurvePostFix = TEXT("_CURVE");
+				ScratchString.Append(CurvePostFix);
 			}
 
-			return TEXT("");
-		}();
+			static FString ControlPostFix = TEXT("_CONTROL");
 		
-		return FName(*(InName.ToString() + PostFix + TEXT("_CONTROL")));
+			ScratchString.Append(ControlPostFix);
+			return NameToControlMapping.Add(InName, FName(*ScratchString));
+		}
 	}
 
 	// if control name is coming as none, we don't append the postfix
@@ -48,22 +62,35 @@ FName UFKControlRig::GetControlTargetName(const FName& InName, const ERigElement
 {
 	if (InName != NAME_None)
 	{
-		const FString& PostFix = [InType]()
+		check(InType == ERigElementType::Bone || InType == ERigElementType::Curve);
+		static thread_local TMap<FName, FName> NameToTargetMappings[2];
+		TMap<FName, FName>& NameToTargetMapping = NameToTargetMappings[InType == ERigElementType::Bone ? 0 : 1];
+		if (const FName* CachedName = NameToTargetMapping.Find(InName))
 		{
+			return *CachedName;
+		}
+		else
+		{
+			static thread_local FString ScratchString;
+			
+			// ToString performs ScratchString.Reset() internally
+			InName.ToString(ScratchString);
+
+			int32 StartPostFix;
 			if (InType == ERigElementType::Curve)
 			{
-				return TEXT("_CURVE_CONTROL");
+				static const TCHAR* CurvePostFix = TEXT("_CURVE_CONTROL");
+				StartPostFix = ScratchString.Find(CurvePostFix, ESearchCase::CaseSensitive);
+			}
+			else
+			{
+				static const TCHAR* ControlPostFix = TEXT("_CONTROL");
+				StartPostFix = ScratchString.Find(ControlPostFix, ESearchCase::CaseSensitive);
 			}
 
-			return TEXT("_CONTROL");
-		}();
-
-		FString StringName = InName.ToString();
-		if (StringName.EndsWith(PostFix, ESearchCase::CaseSensitive))
-		{
-			StringName.RemoveFromEnd(PostFix);
-			return FName(*StringName);
-		}		
+			const FStringView ControlTargetString(*ScratchString, StartPostFix != INDEX_NONE ? StartPostFix : ScratchString.Len());
+			return NameToTargetMapping.Add(InName, FName(ControlTargetString));
+		}
 	}
 
 	// If incoming name is NONE, or not correctly formatted according to expected post-fix return NAME_None
@@ -421,7 +448,7 @@ void UFKControlRig::SetControlOffsetsFromBoneInitials()
 			return;
 		}
 
-		FRigBoneElement* BoneElement = CastChecked<FRigBoneElement>(InElement);
+		const FRigBoneElement* BoneElement = CastChecked<FRigBoneElement>(InElement);
 		const FName BoneName = BoneElement->GetName();
 		const FName ControlName = GetControlName(BoneName, BoneElement->GetType());
 
@@ -454,13 +481,17 @@ void UFKControlRig::SetControlOffsetsFromBoneInitials()
 
 void UFKControlRig::RefreshActiveControls()
 {
-	if (IsControlActive.Num() != GetHierarchy()->Num())
+	if (const URigHierarchy* Hierarchy = GetHierarchy())
 	{
-		IsControlActive.Empty(GetHierarchy()->Num());
-		IsControlActive.SetNum(GetHierarchy()->Num());
-		for (bool& bIsActive : IsControlActive)
+		const int32 NumControls = Hierarchy->Num();
+		if (IsControlActive.Num() != NumControls)
 		{
-			bIsActive = true;
+			IsControlActive.Empty(NumControls);
+			IsControlActive.SetNum(NumControls);
+			for (bool& bIsActive : IsControlActive)
+			{
+				bIsActive = true;
+			}
 		}
 	}
 }

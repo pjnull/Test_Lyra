@@ -4,6 +4,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace EpicGames.Core
@@ -14,11 +15,16 @@ namespace EpicGames.Core
 	public interface IMemoryWriter
 	{
 		/// <summary>
+		/// Length of the written data
+		/// </summary>
+		int Length { get; }
+
+		/// <summary>
 		/// Gets a block of memory with at least the given size
 		/// </summary>
 		/// <param name="minSize">Minimum size of the returned data</param>
-		/// <returns>Memory of at least the given size</returns>
-		Memory<byte> GetMemory(int minSize);
+		/// <returns>Memory of at least the given size. Note that the returned buffer may be larger than the requested size.</returns>
+		Memory<byte> GetMemory(int minSize = 1);
 
 		/// <summary>
 		/// Updates the current position within the input buffer
@@ -35,7 +41,17 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The memory block to write to
 		/// </summary>
-		Memory<byte> _memory;
+		readonly Memory<byte> _memory;
+
+		/// <summary>
+		/// Length of the data that has been written
+		/// </summary>
+		int _length;
+
+		/// <summary>
+		/// Returns the memory that was written to
+		/// </summary>
+		public ReadOnlyMemory<byte> WrittenMemory => _memory.Slice(0, _length);
 
 		/// <summary>
 		/// Constructor
@@ -51,17 +67,84 @@ namespace EpicGames.Core
 		/// </summary>
 		public void CheckEmpty()
 		{
-			if (_memory.Length > 0)
+			if (_length < _memory.Length)
 			{
-				throw new Exception($"Serialization is not at expected offset within the output buffer ({_memory.Length} bytes unused)");
+				throw new Exception($"Serialization is not at expected offset within the output buffer ({_length}/{_memory.Length} bytes used)");
 			}
 		}
 
 		/// <inheritdoc/>
-		public Memory<byte> GetMemory(int length) => _memory;
+		public int Length => _length;
 
 		/// <inheritdoc/>
-		public void Advance(int length) => _memory = _memory.Slice(length);
+		public Memory<byte> GetMemory(int length) => _memory.Slice(_length);
+
+		/// <inheritdoc/>
+		public void Advance(int length) => _length += length;
+	}
+
+	/// <summary>
+	/// Writes into an expandable memory block
+	/// </summary>
+	public class ArrayMemoryWriter : IMemoryWriter
+	{
+		byte[] _data;
+		int _length;
+
+		/// <summary>
+		/// Returns the memory that has been written to
+		/// </summary>
+		public ReadOnlyMemory<byte> WrittenMemory => _data.AsMemory(0, _length);
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		/// <param name="initialSize">Initial size of the allocated data</param>
+		public ArrayMemoryWriter(int initialSize)
+		{
+			_data = new byte[initialSize];
+		}
+
+		/// <inheritdoc/>
+		public int Length => _length;
+
+		/// <summary>
+		/// Resets the current contents of the buffer
+		/// </summary>
+		public void Clear()
+		{
+			_length = 0;
+		}
+
+		/// <summary>
+		/// Resize the underlying buffer, updating the current length.
+		/// </summary>
+		/// <param name="newLength">New length of the buffer</param>
+		public void Resize(int newLength)
+		{
+			if (newLength > _length)
+			{
+				Array.Resize(ref _data, newLength);
+			}
+			_length = newLength;
+		}
+
+		/// <inheritdoc/>
+		public Memory<byte> GetMemory(int minSize = 1)
+		{
+			int requiredLength = _length + minSize;
+			if (_data.Length < requiredLength)
+			{
+				Array.Resize(ref _data, requiredLength + 4096);
+			}
+			return _data.AsMemory(_length);
+		}
+
+		/// <inheritdoc/>
+		public void Advance(int length)
+		{
+			_length += length;
+		}
 	}
 
 	/// <summary>
@@ -75,6 +158,25 @@ namespace EpicGames.Core
 		/// <param name="writer">Writer to serialize to</param>
 		/// <param name="minSize">Minimum size for the returned span</param>
 		public static Span<byte> GetSpan(this IMemoryWriter writer, int minSize) => writer.GetMemory(minSize).Span;
+
+		/// <summary>
+		/// Writes a byte to memory
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="length">Length of the required span</param>
+		public static Memory<byte> GetMemoryAndAdvance(this IMemoryWriter writer, int length)
+		{
+			Memory<byte> memory = writer.GetMemory(length);
+			writer.Advance(length);
+			return memory.Slice(0, length); // Returned memory may be larger than requested
+		}
+
+		/// <summary>
+		/// Writes a byte to memory
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="length">Length of the required span</param>
+		public static Span<byte> GetSpanAndAdvance(this IMemoryWriter writer, int length) => GetMemoryAndAdvance(writer, length).Span;
 
 		/// <summary>
 		/// Writes a boolean to memory
@@ -191,14 +293,51 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
-		/// Appends a sequence of bytes to the buffer
+		/// Writes a Guid to the memory writer
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="guid">Value to write</param>
+		public static void WriteGuid(this IMemoryWriter writer, Guid guid)
+		{
+			Memory<byte> buffer = writer.GetMemory(16);
+			if (!guid.TryWriteBytes(buffer.Slice(0, 16).Span))
+			{
+				throw new InvalidOperationException("Unable to write guid to buffer");
+			}
+			writer.Advance(16);
+		}
+
+		/// <summary>
+		/// Appends a span of bytes to the buffer, without a length field.
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="span">Bytes to write</param>
+		public static void WriteFixedLengthBytes(this IMemoryWriter writer, ReadOnlySpan<byte> span)
+		{
+			Span<byte> target = GetSpanAndAdvance(writer, span.Length);
+			span.CopyTo(target);
+		}
+
+		/// <summary>
+		/// Appends a sequence of bytes to the buffer, without a length field.
 		/// </summary>
 		/// <param name="writer">Writer to serialize to</param>
 		/// <param name="sequence">Sequence to append</param>
-		public static void WriteSequence(this IMemoryWriter writer, ReadOnlySequence<byte> sequence)
+		public static void WriteFixedLengthBytes(this IMemoryWriter writer, ReadOnlySequence<byte> sequence)
 		{
-			Memory<byte> memory = writer.GetMemory((int)sequence.Length);
-			sequence.CopyTo(memory.Span);
+			Span<byte> span = GetSpanAndAdvance(writer, (int)sequence.Length);
+			sequence.CopyTo(span);
+		}
+
+		/// <summary>
+		/// Writes a variable length array
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="list">The array to write</param>
+		/// <param name="writeItem">Delegate to write an individual item</param>
+		public static void WriteList<T>(this IMemoryWriter writer, IReadOnlyList<T> list, Action<T> writeItem)
+		{
+			WriteVariableLengthArray(writer, list, writeItem);
 		}
 
 		/// <summary>
@@ -209,10 +348,22 @@ namespace EpicGames.Core
 		public static void WriteVariableLengthBytes(this IMemoryWriter writer, ReadOnlySpan<byte> bytes)
 		{
 			int lengthBytes = VarInt.MeasureUnsigned(bytes.Length);
-			Span<byte> span = GetSpan(writer, lengthBytes + bytes.Length);
+			Span<byte> span = GetSpanAndAdvance(writer, lengthBytes + bytes.Length);
 			VarInt.WriteUnsigned(span, bytes.Length);
 			bytes.CopyTo(span[lengthBytes..]);
-			writer.Advance(lengthBytes + bytes.Length);
+		}
+
+		/// <summary>
+		/// Appends a sequence of bytes to the buffer, without a length field.
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="sequence">Sequence to append</param>
+		public static void WriteVariableLengthBytes(this IMemoryWriter writer, ReadOnlySequence<byte> sequence)
+		{
+			int lengthBytes = VarInt.MeasureUnsigned((int)sequence.Length);
+			Span<byte> span = GetSpanAndAdvance(writer, (int)(lengthBytes + sequence.Length));
+			VarInt.WriteUnsigned(span, (int)sequence.Length);
+			sequence.CopyTo(span[lengthBytes..]);
 		}
 
 		/// <summary>
@@ -224,18 +375,6 @@ namespace EpicGames.Core
 		{
 			writer.WriteInt32(bytes.Length);
 			writer.WriteFixedLengthBytes(bytes);
-		}
-
-		/// <summary>
-		/// Write a fixed-length sequence of bytes to the buffer
-		/// </summary>
-		/// <param name="writer">Writer to serialize to</param>
-		/// <param name="bytes">The bytes to write</param>
-		public static void WriteFixedLengthBytes(this IMemoryWriter writer, ReadOnlySpan<byte> bytes)
-		{
-			Span<byte> span = GetSpan(writer, bytes.Length);
-			bytes.CopyTo(span);
-			writer.Advance(bytes.Length);
 		}
 
 		/// <summary>
@@ -274,6 +413,23 @@ namespace EpicGames.Core
 			for (int idx = 0; idx < list.Count; idx++)
 			{
 				writeItem(list[idx]);
+			}
+		}
+
+		/// <summary>
+		/// Writes a dictionary to the writer
+		/// </summary>
+		/// <param name="writer">Writer to serialize to</param>
+		/// <param name="dictionary">The dictionary to write</param>
+		/// <param name="writeKey">Delegate to write an individual key</param>
+		/// <param name="writeValue">Delegate to write an individual value</param>
+		public static void WriteDictionary<TKey, TValue>(this IMemoryWriter writer, IReadOnlyDictionary<TKey, TValue> dictionary, Action<TKey> writeKey, Action<TValue> writeValue) where TKey : notnull
+		{
+			writer.WriteUnsignedVarInt(dictionary.Count);
+			foreach (KeyValuePair<TKey, TValue> kvp in dictionary)
+			{
+				writeKey(kvp.Key);
+				writeValue(kvp.Value);
 			}
 		}
 

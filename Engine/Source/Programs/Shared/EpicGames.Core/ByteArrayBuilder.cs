@@ -58,33 +58,14 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
-		/// Appends a single byte to the sequence
+		/// Clear the current builder
 		/// </summary>
-		/// <param name="value">Byte to add</param>
-		public void WriteByte(byte value)
+		public void Clear()
 		{
-			Span<byte> target = GetWritableSpan(1);
-			target[0] = value;
-		}
-
-		/// <summary>
-		/// Appends a span of bytes to the buffer
-		/// </summary>
-		/// <param name="span">Bytes to add</param>
-		public void Append(ReadOnlySpan<byte> span)
-		{
-			Span<byte> target = GetWritableSpan(span.Length);
-			span.CopyTo(target);
-		}
-
-		/// <summary>
-		/// Appends a sequence of bytes to the buffer
-		/// </summary>
-		/// <param name="sequence">Sequence to append</param>
-		public void Append(ReadOnlySequence<byte> sequence)
-		{
-			Span<byte> target = GetWritableSpan((int)sequence.Length);
-			sequence.CopyTo(target);
+			_currentChunk = _chunks[0];
+			_currentChunk.Length = 0;
+			_chunks.RemoveRange(1, _chunks.Count - 1);
+			Length = 0;
 		}
 
 		/// <inheritdoc/>
@@ -95,33 +76,19 @@ namespace EpicGames.Core
 				_currentChunk = new Chunk(_currentChunk.RunningIndex + _currentChunk.Length, Math.Max(minSize, _chunkSize));
 				_chunks.Add(_currentChunk);
 			}
-			return _currentChunk.Data.AsMemory(_currentChunk.Length, minSize);
+			return _currentChunk.Data.AsMemory(_currentChunk.Length);
 		}
 
 		/// <inheritdoc/>
 		public void Advance(int length)
 		{
-			_currentChunk.Length += length;
-			Length += length;
-		}
-
-		/// <summary>
-		/// Gets a span of bytes to write to, and increases the length of the buffer
-		/// </summary>
-		/// <param name="length">Length of the buffer</param>
-		/// <returns>Writable span of bytes</returns>
-		public Span<byte> GetWritableSpan(int length)
-		{
-			if (_currentChunk.Length + length > _currentChunk.Data.Length)
+			if (length < 0 || _currentChunk.Length + length > _currentChunk.Data.Length)
 			{
-				_currentChunk = new Chunk(_currentChunk.RunningIndex + _currentChunk.Length, Math.Max(length, _chunkSize));
-				_chunks.Add(_currentChunk);
+				throw new ArgumentException("Length exceeds possible size of data written to output buffer", nameof(length));
 			}
 
-			Span<byte> span = _currentChunk.Data.AsSpan(_currentChunk.Length, length);
 			_currentChunk.Length += length;
 			Length += length;
-			return span;
 		}
 
 		/// <summary>

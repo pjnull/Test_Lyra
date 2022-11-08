@@ -509,7 +509,7 @@ public:
 			return true;
 		}
 
-		return !(Skeleton && Skeleton->IsCompatibleSkeletonByAssetData(AssetData));
+		return !(Skeleton && Skeleton->IsCompatibleForEditor(AssetData));
 	}
 
 private:
@@ -1150,7 +1150,7 @@ bool FSkeletalAnimationTrackEditor::HandleAssetAdded(UObject* Asset, const FGuid
 		{
 			USkeleton* Skeleton = AcquireSkeletonFromObjectGuid(TargetObjectGuid, GetSequencer());
 
-			if (Skeleton && Skeleton->IsCompatible(AnimSequence->GetSkeleton()))
+			if (Skeleton && Skeleton->IsCompatibleForEditor(AnimSequence->GetSkeleton()))
 			{
 				UObject* Object = SequencerPtr->FindSpawnedObjectOrTemplate(TargetObjectGuid);
 				
@@ -1760,7 +1760,7 @@ bool FSkeletalAnimationTrackEditor::FilterAnimSequences(const FAssetData& AssetD
 		return true;
 	}
 
-	if (Skeleton && Skeleton->IsCompatibleSkeletonByAssetData(AssetData) == false)
+	if (Skeleton && Skeleton->IsCompatibleForEditor(AssetData) == false)
 	{
 		return true;
 	}
@@ -1973,7 +1973,7 @@ bool FSkeletalAnimationTrackEditor::OnAllowDrop(const FDragDropEvent& DragDropEv
 		for (USkeletalMeshComponent* SkeletalMeshComponent : SkeletalMeshComponents)
 		{
 			USkeleton* Skeleton = GetSkeletonFromComponent(SkeletalMeshComponent);
-			if (bValidAnimSequence && Skeleton && Skeleton->IsCompatible(AnimSequence->GetSkeleton()))
+			if (bValidAnimSequence && Skeleton && Skeleton->IsCompatibleForEditor(AnimSequence->GetSkeleton()))
 			{
 				FFrameRate TickResolution = SequencerPtr->GetFocusedTickResolution();
 				FFrameNumber LengthInFrames = TickResolution.AsFrameNumber(AnimSequence->GetPlayLength());
@@ -2036,7 +2036,7 @@ FReply FSkeletalAnimationTrackEditor::OnDrop(const FDragDropEvent& DragDropEvent
 		{
 			USkeleton* Skeleton = GetSkeletonFromComponent(SkeletalMeshComponent);
 
-			if (bValidAnimSequence && Skeleton && Skeleton->IsCompatible(AnimSequence->GetSkeleton()))
+			if (bValidAnimSequence && Skeleton && Skeleton->IsCompatibleForEditor(AnimSequence->GetSkeleton()))
 			{
 				UObject* BoundObject = SequencerPtr.IsValid() ? SequencerPtr->FindSpawnedObjectOrTemplate(DragDropParams.TargetObjectGuid) : nullptr;
 

@@ -926,6 +926,8 @@ FReimportManager::FReimportManager()
 FReimportManager::~FReimportManager()
 {
 	Handlers.Empty();
+
+	// you can't do much here because ~FReimportManager is called from FReimportManager::Instance at cexit shutdown time
 }
 
 int32 FReimportHandler::GetPriority() const

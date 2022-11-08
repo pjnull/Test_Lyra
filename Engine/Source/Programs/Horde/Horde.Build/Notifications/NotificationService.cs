@@ -20,6 +20,7 @@ using Horde.Build.Streams;
 using Horde.Build.Users;
 using Horde.Build.Utilities;
 using HordeCommon;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -87,6 +88,17 @@ namespace Horde.Build.Notifications
 		/// Instance of the <see cref="IDogStatsd"/>.
 		/// </summary>
 		private readonly IDogStatsd _dogStatsd;
+		
+		/// <summary>
+		/// Cache for de-duplicating queued notifications
+		/// </summary>
+		private readonly IMemoryCache _cache;
+		
+		/// <summary>
+		/// Lock object for manipulating the above cache
+		/// Used since batch notification queue handling is run async.
+		/// </summary>
+		private readonly object _cacheLock = new object();
 
 		/// <summary>
 		/// Connection pool for Redis databases
@@ -128,7 +140,22 @@ namespace Horde.Build.Notifications
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public NotificationService(IEnumerable<INotificationSink> sinks, IOptionsMonitor<ServerSettings> settings, ILogger<NotificationService> logger, IGraphCollection graphCollection, ISubscriptionCollection subscriptionCollection, INotificationTriggerCollection triggerCollection, IUserCollection userCollection, JobService jobService, StreamService streamService, IssueService issueService, ILogFileService logFileService, IDogStatsd dogStatsd, RedisService redisService, IClock clock)
+		public NotificationService(
+			IEnumerable<INotificationSink> sinks,
+			IOptionsMonitor<ServerSettings> settings,
+			ILogger<NotificationService> logger,
+			IGraphCollection graphCollection,
+			ISubscriptionCollection subscriptionCollection,
+			INotificationTriggerCollection triggerCollection,
+			IUserCollection userCollection,
+			JobService jobService,
+			StreamService streamService,
+			IssueService issueService,
+			ILogFileService logFileService,
+			IDogStatsd dogStatsd,
+			IMemoryCache cache,
+			RedisService redisService,
+			IClock clock)
 		{
 			_sinks = sinks.ToList();
 			_settings = settings;
@@ -142,6 +169,7 @@ namespace Horde.Build.Notifications
 			_issueService = issueService;
 			_logFileService = logFileService;
 			_dogStatsd = dogStatsd;
+			_cache = cache;
 			_redisConnectionPool = redisService.ConnectionPool;
 
 			issueService.OnIssueUpdated += NotifyIssueUpdated;
@@ -284,10 +312,24 @@ namespace Horde.Build.Notifications
 		/// <summary>
 		/// Enqueue a notification in Redis for batch sending later on 
 		/// </summary>
-		/// <param name="notification"></param>
+		/// <param name="notification">Notification to enqueue</param>
+		/// <param name="deduplicate">True if notification should be deduplicated</param>
 		/// <typeparam name="T">Any INotification type</typeparam>
-		private async Task EnqueueNotificationForBatchSending<T>(T notification) where T : INotification
+		private async Task EnqueueNotificationForBatchSending<T>(T notification, bool deduplicate = true) where T : INotification<T>
 		{
+			lock (_cacheLock)
+			{
+				if (deduplicate)
+				{
+					// Use cache to deduplicate notifications
+					if (_cache.TryGetValue(notification, out object? _))
+					{
+						return;
+					}
+					_cache.Set(notification, notification, _notificationBatchInterval / 2);					
+				}
+			}
+
 			try
 			{
 				byte[] data = JsonSerializer.SerializeToUtf8Bytes(notification);
@@ -317,7 +359,7 @@ namespace Horde.Build.Notifications
 		/// <typeparam name="T"></typeparam>
 		/// <returns>Deserialized notifications</returns>
 		/// <exception cref="Exception"></exception>
-		private async Task<List<T>> GetAllQueuedNotificationsAsync<T>() where T : INotification
+		private async Task<List<T>> GetAllQueuedNotificationsAsync<T>() where T : INotification<T>
 		{
 			IDatabase redis = _redisConnectionPool.GetDatabase();
 
@@ -415,9 +457,9 @@ namespace Horde.Build.Notifications
 		/// Gets the <see cref="INotificationTrigger"/> for a given trigger ID, if any.
 		/// </summary>
 		/// <param name="triggerId"></param>
-		/// <param name="bFireTrigger">If true, the trigger is fired and cannot be reused</param>
+		/// <param name="fireTrigger">If true, the trigger is fired and cannot be reused</param>
 		/// <returns></returns>
-		private async Task<INotificationTrigger?> GetNotificationTrigger(ObjectId? triggerId, bool bFireTrigger)
+		private async Task<INotificationTrigger?> GetNotificationTrigger(ObjectId? triggerId, bool fireTrigger)
 		{
 			if (triggerId == null)
 			{
@@ -430,7 +472,7 @@ namespace Horde.Build.Notifications
 				return null;
 			}
 
-			return bFireTrigger ? await _triggerCollection.FireAsync(trigger) : trigger;
+			return fireTrigger ? await _triggerCollection.FireAsync(trigger) : trigger;
 		}
 	
 		private async Task SendJobNotificationsAsync(IJob job, IGraph graph)
@@ -510,7 +552,7 @@ namespace Horde.Build.Notifications
 			return Task.CompletedTask;
 		}
 
-		private async Task<List<IUser>> GetUsersToNotify(EventRecord? eventRecord, ObjectId? notificationTriggerId, bool bFireTrigger)
+		private async Task<List<IUser>> GetUsersToNotify(EventRecord? eventRecord, ObjectId? notificationTriggerId, bool fireTrigger)
 		{
 			List<UserId> userIds = new List<UserId>();
 
@@ -530,7 +572,7 @@ namespace Horde.Build.Notifications
 			// Find the notifications for this particular step
 			if (notificationTriggerId != null)
 			{
-				INotificationTrigger? trigger = await GetNotificationTrigger(notificationTriggerId, bFireTrigger);
+				INotificationTrigger? trigger = await GetNotificationTrigger(notificationTriggerId, fireTrigger);
 				if (trigger != null)
 				{
 					foreach (INotificationSubscription subscription in trigger.Subscriptions)
@@ -608,7 +650,7 @@ namespace Horde.Build.Notifications
 				return;
 			}
 
-			ILogFile? logFile = await _logFileService.GetLogFileAsync(step.LogId.Value);
+			ILogFile? logFile = await _logFileService.GetLogFileAsync(step.LogId.Value, CancellationToken.None);
 			if(logFile == null)
 			{
 				_logger.LogError("Step does not have a log file");
@@ -694,9 +736,9 @@ namespace Horde.Build.Notifications
 						triggerId = null;
 					}
 
-					bool bFireTrigger = newLabel.State == LabelState.Complete;
+					bool fireTrigger = newLabel.State == LabelState.Complete;
 
-					List<IUser> usersToNotify = await GetUsersToNotify(eventId, triggerId, bFireTrigger);
+					List<IUser> usersToNotify = await GetUsersToNotify(eventId, triggerId, fireTrigger);
 
 					// filter preflight label notifications to only include initiator
 					if (usersToNotify.Count > 0 && job.PreflightChange != 0 && job.StartedByUserId != null)
@@ -742,7 +784,15 @@ namespace Horde.Build.Notifications
 		{
 			foreach (INotificationSink sink in _sinks)
 			{
-				await sink.SendIssueReportAsync(report);
+				try
+				{
+					await sink.SendIssueReportAsync(report);
+				}
+				catch (Exception e)
+				{
+					string streamsWithChannel = String.Join(", ", report.Reports.Select(x => x.Stream.Name + " " + x.TriageChannel));
+					_logger.LogError(e, "Failed sending issue report to {Channel} for streams/channels {StreamsWithChannels})", report.Channel, streamsWithChannel);
+				}
 			}
 		}
 	}

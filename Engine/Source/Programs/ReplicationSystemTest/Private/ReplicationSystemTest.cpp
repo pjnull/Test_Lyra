@@ -6,6 +6,8 @@
 #include "Styling/UMGCoreStyle.h"
 #include "AutomationTestRunner.h"
 #include "NullTestRunner.h"
+#include "Net/Core/Trace/Private/NetTraceInternal.h"
+#include "Materials/Material.h"
 
 #if WITH_AUTOMATION_WORKER
 namespace UE::Net
@@ -35,12 +37,29 @@ int TestMain()
 INT32_MAIN_INT32_ARGC_TCHAR_ARGV()
 #endif
 {
+	FString OriginalCmdLine;
+
+#if !(defined(PLATFORM_XBOXONE) && PLATFORM_XBOXONE)
+	// Parse original cmdline if there is one
+	OriginalCmdLine = FCommandLine::BuildFromArgV(nullptr, ArgC, ArgV, nullptr);	
+#endif
+
 	// Due to some code not respecting nullrhi etc.
 	PRIVATE_GIsRunningCommandlet = true;
 	PRIVATE_GAllowCommandletRendering = false;
 	PRIVATE_GAllowCommandletAudio = false;
 
-	FCommandLine::Set(TEXT("-nullrhi -log -NoAsyncLoadingThread -NoAsyncPostLoad -noedl -unattended -ENGINEINI=Engine.ini"));
+	// Init cmd line used for test
+	{
+		FString CmdLineOverride(TEXT("-nullrhi -log -NoAsyncLoadingThread -NoAsyncPostLoad -noedl -unattended -ENGINEINI=Engine.ini"));
+		FString NetTraceVerbosity;
+		if(FParse::Value(ToCStr(OriginalCmdLine), TEXT("NetTrace="), NetTraceVerbosity))
+		{
+			CmdLineOverride.Appendf(TEXT(" -trace=net,log,cpu -nettrace=%s"), ToCStr(NetTraceVerbosity));
+		}
+
+		FCommandLine::Set(ToCStr(CmdLineOverride));
+	}
 
 	PreInit();
 	LoadModules();
@@ -50,7 +69,17 @@ INT32_MAIN_INT32_ARGC_TCHAR_ARGV()
 
 	{
 		TUniquePtr<TestRunner> Runner(new TestRunner());
-		Runner->RunTests();
+
+		FString TestFilter;
+		if (FParse::Value(ToCStr(OriginalCmdLine), TEXT("TestFilter="), TestFilter))
+		{
+			Runner->RunTests(ToCStr(TestFilter));
+		}
+		else
+		{
+			Runner->RunTests();
+		}
+		
 	}
 
 	TearDown();
@@ -85,6 +114,8 @@ static void TearDown()
 		delete GConfig;
 		GConfig = nullptr;
 	}
+
+	FTraceAuxiliary::Shutdown();
 }
 
 static void PreInit()
@@ -99,6 +130,22 @@ static void PreInit()
 	FPlatformApplicationMisc::Init();
 #endif
 	FPlatformMemory::Init();
+
+	// Initialize trace
+	FString Parameter;
+	if (FParse::Value(FCommandLine::Get(), TEXT("-trace="), Parameter, false))
+	{
+		FTraceAuxiliary::Initialize(FCommandLine::Get());
+		FTraceAuxiliary::TryAutoConnect();
+	}
+
+#if UE_NET_TRACE_ENABLED
+	uint32 NetTraceVerbosity;
+	if(FParse::Value(FCommandLine::Get(), TEXT("NetTrace="), NetTraceVerbosity))
+	{
+		FNetTrace::SetTraceVerbosity(NetTraceVerbosity);
+	}
+#endif
 
 	if (IPlatformFile* WrapperFile = FPlatformFileManager::Get().GetPlatformFile(TEXT("ReplicationSystemTestFile")))
 	{
@@ -120,6 +167,10 @@ static void PreInit()
 	// Config overrides
 	GConfig->SetInt(TEXT("/Script/Engine.GarbageCollectionSettings"), TEXT("gc.MaxObjectsNotConsideredByGC"), 0, GEngineIni);
 	GConfig->SetString(TEXT("/Script/Engine.Engine"), TEXT("AIControllerClassName"), TEXT("/Script/AIModule.AIController"), GEngineIni);
+	GConfig->SetString(TEXT("/Script/Engine.Engine"), TEXT("DefaultMaterialName"), TEXT("/Engine/Transient.MockDefaultMaterial"), GEngineIni);
+	GConfig->SetString(TEXT("/Script/Engine.Engine"), TEXT("DefaultLightFunctionMaterialName"), TEXT("/Engine/Transient.MockDefaultMaterial"), GEngineIni);
+	GConfig->SetString(TEXT("/Script/Engine.Engine"), TEXT("DefaultDeferredDecalMaterialName"), TEXT("/Engine/Transient.MockDefaultMaterial"), GEngineIni);
+	GConfig->SetString(TEXT("/Script/Engine.Engine"), TEXT("DefaultPostProcessMaterialName"), TEXT("/Engine/Transient.MockDefaultMaterial"), GEngineIni);
 
 	// Console commands
 	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("Net.IsPushModelEnabled 1"), *GLog, nullptr);
@@ -151,6 +202,9 @@ static void LoadModules()
 
 	FCoreDelegates::OnInit.Broadcast();
 #endif
+
+	// Create a mock default material to keep the material system happy
+	UMaterial* MockMaterial = NewObject<UMaterial>(GetTransientPackage(), UMaterial::StaticClass(), TEXT("MockDefaultMaterial"), RF_Transient | RF_MarkAsRootSet);
 
 	// ChaosEngineSolvers requires ChaosSolvers. We're not able to call ProcessNewlyLoadedObjects before this module is loaded.
 	FModuleManager::Get().LoadModule(TEXT("ChaosSolvers"));

@@ -28,6 +28,11 @@ class FRayTracingBarycentricsRGS : public FGlobalShader
 	{
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
 	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Default;
+	}
 };
 IMPLEMENT_GLOBAL_SHADER(FRayTracingBarycentricsRGS, "/Engine/Private/RayTracing/RayTracingBarycentrics.usf", "RayTracingBarycentricsMainRGS", SF_RayGen);
 
@@ -44,6 +49,11 @@ class FRayTracingBarycentricsCHS : public FGlobalShader
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Default;
 	}
 
 	FRayTracingBarycentricsCHS() = default;

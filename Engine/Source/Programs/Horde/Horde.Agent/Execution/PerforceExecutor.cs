@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -11,16 +12,18 @@ using System.Threading.Tasks;
 using EpicGames.Core;
 using EpicGames.Perforce;
 using EpicGames.Perforce.Managed;
+using Horde.Agent.Services;
 using Horde.Agent.Utility;
 using HordeCommon.Rpc;
 using HordeCommon.Rpc.Messages;
+using HordeCommon.Rpc.Tasks;
 using Microsoft.Extensions.Logging;
 using OpenTracing;
 using OpenTracing.Util;
 
 namespace Horde.Agent.Execution
 {
-	class PerforceExecutor : BuildGraphExecutor
+	class PerforceExecutor : JobExecutor
 	{
 		protected AgentWorkspace? _autoSdkWorkspaceInfo;
 		protected AgentWorkspace _workspaceInfo;
@@ -29,11 +32,10 @@ namespace Horde.Agent.Execution
 
 		protected WorkspaceInfo? _autoSdkWorkspace;
 		protected WorkspaceInfo _workspace;
+		private bool _syncWithoutHaveTable = false;
 
-		protected Dictionary<string, string> _envVars = new Dictionary<string, string>();
-
-		public PerforceExecutor(IRpcConnection rpcConnection, string jobId, string batchId, string agentTypeName, AgentWorkspace? autoSdkWorkspaceInfo, AgentWorkspace workspaceInfo, DirectoryReference rootDir)
-			: base(rpcConnection, jobId, batchId, agentTypeName)
+		public PerforceExecutor(ISession session, string jobId, string batchId, string agentTypeName, AgentWorkspace? autoSdkWorkspaceInfo, AgentWorkspace workspaceInfo, DirectoryReference rootDir, IHttpClientFactory httpClientFactory)
+			: base(session, jobId, batchId, agentTypeName, httpClientFactory)
 		{
 			_autoSdkWorkspaceInfo = autoSdkWorkspaceInfo;
 			_workspaceInfo = workspaceInfo;
@@ -45,11 +47,19 @@ namespace Horde.Agent.Execution
 		public override async Task InitializeAsync(ILogger logger, CancellationToken cancellationToken)
 		{
 			await base.InitializeAsync(logger, cancellationToken);
+			
+			int index = _additionalArguments.FindIndex(x => x.Contains("-SyncWithoutHaveTable", StringComparison.OrdinalIgnoreCase));
+			if (index >= 0)
+			{
+				logger.LogInformation("Syncing without have table");
+				_additionalArguments.RemoveAt(index);
+				_syncWithoutHaveTable = true;
+			}
 
 			// Setup and sync the autosdk workspace
 			if (_autoSdkWorkspaceInfo != null)
 			{
-				using (IScope ccope = GlobalTracer.Instance.BuildSpan("Workspace").WithResourceName("AutoSDK").StartActive())
+				using (IScope scope = GlobalTracer.Instance.BuildSpan("Workspace").WithResourceName("AutoSDK").StartActive())
 				{
 					_autoSdkWorkspace = await Utility.WorkspaceInfo.SetupWorkspaceAsync(_autoSdkWorkspaceInfo, _rootDir, logger, cancellationToken);
 
@@ -77,7 +87,7 @@ namespace Horde.Agent.Execution
 
 						FileReference autoSdkCacheFile = FileReference.Combine(_autoSdkWorkspace.MetadataDir, "Contents.dat");
 						await WorkspaceInfo.UpdateLocalCacheMarker(autoSdkCacheFile, autoSdkChangeNumber, -1);
-						await _autoSdkWorkspace.SyncAsync(autoSdkChangeNumber, -1, autoSdkCacheFile, cancellationToken);
+						await _autoSdkWorkspace.SyncAsync(autoSdkChangeNumber, -1, autoSdkCacheFile, true, cancellationToken);
 
 						await FileReference.WriteAllTextAsync(syncFile, syncText);
 					}
@@ -98,12 +108,19 @@ namespace Horde.Agent.Execution
 					UpdateJobRequest updateJobRequest = new UpdateJobRequest();
 					updateJobRequest.JobId = _jobId;
 					updateJobRequest.Change = _job.Change;
-					await _rpcConnection.InvokeAsync(x => x.UpdateJobAsync(updateJobRequest, null, null, cancellationToken), new RpcContext(), cancellationToken);
+					await RpcConnection.InvokeAsync(x => x.UpdateJobAsync(updateJobRequest, null, null, cancellationToken), new RpcContext(), cancellationToken);
 				}
 
 				// Sync the workspace
 				int syncPreflightChange = (_job.ClonedPreflightChange != 0) ? _job.ClonedPreflightChange : _job.PreflightChange;
-				await _workspace.SyncAsync(_job.Change, syncPreflightChange, null, cancellationToken);
+				if (_syncWithoutHaveTable)
+				{
+					await _workspace.SyncAsync(_job.Change, syncPreflightChange, null, false, cancellationToken);					
+				}
+				else
+				{
+					await _workspace.SyncAsync(_job.Change, syncPreflightChange, null, true, cancellationToken);
+				}
 
 				// Remove any cached BuildGraph manifests
 				DirectoryReference manifestDir = DirectoryReference.Combine(_workspace.WorkspaceDir, "Engine", "Saved", "BuildGraph");
@@ -207,13 +224,13 @@ namespace Horde.Agent.Execution
 		protected override async Task<bool> SetupAsync(BeginStepResponse step, ILogger logger, CancellationToken cancellationToken)
 		{
 			PerforceLogger perforceLogger = CreatePerforceLogger(logger);
-			return await SetupAsync(step, _workspace.WorkspaceDir, _sharedStorageDir, _envVars, perforceLogger, cancellationToken);
+			return await SetupAsync(step, _workspace.WorkspaceDir, _sharedStorageDir, perforceLogger, cancellationToken);
 		}
 
 		protected override async Task<bool> ExecuteAsync(BeginStepResponse step, ILogger logger, CancellationToken cancellationToken)
 		{
 			PerforceLogger perforceLogger = CreatePerforceLogger(logger);
-			return await ExecuteAsync(step, _workspace.WorkspaceDir, _sharedStorageDir, _envVars, perforceLogger, cancellationToken);
+			return await ExecuteAsync(step, _workspace.WorkspaceDir, _sharedStorageDir, perforceLogger, cancellationToken);
 		}
 
 		public override async Task FinalizeAsync(ILogger logger, CancellationToken cancellationToken)
@@ -223,6 +240,9 @@ namespace Horde.Agent.Execution
 
 		public static async Task ConformAsync(DirectoryReference rootDir, IList<AgentWorkspace> pendingWorkspaces, bool removeUntrackedFiles, ILogger logger, CancellationToken cancellationToken)
 		{
+			using IScope scope = GlobalTracer.Instance.BuildSpan("Conform").StartActive();
+			scope.Span.SetTag("workspaces", String.Join(',', pendingWorkspaces.Select(x => x.Identifier)));
+			
 			// Print out all the workspaces we're going to sync
 			logger.LogInformation("Workspaces:");
 			foreach (AgentWorkspace pendingWorkspace in pendingWorkspaces)
@@ -364,7 +384,7 @@ namespace Horde.Agent.Execution
 					if (populateRequests.Count == 1 && !firstWorkspace.RemoveUntrackedFiles && !removeUntrackedFiles)
 					{
 						await firstWorkspace.CleanAsync(cancellationToken);
-						syncFuncs.Add(() => firstWorkspace.SyncAsync(-1, -1, null, cancellationToken));
+						syncFuncs.Add(() => firstWorkspace.SyncAsync(-1, -1, null, true, cancellationToken));
 					}
 					else
 					{
@@ -385,6 +405,21 @@ namespace Horde.Agent.Execution
 					perforceConnection.Dispose();
 				}
 			}
+		}
+	}
+
+	class PerforceExecutorFactory : JobExecutorFactory
+	{
+		readonly IHttpClientFactory _httpClientFactory;
+
+		public PerforceExecutorFactory(IHttpClientFactory httpClientFactory)
+		{
+			_httpClientFactory = httpClientFactory;
+		}
+
+		public override JobExecutor CreateExecutor(ISession session, ExecuteJobTask executeJobTask, BeginBatchResponse beginBatchResponse)
+		{
+			return new PerforceExecutor(session, executeJobTask.JobId, executeJobTask.BatchId, beginBatchResponse.AgentType, executeJobTask.AutoSdkWorkspace, executeJobTask.Workspace, session.WorkingDir, _httpClientFactory);
 		}
 	}
 }

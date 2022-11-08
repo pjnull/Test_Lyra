@@ -1,11 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
-using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
+using EpicGames.Horde.Storage;
 
 namespace Horde.Build.Storage
 {
@@ -15,12 +16,22 @@ namespace Horde.Build.Storage
 	public interface IStorageBackend
 	{
 		/// <summary>
-		/// Opens a read stream for the given path.
+		/// Attempts to open a read stream for the given path.
 		/// </summary>
 		/// <param name="path">Relative path within the bucket</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
 		/// <returns></returns>
-		Task<Stream?> ReadAsync(string path, CancellationToken cancellationToken = default);
+		Task<Stream?> TryReadAsync(string path, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Attempts to open a read stream for the given path.
+		/// </summary>
+		/// <param name="path">Relative path within the bucket</param>
+		/// <param name="offset">Offset to start reading from</param>
+		/// <param name="length">Length of data to read</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns></returns>
+		Task<Stream?> TryReadAsync(string path, int offset, int length, CancellationToken cancellationToken = default);
 
 		/// <summary>
 		/// Writes a stream to the given path. If the stream throws an exception during read, the write will be aborted.
@@ -45,6 +56,35 @@ namespace Horde.Build.Storage
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
 		/// <returns>Async task</returns>
 		Task DeleteAsync(string path, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Enumerates all the objects in the store
+		/// </summary>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>Sequence of object paths</returns>
+		IAsyncEnumerable<string> EnumerateAsync(CancellationToken cancellationToken = default);
+	}
+
+	/// <summary>
+	/// Storage backend that supports redirecting HTTP traffic (eg. using S3 presigned urls)
+	/// </summary>
+	public interface IStorageBackendWithRedirects : IStorageBackend
+	{
+		/// <summary>
+		/// Gets a redirect for a read request
+		/// </summary>
+		/// <param name="path">Path to read from</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>Path to upload the data to</returns>
+		ValueTask<Uri?> GetReadRedirectAsync(string path, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Gets a redirect for a write request
+		/// </summary>
+		/// <param name="path">Path to write to</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>Path to upload the data to</returns>
+		ValueTask<Uri?> GetWriteRedirectAsync(string path, CancellationToken cancellationToken = default);
 	}
 
 	/// <summary>
@@ -58,13 +98,13 @@ namespace Horde.Build.Storage
 	/// <summary>
 	/// Extension methods for <see cref="IStorageBackend"/>
 	/// </summary>
-	public static class StorageBackendExtensions
+	public static class StorageBackend
 	{
 		/// <summary>
 		/// Wrapper for <see cref="IStorageBackend"/>
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
-		class StorageBackend<T> : IStorageBackend<T>
+		class TypedStorageBackend<T> : IStorageBackend<T>
 		{
 			readonly IStorageBackend _inner;
 
@@ -72,10 +112,13 @@ namespace Horde.Build.Storage
 			/// Constructor
 			/// </summary>
 			/// <param name="inner"></param>
-			public StorageBackend(IStorageBackend inner) => _inner = inner;
+			public TypedStorageBackend(IStorageBackend inner) => _inner = inner;
 
 			/// <inheritdoc/>
-			public Task<Stream?> ReadAsync(string path, CancellationToken cancellationToken) => _inner.ReadAsync(path, cancellationToken);
+			public Task<Stream?> TryReadAsync(string path, CancellationToken cancellationToken) => _inner.TryReadAsync(path, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<Stream?> TryReadAsync(string path, int offset, int length, CancellationToken cancellationToken) => _inner.TryReadAsync(path, offset, length, cancellationToken);
 
 			/// <inheritdoc/>
 			public Task WriteAsync(string path, Stream stream, CancellationToken cancellationToken) => _inner.WriteAsync(path, stream, cancellationToken);
@@ -85,6 +128,56 @@ namespace Horde.Build.Storage
 
 			/// <inheritdoc/>
 			public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken) => _inner.ExistsAsync(path, cancellationToken);
+
+			/// <inheritdoc/>
+			public IAsyncEnumerable<string> EnumerateAsync(CancellationToken cancellationToken = default) => _inner.EnumerateAsync(cancellationToken);
+		}
+
+		/// <summary>
+		/// Extension for blob files
+		/// </summary>
+		public const string BlobExtension = ".blob";
+
+		/// <summary>
+		/// Gets the blob id from a path
+		/// </summary>
+		/// <param name="path">Path to the blob</param>
+		/// <returns>Path to the blob</returns>
+		public static BlobId GetBlobIdFromPath(string path)
+		{
+			BlobId blobId;
+			if (!TryGetBlobIdFromPath(path, out blobId))
+			{
+				throw new ArgumentException("Path is not a valid blob identifier", nameof(path));
+			}
+			return blobId;
+		}
+
+		/// <summary>
+		/// Gets the path to a blob
+		/// </summary>
+		/// <param name="blobId">Blob identifier</param>
+		/// <returns>Path to the blob</returns>
+		public static string GetBlobPath(BlobId blobId) => $"{blobId}{BlobExtension}";
+
+		/// <summary>
+		/// Gets a blob id from a path within the storage backend
+		/// </summary>
+		/// <param name="path">Path to the file</param>
+		/// <param name="blobId">Receives the blob id on success</param>
+		/// <returns>True on success</returns>
+		public static bool TryGetBlobIdFromPath(string path, out BlobId blobId)
+		{
+			if (path.EndsWith(BlobExtension, StringComparison.Ordinal))
+			{
+				blobId = new BlobId(path.Substring(0, path.Length - BlobExtension.Length));
+				return true;
+			}
+			else
+			{
+				blobId = default;
+				return false;
+			}
 		}
 
 		/// <summary>
@@ -95,7 +188,43 @@ namespace Horde.Build.Storage
 		/// <returns></returns>
 		public static IStorageBackend<T> ForType<T>(this IStorageBackend backend)
 		{
-			return new StorageBackend<T>(backend);
+			return new TypedStorageBackend<T>(backend);
+		}
+
+		/// <summary>
+		/// Writes a block of memory to storage
+		/// </summary>
+		/// <param name="storageBackend"></param>
+		/// <param name="path"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<Stream> ReadAsync(this IStorageBackend storageBackend, string path, CancellationToken cancellationToken = default)
+		{
+			Stream? stream = await storageBackend.TryReadAsync(path, cancellationToken);
+			if (stream == null)
+			{
+				throw new FileNotFoundException($"Unable to read from path {path}");
+			}
+			return stream;
+		}
+
+		/// <summary>
+		/// Writes a block of memory to storage
+		/// </summary>
+		/// <param name="storageBackend"></param>
+		/// <param name="path"></param>
+		/// <param name="offset">Offset of the data to read</param>
+		/// <param name="length">Length of the data to read</param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<Stream> ReadAsync(this IStorageBackend storageBackend, string path, int offset, int length, CancellationToken cancellationToken = default)
+		{
+			Stream? stream = await storageBackend.TryReadAsync(path, offset, length, cancellationToken);
+			if (stream == null)
+			{
+				throw new FileNotFoundException($"Unable to read from path {path}");
+			}
+			return stream;
 		}
 
 		/// <summary>
@@ -107,7 +236,7 @@ namespace Horde.Build.Storage
 		/// <returns></returns>
 		public static async Task<ReadOnlyMemory<byte>?> ReadBytesAsync(this IStorageBackend storageBackend, string path, CancellationToken cancellationToken = default)
 		{
-			using (Stream? inputStream = await storageBackend.ReadAsync(path, cancellationToken))
+			using (Stream? inputStream = await storageBackend.TryReadAsync(path, cancellationToken))
 			{
 				if (inputStream == null)
 				{

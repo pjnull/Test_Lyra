@@ -493,7 +493,7 @@ void UAnimPoseExtensions::GetReferencePose(USkeleton* Skeleton, FAnimPose& OutPo
 		RequiredBoneIndexArray.AddUninitialized(RefSkeleton.GetNum());
 		for (int32 BoneIndex = 0; BoneIndex < RequiredBoneIndexArray.Num(); ++BoneIndex)
 		{
-			RequiredBoneIndexArray[BoneIndex] = BoneIndex;
+			RequiredBoneIndexArray[BoneIndex] = IntCastChecked<FBoneIndexType>(BoneIndex);
 		}
 
 		FBoneContainer RequiredBones;
@@ -527,12 +527,11 @@ float UAnimPoseExtensions::GetCurveWeight(const FAnimPose& Pose, const FName& Cu
 
 void UAnimPoseExtensions::GetAnimPoseAtFrame(const UAnimSequenceBase* AnimationSequenceBase, int32 FrameIndex, FAnimPoseEvaluationOptions EvaluationOptions, FAnimPose& Pose)
 {
-	float Time = 0.f;
-	UAnimationBlueprintLibrary::GetTimeAtFrame(AnimationSequenceBase, FrameIndex, Time);
+	const double Time = AnimationSequenceBase->GetDataModel()->GetFrameRate().AsSeconds(FrameIndex);
 	GetAnimPoseAtTime(AnimationSequenceBase, Time, EvaluationOptions, Pose);
 }
 
-void UAnimPoseExtensions::GetAnimPoseAtTime(const UAnimSequenceBase* AnimationSequenceBase, float Time, FAnimPoseEvaluationOptions EvaluationOptions, FAnimPose& Pose)
+void UAnimPoseExtensions::GetAnimPoseAtTime(const UAnimSequenceBase* AnimationSequenceBase, double Time, FAnimPoseEvaluationOptions EvaluationOptions, FAnimPose& Pose)
 {
 	TArray<FAnimPose> InOutPoses;
 	GetAnimPoseAtTimeIntervals(AnimationSequenceBase, { Time }, EvaluationOptions, InOutPoses);
@@ -544,7 +543,7 @@ void UAnimPoseExtensions::GetAnimPoseAtTime(const UAnimSequenceBase* AnimationSe
 	}
 } 
 
-void UAnimPoseExtensions::GetAnimPoseAtTimeIntervals(const UAnimSequenceBase* AnimationSequenceBase, TArray<float> TimeIntervals, FAnimPoseEvaluationOptions EvaluationOptions, TArray<FAnimPose>& InOutPoses)
+void UAnimPoseExtensions::GetAnimPoseAtTimeIntervals(const UAnimSequenceBase* AnimationSequenceBase, TArray<double> TimeIntervals, FAnimPoseEvaluationOptions EvaluationOptions, TArray<FAnimPose>& InOutPoses)
 {
 	if (AnimationSequenceBase && AnimationSequenceBase->GetSkeleton())
 	{
@@ -568,7 +567,7 @@ void UAnimPoseExtensions::GetAnimPoseAtTimeIntervals(const UAnimSequenceBase* An
 		RequiredBoneIndexArray.AddUninitialized(NumRequiredBones);
 		for (int32 BoneIndex = 0; BoneIndex < RequiredBoneIndexArray.Num(); ++BoneIndex)
 		{
-			RequiredBoneIndexArray[BoneIndex] = BoneIndex;
+			RequiredBoneIndexArray[BoneIndex] = static_cast<FBoneIndexType>(BoneIndex);
 		}
 
 		FBoneContainer RequiredBones;
@@ -584,7 +583,7 @@ void UAnimPoseExtensions::GetAnimPoseAtTimeIntervals(const UAnimSequenceBase* An
         UE::Anim::FStackAttributeContainer Attributes;
 
         FAnimationPoseData PoseData(CompactPose, Curve, Attributes);
-        FAnimExtractContext Context(0.f, EvaluationOptions.bExtractRootMotion);
+        FAnimExtractContext Context(0.0, EvaluationOptions.bExtractRootMotion);
     
         FCompactPose BasePose;
         BasePose.SetBoneContainer(&RequiredBones);
@@ -597,10 +596,10 @@ void UAnimPoseExtensions::GetAnimPoseAtTimeIntervals(const UAnimSequenceBase* An
 		
 		for (int32 Index = 0; Index < TimeIntervals.Num(); ++Index)
 		{
-			const float EvalInterval = TimeIntervals[Index];
+			const double EvalInterval = TimeIntervals[Index];
 			
 			bool bValidTime = false;
-			UAnimationBlueprintLibrary::IsValidTime(AnimationSequenceBase, EvalInterval, bValidTime);
+			UAnimationBlueprintLibrary::IsValidTime(AnimationSequenceBase, static_cast<float>(EvalInterval), bValidTime);
 			ensure(bValidTime);
 
 			Context.CurrentTime = EvalInterval;

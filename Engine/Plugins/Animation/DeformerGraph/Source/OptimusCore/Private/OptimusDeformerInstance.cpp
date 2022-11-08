@@ -10,7 +10,6 @@
 #include "OptimusVariableDescription.h"
 #include "RenderGraphBuilder.h"
 #include "Rendering/SkeletalMeshRenderData.h"
-#include "SkeletalRenderPublic.h"
 #include "DataInterfaces/OptimusDataInterfaceRawBuffer.h"
 
 
@@ -337,18 +336,6 @@ void UOptimusDeformerInstance::SetupFromDeformer(UOptimusDeformer* InDeformer)
 			}
 		}
 
-		int32 LODIndex = 0;
-		if (const USkinnedMeshComponent* SkinnedMeshComponent = Cast<USkinnedMeshComponent>(MeshComponent))
-		{
-			// This guff should be a utility function on USkinnedMeshComponent. 
-			LODIndex = SkinnedMeshComponent->GetPredictedLODLevel();
-			
-			if (SkinnedMeshComponent->GetSkinnedAsset() && SkinnedMeshComponent->GetSkinnedAsset()->IsStreamable() && SkinnedMeshComponent->MeshObject)
-			{
-				LODIndex = FMath::Max<int32>(LODIndex, SkinnedMeshComponent->MeshObject->GetSkeletalMeshRenderData().PendingFirstLODIdx);
-			}
-		}
-
 		for(TObjectPtr<UComputeDataProvider> DataProvider: Info.ComputeGraphInstance.GetDataProviders())
 		{
 			// Make the persistent buffer data provider aware of the buffer pool and current LOD index.
@@ -515,6 +502,11 @@ bool UOptimusDeformerInstance::SetVectorVariable(FName InVariableName, const FVe
 bool UOptimusDeformerInstance::SetVector4Variable(FName InVariableName, const FVector4& InValue)
 {
 	return SetVariableValue<FVector4>(Variables, InVariableName, "FVector4", InValue);
+}
+
+bool UOptimusDeformerInstance::SetTransformVariable(FName InVariableName, const FTransform& InValue)
+{
+	return SetVariableValue<FTransform>(Variables, InVariableName, "FTransform", InValue);
 }
 
 const TArray<UOptimusVariableDescription*>& UOptimusDeformerInstance::GetVariables() const

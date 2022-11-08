@@ -19,7 +19,7 @@
 
 class IPlatformChunkInstall;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogChunkInstaller, Log, All);
+CORE_API DECLARE_LOG_CATEGORY_EXTERN(LogChunkInstaller, Log, All);
 
 namespace EChunkLocation
 {
@@ -81,6 +81,11 @@ DECLARE_DELEGATE_OneParam(FPlatformChunkInstallCompleteDelegate, uint32);
 /** Delegate called when a chunk either successfully installs or fails to install, bool is success */
 DECLARE_DELEGATE_TwoParams(FPlatformChunkInstallDelegate, uint32, bool);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FPlatformChunkInstallMultiDelegate, uint32, bool);
+
+/** Delegate called when a Named Chunk either successfully installs or fails to install, bool is success */
+DECLARE_DELEGATE_TwoParams(FPlatformNamedChunkInstallDelegate, FName, bool);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FPlatformNamedChunkInstallMultiDelegate, FName, bool);
+
 
 enum class ECustomChunkType : uint8
 {
@@ -205,12 +210,6 @@ public:
 	 */
 	virtual void RemoveChunkInstallDelegate( FDelegateHandle Delegate ) = 0;
 
-	UE_DEPRECATED(4.18, "Call AddChunkInstallDelegate instead, which is now bound for all chunk ids")
-	virtual FDelegateHandle SetChunkInstallDelgate( uint32 ChunkID, FPlatformChunkInstallCompleteDelegate Delegate ) = 0;
-
-	UE_DEPRECATED(4.18, "Call RemoveChunkInstallDelegate instead")
-	virtual void RemoveChunkInstallDelgate( uint32 ChunkID, FDelegateHandle Delegate ) = 0;
-
 
 	UE_DEPRECATED(5.1, "Call SupportsNamedChunkInstall instead")
 	virtual bool SupportsIntelligentInstall() = 0;
@@ -223,6 +222,9 @@ public:
 
 	UE_DEPRECATED(5.1, "Call UninstallNamedChunks instead")
 	virtual bool UninstallChunks(const TArray<FCustomChunk>& ChunkTagsID) = 0;
+
+	UE_DEPRECATED(5.2, "Call GetNamedChunksByType instead")
+	virtual TArray<FCustomChunk> GetCustomChunksByType(ECustomChunkType DesiredChunkType) = 0;
 
 
 	/**
@@ -257,14 +259,14 @@ public:
 	 * @param NamedChunks	The names of the chunks to install
 	 * @return				whether installation task has been kicked
 	 **/
-	virtual bool InstallNamedChunks(const TArrayView<FName>& NamedChunks) = 0;
+	virtual bool InstallNamedChunks(const TArrayView<const FName>& NamedChunks) = 0;
 
 	/**
 	 * Uninstall the given set of named chunks
 	 * @param NamedChunk	The names of the chunks to uninstall
 	 * @return				whether uninstallation task has been kicked
 	 **/
-	virtual bool UninstallNamedChunks(const TArrayView<FName>& NamedChunks) = 0;
+	virtual bool UninstallNamedChunks(const TArrayView<const FName>& NamedChunks) = 0;
 
 	/**
 	 * Get the current location of the given named chunk
@@ -302,6 +304,19 @@ public:
 	 * @return				Array containing all named chunks of the given type
 	 */
 	virtual TArray<FName> GetNamedChunksByType(ENamedChunkType NamedChunkType) const = 0;
+
+	/** 
+	 * Request a delegate callback on named chunk install completion or failure. Request may not be respected.
+	 * @param Delegate		The delegate to call when any named chunk is installed or fails to install
+	 * @return				Handle to the bound delegate
+	 */
+	virtual FDelegateHandle AddNamedChunkInstallDelegate( FPlatformNamedChunkInstallDelegate Delegate ) = 0;
+
+	/**
+	 * Remove a delegate callback on named chunk install completion.
+	 * @param Delegate		The delegate to remove.
+	 */
+	virtual void RemoveNamedChunkInstallDelegate( FDelegateHandle Delegate ) = 0;
 
 protected:
 		/**
@@ -393,16 +408,6 @@ public:
 		InstallDelegate.Remove(Delegate);
 	}
 
-	virtual FDelegateHandle SetChunkInstallDelgate(uint32 ChunkID, FPlatformChunkInstallCompleteDelegate Delegate) override
-	{
-		return FDelegateHandle();
-	}
-
-	virtual void RemoveChunkInstallDelgate(uint32 ChunkID, FDelegateHandle Delegate) override
-	{
-		return;
-	}
-
 	virtual bool SupportsIntelligentInstall() override
 	{
 		return false;
@@ -423,6 +428,11 @@ public:
 		return false;
 	}
 
+	virtual TArray<FCustomChunk> GetCustomChunksByType(ECustomChunkType DesiredChunkType) override
+	{
+		return TArray<FCustomChunk>();
+	}
+
 	virtual bool SupportsNamedChunkInstall() const override
 	{
 		return false;
@@ -435,20 +445,20 @@ public:
 
 	virtual bool InstallNamedChunk(const FName NamedChunk) override
 	{
-		return false;
+		return InstallNamedChunks(MakeArrayView(&NamedChunk,1));
 	}
 
 	virtual bool UninstallNamedChunk(const FName NamedChunk) override
 	{
-		return false;
+		return UninstallNamedChunks(MakeArrayView(&NamedChunk,1));
 	}
 
-	virtual bool InstallNamedChunks(const TArrayView<FName>& NamedChunks) override
+	virtual bool InstallNamedChunks(const TArrayView<const FName>& NamedChunks) override
 	{
 		return false;
 	}
 
-	virtual bool UninstallNamedChunks(const TArrayView<FName>& NamedChunks) override
+	virtual bool UninstallNamedChunks(const TArrayView<const FName>& NamedChunks) override
 	{
 		return false;
 	}
@@ -478,10 +488,22 @@ public:
 		return TArray<FName>();
 	}
 
+	virtual FDelegateHandle AddNamedChunkInstallDelegate(FPlatformNamedChunkInstallDelegate Delegate) override
+	{
+		return NamedChunkInstallDelegate.Add(Delegate);
+	}
+
+	virtual void RemoveNamedChunkInstallDelegate(FDelegateHandle Delegate) override
+	{
+		NamedChunkInstallDelegate.Remove(Delegate);
+	}
+
+
 protected:
 
-	/** Delegate called when installation succeeds or fails */
+	/** Delegates called when installation succeeds or fails */
 	FPlatformChunkInstallMultiDelegate InstallDelegate;
+	FPlatformNamedChunkInstallMultiDelegate NamedChunkInstallDelegate;
 
 	virtual EChunkLocation::Type GetChunkLocation(uint32 ChunkID) override
 	{
@@ -489,36 +511,15 @@ protected:
 	}
 };
 
-// temporary helper base for platform chunk installers to transition from FCustomChunk to named chunks
-class FNamedChunkPlatformChunkInstall : public FGenericPlatformChunkInstall
+
+// temporary helper base class for platform chunk installers that have implemented named chunk support to provide FCustomChunk emulation
+class CORE_API FGenericPlatformChunkInstall_WithEmulatedCustomChunks : public FGenericPlatformChunkInstall
 {
 public:
-	virtual bool SupportsNamedChunkInstall() const override
-	{
-		return true;
-	}
-
-	virtual bool IsNamedChunkInProgress(const FName NamedChunk) override;
-	virtual bool InstallNamedChunk(const FName NamedChunk) override;
-	virtual bool UninstallNamedChunk(const FName NamedChunk) override;
-	virtual bool InstallNamedChunks(const TArrayView<FName>& NamedChunks) override;
-	virtual bool UninstallNamedChunks(const TArrayView<FName>& NamedChunks) override;
-
-	virtual EChunkLocation::Type GetNamedChunkLocation(const FName NamedChunk) override;
-	virtual float GetNamedChunkProgress(const FName NamedChunk, EChunkProgressReportingType::Type ReportType) override;
-	virtual bool PrioritizeNamedChunk(const FName NamedChunk, EChunkPriority::Type Priority) override;
-
-	virtual ENamedChunkType GetNamedChunkType(const FName NamedChunk) const override;
-	virtual TArray<FName> GetNamedChunksByType(ENamedChunkType NamedChunkType) const override;
-
-protected:
-	virtual float GetCustomChunkProgress(const FCustomChunk& CustomChunk, EChunkProgressReportingType::Type ReportType) = 0; // platform specializations need to implement this as it's missing in the existing api
-	bool TryGetCustomChunkFromNamedChunk(const FName NamedChunk, FCustomChunk& OutCustomChunk) const;
-	TArray<FCustomChunk> GetCustomChunksFromNamedChunk(const FName NamedChunk) const;
-	TArray<FCustomChunk> GetCustomChunksFromNamedChunks(const TArrayView<FName>& NamedChunks) const;
-	TArray<FName> GetNamedChunksFromCustomChunks(const TArray<FCustomChunk>& CustomChunks) const;
-	FName GetNamedChunkByPakChunkIndex(int32 InPakchunkIndex) const;
-	FName GetCustomChunkName(const FCustomChunk& CustomChunk) const;
+	virtual bool SupportsIntelligentInstall() override final { return true; }
+	virtual bool IsChunkInstallationPending(const TArray<FCustomChunk>& ChunkTagsID) override final;
+	virtual bool InstallChunks(const TArray<FCustomChunk>& ChunkTagsID)  override final;
+	virtual bool UninstallChunks(const TArray<FCustomChunk>& ChunkTagsID) override final;
 };
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

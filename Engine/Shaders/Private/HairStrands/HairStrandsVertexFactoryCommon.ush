@@ -50,6 +50,22 @@ FHairControlPoint UnpackHairControlPoint(
 	return Out;	
 }
 
+float UnpackHairControlPointCoordU(uint4 InPackedData)
+{
+	const uint PackedAlpha = asuint(InPackedData.w);
+	return ((PackedAlpha & 0xFF00) >> 8) / 255.f;
+}
+
+float3 UnpackHairControlPointPosition(uint4 InPackedData, float3 InVF_PositionOffset)
+{
+	return f16tof32(InPackedData.xyz) + InVF_PositionOffset;
+}
+
+uint4 PackHairControlPointPosition(uint4 InPackedData, float3 InNewPosition, float3 InPositionOffset)
+{
+	return uint4(f32tof16(InNewPosition.xyz - InPositionOffset), InPackedData.w);
+}
+
 bool IsValidHairStrandsSegment(const FHairControlPoint CP0, const FHairControlPoint CP1)
 {
 	return !(CP0.Type == HAIR_CONTROLPOINT_END && CP1.Type == HAIR_CONTROLPOINT_START);
@@ -65,7 +81,7 @@ struct FHairAttributes
 	float WorldLength;
 };
 
-FHairAttributes DecodeHairAttribute(float2 Attributes0, uint Attributes1, float InVF_Length)
+FHairAttributes UnpackHairAttribute(float2 Attributes0, uint Attributes1, float InVF_Length)
 {
 	float2 RootUV, RootIndex;
 	RootUV.x		= ((Attributes1    ) & 0x7FF) / 2047.f;	// Coord are encoded on 11 bits
@@ -80,6 +96,23 @@ FHairAttributes DecodeHairAttribute(float2 Attributes0, uint Attributes1, float 
 	Out.RootUV		= RootUV + RootIndex;
 	Out.WorldLength = Attributes0.x * InVF_Length;
 	Out.Seed		= Attributes0.y;
+	return Out;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Hair Curve
+
+struct FHairCurve
+{
+	uint PointIndex;
+	uint PointCount;
+};
+
+FHairCurve UnpackHairCurve(uint In)
+{
+	FHairCurve Out = (FHairCurve)0;
+	Out.PointIndex = In & 0xFFFFFF;
+	Out.PointCount = In >> 24;
 	return Out;
 }
 

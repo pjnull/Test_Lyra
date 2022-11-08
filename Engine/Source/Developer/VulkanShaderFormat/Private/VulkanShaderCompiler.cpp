@@ -870,6 +870,12 @@ static void ConvertToNEWHeader(FOLDVulkanCodeHeader& OLDHeader,
 	OutHeader.DebugName = OLDHeader.ShaderName;
 #endif
 	OutHeader.InOutMask = OLDHeader.SerializedBindings.InOutMask.Bitmask;
+
+	OutHeader.RayTracingPayloadType = 0;
+	if (const FString* RTPayloadTypePtr = ShaderInput.Environment.GetDefinitions().Find(TEXT("RT_PAYLOAD_TYPE")))
+	{
+		OutHeader.RayTracingPayloadType = FCString::Atoi(**RTPayloadTypePtr);
+	}
 }
 
 
@@ -880,6 +886,7 @@ static void BuildShaderOutput(
 	int32						SourceLen,
 	const FVulkanBindingTable&	BindingTable,
 	uint32						NumLines,
+	uint8						WaveSize,
 	FVulkanSpirv&				Spirv,
 	const FString&				DebugName,
 	bool						bSourceContainsMetaDataOnly)
@@ -900,7 +907,6 @@ static void BuildShaderOutput(
 
 	FOLDVulkanCodeHeader OLDHeader;
 
-	FShaderParameterMap& ParameterMap = ShaderOutput.ParameterMap;
 	EShaderFrequency Frequency = (EShaderFrequency)ShaderOutput.Target.Frequency;
 
 	TBitArray<> UsedUniformBufferSlots;
@@ -1032,7 +1038,9 @@ static void BuildShaderOutput(
 			ShaderOutput
 		);
 
-		NEWEntryTypes.Add(PackedGlobal.Name, FVulkanShaderHeader::PackedGlobal);
+		FString ParamName = PackedGlobal.Name;
+		UE::ShaderCompilerCommon::RemoveBindlessParameterPrefix(ParamName);
+		NEWEntryTypes.Add(ParamName, FVulkanShaderHeader::PackedGlobal);
 
 		uint32& Size = PackedGlobalArraySize.FindOrAdd((CrossCompiler::EPackedTypeName)PackedGlobal.PackedType);
 		Size = FMath::Max<uint32>(BytesPerComponent * (PackedGlobal.Offset + PackedGlobal.Count), Size);
@@ -1198,7 +1206,7 @@ static void BuildShaderOutput(
 			if (!SharedSamplerStates.Contains(SamplerState))
 			{
 				// ParameterMap does not use a TMultiMap, so we cannot push the same entry to it more than once!  if we try to, we've done something wrong...
-				check(!ParameterMap.ContainsParameterAllocation(*SamplerState));
+				check(!ShaderOutput.ParameterMap.ContainsParameterAllocation(*SamplerState));
 
 				HandleReflectedShaderSampler(SamplerState, Sampler.Offset, VulkanBindingIndex, Sampler.Count, ShaderOutput);
 
@@ -1304,6 +1312,9 @@ static void BuildShaderOutput(
 		NEWHeader.DebugName = ShaderInput.GenerateShaderName();
 	}
 
+	// Plug the passed in WaveSize
+	NEWHeader.WaveSize = WaveSize;
+
 	// Write out the header and shader source code.
 	FMemoryWriter Ar(ShaderOutput.ShaderCode.GetWriteAccess(), true);
 	Ar << NEWHeader;
@@ -1341,10 +1352,8 @@ FCompilerInfo::FCompilerInfo(const FShaderCompilerInput& InInput, const FString&
 	Input(InInput),
 	WorkingDirectory(InWorkingDirectory),
 	CCFlags(0),
-	Frequency(InFrequency),
-	bDebugDump(false)
+	Frequency(InFrequency)
 {
-	bDebugDump = Input.DumpDebugInfoPath != TEXT("") && IFileManager::Get().DirectoryExists(*Input.DumpDebugInfoPath);
 	BaseSourceFilename = Input.GetSourceFilename();
 }
 
@@ -1353,9 +1362,29 @@ FCompilerInfo::FCompilerInfo(const FShaderCompilerInput& InInput, const FString&
 static void GatherSpirvReflectionBindings(
 	spv_reflect::ShaderModule&	Reflection,
 	FSpirvReflectBindings&		OutBindings,
-	const EShaderFrequency		ShaderFrequency)
+	const EShaderFrequency		ShaderFrequency,
+	const bool					bSupportsBindless)
 {
-	SpvReflectResult SpvResult = SPV_REFLECT_RESULT_NOT_READY;
+	// Change descriptor set numbers
+	TArray<SpvReflectDescriptorSet*> DescriptorSets;
+	uint32 NumDescriptorSets = 0;
+
+	// If bindless is supported, then offset the descriptor set to fit the bindless heaps at the beginning
+	const uint32 DescSetNo = bSupportsBindless ? VulkanBindless::NumBindlessSets + ShaderStage::GetStageForFrequency(ShaderFrequency) : ShaderStage::GetStageForFrequency(ShaderFrequency);
+
+	SpvReflectResult SpvResult = Reflection.EnumerateDescriptorSets(&NumDescriptorSets, nullptr);
+	check(SpvResult == SPV_REFLECT_RESULT_SUCCESS);
+	if (NumDescriptorSets > 0)
+	{
+		DescriptorSets.SetNum(NumDescriptorSets);
+		SpvResult = Reflection.EnumerateDescriptorSets(&NumDescriptorSets, DescriptorSets.GetData());
+		check(SpvResult == SPV_REFLECT_RESULT_SUCCESS);
+
+		for (const SpvReflectDescriptorSet* DescSet : DescriptorSets)
+		{
+			Reflection.ChangeDescriptorSetNumber(DescSet, DescSetNo);
+		}
+	}
 
 	OutBindings.GatherInputAttributes(Reflection);
 	OutBindings.GatherOutputAttributes(Reflection);
@@ -1371,23 +1400,29 @@ static void GatherSpirvReflectionBindings(
 		OutBindings.AssignInputAttributeLocationsBySemanticIndex(Reflection, CrossCompiler::FShaderConductorContext::GetIdentifierTable().InputAttribute);
 	}
 
-	// Change descriptor set numbers
-	TArray<SpvReflectDescriptorSet*> DescriptorSets;
-	uint32 NumDescriptorSets = 0;
-
-	SpvResult = Reflection.EnumerateDescriptorSets(&NumDescriptorSets, nullptr);
-	check(SpvResult == SPV_REFLECT_RESULT_SUCCESS);
-	if (NumDescriptorSets > 0)
+	// Patch resource heaps descriptor set numbers
+	if (bSupportsBindless)
 	{
-		DescriptorSets.SetNum(NumDescriptorSets);
-		SpvResult = Reflection.EnumerateDescriptorSets(&NumDescriptorSets, DescriptorSets.GetData());
-		check(SpvResult == SPV_REFLECT_RESULT_SUCCESS);
-
-		for (const SpvReflectDescriptorSet* DescSet : DescriptorSets)
+		// Move the bindless heap to its dedicated descriptor set and remove it from our regular binding arrays
+		auto MoveBindlessHeaps = [&](TArray<SpvReflectDescriptorBinding*>& BindingArray, const TCHAR* HeapPrefix, uint32 BinldessDescSetNo)
 		{
-			const uint32 DescSetNo = ShaderStage::GetStageForFrequency(ShaderFrequency);
-			Reflection.ChangeDescriptorSetNumber(DescSet, DescSetNo);
-		}
+			for (int32 Index = BindingArray.Num() - 1; Index >= 0; --Index)
+			{
+				const SpvReflectDescriptorBinding* pBinding = BindingArray[Index];
+				FString BindingName(ANSI_TO_TCHAR(pBinding->name));
+				if (BindingName.StartsWith(HeapPrefix))
+				{
+					const uint32 Binding = 0;  // single bindless heap per descriptor set
+					Reflection.ChangeDescriptorBindingNumbers(pBinding, Binding, BinldessDescSetNo);
+					BindingArray.RemoveAtSwap(Index);
+				}
+			}
+		};
+
+		// Remove sampler heaps from binding arrays
+		MoveBindlessHeaps(OutBindings.Samplers, VulkanBindless::kBindlessSamplerArrayPrefix, VulkanBindless::BindlessSamplerSet);
+
+		// todo-jn: Remove resource heaps from binding arrays
 	}
 }
 
@@ -1447,6 +1482,7 @@ static bool BuildShaderOutputFromSpirv(
 	FShaderCompilerOutput&					Output,
 	FVulkanBindingTable&					BindingTable,
 	const FString&							EntryPointName,
+	uint8									WaveSize,
 	bool									bStripReflect,
 	bool									bIsRayTracingShader,
 	bool									bDebugDump)
@@ -1494,8 +1530,10 @@ static bool BuildShaderOutputFromSpirv(
 		check(Result == SPV_REFLECT_RESULT_SUCCESS);
 	}
 
+	const bool bSupportsBindless = Input.Environment.CompilerFlags.Contains(CFLAG_BindlessResources) || Input.Environment.CompilerFlags.Contains(CFLAG_BindlessSamplers);
+
 	FSpirvReflectBindings Bindings;
-	GatherSpirvReflectionBindings(Reflection, Bindings, static_cast<EShaderFrequency>(Input.Target.Frequency));
+	GatherSpirvReflectionBindings(Reflection, Bindings, static_cast<EShaderFrequency>(Input.Target.Frequency), bSupportsBindless);
 
 	// Register how often a sampler-state is used
 	for (const SpvReflectDescriptorBinding* Binding : Bindings.TextureSRVs)
@@ -1855,6 +1893,7 @@ static bool BuildShaderOutputFromSpirv(
 		MetaData.Len(),
 		BindingTable,
 		ApproxInstructionCount,
+		WaveSize,
 		Spirv,
 		DebugName,
 		true // source contains meta data only
@@ -2107,6 +2146,96 @@ static void VulkanCreateDXCCompileBatchFiles(
 	}
 }
 
+// Quick and dirty way to get the location of the entrypoint in the source
+// NOTE: Preprocessed shaders have mcros resolves and comments removed, it makes this easier...
+static FString ParseEntrypointDecl(FStringView PreprocessedShader, FStringView Entrypoint)
+{
+	auto SkipWhitespace = [&](int32& Index)
+	{
+		while (FChar::IsWhitespace(PreprocessedShader[Index]))
+		{
+			++Index;
+		}
+	};
+
+	auto EraseDebugLines = [](FString& EntryPointDecl)
+	{
+		int32 HashIndex;
+		while (EntryPointDecl.FindChar(TEXT('#'), HashIndex))
+		{
+			while ((HashIndex < EntryPointDecl.Len()) && (!FChar::IsLinebreak(EntryPointDecl[HashIndex])))
+			{
+				EntryPointDecl[HashIndex] = TEXT(' ');
+				++HashIndex;
+			}
+		}
+	};
+
+	FString EntryPointDecl;
+
+	// Go through all the case sensitive matches in the source
+	int32 EntrypointIndex = PreprocessedShader.Find(Entrypoint);
+	check(EntrypointIndex != INDEX_NONE);
+	while (EntrypointIndex != INDEX_NONE)
+	{
+		// This should be the beginning of a new word
+		if ((EntrypointIndex == 0) || !FChar::IsWhitespace(PreprocessedShader[EntrypointIndex - 1]))
+		{
+			EntrypointIndex = PreprocessedShader.Find(Entrypoint, EntrypointIndex + 1);
+			continue;
+		}
+
+		// The next thing after the entrypoint should its parameters
+		// White space is allowed, so skip any that is found
+
+		int32 ParamsStart = EntrypointIndex + Entrypoint.Len();
+		SkipWhitespace(ParamsStart);
+		if (PreprocessedShader[ParamsStart] != TEXT('('))
+		{
+			EntrypointIndex = PreprocessedShader.Find(Entrypoint, ParamsStart);
+			continue;
+		}
+
+		int32 ParamsEnd = PreprocessedShader.Find(TEXT(")"), ParamsStart+1);
+		check(ParamsEnd != INDEX_NONE);
+		if (ParamsEnd == INDEX_NONE)
+		{
+			// Suspicious
+			EntrypointIndex = PreprocessedShader.Find(Entrypoint, ParamsStart);
+			continue;
+		}
+
+		// Make sure to grab everything up to the function content
+
+		int32 DeclEnd = ParamsEnd + 1;
+		while (PreprocessedShader[DeclEnd] != TEXT('{') && (PreprocessedShader[DeclEnd] != TEXT(';')))
+		{
+			++DeclEnd;
+		}
+		if (PreprocessedShader[DeclEnd] != TEXT('{'))
+		{
+			EntrypointIndex = PreprocessedShader.Find(Entrypoint, DeclEnd);
+			continue;
+		}
+
+		// Now back up to pick up the return value, the attributes and everything else that can come with it, like "[numthreads(1,1,1)]"
+
+		int32 DeclBegin = EntrypointIndex - 1;
+		while ( (DeclBegin > 0) && (PreprocessedShader[DeclBegin] != TEXT(';')) && (PreprocessedShader[DeclBegin] != TEXT('}')))
+		{
+			--DeclBegin;
+		}
+		++DeclBegin;
+
+		EntryPointDecl = FString(DeclEnd - DeclBegin, &PreprocessedShader[DeclBegin]);
+		EraseDebugLines(EntryPointDecl);
+		EntryPointDecl.TrimStartAndEndInline();
+		break;
+	}
+
+	return EntryPointDecl;
+}
+
 static bool CompileWithShaderConductor(
 	const FString&			PreprocessedShader,
 	const FString&			EntryPointName,
@@ -2119,8 +2248,9 @@ static bool CompileWithShaderConductor(
 	const FShaderCompilerInput& Input = CompilerInfo.Input;
 
 	const bool bIsRayTracingShader = Input.IsRayTracingShader();
+	const bool bHasBindless = Input.Environment.CompilerFlags.Contains(CFLAG_BindlessResources) || Input.Environment.CompilerFlags.Contains(CFLAG_BindlessSamplers);
 	const bool bRewriteHlslSource = !bIsRayTracingShader;
-	const bool bDebugDump = CompilerInfo.bDebugDump;
+	const bool bDebugDump = Input.DumpDebugInfoEnabled();
 
 	CrossCompiler::FShaderConductorContext CompilerContext;
 
@@ -2150,6 +2280,8 @@ static bool CompileWithShaderConductor(
 		Options.TargetEnvironment = GetMinimumTargetEnvironment(Input.Target.GetPlatform());
 	}
 
+	UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShader, { CompilerInfo.CCFlags });
+
 	if (bDebugDump)
 	{
 		VulkanCreateDXCCompileBatchFiles(
@@ -2157,8 +2289,45 @@ static bool CompileWithShaderConductor(
 			Frequency,
 			CompilerInfo,
 			Options);
+	}
 
-		DumpDebugUSF(Input, PreprocessedShader, CompilerInfo.CCFlags);
+	// Before the shader rewritter removes all traces of it, pull any WAVESIZE directives from the shader source
+	uint8 WaveSize = 0;
+	if (!bIsRayTracingShader)
+	{
+		const FString EntrypointDecl = ParseEntrypointDecl(PreprocessedShader, EntryPointName);
+
+		const FString WaveSizeMacro(TEXT("VULKAN_WAVESIZE("));
+		int32 WaveSizeIndex = EntrypointDecl.Find(*WaveSizeMacro, ESearchCase::CaseSensitive);
+		while (WaveSizeIndex != INDEX_NONE)
+		{
+			const int32 StartNumber = WaveSizeIndex + WaveSizeMacro.Len();
+			const int32 EndNumber = EntrypointDecl.Find(TEXT(")"), ESearchCase::CaseSensitive, ESearchDir::FromStart, StartNumber);
+			check(EndNumber != INDEX_NONE);
+
+			FString WaveSizeValue(EndNumber - StartNumber, &EntrypointDecl[StartNumber]);
+			WaveSizeValue.RemoveSpacesInline();
+			if (WaveSizeValue != TEXT("N"))  // skip the macro decl
+			{
+				float FloatResult = 0.0;
+				if (FMath::Eval(WaveSizeValue, FloatResult))
+				{
+					checkf((FloatResult >= 0.0f) && (FloatResult < (float)MAX_uint8), TEXT("Specified wave size is too large for 8bit uint!"));
+					WaveSize = static_cast<uint8>(FloatResult);
+
+				}
+				else
+				{
+					check(WaveSizeValue.IsNumeric());
+					const int32 ConvertedWaveSize = FCString::Atoi(*WaveSizeValue);
+					checkf((ConvertedWaveSize > 0) && (ConvertedWaveSize < MAX_uint8), TEXT("Specified wave size is too large for 8bit uint!"));
+					WaveSize = (uint8)ConvertedWaveSize;
+				}
+				break;
+			}
+
+			WaveSizeIndex = EntrypointDecl.Find(*WaveSizeMacro, ESearchCase::CaseSensitive, ESearchDir::FromStart, EndNumber);
+		}
 	}
 
 	if (bRewriteHlslSource)
@@ -2193,7 +2362,7 @@ static bool CompileWithShaderConductor(
 	Patch64bitSamplers(Spirv);
 
 	// Build shader output and binding table
-	Output.bSucceeded = BuildShaderOutputFromSpirv(CompilerContext, Spirv, Input, Output, BindingTable, EntryPointName, bStripReflect, bIsRayTracingShader, bDebugDump);
+	Output.bSucceeded = BuildShaderOutputFromSpirv(CompilerContext, Spirv, Input, Output, BindingTable, EntryPointName, WaveSize, bStripReflect, bIsRayTracingShader, bDebugDump);
 
 	if (Input.Environment.CompilerFlags.Contains(CFLAG_ExtraShaderData))
 	{
@@ -2288,7 +2457,15 @@ void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOut
 	if (TargetEnvironment >= CrossCompiler::FShaderConductorOptions::ETargetEnvironment::Vulkan_1_1)
 	{
 		AdditionalDefines.SetDefine(TEXT("PLATFORM_SUPPORTS_SM6_0_WAVE_OPERATIONS"), 1);
+		AdditionalDefines.SetDefine(TEXT("VULKAN_SUPPORTS_SUBGROUP_SIZE_CONTROL"), 1);
 	}
+	else
+	{
+		check(!Input.Environment.CompilerFlags.Contains(CFLAG_WaveOperations));
+	}
+
+	AdditionalDefines.SetDefine(TEXT("VULKAN_BINDLESS_SAMPLER_ARRAY_PREFIX"), VulkanBindless::kBindlessSamplerArrayPrefix);
+	AdditionalDefines.SetDefine(TEXT("VULKAN_BINDLESS_RESOURCE_ARRAY_PREFIX"), VulkanBindless::kBindlessResourceArrayPrefix);
 
 	const double StartPreprocessTime = FPlatformTime::Seconds();
 
@@ -2315,7 +2492,7 @@ void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOut
 	}
 
 	FShaderParameterParser ShaderParameterParser;
-	if (!ShaderParameterParser.ParseAndModify(Input, Output, PreprocessedShaderSource, /* ConstantBufferType = */ nullptr))
+	if (!ShaderParameterParser.ParseAndModify(Input, Output, PreprocessedShaderSource))
 	{
 		// The FShaderParameterParser will add any relevant errors.
 		return;
@@ -2363,13 +2540,8 @@ void DoCompileVulkanShader(const FShaderCompilerInput& Input, FShaderCompilerOut
 		}
 	}
 
-	// Write out the preprocessed file and a batch file to compile it if requested (DumpDebugInfoPath is valid)
-	if (CompilerInfo.bDebugDump)
-	{
-		DumpDebugUSF(Input, PreprocessedShaderSource, CompilerInfo.CCFlags);
-	}
+	UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShaderSource, { CompilerInfo.CCFlags });
 
-	TArray<ANSICHAR> GeneratedGlslSource;
 	FVulkanBindingTable BindingTable(CompilerInfo.Frequency);
 	bool bSuccess = false;
 

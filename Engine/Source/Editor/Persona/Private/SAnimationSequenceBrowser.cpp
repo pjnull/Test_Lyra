@@ -470,7 +470,7 @@ SAnimationSequenceBrowser::~SAnimationSequenceBrowser()
 
 	if(ViewportClient.IsValid())
 	{
-		ViewportClient->Viewport = NULL;
+		ViewportClient->Viewport = nullptr;
 	}
 }
 
@@ -701,7 +701,7 @@ void SAnimationSequenceBrowser::GetSelectedPackages(const TArray<FAssetData>& As
 {
 	for (int32 AssetIdx = 0; AssetIdx < Assets.Num(); ++AssetIdx)
 	{
-		UPackage* Package = FindPackage(NULL, *Assets[AssetIdx].PackageName.ToString());
+		UPackage* Package = FindPackage(nullptr, *Assets[AssetIdx].PackageName.ToString());
 
 		if ( Package )
 		{
@@ -1015,7 +1015,7 @@ void SAnimationSequenceBrowser::Construct(const FArguments& InArgs, const TShare
 	// Making Skeleton to be private, and now GET_MEMBER_NAME_CHECKED doesn't work
 	AssetRegistryTagsToIgnore.Add(TEXT("Skeleton"));
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	AssetRegistryTagsToIgnore.Add(GET_MEMBER_NAME_CHECKED(UAnimSequenceBase, SequenceLength));
+	AssetRegistryTagsToIgnore.Add(TEXT("SequenceLength"));
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	AssetRegistryTagsToIgnore.Add(GET_MEMBER_NAME_CHECKED(UAnimSequenceBase, RateScale));
 }
@@ -1067,7 +1067,7 @@ FReply SAnimationSequenceBrowser::OnMouseDownHistory( const FGeometry& MyGeometr
 
 TSharedRef<SWidget> SAnimationSequenceBrowser::CreateHistoryMenu(bool bInBackHistory) const
 {
-	FMenuBuilder MenuBuilder(true, NULL);
+	FMenuBuilder MenuBuilder(true, nullptr);
 	if(bInBackHistory)
 	{
 		int32 HistoryIdx = CurrentAssetHistoryIndex - 1;
@@ -1325,11 +1325,11 @@ TSharedRef<SToolTip> SAnimationSequenceBrowser::CreateCustomAssetToolTip(FAssetD
 
 	TSharedPtr<SHorizontalBox> ContentBox = nullptr;
 	TSharedRef<SToolTip> ToolTipWidget = SNew(SToolTip)
-	.TextMargin(1)
+	.TextMargin(1.f)
 	.BorderImage(FAppStyle::GetBrush("ContentBrowser.TileViewTooltip.ToolTipBorder"))
 	[
 		SNew(SBorder)
-		.Padding(6)
+		.Padding(6.f)
 		.BorderImage(FAppStyle::GetBrush("ContentBrowser.TileViewTooltip.NonContentBorder"))
 		[
 			SNew(SVerticalBox)
@@ -1338,7 +1338,7 @@ TSharedRef<SToolTip> SAnimationSequenceBrowser::CreateCustomAssetToolTip(FAssetD
 			.Padding(0,0,0,4)
 			[
 				SNew(SBorder)
-				.Padding(6)
+				.Padding(6.f)
 				.BorderImage(FAppStyle::GetBrush("ContentBrowser.TileViewTooltip.ContentBorder"))
 				[
 					SNew(SBox)
@@ -1358,7 +1358,7 @@ TSharedRef<SToolTip> SAnimationSequenceBrowser::CreateCustomAssetToolTip(FAssetD
 				.AutoWidth()
 				[
 					SNew(SBorder)
-					.Padding(6)
+					.Padding(6.f)
 					.Visibility(AssetClass->IsChildOf<UAnimationAsset>() ? EVisibility::Visible : EVisibility::Collapsed)
 					.BorderImage(FAppStyle::GetBrush("ContentBrowser.TileViewTooltip.ContentBorder"))
 					[
@@ -1385,10 +1385,10 @@ TSharedRef<SToolTip> SAnimationSequenceBrowser::CreateCustomAssetToolTip(FAssetD
 
 	// add an extra section to the tooltip for it.
 	ContentBox->AddSlot()
-	.Padding(AssetClass->IsChildOf<UAnimationAsset>() ? 4 : 0, 0, 0, 0)
+	.Padding(AssetClass->IsChildOf<UAnimationAsset>() ? 4.f : 0, 0, 0, 0)
 	[
 		SNew(SBorder)
-		.Padding(6)
+		.Padding(6.f)
 		.BorderImage(FAppStyle::GetBrush("ContentBrowser.TileViewTooltip.ContentBorder"))
 		[
 			DescriptionBox
@@ -1461,9 +1461,9 @@ bool SAnimationSequenceBrowser::OnVisualizeAssetToolTip(const TSharedPtr<SWidget
 			PreviewComponent->EnablePreview(true, Asset);
 			PreviewComponent->PreviewInstance->PlayAnim(true);
 
-			FBoxSphereBounds MeshImportedBounds = MeshToUse->GetImportedBounds();
-			float HalfFov = FMath::DegreesToRadians(ViewportClient->ViewFOV) / 2.0f;
-			float TargetDist = MeshImportedBounds.SphereRadius / FMath::Tan(HalfFov);
+			const FBoxSphereBounds MeshImportedBounds = MeshToUse->GetImportedBounds();
+			const float HalfFov = FMath::DegreesToRadians(ViewportClient->ViewFOV) / 2.0f;
+			const float TargetDist = static_cast<float>(MeshImportedBounds.SphereRadius / FMath::Tan(HalfFov));
 
 			ViewportClient->SetViewRotation(FRotator(0.0f, -45.0f, 0.0f));
 			ViewportClient->SetViewLocationForOrbiting(FVector(0.0f, 0.0f, MeshImportedBounds.BoxExtent.Z / 2.0f), TargetDist);
@@ -1545,7 +1545,7 @@ bool SAnimationSequenceBrowser::HandleFilterAsset(const FAssetData& InAssetData)
 		const USkeleton* DesiredSkeleton = PersonaToolkitPtr.Pin()->GetSkeleton();
 		if (DesiredSkeleton)
 		{
-			return !DesiredSkeleton->IsCompatibleSkeletonByAssetData(InAssetData);
+			return !DesiredSkeleton->IsCompatibleForEditor(InAssetData);
 		}
 	}
 

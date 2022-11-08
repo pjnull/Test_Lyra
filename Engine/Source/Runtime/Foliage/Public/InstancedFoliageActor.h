@@ -81,6 +81,9 @@ public:
 
 protected:
 #if WITH_EDITOR
+	void RegisterDelegates();
+	void UnregisterDelegates();
+
 	void HandleFoliageInstancePreMove(const FFoliageInstanceId& InstanceId);
 	void HandleFoliageInstancePostMove(const FFoliageInstanceId& InstanceId);
 #endif
@@ -180,7 +183,7 @@ public:
 	virtual void PostEditUndo() override;
 	virtual void PostDuplicate(bool bDuplicateForPIE) override;
 	virtual bool ShouldExport() override;
-	virtual bool ShouldImport(FString* ActorPropString, bool IsMovingLevel) override;
+	virtual bool ShouldImport(FStringView ActorPropString, bool IsMovingLevel) override;
 	virtual FBox GetStreamingBounds() const override;
 
 	// Called in response to BSP rebuilds to migrate foliage from obsolete to new components.

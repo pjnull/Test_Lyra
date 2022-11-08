@@ -309,7 +309,7 @@ static FProperty* GetReplicatedProperty(const UClass* CallingClass, const UClass
 #define DOREPLIFETIME_ACTIVE_OVERRIDE_FAST(c,v,active) \
 { \
 	static const bool bIsValid_##c_##v = ValidateReplicatedClassInheritance(StaticClass(), c::StaticClass(), TEXT(#v)); \
-	ChangedPropertyTracker.SetCustomIsActiveOverride(this, (int32)c::ENetFields_Private::v, active); \
+	UE::Net::Private::FNetPropertyConditionManager::SetPropertyActiveOverride(ChangedPropertyTracker, this, (int32)c::ENetFields_Private::v, active); \
 }
 
 #define DOREPLIFETIME_ACTIVE_OVERRIDE_FAST_STATIC_ARRAY(c,v,active) \
@@ -317,7 +317,7 @@ static FProperty* GetReplicatedProperty(const UClass* CallingClass, const UClass
 	static const bool bIsValid_##c_##v = ValidateReplicatedClassInheritance(StaticClass(), c::StaticClass(), TEXT(#v)); \
 	for (int32 i = 0; i < (int32)c::EArrayDims_Private::v; ++i) \
 	{ \
-		ChangedPropertyTracker.SetCustomIsActiveOverride(this, (int32)c::ENetFields_Private::v##_STATIC_ARRAY + i, active); \
+		UE::Net::Private::FNetPropertyConditionManager::SetPropertyActiveOverride(ChangedPropertyTracker, this, (int32)c::ENetFields_Private::v##_STATIC_ARRAY + i, active); \
 	} \
 }
 
@@ -326,7 +326,7 @@ static FProperty* GetReplicatedProperty(const UClass* CallingClass, const UClass
 	static FProperty* sp##v = GetReplicatedProperty(StaticClass(), c::StaticClass(),GET_MEMBER_NAME_CHECKED(c,v)); \
 	for (int32 i = 0; i < sp##v->ArrayDim; i++) \
 	{ \
-		ChangedPropertyTracker.SetCustomIsActiveOverride(this, sp##v->RepIndex + i, active); \
+		UE::Net::Private::FNetPropertyConditionManager::SetPropertyActiveOverride(ChangedPropertyTracker, this, sp##v->RepIndex + i, active); \
 	} \
 }
 
@@ -343,9 +343,10 @@ static FProperty* GetReplicatedProperty(const UClass* CallingClass, const UClass
 
 #define DOREPCUSTOMCONDITION_SETACTIVE_FAST_STATIC_ARRAY(c,v,active) \
 { \
+	UE::Net::Private::FNetPropertyConditionManager& PropertyConditionManager = UE::Net::Private::FNetPropertyConditionManager::Get(); \
 	for (int32 i = 0; i < (int32)c::EArrayDims_Private::v; ++i) \
 	{ \
-		UE::Net::Private::FNetPropertyConditionManager::Get().SetPropertyActive(this, (uint16)c::ENetFields_Private::v##_STATIC_ARRAY + i, active); \
+		PropertyConditionManager.SetPropertyActive(this, (uint16)c::ENetFields_Private::v##_STATIC_ARRAY + i, active); \
 	} \
 }
 

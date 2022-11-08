@@ -902,7 +902,7 @@ void UAssetRegistryImpl::InitializeEvents(UE::AssetRegistry::Impl::FInitializeCo
 
 	if (Context.bRedirectorsNeedSubscribe)
 	{
-		FCoreDelegates::FResolvePackageNameDelegate PackageResolveDelegate;
+		TDelegate<bool(const FString&, FString&)> PackageResolveDelegate;
 		PackageResolveDelegate.BindUObject(this, &UAssetRegistryImpl::OnResolveRedirect);
 		FCoreDelegates::PackageNameResolvers.Add(PackageResolveDelegate);
 	}
@@ -1642,6 +1642,8 @@ void UAssetRegistryImpl::WaitForCompletion()
 			FClassInheritanceContext InheritanceContext;
 			FClassInheritanceBuffer InheritanceBuffer;
 			GetInheritanceContextWithRequiredLock(InterfaceScopeLock, InheritanceContext, InheritanceBuffer);
+
+			GuardedData.WaitForGathererIdleIfSynchronous();
 
 			bool bUnusedInterrupted;
 			Status = GuardedData.TickGatherer(EventContext, InheritanceContext, -1., bUnusedInterrupted);
@@ -3748,6 +3750,14 @@ void FAssetRegistryImpl::TickDeletes()
 	}
 	DeleteActions.Empty();
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+}
+
+void FAssetRegistryImpl::WaitForGathererIdleIfSynchronous()
+{
+	if (GlobalGatherer && GlobalGatherer->IsSynchronous())
+	{
+		GlobalGatherer->WaitForIdle();
+	}
 }
 
 Impl::EGatherStatus FAssetRegistryImpl::TickGatherer(Impl::FEventContext& EventContext,
@@ -6594,67 +6604,56 @@ void UAssetRegistryImpl::Broadcast(UE::AssetRegistry::Impl::FEventContext& Event
 
 UAssetRegistryImpl::FPathAddedEvent& UAssetRegistryImpl::OnPathAdded()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return PathAddedEvent;
 }
 
 UAssetRegistryImpl::FPathRemovedEvent& UAssetRegistryImpl::OnPathRemoved()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return PathRemovedEvent;
 }
 
 UAssetRegistryImpl::FAssetAddedEvent& UAssetRegistryImpl::OnAssetAdded()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetAddedEvent;
 }
 
 UAssetRegistryImpl::FAssetRemovedEvent& UAssetRegistryImpl::OnAssetRemoved()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetRemovedEvent;
 }
 
 UAssetRegistryImpl::FAssetRenamedEvent& UAssetRegistryImpl::OnAssetRenamed()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetRenamedEvent;
 }
 
 UAssetRegistryImpl::FAssetUpdatedEvent& UAssetRegistryImpl::OnAssetUpdated()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetUpdatedEvent;
 }
 
 UAssetRegistryImpl::FAssetUpdatedEvent& UAssetRegistryImpl::OnAssetUpdatedOnDisk()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return AssetUpdatedOnDiskEvent;
 }
 
 UAssetRegistryImpl::FInMemoryAssetCreatedEvent& UAssetRegistryImpl::OnInMemoryAssetCreated()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return InMemoryAssetCreatedEvent;
 }
 
 UAssetRegistryImpl::FInMemoryAssetDeletedEvent& UAssetRegistryImpl::OnInMemoryAssetDeleted()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return InMemoryAssetDeletedEvent;
 }
 
 UAssetRegistryImpl::FFilesLoadedEvent& UAssetRegistryImpl::OnFilesLoaded()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return FileLoadedEvent;
 }
 
 UAssetRegistryImpl::FFileLoadProgressUpdatedEvent& UAssetRegistryImpl::OnFileLoadProgressUpdated()
 {
-	checkf(IsInGameThread(), TEXT("Registering to AssetRegistry events is not supported from multiple threads."));
 	return FileLoadProgressUpdatedEvent;
 }
 

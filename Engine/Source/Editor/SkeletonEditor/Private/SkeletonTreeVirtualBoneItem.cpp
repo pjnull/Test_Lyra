@@ -190,7 +190,7 @@ void FSkeletonTreeVirtualBoneItem::OnBlendSliderCommitted(float NewValue, ETextC
 
 	if (BlendProfile)
 	{
-		FScopedTransaction(LOCTEXT("SetBlendProfileValue", "Set Blend Profile Value"));
+		FScopedTransaction Transaction(LOCTEXT("SetBlendProfileValue", "Set Blend Profile Value"));
 		BlendProfile->SetFlags(RF_Transactional);
 		BlendProfile->Modify();
 

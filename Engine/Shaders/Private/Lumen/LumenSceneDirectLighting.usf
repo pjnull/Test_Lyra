@@ -17,7 +17,7 @@ FDeferredLightData GetLumenDirectLightingLightData(uint LightIndex, float3 PreVi
 	FDeferredLightData Out;
 
 #if USE_LIGHT_UNIFORM_BUFFER
-	Out = LoadLightData(LIGHT_TYPE);
+	Out = InitDeferredLightFromUniforms(LIGHT_TYPE);
 #else
 	FLumenLight LumenLight = LoadLumenLight(LightIndex, PreViewTranslation);
 	Out = LumenLight.DeferredLightData;
@@ -61,7 +61,7 @@ float3 GetIrradianceForLight(
 
 			if (IsRectVisible(Rect))
 			{
-				const FRectTexture SourceTexture = InitRectTexture(LightData);
+				const FRectTexture SourceTexture = ConvertToRectTexture(LightData);
 				Context = CreateRectIntegrateContext(Roughness, WorldNormal, V, Rect, SourceTexture);
 			}
 		}

@@ -44,7 +44,15 @@ export function getIntegrationOwner(arg0: Branch | PendingChange, overriddenOwne
 	const branch = pending ? pending.action.branch : targetBranch
 	const owner = pending ? pending.change.owner : overriddenOwner
 
-	return branch!.resolver || owner || null
+	let resolver = branch!.resolver
+	if (pending) {
+		const edgeprops = pending.change.branch.edgeProperties.get(branch!.upperName)
+		if (edgeprops) {
+			resolver = edgeprops.resolver || resolver || null
+		}	
+	}
+
+	return resolver || owner || null
 }
 
 export function getNodeBotFullName(botname: string, branchName: string) {
@@ -75,7 +83,7 @@ const ROBO_TAGS = [
 	'ROBOMERGE-SOURCE',
 ]
 
-type ChangeFlag = 'manual' | 'null' | 'ignore' | 'disregardexcludedauthors'
+type ChangeFlag = 'manual' | 'null' | 'ignore' | 'disregardexcludedauthors' | 'disregardassetblock'
 
 // mapping of #ROBOMERGE: flags to canonical names
 // use these with a pound like #ROBOMERGE: #stage
@@ -94,6 +102,9 @@ const FLAGMAP: {[name: string]: ChangeFlag} = {
 
 	// process this change even if the author is on the excluded list
 	disregardexcludedauthors: 'disregardexcludedauthors',
+
+	// process this change even if block assets is enabled for the edge and it contains assets
+	disregardassetblock: 'disregardassetblock',
 }
 
 const ALLOWED_RAW_FLAGS = ['null','ignore','deadend']

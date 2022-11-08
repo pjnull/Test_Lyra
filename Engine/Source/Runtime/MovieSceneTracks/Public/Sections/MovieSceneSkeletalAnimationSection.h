@@ -173,6 +173,7 @@ public:
 
 	/* Location offset applied after the matched offset*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Root Motions")
+
 	FRotator StartRotationOffset;
 
 	UPROPERTY()
@@ -206,7 +207,7 @@ public:
 
 #if WITH_EDITORONLY_DATA
 	/** Whether to show the underlying skeleton for this section. */
-	UPROPERTY(EditAnywhere, Category = "Root Motions")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Root Motions")
 	bool bShowSkeleton;
 #endif
 	//Previous transform used to specify the global OffsetTransform while calculting the root motions.

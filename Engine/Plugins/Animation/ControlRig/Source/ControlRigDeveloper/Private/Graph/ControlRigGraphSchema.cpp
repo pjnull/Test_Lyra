@@ -714,7 +714,8 @@ bool UControlRigGraphSchema::TryCreateConnection(UEdGraphPin* PinA, UEdGraphPin*
 			}
 #endif
 
-			return Controller->AddLink(PinA->GetName(), PinB->GetName(), true, true, UserLinkDirection);
+			const bool bCreateCastNode = !FSlateApplication::Get().GetModifierKeys().IsAltDown();
+			return Controller->AddLink(PinA->GetName(), PinB->GetName(), true, true, UserLinkDirection, bCreateCastNode);
 		}
 	}
 	return false;
@@ -795,8 +796,9 @@ const FPinConnectionResponse UControlRigGraphSchema::CanCreateConnection(const U
 
 		const FRigVMByteCode* ByteCode = RigNodeA->GetController()->GetCurrentByteCode();
 
+		const bool bEnableTypeCasting = !FSlateApplication::Get().GetModifierKeys().IsAltDown();
 		FString FailureReason;
-		bool bResult = RigNodeA->GetModel()->CanLink(PinA, PinB, &FailureReason, ByteCode, UserLinkDirection);
+		bool bResult = RigNodeA->GetModel()->CanLink(PinA, PinB, &FailureReason, ByteCode, UserLinkDirection, bEnableTypeCasting);
 		if (!bResult)
 		{
 			return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, FText::FromString(FailureReason));
@@ -1170,7 +1172,20 @@ FConnectionDrawingPolicy* UControlRigGraphSchema::CreateConnectionDrawingPolicy(
 bool UControlRigGraphSchema::ShouldHidePinDefaultValue(UEdGraphPin* Pin) const
 {
 	// we should hide default values if any of our parents are connected
-	return HasParentConnection_Recursive(Pin);
+	if(HasParentConnection_Recursive(Pin))
+	{
+		return true;
+	}
+
+	if(UControlRigGraphNode* RigGraphNode = Cast<UControlRigGraphNode>(Pin->GetOwningNode()))
+	{
+		if(RigGraphNode->DrawAsCompactNode())
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool UControlRigGraphSchema::IsPinBeingWatched(UEdGraphPin const* Pin) const
@@ -1795,33 +1810,45 @@ bool UControlRigGraphSchema::ArePinsCompatible(const UEdGraphPin* PinA, const UE
 		{
 			if(const UControlRigGraphNode* RigNode = Cast<UControlRigGraphNode>(InPin->GetOwningNode()))
 			{
-				if(const FRigVMTemplate* Template = RigNode->GetTemplate())
+				FString CPPType;
+				UObject* CPPTypeObject = nullptr;
+				if(RigVMTypeUtils::CPPTypeFromPinType(InPinType, CPPType, &CPPTypeObject))
 				{
-					FString CPPType;
-					UObject* CPPTypeObject = nullptr;
-					if(RigVMTypeUtils::CPPTypeFromPinType(InPinType, CPPType, &CPPTypeObject))
-					{
-						FString PinPath, PinName;
-						URigVMPin::SplitPinPathAtEnd(InPin->GetName(), PinPath, PinName);
+					FString PinPath, PinName;
+					URigVMPin::SplitPinPathAtEnd(InPin->GetName(), PinPath, PinName);
 						
-						if((InPin->ParentPin != nullptr) &&
-							(InPin->ParentPin->ParentPin == nullptr) &&
-							(InPin->ParentPin->PinType.ContainerType == EPinContainerType::Array))
-						{
-							URigVMPin::SplitPinPathAtEnd(InPin->ParentPin->GetName(), PinPath, PinName);
-							CPPType = RigVMTypeUtils::ArrayTypeFromBaseType(CPPType);
-						}
+					if((InPin->ParentPin != nullptr) &&
+						(InPin->ParentPin->ParentPin == nullptr) &&
+						(InPin->ParentPin->PinType.ContainerType == EPinContainerType::Array))
+					{
+						URigVMPin::SplitPinPathAtEnd(InPin->ParentPin->GetName(), PinPath, PinName);
+						CPPType = RigVMTypeUtils::ArrayTypeFromBaseType(CPPType);
+					}
 
-						const FRigVMTemplateArgumentType Type(*CPPType, CPPTypeObject);
-						const int32 TypeIndex = FRigVMRegistry::Get().GetTypeIndex(Type);
-						if(!Template->ArgumentSupportsTypeIndex(*PinName, TypeIndex))
+					const FRigVMTemplateArgumentType Type(*CPPType, CPPTypeObject);
+					const TRigVMTypeIndex TypeIndex = FRigVMRegistry::Get().GetTypeIndex(Type);
+					if(const FRigVMTemplate* Template = RigNode->GetTemplate())
+					{
+						if(const FRigVMTemplateArgument* Argument = Template->FindArgument(*PinName))
 						{
-							return false;
+							if(Argument->SupportsTypeIndex(TypeIndex))
+							{
+								return true;
+							}
+					
+							const TArray<TRigVMTypeIndex>& AvailableCasts = RigVMTypeUtils::GetAvailableCasts(TypeIndex, InPin->Direction == EGPD_Output);
+							for(const TRigVMTypeIndex& AvailableCast : AvailableCasts)
+							{
+								if(Argument->SupportsTypeIndex(AvailableCast))
+								{
+									return true;
+								}
+							}
 						}
 					}
 				}
 			}
-			return true;
+			return false;
 		};
 
 		auto IsTemplateNodePin = [](const UEdGraphPin* InPin)
@@ -1869,7 +1896,15 @@ bool UControlRigGraphSchema::ArePinsCompatible(const UEdGraphPin* PinA, const UE
 		}
 	}
 
-	return GetDefault<UEdGraphSchema_K2>()->ArePinsCompatible(PinA, PinB, CallingContext, bIgnoreArray);
+	if(GetDefault<UEdGraphSchema_K2>()->ArePinsCompatible(PinA, PinB, CallingContext, bIgnoreArray))
+	{
+		return true;
+	}
+
+	// also check if there's a cast available for the type
+	const TRigVMTypeIndex TypeIndexA = RigVMTypeUtils::TypeIndexFromPinType(PinA->Direction == EGPD_Output ? PinA->PinType : PinB->PinType);
+	const TRigVMTypeIndex TypeIndexB = RigVMTypeUtils::TypeIndexFromPinType(PinA->Direction == EGPD_Output ? PinB->PinType : PinA->PinType);
+	return RigVMTypeUtils::CanCastTypes(TypeIndexA, TypeIndexB);
 }
 
 void UControlRigGraphSchema::RenameNode(UControlRigGraphNode* Node, const FName& InNewNodeName) const

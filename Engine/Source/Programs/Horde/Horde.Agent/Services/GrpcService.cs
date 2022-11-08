@@ -5,11 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using Grpc.Net.Client;
 using Horde.Agent.Utility;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Polly;
-using Polly.Extensions.Http;
 
 namespace Horde.Agent.Services
 {
@@ -20,16 +17,19 @@ namespace Horde.Agent.Services
 	{
 		private readonly ServerProfile _serverProfile;
 		private readonly ILogger _logger;
+		private readonly ILoggerFactory _loggerFactory;
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="settings"></param>
 		/// <param name="logger"></param>
-		public GrpcService(IOptions<AgentSettings> settings, ILogger<GrpcService> logger)
+		/// <param name="loggerFactory"></param>
+		public GrpcService(IOptions<AgentSettings> settings, ILogger<GrpcService> logger, ILoggerFactory loggerFactory)
 		{
 			_serverProfile = settings.Value.GetCurrentServerProfile();
 			_logger = logger;
+			_loggerFactory = loggerFactory;
 		}
 
 		/// <summary>
@@ -63,17 +63,14 @@ namespace Horde.Agent.Services
 		/// <returns>New grpc channel</returns>
 		public GrpcChannel CreateGrpcChannel(Uri address, AuthenticationHeaderValue? authHeaderValue)
 		{
+			#pragma warning disable CA2000 // Dispose objects before losing scope
+			// HTTP client handler is disposed by GrpcChannel below
 			HttpClientHandler customCertHandler = new HttpClientHandler();
+			#pragma warning restore CA2000 // Dispose objects before losing scope
 			customCertHandler.ServerCertificateCustomValidationCallback += (sender, cert, chain, errors) => CertificateHelper.CertificateValidationCallBack(_logger, sender, cert, chain, errors, _serverProfile);
+			customCertHandler.CheckCertificateRevocationList = true;
 
-			TimeSpan[] retryDelay = { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) };
-			IAsyncPolicy<HttpResponseMessage> policy = HttpPolicyExtensions.HandleTransientHttpError().WaitAndRetryAsync(retryDelay);
-#pragma warning disable CA2000 // Dispose objects before losing scope
-			PolicyHttpMessageHandler retryHandler = new PolicyHttpMessageHandler(policy);
-#pragma warning restore CA2000 // Dispose objects before losing scope
-			retryHandler.InnerHandler = customCertHandler;
-
-			HttpClient httpClient = new HttpClient(retryHandler, true);
+			HttpClient httpClient = new (customCertHandler, true);
 			httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 			if (authHeaderValue != null)
 			{
@@ -89,6 +86,7 @@ namespace Horde.Agent.Services
 				MaxReceiveMessageSize = 1024 * 1024 * 1024, // 1 GB
 				MaxSendMessageSize = 1024 * 1024 * 1024, // 1 GB
 				
+				LoggerFactory = _loggerFactory,
 				HttpClient = httpClient,
 				DisposeHttpClient = true
 			});

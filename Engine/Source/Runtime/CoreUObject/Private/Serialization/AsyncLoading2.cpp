@@ -1081,7 +1081,6 @@ public:
 				if (PackageId != LastPackageId)
 				{
 					UE_ASYNC_PACKAGEID_DEBUG(PackageId);
-
 					LastPackageId = PackageId;
 					PackageRef = FindPackageRef(PackageId);
 				}
@@ -2261,7 +2260,6 @@ private:
 
 struct FAsyncPackage2
 {
-	friend struct FScopedAsyncPackageEvent2;
 	friend struct FAsyncPackageScope2;
 	friend class FAsyncLoadingThread2;
 	friend class FAsyncLoadEventQueue2;
@@ -2373,7 +2371,7 @@ private:
 		int32 SerializeExportIndex = 0;
 		int32 PostLoadExportIndex = 0;
 #if WITH_EDITORONLY_DATA
-		TOptional<int32> MetaDataIndex;
+		int32 MetaDataIndex = -1;
 #endif
 		bool bIsCurrentlyProcessingImports = false;
 
@@ -2618,20 +2616,6 @@ public:
 
 	/** Serialization context for this package */
 	FUObjectSerializeContext* GetSerializeContext();
-};
-
-struct FScopedAsyncPackageEvent2
-{
-	/** Current scope package */
-	FAsyncPackage2* Package;
-	/** Outer scope package */
-	FAsyncPackage2* PreviousPackage;
-#if WITH_EDITOR
-	IAsyncPackageLoader* PreviousAsyncPackageLoader;
-#endif
-
-	FScopedAsyncPackageEvent2(FAsyncPackage2* InPackage);
-	~FScopedAsyncPackageEvent2();
 };
 
 class FAsyncLoadingThread2 final
@@ -3256,9 +3240,8 @@ struct FAsyncPackageScope2
 {
 	/** Outer scope package */
 	void* PreviousPackage;
-#if WITH_IOSTORE_IN_EDITOR
 	IAsyncPackageLoader* PreviousAsyncPackageLoader;
-#endif
+
 	/** Cached ThreadContext so we don't have to access it again */
 	FUObjectThreadContext& ThreadContext;
 
@@ -3267,17 +3250,13 @@ struct FAsyncPackageScope2
 	{
 		PreviousPackage = ThreadContext.AsyncPackage;
 		ThreadContext.AsyncPackage = InPackage;
-#if WITH_IOSTORE_IN_EDITOR
 		PreviousAsyncPackageLoader = ThreadContext.AsyncPackageLoader;
 		ThreadContext.AsyncPackageLoader = &InPackage->AsyncLoadingThread;
-#endif
 	}
 	~FAsyncPackageScope2()
 	{
 		ThreadContext.AsyncPackage = PreviousPackage;
-#if WITH_IOSTORE_IN_EDITOR
 		ThreadContext.AsyncPackageLoader = PreviousAsyncPackageLoader;
-#endif
 	}
 };
 
@@ -3939,34 +3918,6 @@ bool FAsyncLoadEventQueue2::ExecuteSyncLoadEvents(FAsyncLoadingThreadState2& Thr
 	return bDidSomething;
 }
 
-FScopedAsyncPackageEvent2::FScopedAsyncPackageEvent2(FAsyncPackage2* InPackage)
-	:Package(InPackage)
-{
-	check(Package);
-
-	// Update the thread context with the current package. This is used by NotifyConstructedDuringAsyncLoading.
-	FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
-	PreviousPackage = static_cast<FAsyncPackage2*>(ThreadContext.AsyncPackage);
-	ThreadContext.AsyncPackage = Package;
-#if WITH_IOSTORE_IN_EDITOR
-	PreviousAsyncPackageLoader = ThreadContext.AsyncPackageLoader;
-	ThreadContext.AsyncPackageLoader = &InPackage->AsyncLoadingThread;
-#endif
-	Package->BeginAsyncLoad();
-}
-
-FScopedAsyncPackageEvent2::~FScopedAsyncPackageEvent2()
-{
-	Package->EndAsyncLoad();
-
-	// Restore the package from the outer scope
-	FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
-	ThreadContext.AsyncPackage = PreviousPackage;
-#if WITH_IOSTORE_IN_EDITOR
-	ThreadContext.AsyncPackageLoader = PreviousAsyncPackageLoader;
-#endif
-}
-
 FUObjectSerializeContext* FAsyncPackage2::GetSerializeContext()
 {
 	return FUObjectThreadContext::Get().GetSerializeContext();
@@ -4425,6 +4376,9 @@ void FAsyncPackage2::CreateLinker(const FLinkerInstancingContext* InstancingCont
 	}
 	check(Linker);
 	check(Linker->LinkerRoot == LinkerRoot);
+	check(!Linker->AsyncRoot);
+	TRACE_LOADTIME_ASYNC_PACKAGE_LINKER_ASSOCIATION(this, Linker);
+	Linker->AsyncRoot = this;
 	LinkerLoadState->Linker = Linker;
 #if ALT2_ENABLE_NEW_ARCHIVE_FOR_LINKERLOAD
 	Linker->ResetStatusInfo();
@@ -4435,6 +4389,8 @@ void FAsyncPackage2::DetachLinker()
 {
 	if (LinkerLoadState.IsSet() && LinkerLoadState->Linker)
 	{
+		check(LinkerLoadState->Linker->AsyncRoot == this);
+		LinkerLoadState->Linker->AsyncRoot = nullptr;
 		LinkerLoadState->Linker = nullptr;
 	}
 }
@@ -4443,7 +4399,6 @@ void FAsyncPackage2::DetachLinker()
 void FAsyncPackage2::StartLoading(FIoBatch& IoBatch)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(StartLoading);
-	TRACE_LOADTIME_BEGIN_LOAD_ASYNC_PACKAGE(this);
 
 	LoadStartTime = FPlatformTime::Seconds();
 
@@ -4598,13 +4553,13 @@ EEventLoadNodeExecutionResult FAsyncPackage2::ProcessLinkerLoadPackageSummary(FA
 	TRACE_CPUPROFILER_EVENT_SCOPE(ProcessLinkerLoadPackageSummary);
 
 #if ALT2_ENABLE_NEW_ARCHIVE_FOR_LINKERLOAD
-	if (LinkerLoadState->Linker->GetLoader()->IsError())
+	FLinkerLoad::ELinkerStatus LinkerResult = FLinkerLoad::LINKER_Failed;
+	if (!LinkerLoadState->Linker->GetLoader()->IsError())
 	{
-		bLoadHasFailed = true;
-		return EEventLoadNodeExecutionResult::Complete;
+		LinkerLoadState->Linker->bUseTimeLimit = false;
+		TRACE_LOADTIME_PROCESS_SUMMARY_SCOPE(LinkerLoadState->Linker);
+		LinkerResult = LinkerLoadState->Linker->ProcessPackageSummary(nullptr);
 	}
-	LinkerLoadState->Linker->bUseTimeLimit = false;
-	FLinkerLoad::ELinkerStatus LinkerResult = LinkerLoadState->Linker->ProcessPackageSummary(nullptr);
 #else
 	FLinkerLoad::ELinkerStatus LinkerResult = LinkerLoadState->Linker->Tick(/* RemainingTimeLimit */ 0.0, /* bUseTimeLimit */ false, /* bUseFullTimeLimit */ false, nullptr);
 #endif
@@ -4612,9 +4567,8 @@ EEventLoadNodeExecutionResult FAsyncPackage2::ProcessLinkerLoadPackageSummary(FA
 	if (LinkerResult == FLinkerLoad::LINKER_Failed)
 	{
 		bLoadHasFailed = true;
-		return EEventLoadNodeExecutionResult::Complete;
 	}
-	check(LinkerLoadState->Linker->HasFinishedInitialization());
+	check(LinkerLoadState->Linker->HasFinishedInitialization() || bLoadHasFailed);
 
 	LinkerLoadState->LinkerLoadHeaderData.ImportMap.SetNum(LinkerLoadState->Linker->ImportMap.Num());
 	TArray<FName, TInlineAllocator<128>> ImportedPackageNames;
@@ -4736,6 +4690,38 @@ EEventLoadNodeExecutionResult FAsyncPackage2::ProcessLinkerLoadPackageSummary(FA
 	HeaderData.ImportedPublicExportHashes = LinkerLoadState->LinkerLoadHeaderData.ImportedPublicExportHashes;
 	HeaderData.ImportMap = LinkerLoadState->LinkerLoadHeaderData.ImportMap;
 
+	FLoadedPackageRef& PackageRef = AsyncLoadingThread.GlobalImportStore.FindPackageRefChecked(Desc.UPackageId);
+	if (!bLoadHasFailed)
+	{
+		PackageRef.ReserveSpaceForPublicExports(LinkerLoadState->LinkerLoadHeaderData.PublicExportHashes.Num());
+#if WITH_EDITORONLY_DATA
+		// Create metadata object, this needs to happen before any other package wants to use our exports
+		LinkerLoadState->MetaDataIndex = LinkerLoadState->Linker->LoadMetaDataFromExportMap(false);
+		if (LinkerLoadState->MetaDataIndex >= 0)
+		{
+			FObjectExport& LinkerExport = LinkerLoadState->Linker->ExportMap[LinkerLoadState->MetaDataIndex];
+			FExportObject& ExportObject = Data.Exports[LinkerLoadState->MetaDataIndex];
+			ExportObject.Object = LinkerExport.Object;
+			if (ExportObject.Object)
+			{
+				ExportObject.bWasFoundInMemory = true; // Make sure that the async flags are cleared in ClearConstructedObjects
+			}
+			else
+			{
+				ExportObject.bExportLoadFailed = LinkerExport.bExportLoadFailed;
+				if (!ExportObject.bExportLoadFailed)
+				{
+					ExportObject.bFiltered = true;
+				}
+			}
+		}
+#endif
+	}
+	else if (Desc.bCanBeImported)
+	{
+		PackageRef.SetHasFailed();
+	}
+
 	AsyncPackageLoadingState = EAsyncPackageLoadingState2::SetupDependencies;
 	GetPackageNode(Package_SetupDependencies).ReleaseBarrier();
 	return EEventLoadNodeExecutionResult::Complete;
@@ -4774,6 +4760,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::ProcessLinkerLoadPackageImportsAnd
 
 bool FAsyncPackage2::ProcessLinkerLoadPackageImports(FAsyncLoadingThreadState2& ThreadState)
 {
+	check(AsyncPackageLoadingState == EAsyncPackageLoadingState2::ProcessExportBundles);
 	if (LinkerLoadState->bIsCurrentlyProcessingImports)
 	{
 		return true;
@@ -4783,15 +4770,19 @@ bool FAsyncPackage2::ProcessLinkerLoadPackageImports(FAsyncLoadingThreadState2& 
 	while (LinkerLoadState->ProcessingImportedPackageIndex < ImportedPackagesCount)
 	{
 		FAsyncPackage2* ImportedPackage = Data.ImportedAsyncPackages[LinkerLoadState->ProcessingImportedPackageIndex];
-		if (ImportedPackage && ImportedPackage->LinkerLoadState.IsSet() && ImportedPackage->LinkerLoadState->Linker)
+		if (ImportedPackage && ImportedPackage->LinkerLoadState.IsSet())
 		{
-			if (!ImportedPackage->ProcessLinkerLoadPackageImports(ThreadState))
+			check(ImportedPackage->AsyncPackageLoadingState >= EAsyncPackageLoadingState2::ProcessExportBundles);
+			if (ImportedPackage->AsyncPackageLoadingState == EAsyncPackageLoadingState2::ProcessExportBundles)
 			{
-				return false;
-			}
-			if (!ImportedPackage->ProcessLinkerLoadPackageExports(ThreadState))
-			{
-				return false;
+				if (!ImportedPackage->ProcessLinkerLoadPackageImports(ThreadState))
+				{
+					return false;
+				}
+				if (!ImportedPackage->ProcessLinkerLoadPackageExports(ThreadState))
+				{
+					return false;
+				}
 			}
 		}
 		++LinkerLoadState->ProcessingImportedPackageIndex;
@@ -4844,33 +4835,7 @@ bool FAsyncPackage2::ProcessLinkerLoadPackageImports(FAsyncLoadingThreadState2& 
 
 bool FAsyncPackage2::ProcessLinkerLoadPackageExports(FAsyncLoadingThreadState2& ThreadState)
 {
-#if WITH_EDITORONLY_DATA
-	// Create metadata object
-	int32 MetaDataIndex = LinkerLoadState->MetaDataIndex.IsSet() ? LinkerLoadState->MetaDataIndex.GetValue() : -1;
-	if (MetaDataIndex < 0)
-	{
-		MetaDataIndex = LinkerLoadState->Linker->LoadMetaDataFromExportMap(false);
-		if (MetaDataIndex >= 0)
-		{
-			FObjectExport& LinkerExport = LinkerLoadState->Linker->ExportMap[MetaDataIndex];
-			FExportObject& ExportObject = Data.Exports[MetaDataIndex];
-			ExportObject.Object = LinkerExport.Object;
-			if (ExportObject.Object)
-			{
-				ExportObject.bWasFoundInMemory = true; // Make sure that the async flags are cleared in ClearConstructedObjects
-			}
-			else
-			{
-				ExportObject.bExportLoadFailed = LinkerExport.bExportLoadFailed;
-				if (!ExportObject.bExportLoadFailed)
-				{
-					ExportObject.bFiltered = true;
-				}
-			}
-		}
-		LinkerLoadState->MetaDataIndex = MetaDataIndex;
-	}
-#endif
+	check(AsyncPackageLoadingState == EAsyncPackageLoadingState2::ProcessExportBundles);
 
 	// Create exports
 	const int32 ExportCount = LinkerLoadState->Linker->ExportMap.Num();
@@ -4878,7 +4843,7 @@ bool FAsyncPackage2::ProcessLinkerLoadPackageExports(FAsyncLoadingThreadState2& 
 	{
 		const int32 ExportIndex = LinkerLoadState->CreateExportIndex++;
 #if WITH_EDITORONLY_DATA
-		if (ExportIndex == MetaDataIndex)
+		if (ExportIndex == LinkerLoadState->MetaDataIndex)
 		{
 			continue;
 		}
@@ -4887,6 +4852,7 @@ bool FAsyncPackage2::ProcessLinkerLoadPackageExports(FAsyncLoadingThreadState2& 
 		FExportObject& ExportObject = Data.Exports[ExportIndex];
 		if (UObject* Object = LinkerLoadState->Linker->CreateExport(ExportIndex))
 		{
+			checkf(!Object->HasAnyInternalFlags(EInternalObjectFlags::Unreachable), TEXT("Trying to store an unreachable object '%s' in the import store"), *Object->GetFullName());
 			ExportObject.Object = Object;
 			ExportObject.bWasFoundInMemory = true; // Make sure that the async flags are cleared in ClearConstructedObjects
 			EInternalObjectFlags FlagsToSet = EInternalObjectFlags::Async;
@@ -4936,18 +4902,15 @@ bool FAsyncPackage2::ProcessLinkerLoadPackageExports(FAsyncLoadingThreadState2& 
 
 EEventLoadNodeExecutionResult FAsyncPackage2::PostLoadLinkerLoadPackageExports(FAsyncLoadingThreadState2& ThreadState)
 {
+	TRACE_LOADTIME_POSTLOAD_SCOPE;
+
 	FAsyncLoadingTickScope2 InAsyncLoadingTick(AsyncLoadingThread);
 
-	const int32 ExportCount = LinkerLoadState->Linker->ExportMap.Num();
-	while (LinkerLoadState->PostLoadExportIndex < ExportCount)
+	const int32 ObjectCount = ConstructedObjects.Num();
+	while (LinkerLoadState->PostLoadExportIndex < ObjectCount)
 	{
-		const int32 ExportIndex = LinkerLoadState->PostLoadExportIndex++;
-		const FObjectExport& Export = LinkerLoadState->Linker->ExportMap[ExportIndex];
-		UObject* Object = Export.Object;
-		if (Object)
-		{
-			Object->ConditionalPostLoad();
-		}
+		const int32 ObjectIndex = LinkerLoadState->PostLoadExportIndex++;
+		ConstructedObjects[ObjectIndex]->ConditionalPostLoad();
 	}
 
 	FUObjectSerializeContext* LoadContext = GetSerializeContext();
@@ -4967,16 +4930,12 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_ProcessPackageSummary(FAsync
 	check(Package->AsyncPackageLoadingState == EAsyncPackageLoadingState2::WaitingForIo);
 	Package->AsyncPackageLoadingState = EAsyncPackageLoadingState2::ProcessPackageSummary;
 
-	FScopedAsyncPackageEvent2 Scope(Package);
+	FAsyncPackageScope2 Scope(Package);
 
 #if ALT2_ENABLE_LINKERLOAD_SUPPORT
 	if (Package->LinkerLoadState.IsSet())
 	{
-		EEventLoadNodeExecutionResult Result = Package->ProcessLinkerLoadPackageSummary(ThreadState);
-		if (!Package->bLoadHasFailed)
-		{
-			return Result;
-		}
+		return Package->ProcessLinkerLoadPackageSummary(ThreadState);
 	}
 #endif
 	if (Package->bLoadHasFailed)
@@ -4989,6 +4948,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_ProcessPackageSummary(FAsync
 	}
 	else
 	{
+		TRACE_LOADTIME_PROCESS_SUMMARY_SCOPE(Package);
 		check(Package->ExportBundleEntryIndex == 0);
 
 		ReadAsyncPackageHeader(Package->SerializationState, Package->HeaderData);
@@ -5138,7 +5098,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_ProcessExportBundle(FAsyncLo
 	UE_ASYNC_PACKAGE_DEBUG(Package->Desc);
 	check(Package->AsyncPackageLoadingState == EAsyncPackageLoadingState2::ProcessExportBundles);
 
-	FScopedAsyncPackageEvent2 Scope(Package);
+	FAsyncPackageScope2 Scope(Package);
 
 #if ALT2_ENABLE_LINKERLOAD_SUPPORT
 	if (Package->LinkerLoadState.IsSet())
@@ -5925,8 +5885,13 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_PostLoadExportBundle(FAsyncL
 	UE_ASYNC_PACKAGE_DEBUG(Package->Desc);
 	check(Package->AsyncPackageLoadingState == EAsyncPackageLoadingState2::PostLoad);
 	check(Package->ExternalReadDependencies.Num() == 0);
-	
+
 	FAsyncPackageScope2 PackageScope(Package);
+
+#if WITH_EDITOR
+	// This needs to happen after loading new blueprints in the editor, and this is handled in EndLoad for synchronous loads
+	FBlueprintSupport::FlushReinstancingQueue();
+#endif
 
 #if ALT2_ENABLE_LINKERLOAD_SUPPORT
 	if (Package->LinkerLoadState.IsSet())
@@ -5999,6 +5964,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_PostLoadExportBundle(FAsyncL
 		const TArrayView<FExportObject>& Exports = Package->Data.Exports;
 #endif
 
+		TRACE_LOADTIME_POSTLOAD_SCOPE;
 		while (Package->ExportBundleEntryIndex < int32(ExportBundle->EntryCount))
 		{
 			const FExportBundleEntry& BundleEntry = HeaderData->ExportBundleEntries[ExportBundle->FirstEntryIndex + Package->ExportBundleEntryIndex];
@@ -6030,10 +5996,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_PostLoadExportBundle(FAsyncL
 					if (!bIsMultithreaded || (bAsyncPostLoadEnabled && CanPostLoadOnAsyncLoadingThread(Object)))
 					{
 						ThreadContext.CurrentlyPostLoadedObjectByALT = Object;
-						{
-							TRACE_LOADTIME_POSTLOAD_EXPORT_SCOPE(Object);
-							Object->ConditionalPostLoad();
-						}
+						Object->ConditionalPostLoad();
 						ThreadContext.CurrentlyPostLoadedObjectByALT = nullptr;
 					}
 				} while (false);
@@ -6083,6 +6046,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_DeferredPostLoadExportBundle
 	check(Package->AsyncPackageLoadingState == EAsyncPackageLoadingState2::DeferredPostLoad);
 
 	FAsyncPackageScope2 PackageScope(Package);
+	TGuardValue<bool> GuardIsRoutingPostLoad(PackageScope.ThreadContext.IsRoutingPostLoad, true);
 
 #if ALT2_ENABLE_LINKERLOAD_SUPPORT
 	if (Package->LinkerLoadState.IsSet())
@@ -6101,7 +6065,6 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_DeferredPostLoadExportBundle
 	}
 	else
 	{
-		TGuardValue<bool> GuardIsRoutingPostLoad(PackageScope.ThreadContext.IsRoutingPostLoad, true);
 		FAsyncLoadingTickScope2 InAsyncLoadingTick(Package->AsyncLoadingThread);
 
 #if WITH_EDITOR
@@ -6127,6 +6090,7 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_DeferredPostLoadExportBundle
 		const TArrayView<FExportObject>& Exports = Package->Data.Exports;
 #endif
 
+		TRACE_LOADTIME_POSTLOAD_SCOPE;
 		while (Package->ExportBundleEntryIndex < int32(ExportBundle->EntryCount))
 		{
 			const FExportBundleEntry& BundleEntry = HeaderData->ExportBundleEntries[ExportBundle->FirstEntryIndex + Package->ExportBundleEntryIndex];
@@ -6153,7 +6117,6 @@ EEventLoadNodeExecutionResult FAsyncPackage2::Event_DeferredPostLoadExportBundle
 					{
 						PackageScope.ThreadContext.CurrentlyPostLoadedObjectByALT = Object;
 						{
-							TRACE_LOADTIME_POSTLOAD_EXPORT_SCOPE(Object);
 							FScopeCycleCounterUObject ConstructorScope(Object, GET_STATID(STAT_FAsyncPackage_PostLoadObjectsGameThread));
 							Object->ConditionalPostLoad();
 						}
@@ -6487,7 +6450,6 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 			--LoadingPackagesCounter;
 
 			TRACE_COUNTER_SET(AsyncLoadingLoadingPackages, LoadingPackagesCounter);
-			TRACE_LOADTIME_END_LOAD_ASYNC_PACKAGE(Package);
 
 			PackagesReadyForCallback.Add(Package);
 		}
@@ -6569,11 +6531,6 @@ EAsyncPackageState::Type FAsyncLoadingThread2::ProcessLoadedPackagesFromGameThre
 
 	if (Result == EAsyncPackageState::Complete)
 	{
-#if WITH_EDITORONLY_DATA
-		// This needs to happen after loading new blueprints in the editor, and this is handled in EndLoad for synchronous loads
-		FBlueprintSupport::FlushReinstancingQueue();
-#endif
-
 #if WITH_EDITOR
 		// In editor builds, call the asset load callback. This happens in both editor and standalone to match EndLoad
 		TSet<FWeakObjectPtr> TempLoadedAssets = LoadedAssets;
@@ -7106,6 +7063,33 @@ void FAsyncLoadingThread2::CollectUnreachableObjects(
 					Item.PackageId = Package->GetPackageId();
 				}
 			}
+
+#if ALT2_ENABLE_LINKERLOAD_SUPPORT
+			// Clear garbage objects from linker export tables
+			// Normally done from UObject::BeginDestroy but we need to do it already here
+			if (FLinkerLoad* ObjectLinker = Object->GetLinker())
+			{
+#if WITH_EDITORONLY_DATA
+				// Make sure the linker entry stays as 'bExportLoadFailed' if the entry was marked as such, 
+				// Not doing this will cause crashes when resolving circular imports!
+				const int32 CachedLinkerIndex = Object->GetLinkerIndex();
+				bool bLinkerEntryWasInvalid = false;
+				if (ObjectLinker->ExportMap.IsValidIndex(CachedLinkerIndex))
+				{
+					FObjectExport& ObjExport = ObjectLinker->ExportMap[CachedLinkerIndex];
+					bLinkerEntryWasInvalid = ObjExport.bExportLoadFailed;
+				}
+#endif // WITH_EDITORONLY_DATA
+				Object->SetLinker(NULL, INDEX_NONE);
+#if WITH_EDITORONLY_DATA
+				if (bLinkerEntryWasInvalid)
+				{
+					FObjectExport& ObjExport = ObjectLinker->ExportMap[CachedLinkerIndex];
+					ObjExport.bExportLoadFailed = true;
+				}
+#endif // WITH_EDITORONLY_DATA
+			}
+#endif // ALT2_ENABLE_LINKERLOAD_SUPPORT
 		});
 	}
 
@@ -7653,24 +7637,11 @@ EAsyncPackageState::Type FAsyncPackage2::CreateClusters(FAsyncLoadingThreadState
 
 void FAsyncPackage2::FinishUPackage()
 {
-	if (LinkerRoot)
+	if (LinkerRoot && !bLoadHasFailed)
 	{
-		if (!bLoadHasFailed)
-		{
-			// Mark package as having been fully loaded and update load time.
-			LinkerRoot->MarkAsFullyLoaded();
-			LinkerRoot->SetLoadTime(FPlatformTime::Seconds() - LoadStartTime);
-		}
-		else
-		{
-			// Clean up UPackage so it can't be found later
-			if (bCreatedLinkerRoot && !LinkerRoot->IsRooted())
-			{
-				LinkerRoot->ClearFlags(RF_NeedPostLoad | RF_NeedLoad | RF_NeedPostLoadSubobjects);
-				LinkerRoot->MarkAsGarbage();
-				LinkerRoot->Rename(*MakeUniqueObjectName(GetTransientPackage(), UPackage::StaticClass()).ToString(), nullptr, REN_DontCreateRedirectors | REN_DoNotDirty | REN_ForceNoResetLoaders | REN_NonTransactional);
-			}
-		}
+		// Mark package as having been fully loaded and update load time.
+		LinkerRoot->MarkAsFullyLoaded();
+		LinkerRoot->SetLoadTime(FPlatformTime::Seconds() - LoadStartTime);
 	}
 }
 

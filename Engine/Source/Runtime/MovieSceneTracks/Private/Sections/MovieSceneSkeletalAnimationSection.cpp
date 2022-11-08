@@ -455,14 +455,14 @@ int32 UMovieSceneSkeletalAnimationSection::SetBoneIndexForRootMotionCalculations
 		TempRootBoneIndex.Reset();
 		return 0;
 	}
-	else if(UAnimSequence* AnimSequence = Cast<UAnimSequence>(Params.Animation) )
-	{ 
-		if(TempRootBoneIndex.IsSet() == false || TempRootBoneIndex.GetValue() == INDEX_NONE)
+	else if (UAnimSequence* AnimSequence = Cast<UAnimSequence>(Params.Animation))
+	{
+		if (TempRootBoneIndex.IsSet() == false || TempRootBoneIndex.GetValue() == INDEX_NONE)
 		{
 			//but if not first find first
 			int32 RootIndex = INDEX_NONE;
 #if WITH_EDITOR
-			const UAnimDataModel* DataModel = AnimSequence->GetDataModel();
+			const IAnimationDataModel* DataModel = AnimSequence->GetDataModel();
 			const TArray<FBoneAnimationTrack>& BoneAnimationTracks = DataModel->GetBoneAnimationTracks();
 			const int32 NumTracks = BoneAnimationTracks.Num();
 			for (int32 TrackIndex = 0; TrackIndex < NumTracks; ++TrackIndex)
@@ -490,6 +490,7 @@ int32 UMovieSceneSkeletalAnimationSection::SetBoneIndexForRootMotionCalculations
 
 				}
 			}
+
 #else
 			const TArray<FTrackToSkeletonMap>& BoneMappings = AnimSequence->GetCompressedTrackToSkeletonMapTable();
 			const int32 NumTracks = BoneMappings.Num();
@@ -512,7 +513,13 @@ int32 UMovieSceneSkeletalAnimationSection::SetBoneIndexForRootMotionCalculations
 						for (int32 Index = 0; Index < NumFrames; ++Index)
 						{
 							float Pos = FMath::Clamp((float)AnimSequence->GetSamplingFrameRate().AsSeconds(Index), 0.f, AnimSequence->GetPlayLength());
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+							//jurre this is what I am talking  about
+							// can't create tkhis since GetRetargetTransformsSourceName isn't  public.
+							//FAnimSequenceDecompressionContext DecompContext(AnimSequence->GetSamplingFrameRate(), AnimSequence->GetSamplingFrameRate().AsFrameNumber(AnimSequence->GetPlayLength()).Value, AnimSequence->Interpolation, AnimSequence->GetRetargetTransformsSourceName(), *AnimSequence->CompressedData.CompressedDataStructure, AnimSequence->GetSkeleton()->GetRefLocalPoses(), AnimSequence->CompressedData.CompressedTrackToSkeletonMapTable, AnimSequence->GetSkeleton(), AnimSequence->IsValidAdditive());
+
 							AnimSequence->GetBoneTransform(Transform, TrackIndex, Pos, false);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 							if (Transform.Equals(FTransform::Identity) == false)
 							{
 								TempRootBoneIndex = BoneTreeIndex;
@@ -555,8 +562,8 @@ bool UMovieSceneSkeletalAnimationSection::GetRootMotionTransform(FAnimationPoseD
 		Params.Weight.Evaluate(InOutParams.CurrentTime, ManualWeight);
 		InOutParams.OutWeight = ManualWeight * EvaluateEasing(InOutParams.CurrentTime);
 		InOutParams.bOutIsAdditive = false;
-		const float CurrentTimeSeconds = static_cast<float>(MapTimeToAnimation(InOutParams.CurrentTime, InOutParams.FrameRate));
-		const float StartSeconds = static_cast<float>(MapTimeToAnimation(FFrameNumber(0), InOutParams.FrameRate));
+		const double CurrentTimeSeconds = MapTimeToAnimation(InOutParams.CurrentTime, InOutParams.FrameRate);
+		const double StartSeconds = (MapTimeToAnimation(FFrameNumber(0), InOutParams.FrameRate));
 
 		InOutParams.bOutIsAdditive = AnimSequence->GetAdditiveAnimType() != EAdditiveAnimationType::AAT_None;
 		FTransform StartBoneTransform;

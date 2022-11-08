@@ -55,6 +55,7 @@
 #include "BufferVisualizationData.h"
 #include "NaniteVisualizationData.h"
 #include "LumenVisualizationData.h"
+#include "StrataVisualizationData.h"
 #include "VirtualShadowMapVisualizationData.h"
 #include "GPUSkinCacheVisualizationData.h"
 #include "UnrealWidget.h"
@@ -64,6 +65,7 @@
 #include "ProfilingDebugging/TraceScreenshot.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "IImageWrapperModule.h"
+#include "HDRHelper.h"
 
 #define LOCTEXT_NAMESPACE "EditorViewportClient"
 
@@ -305,7 +307,10 @@ const uint32 FEditorViewportClient::MaxCameraSpeeds = 8;
 
 float FEditorViewportClient::GetCameraSpeed() const
 {
-	return GetCameraSpeed(GetCameraSpeedSetting());
+	const float CameraBoost = (GetDefault<ULevelEditorViewportSettings>()->FlightCameraControlExperimentalNavigation && IsShiftPressed()) ? 2.0f : 1.0f;
+	const float SpeedSetting = GetCameraSpeed(GetCameraSpeedSetting());
+	const float FinalCameraSpeedScale = SpeedSetting * FlightCameraSpeedScale * GetCameraSpeedScalar() * CameraBoost;
+	return FinalCameraSpeedScale;
 }
 
 float FEditorViewportClient::GetCameraSpeed(int32 SpeedSetting) const
@@ -318,7 +323,7 @@ float FEditorViewportClient::GetCameraSpeed(int32 SpeedSetting) const
 	//#define MOVEMENTSPEED_VERYFAST		64	~ 16
 
 	const int32 SpeedToUse = FMath::Clamp<int32>(SpeedSetting, 1, MaxCameraSpeeds);
-	const float Speed[] = { 0.03125f, 0.09375f, 0.33f, 1.f, 3.f, 8.f, 16.f, 32.f };
+	const float Speed[] = { 0.033f, 0.1f, 0.33f, 1.f, 3.f, 8.f, 16.f, 32.f };
 
 	return Speed[SpeedToUse - 1];
 }
@@ -388,6 +393,7 @@ FEditorViewportClient::FEditorViewportClient(FEditorModeTools* InModeTools, FPre
 	, CurrentBufferVisualizationMode(NAME_None)
 	, CurrentNaniteVisualizationMode(NAME_None)
 	, CurrentLumenVisualizationMode(NAME_None)
+	, CurrentStrataVisualizationMode(NAME_None)
 	, CurrentVirtualShadowMapVisualizationMode(NAME_None)
 	, CurrentRayTracingDebugVisualizationMode(NAME_None)
 	, CurrentGPUSkinCacheVisualizationMode(NAME_None)
@@ -2675,6 +2681,23 @@ FText FEditorViewportClient::GetCurrentVirtualShadowMapVisualizationModeDisplayN
 	return GetVirtualShadowMapVisualizationData().GetModeDisplayName(CurrentVirtualShadowMapVisualizationMode);
 }
 
+void FEditorViewportClient::ChangeStrataVisualizationMode(FName InName)
+{
+	SetViewMode(VMI_VisualizeStrata);
+	CurrentStrataVisualizationMode = InName;
+}
+
+bool FEditorViewportClient::IsStrataVisualizationModeSelected(FName InName) const
+{
+	return IsViewModeEnabled(VMI_VisualizeStrata) && CurrentStrataVisualizationMode == InName;
+}
+
+FText FEditorViewportClient::GetCurrentStrataVisualizationModeDisplayName() const
+{
+	checkf(IsViewModeEnabled(VMI_VisualizeStrata), TEXT("In order to call GetCurrentStrataVisualizationMode(), first you must set ViewMode to VMI_VisualizeStrata."));
+	return GetStrataVisualizationData().GetModeDisplayName(CurrentStrataVisualizationMode);
+}
+
 bool FEditorViewportClient::IsVisualizeCalibrationMaterialEnabled() const
 {
 	// Get the list of requested buffers from the console
@@ -3839,6 +3862,7 @@ void FEditorViewportClient::SetupViewForRendering(FSceneViewFamily& ViewFamily, 
 	View.CurrentBufferVisualizationMode = CurrentBufferVisualizationMode;
 	View.CurrentNaniteVisualizationMode = CurrentNaniteVisualizationMode;
 	View.CurrentLumenVisualizationMode = CurrentLumenVisualizationMode;
+	View.CurrentStrataVisualizationMode = CurrentStrataVisualizationMode;
 	View.CurrentVirtualShadowMapVisualizationMode = CurrentVirtualShadowMapVisualizationMode;
 	View.CurrentGPUSkinCacheVisualizationMode = CurrentGPUSkinCacheVisualizationMode;
 #if RHI_RAYTRACING
@@ -3944,6 +3968,9 @@ void FEditorViewportClient::Draw(FViewport* InViewport, FCanvas* Canvas)
 	ViewFamily.EngineShowFlags = UseEngineShowFlags;
 
 	ViewFamily.bIsHDR = Viewport->IsHDRViewport();
+	
+	// The view is in focus if it is currently in editing
+	ViewFamily.SetIsInFocus(GetIsCurrentLevelEditingFocus());
 
 	if( !AllowsCinematicControl() )
 	{
@@ -5653,8 +5680,11 @@ void FEditorViewportClient::TakeScreenshot(FViewport* InViewport, bool bInValida
 
 	TUniquePtr<FImageWriteTask> ImageTask = MakeUnique<FImageWriteTask>();
 
+	// Read the contents of the viewport into an array.
+	bool bHdrEnabled = InViewport->GetSceneHDREnabled();
+	
+	if (!bHdrEnabled)
 	{
-		// Read the contents of the viewport into an array.
 		TArray<FColor> RawPixels;
 		RawPixels.SetNum(InViewport->GetSizeXY().X * InViewport->GetSizeXY().Y);
 		if( !InViewport->ReadPixels(RawPixels) )
@@ -5668,10 +5698,31 @@ void FEditorViewportClient::TakeScreenshot(FViewport* InViewport, bool bInValida
 
 		check(PixelData->IsDataWellFormed());
 		ImageTask->PixelData = MoveTemp(PixelData);
-	}
 
-	// Ensure the alpha channel is full alpha (this happens on the background thread)
-	ImageTask->PixelPreProcessors.Add(TAsyncAlphaWrite<FColor>(255));
+		// Ensure the alpha channel is full alpha (this happens on the background thread)
+		ImageTask->PixelPreProcessors.Add(TAsyncAlphaWrite<FColor>(255));
+	}
+	else
+	{
+		TArray<FLinearColor> RawPixels;
+		RawPixels.SetNum(InViewport->GetSizeXY().X * InViewport->GetSizeXY().Y);
+		if (!InViewport->ReadLinearColorPixels(RawPixels))
+		{
+			// Failed to read the image from the viewport
+			SaveMessagePtr->SetText(NSLOCTEXT("UnrealEd", "ScreenshotFailedViewport", "Screenshot failed, unable to read image from viewport"));
+			return;
+		}
+
+		ConvertPixelDataToSCRGB(RawPixels, InViewport->GetDisplayOutputFormat());
+
+		TUniquePtr<TImagePixelData<FLinearColor>> PixelData = MakeUnique<TImagePixelData<FLinearColor>>(InViewport->GetSizeXY(), TArray64<FLinearColor>(MoveTemp(RawPixels)));
+
+		check(PixelData->IsDataWellFormed());
+		ImageTask->PixelData = MoveTemp(PixelData);
+
+		// Ensure the alpha channel is full alpha (this happens on the background thread)
+		ImageTask->PixelPreProcessors.Add(TAsyncAlphaWrite<FLinearColor>(1.0f));
+	}
 
 	// Create screenshot folder if not already present.
 	const FString& Directory = GetDefault<ULevelEditorMiscSettings>()->EditorScreenshotSaveDirectory.Path;
@@ -5684,13 +5735,15 @@ void FEditorViewportClient::TakeScreenshot(FViewport* InViewport, bool bInValida
 	}
 
 	// Save the contents of the array to a bitmap file.
-	HighResScreenshotConfig.SetHDRCapture(false);
+	HighResScreenshotConfig.SetHDRCapture(bHdrEnabled);
 
 	// Set the image task parameters
-	ImageTask->Format = EImageFormat::PNG;
+	ImageTask->Format = bHdrEnabled ? EImageFormat::EXR : EImageFormat::PNG;
 	ImageTask->CompressionQuality = (int32)EImageCompressionQuality::Default;
 
-	bool bGeneratedFilename = FFileHelper::GenerateNextBitmapFilename(Directory / TEXT("ScreenShot"), TEXT("png"), ImageTask->Filename);
+	const TCHAR* FileExtension = bHdrEnabled ? TEXT("exr") : TEXT("png");
+
+	bool bGeneratedFilename = FFileHelper::GenerateNextBitmapFilename(Directory / TEXT("ScreenShot"), FileExtension, ImageTask->Filename);
 	if (!bGeneratedFilename)
 	{
 		SaveMessagePtr->SetText(NSLOCTEXT( "UnrealEd", "ScreenshotFailed_TooManyScreenshots", "Screenshot failed, too many screenshots in output directory" ));
@@ -5773,6 +5826,109 @@ void FEditorViewportClient::TakeHighResScreenShot()
 	}
 }
 
+template<class FColorType>
+void ClipBitmapDataScreenshotDataEditor(bool& bWriteAlpha, TArray<FColorType>& Bitmap, FIntPoint& BitmapSize, const FIntRect& CaptureRect, bool bCaptureAreaValid)
+{
+	FHighResScreenshotConfig& HighResScreenshotConfig = GetHighResScreenshotConfig();
+
+	// Determine which region of the captured data we want to save out. If the highres screenshot capture region
+	// is not valid, we want to save out everything in the viewrect that we just grabbed.
+	FIntRect SourceRect = FIntRect(0, 0, 0, 0);
+	if (GIsHighResScreenshot && bCaptureAreaValid)
+	{
+		// Highres screenshot capture region is valid, so use that
+		SourceRect = HighResScreenshotConfig.CaptureRegion;
+	}
+
+	bWriteAlpha = false;
+
+	// If this is a high resolution screenshot and we are using the masking feature,
+	// Get the results of the mask rendering pass and insert into the alpha channel of the screenshot.
+	if (GIsHighResScreenshot && HighResScreenshotConfig.bMaskEnabled)
+	{
+		bWriteAlpha = HighResScreenshotConfig.MergeMaskIntoAlpha(Bitmap, CaptureRect);
+	}
+
+	// Clip the bitmap to just the capture region if valid
+	if (!SourceRect.IsEmpty())
+	{
+		const int32 OldWidth = BitmapSize.X;
+		const int32 OldHeight = BitmapSize.Y;
+
+		//clamp in bounds:
+		int CaptureMinX = FMath::Clamp(SourceRect.Min.X, 0, OldWidth);
+		int CaptureMinY = FMath::Clamp(SourceRect.Min.Y, 0, OldHeight);
+
+		int CaptureMaxX = FMath::Clamp(SourceRect.Max.X, 0, OldWidth);
+		int CaptureMaxY = FMath::Clamp(SourceRect.Max.Y, 0, OldHeight);
+
+		int32 NewWidth = CaptureMaxX - CaptureMinX;
+		int32 NewHeight = CaptureMaxY - CaptureMinY;
+
+		if (NewWidth > 0 && NewHeight > 0 && NewWidth != OldWidth && NewHeight != OldHeight)
+		{
+			FColorType* const Data = Bitmap.GetData();
+
+			for (int32 Row = 0; Row < NewHeight; Row++)
+			{
+				FMemory::Memmove(Data + Row * NewWidth, Data + (Row + CaptureMinY) * OldWidth + CaptureMinX, NewWidth * sizeof(*Data));
+			}
+
+			Bitmap.RemoveAt(NewWidth * NewHeight, OldWidth * OldHeight - NewWidth * NewHeight, false);
+			BitmapSize = FIntPoint(NewWidth, NewHeight);
+		}
+	}
+}
+
+template<class FColorType, typename TChannelType>
+bool RequestSaveScreenshot(bool bWriteAlpha, TArray<FColorType>& Bitmap, FIntPoint& BitmapSize, TChannelType OpaqueAlphaValue)
+{
+	FHighResScreenshotConfig& HighResScreenshotConfig = GetHighResScreenshotConfig();
+	bool bIsScreenshotSaved = false;
+	bool bSuppressWritingToFile = false;
+	if (SHOULD_TRACE_SCREENSHOT())
+	{
+		bSuppressWritingToFile = FTraceScreenshot::ShouldSuppressWritingToFile();
+		FTraceScreenshot::TraceScreenshot(BitmapSize.X, BitmapSize.Y, Bitmap, FScreenshotRequest::GetFilename());
+	}
+
+	if (!bSuppressWritingToFile)
+	{
+		TUniquePtr<FImageWriteTask> ImageTask = MakeUnique<FImageWriteTask>();
+		ImageTask->PixelData = MakeUnique<TImagePixelData<FColorType>>(BitmapSize, TArray64<FColorType>(MoveTemp(Bitmap)));
+
+		// Set full alpha on the bitmap
+		if (!bWriteAlpha)
+		{
+			ImageTask->PixelPreProcessors.Add(TAsyncAlphaWrite<FColorType>(OpaqueAlphaValue));
+		}
+
+		HighResScreenshotConfig.PopulateImageTaskParams(*ImageTask);
+		ImageTask->Filename = FScreenshotRequest::GetFilename();
+
+		{
+			// if not high dynamic range, get format from filename :
+			IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+			EImageFormat ImageFormat = ImageWrapperModule.GetImageFormatFromExtension(*ImageTask->Filename);
+			if (ImageFormat != EImageFormat::Invalid)
+			{
+				ImageTask->Format = ImageFormat;
+			}
+		}
+
+		// Save the bitmap to disk
+		TFuture<bool> CompletionFuture = HighResScreenshotConfig.ImageWriteQueue->Enqueue(MoveTemp(ImageTask));
+		if (CompletionFuture.IsValid())
+		{
+			// this queues it then immediately waits? what's the point of ImageWriteQueue then?
+			// just use FImageUtils::Save
+			bIsScreenshotSaved = CompletionFuture.Get();
+		}
+	}
+
+	return bIsScreenshotSaved;
+}
+
 bool FEditorViewportClient::ProcessScreenShots(FViewport* InViewport)
 {
 	bool bIsScreenshotSaved = false;
@@ -5814,117 +5970,42 @@ bool FEditorViewportClient::ProcessScreenShots(FViewport* InViewport)
 			CaptureRect = View->UnscaledViewRect;
 		}
 
-		TArray<FColor> Bitmap;
-		if (GetViewportScreenShot(InViewport, Bitmap, CaptureRect))
+		bool bHdrEnabled = InViewport->GetSceneHDREnabled();
+
+		// Determine the size of the captured viewport data.
+		FIntPoint BitmapSize = CaptureRect.Area() > 0 ? CaptureRect.Size() : InViewport->GetSizeXY();
+		if (!bHdrEnabled)
 		{
-			// Determine the size of the captured viewport data.
-			FIntPoint BitmapSize = CaptureRect.Area() > 0 ? CaptureRect.Size() : InViewport->GetSizeXY();
-
-			// Determine which region of the captured data we want to save out. If the highres screenshot capture region
-			// is not valid, we want to save out everything in the viewrect that we just grabbed.
-			FIntRect SourceRect = FIntRect(0, 0, 0, 0);
-			if (GIsHighResScreenshot && bCaptureAreaValid)
+			TArray<FColor> Bitmap;
+			if (GetViewportScreenShot(InViewport, Bitmap, CaptureRect))
 			{
-				// Highres screenshot capture region is valid, so use that
-				SourceRect = HighResScreenshotConfig.CaptureRegion;
-			}
+				bool bWriteAlpha = false;
+				ClipBitmapDataScreenshotDataEditor(bWriteAlpha, Bitmap, BitmapSize, CaptureRect, bCaptureAreaValid);
 
-			bool bWriteAlpha = false;
-
-			// If this is a high resolution screenshot and we are using the masking feature,
-			// Get the results of the mask rendering pass and insert into the alpha channel of the screenshot.
-			if (GIsHighResScreenshot && HighResScreenshotConfig.bMaskEnabled)
-			{
-				bWriteAlpha = HighResScreenshotConfig.MergeMaskIntoAlpha(Bitmap, CaptureRect);
-			}
-
-			// Clip the bitmap to just the capture region if valid
-			if (!SourceRect.IsEmpty())
-			{
-				const int32 OldWidth = BitmapSize.X;
-				const int32 OldHeight = BitmapSize.Y;
-
-				//clamp in bounds:
-				int CaptureMinX = FMath::Clamp(SourceRect.Min.X,0,OldWidth);
-				int CaptureMinY = FMath::Clamp(SourceRect.Min.Y,0,OldHeight);
-				
-				int CaptureMaxX = FMath::Clamp(SourceRect.Max.X,0,OldWidth);
-				int CaptureMaxY = FMath::Clamp(SourceRect.Max.Y,0,OldHeight);
-				
-				int32 NewWidth  = CaptureMaxX - CaptureMinX;
-				int32 NewHeight = CaptureMaxY - CaptureMinY;
- 
-				if ( NewWidth > 0 && NewHeight > 0 )
+				if (FScreenshotRequest::OnScreenshotCaptured().IsBound())
 				{
-					FColor* const Data = Bitmap.GetData();
+					TArray<FColor> BitmapForBroadcast(Bitmap);
 
-					for (int32 Row = 0; Row < NewHeight; Row++)
+					if (!bWriteAlpha)
 					{
-						FMemory::Memmove(Data + Row * NewWidth, Data + (Row + CaptureMinY) * OldWidth + CaptureMinX, NewWidth * sizeof(*Data));
+						// Set full alpha on the bitmap
+						for (FColor& Pixel : BitmapForBroadcast) { Pixel.A = 255; }
 					}
 
-					Bitmap.RemoveAt(NewWidth * NewHeight, OldWidth * OldHeight - NewWidth * NewHeight, false);
-					BitmapSize = FIntPoint(NewWidth, NewHeight);
+					FScreenshotRequest::OnScreenshotCaptured().Broadcast(BitmapSize.X, BitmapSize.Y, MoveTemp(BitmapForBroadcast));
 				}
+
+				bIsScreenshotSaved = RequestSaveScreenshot(bWriteAlpha, Bitmap, BitmapSize, 255);
 			}
-
-			if (GIsAutomationTesting)
+		}
+		else
+		{
+			TArray<FLinearColor> BitmapHDR;
+			if (GetViewportScreenShotHDR(InViewport, BitmapHDR, CaptureRect))
 			{
-				// Under automation test, the screenshot is highjacked and sent to be compared
-				TArray<FColor> BitmapForCompare(Bitmap);
-				if (!bWriteAlpha)
-				{
-					// Set full alpha on the bitmap
-					for (FColor& Pixel : BitmapForCompare) { Pixel.A = 255; }
-				}
-
-				FScreenshotRequest::OnScreenshotCaptured().Broadcast(BitmapSize.X, BitmapSize.Y, MoveTemp(BitmapForCompare));
-			}
-
-			bool bSuppressWritingToFile = false;
-			if (SHOULD_TRACE_SCREENSHOT())
-			{
-				bSuppressWritingToFile = FTraceScreenshot::ShouldSuppressWritingToFile();
-				FTraceScreenshot::TraceScreenshot(BitmapSize.X, BitmapSize.Y, Bitmap, FScreenshotRequest::GetFilename());
-			}
-
-			if (!bSuppressWritingToFile)
-			{
-				TUniquePtr<FImageWriteTask> ImageTask = MakeUnique<FImageWriteTask>();
-				ImageTask->PixelData = MakeUnique<TImagePixelData<FColor>>(BitmapSize, TArray64<FColor>(MoveTemp(Bitmap)));
-
-				// Set full alpha on the bitmap
-				if (!bWriteAlpha)
-				{
-					ImageTask->PixelPreProcessors.Add(TAsyncAlphaWrite<FColor>(255));
-				}
-
-				HighResScreenshotConfig.PopulateImageTaskParams(*ImageTask);
-				ImageTask->Filename = FScreenshotRequest::GetFilename();
-
-				// Filename can be PNG but EImageFormat can be EXR
-
-				// PopulateImageTaskParams sets Format, ignores extension on file name
-				// ignore EXR from PopulateImageTaskParams, we are always 8-bit here
-				//if ( ImageTask->Format != EImageFormat::EXR )
-				{
-					// if not high dynamic range, get format from filename :
-					IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
-					EImageFormat ImageFormat = ImageWrapperModule.GetImageFormatFromExtension(*ImageTask->Filename);
-					if (ImageFormat != EImageFormat::Invalid)
-					{
-						ImageTask->Format = ImageFormat;
-					}
-				}
-
-				// Save the bitmap to disk
-				TFuture<bool> CompletionFuture = HighResScreenshotConfig.ImageWriteQueue->Enqueue(MoveTemp(ImageTask));
-				if (CompletionFuture.IsValid())
-				{
-					// this queues it then immediately waits? what's the point of ImageWriteQueue then?
-					// just use FImageUtils::Save
-					bIsScreenshotSaved = CompletionFuture.Get();
-				}
+				bool bWriteAlpha = false;
+				ClipBitmapDataScreenshotDataEditor(bWriteAlpha, BitmapHDR, BitmapSize, CaptureRect, bCaptureAreaValid);
+				bIsScreenshotSaved = RequestSaveScreenshot(bWriteAlpha, BitmapHDR, BitmapSize, 1.0f);
 			}
 		}
 

@@ -2126,17 +2126,19 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 
-void AActor::K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies)
+bool AActor::K2_AttachToComponent(USceneComponent* Parent, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies)
 {
-	AttachToComponent(Parent, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
+	return AttachToComponent(Parent, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
 }
 
-void AActor::AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName)
+bool AActor::AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName)
 {
 	if (RootComponent && Parent)
 	{
-		RootComponent->AttachToComponent(Parent, AttachmentRules, SocketName);
+		return RootComponent->AttachToComponent(Parent, AttachmentRules, SocketName);
 	}
+
+	return false;
 }
 
 void AActor::OnRep_AttachmentReplication()
@@ -2198,21 +2200,23 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 }
 
-void AActor::K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies)
+bool AActor::K2_AttachToActor(AActor* ParentActor, FName SocketName, EAttachmentRule LocationRule, EAttachmentRule RotationRule, EAttachmentRule ScaleRule, bool bWeldSimulatedBodies)
 {
-	AttachToActor(ParentActor, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
+	return AttachToActor(ParentActor, FAttachmentTransformRules(LocationRule, RotationRule, ScaleRule, bWeldSimulatedBodies), SocketName);
 }
 
-void AActor::AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName)
+bool AActor::AttachToActor(AActor* ParentActor, const FAttachmentTransformRules& AttachmentRules, FName SocketName)
 {
 	if (RootComponent && ParentActor)
 	{
 		USceneComponent* ParentDefaultAttachComponent = ParentActor->GetDefaultAttachComponent();
 		if (ParentDefaultAttachComponent)
 		{
-			RootComponent->AttachToComponent(ParentDefaultAttachComponent, AttachmentRules, SocketName);
+			return RootComponent->AttachToComponent(ParentDefaultAttachComponent, AttachmentRules, SocketName);
 		}
 	}
+
+	return false;
 }
 
 void AActor::DetachRootComponentFromParent(bool bMaintainWorldPosition)
@@ -3623,7 +3627,7 @@ static void ValidateDeferredTransformCache()
 	}
 }
 
-void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail, bool bDeferConstruction)
+void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* InOwner, APawn* InInstigator, bool bRemoteOwned, bool bNoFail, bool bDeferConstruction, ESpawnActorScaleMethod TransformScaleMethod)
 {
 	// General flow here is like so
 	// - Actor sets up the basics.
@@ -3660,7 +3664,17 @@ void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* I
 		// Respect any non-default transform value that the root component may have received from the archetype that's owned
 		// by the native CDO, so the final transform might not always necessarily equate to the passed-in UserSpawnTransform.
 		const FTransform RootTransform(SceneRootComponent->GetRelativeRotation(), SceneRootComponent->GetRelativeLocation(), SceneRootComponent->GetRelativeScale3D());
-		const FTransform FinalRootComponentTransform = RootTransform * UserSpawnTransform;
+		FTransform FinalRootComponentTransform = RootTransform;
+		switch(TransformScaleMethod)
+		{
+		case ESpawnActorScaleMethod::OverrideRootScale:
+			FinalRootComponentTransform = UserSpawnTransform;
+			break;
+		case ESpawnActorScaleMethod::MultiplyWithRoot:
+		case ESpawnActorScaleMethod::SelectDefaultAtRuntime:
+			FinalRootComponentTransform = RootTransform * UserSpawnTransform;
+			break;
+		}
 		SceneRootComponent->SetWorldTransform(FinalRootComponentTransform, false, nullptr, ETeleportType::ResetPhysics);
 	}
 
@@ -3711,7 +3725,7 @@ void AActor::PostSpawnInitialize(FTransform const& UserSpawnTransform, AActor* I
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Actor)
 
-void AActor::FinishSpawning(const FTransform& UserTransform, bool bIsDefaultTransform, const FComponentInstanceDataCache* InstanceDataCache)
+void AActor::FinishSpawning(const FTransform& UserTransform, bool bIsDefaultTransform, const FComponentInstanceDataCache* InstanceDataCache, ESpawnActorScaleMethod TransformScaleMethod)
 {
 #if ENABLE_SPAWNACTORTIMER
 	FScopedSpawnActorTimer SpawnTimer(GetClass()->GetFName(), ESpawnActorTimingType::FinishSpawning);
@@ -3755,7 +3769,7 @@ void AActor::FinishSpawning(const FTransform& UserTransform, bool bIsDefaultTran
 
 		{
 			FEditorScriptExecutionGuard ScriptGuard;
-			ExecuteConstruction(FinalRootComponentTransform, nullptr, InstanceDataCache, bIsDefaultTransform);
+			ExecuteConstruction(FinalRootComponentTransform, nullptr, InstanceDataCache, bIsDefaultTransform, TransformScaleMethod);
 		}
 
 		{
@@ -3925,6 +3939,12 @@ void AActor::SetReplicates(bool bInReplicates)
 					ForcePropertyCompare();
 				}
 			}
+#if UE_WITH_IRIS
+			else if (HasActorBegunPlay())
+			{
+				EndReplication(EEndPlayReason::RemovedFromWorld);
+			}
+#endif
 
 			MARK_PROPERTY_DIRTY_FROM_NAME(AActor, RemoteRole, this);
 		}

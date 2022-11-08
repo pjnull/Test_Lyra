@@ -1585,14 +1585,12 @@ namespace ObjectTools
 						UClass* OldClass = BlueprintToConsolidate->GeneratedClass;
 						UClass* OldSkeletonClass = BlueprintToConsolidate->SkeletonGeneratedClass;
 
-						FReplaceInstancesOfClassParameters ReplaceInstanceParams = FReplaceInstancesOfClassParameters(OldClass, BlueprintToConsolidateTo->GeneratedClass);
-						ReplaceInstanceParams.OriginalCDO = nullptr;
+						FReplaceInstancesOfClassParameters ReplaceInstanceParams;
 						ReplaceInstanceParams.ObjectsThatShouldUseOldStuff = &ObjectsToNotConsolidateWithin;
-						ReplaceInstanceParams.bClassObjectReplaced = true;
 						ReplaceInstanceParams.bPreserveRootComponent = true;
 						ReplaceInstanceParams.InstancesThatShouldUseOldClass = &ObjectsToNotConsolidateWithin;
 
-						FBlueprintCompileReinstancer::ReplaceInstancesOfClassEx(ReplaceInstanceParams);
+						FBlueprintCompileReinstancer::ReplaceInstancesOfClass(OldClass, BlueprintToConsolidateTo->GeneratedClass, ReplaceInstanceParams);
 						BlueprintToConsolidate->GeneratedClass = OldClass;
 						BlueprintToConsolidate->SkeletonGeneratedClass = OldSkeletonClass;
 					}
@@ -2424,7 +2422,7 @@ namespace ObjectTools
 					{
 						FFormatNamedArguments Args;
 						Args.Add(TEXT("Filename"), FText::FromString(PackageFilename));
-						const FText Message = FText::Format(NSLOCTEXT("ObjectTools", "DeleteReadOnlyWarning", "File '{Filename}' is read-only on disk, are you sure you want to delete it?"), Args);
+						const FText Message = FText::Format(NSLOCTEXT("ObjectTools", "DeleteReadOnlyWarning", "This file is read-only on disk:\n\n{Filename}\n\nDelete it anyway?"), Args);
 
 						ReturnType = FMessageDialog::Open(EAppMsgType::YesNoYesAllNoAll, Message);
 						bMakeWritable = ReturnType == EAppReturnType::YesAll;
@@ -2882,7 +2880,7 @@ namespace ObjectTools
 					{
 						FFormatNamedArguments Args;
 						Args.Add(TEXT("Filename"), FText::FromString(PackageFilename));
-						const FText Message = FText::Format(NSLOCTEXT("ObjectTools", "DeleteReadOnlyWarning", "File '{Filename}' is read-only on disk, are you sure you want to delete it?"), Args);
+						const FText Message = FText::Format(NSLOCTEXT("ObjectTools", "DeleteReadOnlyWarning", "This file is read-only on disk:\n\n{Filename}\n\nDelete it anyway?"), Args);
 
 						ReturnType = FMessageDialog::Open(EAppMsgType::YesNoYesAllNoAll, EAppReturnType::No, Message);
 						bMakeWritable = ReturnType == EAppReturnType::YesAll;

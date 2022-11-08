@@ -911,20 +911,43 @@ void UWorld::PostDuplicate(bool bDuplicateForPIE)
 		UBlueprint* LevelScriptBlueprint = PersistentLevel->GetLevelScriptBlueprint(bDontCreate);
 		if (LevelScriptBlueprint)
 		{
+			// Duplicating a UClass shallow copies the ClassGeneratedBy field and the CDO.
+			// This is problematic because we might accidentally reference these objects,
+			// which prevents saving of the level since these objects are external
+			// (eg: event dispatchers in a level blueprint can trigger this scenario).
+			auto FixupGeneratedClass = [LevelScriptBlueprint](UObject* NewClass)
+			{
+				if (UClass* Class = Cast<UClass>(NewClass))
+				{
+					// We can likely work around a deep-copied CDO, but it's also unexpected in this scenario.
+					ensureMsgf(!Class->ClassDefaultObject || Class->ClassDefaultObject->GetOuter() != Class, TEXT("Expecting shallow copy of CDO"));
+
+					Class->ClassGeneratedBy = LevelScriptBlueprint;
+					Class->StaticLink(true);
+					Class->ClassDefaultObject = nullptr;
+					Class->GetDefaultObject();
+				}
+			};
+
 			UObject* OldGeneratedClass = LevelScriptBlueprint->GeneratedClass;
 			if (OldGeneratedClass)
 			{
 				UObject* NewGeneratedClass = StaticDuplicateObject(OldGeneratedClass, MyPackage, OldGeneratedClass->GetFName());
+				FixupGeneratedClass(NewGeneratedClass);
+
 				ReplacementMap.Add(OldGeneratedClass, NewGeneratedClass);
 
 				// The class may have referenced a lightmap or landscape resource that is also being duplicated. Add it to the list of objects that need references fixed up.
 				ObjectsToFixReferences.Add(NewGeneratedClass);
+
 			}
 
 			UObject* OldSkeletonClass = LevelScriptBlueprint->SkeletonGeneratedClass;
 			if (OldSkeletonClass)
 			{
 				UObject* NewSkeletonClass = StaticDuplicateObject(OldSkeletonClass, MyPackage, OldSkeletonClass->GetFName());
+				FixupGeneratedClass(NewSkeletonClass);
+
 				ReplacementMap.Add(OldSkeletonClass, NewSkeletonClass);
 
 				// The class may have referenced a lightmap or landscape resource that is also being duplicated. Add it to the list of objects that need references fixed up.
@@ -1132,22 +1155,25 @@ void UWorld::FinishDestroy()
 	{
 		UPackage* WorldPackage = GetOutermost();
 
-		bool bContainsAnotherWorld = false;
-		TArray<UObject*> PotentialWorlds;
-		GetObjectsWithPackage(WorldPackage, PotentialWorlds, false);
-		for (UObject* PotentialWorld : PotentialWorlds)
+		if (WorldPackage->HasAnyPackageFlags(PKG_ContainsMap))
 		{
-			UWorld* World = Cast<UWorld>(PotentialWorld);
-			if (World && World != this)
+			bool bContainsAnotherWorld = false;
+			TArray<UObject*> PotentialWorlds;
+			GetObjectsWithPackage(WorldPackage, PotentialWorlds, false);
+			for (UObject* PotentialWorld : PotentialWorlds)
 			{
-				bContainsAnotherWorld = true;
-				break;
+				UWorld* World = Cast<UWorld>(PotentialWorld);
+				if (World && World != this)
+				{
+					bContainsAnotherWorld = true;
+					break;
+				}
 			}
-		}
 
-		if ( !bContainsAnotherWorld )
-		{
-			WorldPackage->ClearPackageFlags(PKG_ContainsMap);
+			if ( !bContainsAnotherWorld )
+			{
+				WorldPackage->ClearPackageFlags(PKG_ContainsMap);
+			}
 		}
 	}
 

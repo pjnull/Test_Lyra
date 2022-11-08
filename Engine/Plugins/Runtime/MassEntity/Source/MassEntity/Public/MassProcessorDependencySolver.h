@@ -4,18 +4,11 @@
 
 #include "MassProcessingTypes.h"
 #include "MassEntityTypes.h"
+#include "MassArchetypeTypes.h"
 #include "Containers/StaticArray.h"
 
 
 class UMassProcessor;
-
-enum class EDependencyNodeType : uint8
-{
-	Invalid,
-	Processor,
-	GroupStart,
-	GroupEnd
-};
 
 namespace EMassAccessOperation
 {
@@ -53,6 +46,7 @@ struct MASSENTITY_API FMassExecutionRequirements
 	void CountResourcesUsed();
 	int32 GetTotalBitsUsedCount();
 	bool IsEmpty() const;
+	FMassArchetypeCompositionDescriptor AsCompositionDescriptor() const;
 
 	TMassExecutionAccess<FMassFragmentBitSet> Fragments;
 	TMassExecutionAccess<FMassChunkFragmentBitSet> ChunkFragments;
@@ -64,7 +58,7 @@ struct MASSENTITY_API FMassExecutionRequirements
 	int32 ResourcesUsedCount = INDEX_NONE;
 };
 
-struct FProcessorDependencySolver
+struct FMassProcessorDependencySolver
 {
 private:
 	struct FNode
@@ -72,6 +66,9 @@ private:
 		FNode(const FName InName, UMassProcessor* InProcessor, const int32 InNodeIndex = INDEX_NONE) 
 			: Name(InName), Processor(InProcessor), NodeIndex(InNodeIndex)
 		{}
+
+		bool IsGroup() const { return Processor == nullptr; }
+		void IncreaseWaitingNodesCount(TArrayView<FNode> InAllNodes);
 
 		FName Name = TEXT("");
 		UMassProcessor* Processor = nullptr;
@@ -81,16 +78,22 @@ private:
 		TArray<FName> ExecuteAfter;
 		FMassExecutionRequirements Requirements;
 		int32 NodeIndex = INDEX_NONE;
+		/** indicates how often given node can be found in dependencies sequence for other nodes  */
+		int32 TotalWaitingNodes = 0;
+		/** 
+		 * indicates how deep within dependencies graph this give node is, or in other words, what's the longest sequence 
+		 * from this node to a dependency-less "parent" node 
+		 */
+		int32 SequencePositionIndex = 0;
 		TArray<int32> SubNodeIndices;
-
-		bool IsGroup() const { return Processor == nullptr; }
+		TArray<FMassArchetypeHandle> ValidArchetypes;
 	};
 
 	struct FResourceUsage
 	{
-		FResourceUsage();
+		FResourceUsage(const TArray<FNode>& InAllNodes);
 
-		bool CanAccessRequirements(const FMassExecutionRequirements& TestedRequirements) const;
+		bool CanAccessRequirements(const FMassExecutionRequirements& TestedRequirements, const TArray<FMassArchetypeHandle>& InArchetypes) const;
 		void SubmitNode(const int32 NodeIndex, FNode& InOutNode);
 
 	private:
@@ -109,28 +112,46 @@ private:
 		TMassExecutionAccess<FResourceAccess> ChunkFragmentsAccess;
 		TMassExecutionAccess<FResourceAccess> SharedFragmentsAccess;
 		TMassExecutionAccess<FResourceAccess> RequiredSubsystemsAccess;
+		TConstArrayView<FNode> AllNodesView;
 
 		template<typename TBitSet>
-		static void HandleElementType(TMassExecutionAccess<FResourceAccess>& ElementAccess
-			, const TMassExecutionAccess<TBitSet>& TestedRequirements, FProcessorDependencySolver::FNode& InOutNode, const int32 NodeIndex);
+		void HandleElementType(TMassExecutionAccess<FResourceAccess>& ElementAccess
+			, const TMassExecutionAccess<TBitSet>& TestedRequirements, FMassProcessorDependencySolver::FNode& InOutNode, const int32 NodeIndex);
 
 		template<typename TBitSet>
 		static bool CanAccess(const TMassExecutionAccess<TBitSet>& StoredElements, const TMassExecutionAccess<TBitSet>& TestedElements);
+
+		/** Determines whether any of the Elements' (i.e. Fragment, Tag,...) users operate on any of the archetypes given via InArchetypes */
+		bool HasArchetypeConflict(TMassExecutionAccess<FResourceAccess> ElementAccess, const TArray<FMassArchetypeHandle>& InArchetypes) const;
 	};
 
 public:
-	struct FOrderInfo
+	/** Optionally returned by ResolveDependencies and contains information about processors that have been pruned and 
+	 *  other potentially useful bits. To be used in a transient fashion. */
+	struct FResult
 	{
-		FName Name = TEXT("");
-		UMassProcessor* Processor = nullptr;
-		EDependencyNodeType NodeType = EDependencyNodeType::Invalid;
-		TArray<FName> Dependencies;
+		FString DependencyGraphFileName;
+		TArray<TSubclassOf<UMassProcessor>> PrunedProcessorClasses;
+		int32 MaxSequenceLength = 0;
+		uint32 ArchetypeDataVersion = 0;
+
+		void Reset()
+		{
+			PrunedProcessorClasses.Reset();
+			MaxSequenceLength = 0;
+			ArchetypeDataVersion = 0;
+		}
 	};
 
-	MASSENTITY_API FProcessorDependencySolver(TArrayView<UMassProcessor*> InProcessors, const FName Name, const FString& InDependencyGraphFileName = FString());
-	MASSENTITY_API void ResolveDependencies(TArray<FOrderInfo>& OutResult);
+	MASSENTITY_API FMassProcessorDependencySolver(TArrayView<UMassProcessor*> InProcessors, const bool bIsGameRuntime = true);
+	MASSENTITY_API void ResolveDependencies(TArray<FMassProcessorOrderInfo>& OutResult, TSharedPtr<FMassEntityManager> EntityManager = nullptr, FResult* InOutOptionalResult = nullptr);
 
 	MASSENTITY_API static void CreateSubGroupNames(FName InGroupName, TArray<FString>& SubGroupNames);
+
+	/** Determines whether the dependency solving that produced InResult will produce different results if run with a given EntityManager */
+	static bool IsResultUpToDate(const FResult& InResult, TSharedPtr<FMassEntityManager> EntityManager);
+
+	bool IsSolvingForSingleThread() const { return bSingleThreadTarget; }
 
 protected:
 	// note that internals are protected rather than private to support unit testing
@@ -143,9 +164,9 @@ protected:
 	 */
 	bool PerformSolverStep(FResourceUsage& ResourceUsage, TArray<int32>& InOutIndicesRemaining, TArray<int32>& OutNodeIndices);
 	
-	void CreateNodes(UMassProcessor& Processor);
+	int32 CreateNodes(UMassProcessor& Processor);
 	void BuildDependencies();
-	void Solve(TArray<FProcessorDependencySolver::FOrderInfo>& OutResult);
+	void Solve(TArray<FMassProcessorOrderInfo>& OutResult);
 	void LogNode(const FNode& Node, int Indent = 0);
 	
 	// @todo due to fundamental change to how nodes are organized the graph generation needs reimplementation
@@ -154,8 +175,16 @@ protected:
 
 	TArrayView<UMassProcessor*> Processors;
 	bool bAnyCyclesDetected = false;
+	/**
+	 * indicates whether we're generating processor order to be run in single- or multi-threaded environment (usually
+	 * this meas Dedicated Server vs Any other configuration). In Single-Threaded mode we can skip a bunch of expensive, 
+	 * fine tunning tests.
+	 * @Note: currently the value depends on MASS_DO_PARALLEL and there's no way to configure it otherwise, but there's 
+	 * nothing inherently stopping us from letting users configure it.
+	 */
+	const bool bSingleThreadTarget = bool(!MASS_DO_PARALLEL);
+	const bool bGameRuntime = true;
 	FString DependencyGraphFileName;
-	FName CollectionName;
 	TArray<FNode> AllNodes;
 	TMap<FName, int32> NodeIndexMap;
 };

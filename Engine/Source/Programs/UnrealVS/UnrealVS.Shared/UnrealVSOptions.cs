@@ -28,13 +28,18 @@ namespace UnrealVS
 		public bool AllowUnrealVSOverrideDiffSettings { get; set; }
 
 		[Category("Unreal.P4")]
+		[DisplayName("Use P4V Diff")]
+		[Description("Uses P4V to diff files")]
+		public bool UseP4VDiff { get; set; }
+
+		[Category("Unreal.P4")]
 		[DisplayName("Allow perforce operations")]
-		[Description("Uses p4 ini / environment settings to call P4 functionlality, use 'RunUAT P4WriteConfig' to initialize those settings")]
+		[Description("Uses p4 ini / environment settings to call P4 functionality, use 'RunUAT P4WriteConfig' to initialize those settings")]
 		public bool AllowUnrealVSP4 { get; set; }
 
 		[Category("Unreal.P4")]
 		[DisplayName("Allow Async Checkout")]
-		[Description("Switches checkout (on edit or manual) to an async method, note if the p4 operation fails the local file will still be writeable")]
+		[Description("Switches checkout (on edit or manual) to an async method, note if the p4 operation fails the local file will still be writable")]
 		public bool AllowAsyncP4Checkout { get; set; }
 
 		[Category("Unreal.P4")]
@@ -51,6 +56,11 @@ namespace UnrealVS
 		[DisplayName("Reconcile Extensions")]
 		[Description("Reconcile will attempt to resolve these extensions (including wildcards)")]
 		public string ReconcileExtensions { get; set; } = "c*;h*;ini;uproject;uplugin";
+
+		[Category("General")]
+		[DisplayName("Prefix UE5 solution name with folder")]
+		[Description("Will include name of folder that UE5.sln is located in to Visual Studio window title.")]
+		public bool IncludeFolderInUE5SolutionName { get; set; } = true;
 
 		protected override void OnApply(PageApplyEventArgs e)
 		{

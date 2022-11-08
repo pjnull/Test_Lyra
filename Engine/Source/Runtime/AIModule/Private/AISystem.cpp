@@ -30,8 +30,6 @@ UAISystem::UAISystem(const FObjectInitializer& ObjectInitializer)
 	bAllowStrafing = false;
 	DefaultSightCollisionChannel = ECC_Visibility;
 
-	bEnableBTAITasks = true;
-
 	if (HasAnyFlags(RF_ClassDefaultObject))
 	{
 		// game-wise config
@@ -86,9 +84,11 @@ void UAISystem::PostInitProperties()
 
 		if (WorldOuter)
 		{
-			FOnActorSpawned::FDelegate ActorSpawnedDelegate = FOnActorSpawned::FDelegate::CreateUObject(this, &UAISystem::OnActorSpawned);
+			const FOnActorSpawned::FDelegate ActorSpawnedDelegate = FOnActorSpawned::FDelegate::CreateUObject(this, &UAISystem::OnActorSpawned);
 			ActorSpawnedDelegateHandle = WorldOuter->AddOnActorSpawnedHandler(ActorSpawnedDelegate);
 		}
+
+		PawnBeginPlayDelegateHandle = APawn::OnPawnBeginPlay.AddUObject(this, &UAISystem::OnPawnBeginPlay);
 
 		ConditionalLoadDebuggerPlugin();
 	}
@@ -106,15 +106,23 @@ void UAISystem::StartPlay()
 
 void UAISystem::OnActorSpawned(AActor* SpawnedActor)
 {
+}
+
+void UAISystem::OnPawnBeginPlay(APawn* Pawn)
+{
+	check(Pawn);
+
 	if (PerceptionSystem == nullptr || PerceptionSystem->bHandlePawnNotification == false)
 	{
 		return;
 	}
 
-	APawn* AsPawn = Cast<APawn>(SpawnedActor);
-	if (AsPawn)
+	const UWorld* const PawnWorld = Pawn->GetWorld();
+	check(PawnWorld);
+
+	if (PawnWorld == GetWorld())
 	{
-		PerceptionSystem->OnNewPawn(*AsPawn);
+		PerceptionSystem->OnNewPawn(*Pawn);
 	}
 }
 
@@ -145,6 +153,13 @@ void UAISystem::CleanupWorld(bool bSessionEnded, bool bCleanupResources)
 			EnvironmentQueryManager = nullptr;
 		}
 	}
+
+	const UWorld* const WorldOuter = GetOuterWorld();
+	if (WorldOuter)
+	{
+		WorldOuter->RemoveOnActorSpawnedHandler(ActorSpawnedDelegateHandle);
+	}
+	APawn::OnPawnBeginPlay.Remove(PawnBeginPlayDelegateHandle);
 }
 
 void UAISystem::AIIgnorePlayers()

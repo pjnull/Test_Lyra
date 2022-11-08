@@ -422,9 +422,12 @@ static void FixupArrayOfStructKeysForSection(FConfigSection* Section, const FStr
  */
 /*static*/ bool DoesConfigFileExistWrapper(const TCHAR* IniFile, const TSet<FString>* IniCacheSet)
 {
-	// will any delegates return contents via PreLoadConfigFileDelegate()?
+	// will any delegates return contents via TSPreLoadConfigFileDelegate()?
 	int32 ResponderCount = 0;
+	FCoreDelegates::TSCountPreLoadConfigFileRespondersDelegate().Broadcast(IniFile, ResponderCount);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::CountPreLoadConfigFileRespondersDelegate.Broadcast(IniFile, ResponderCount);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	if (ResponderCount > 0)
 	{
@@ -470,7 +473,10 @@ static void FixupArrayOfStructKeysForSection(FConfigSection* Section, const FStr
 static bool LoadConfigFileWrapper(const TCHAR* IniFile, FString& Contents, bool bIsOverride = false)
 {
 	// let other systems load the file instead of the standard load below
+	FCoreDelegates::TSPreLoadConfigFileDelegate().Broadcast(IniFile, Contents);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::PreLoadConfigFileDelegate.Broadcast(IniFile, Contents);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	// if this loaded any text, we are done, and we won't override the contents with standard ini file data
 	if (Contents.Len())
@@ -503,7 +509,10 @@ static bool SaveConfigFileWrapper(const TCHAR* IniFile, const FString& Contents)
 
 	// let anyone that needs to save it, do so (counting how many did)
 	int32 SavedCount = 0;
+	FCoreDelegates::TSPreSaveConfigFileDelegate().Broadcast(IniFile, Contents, SavedCount);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::PreSaveConfigFileDelegate.Broadcast(IniFile, Contents, SavedCount);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	// save it even if a delegate did as well
 	bool bLocalWriteSucceeded = false;
@@ -540,11 +549,10 @@ FConfigFile::FConfigFile()
 , Name( NAME_None )
 , SourceConfigFile(nullptr)
 {
-
-	if (FCoreDelegates::OnFConfigCreated.IsBound())
-	{
-		FCoreDelegates::OnFConfigCreated.Broadcast(this);
-	}
+	FCoreDelegates::TSOnFConfigCreated().Broadcast(this);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	FCoreDelegates::OnFConfigCreated.Broadcast(this);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 
 FConfigFile::~FConfigFile()
@@ -553,11 +561,10 @@ FConfigFile::~FConfigFile()
 
 	if ( !GExitPurge )
 	{
-		// FCoreDelegates::OnFConfigDeleted may already be deleted
-		if ( FCoreDelegates::OnFConfigDeleted.IsBound() )
-		{
-			FCoreDelegates::OnFConfigDeleted.Broadcast(this);
-		}
+		FCoreDelegates::TSOnFConfigDeleted().Broadcast(this);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		FCoreDelegates::OnFConfigDeleted.Broadcast(this);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	delete SourceConfigFile;
@@ -2491,7 +2498,10 @@ bool FConfigCacheIni::GetString( const TCHAR* Section, const TCHAR* Key, FString
 	}
 	Value = ConfigValue->GetValue();
 
+	FCoreDelegates::TSOnConfigValueRead().Broadcast(*Filename, Section, Key);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::OnConfigValueRead.Broadcast(*Filename, Section, Key);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	return true;
 }
@@ -2522,7 +2532,10 @@ bool FConfigCacheIni::GetText( const TCHAR* Section, const TCHAR* Key, FText& Va
 		return false;
 	}
 
+	FCoreDelegates::TSOnConfigValueRead().Broadcast(*Filename, Section, Key);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::OnConfigValueRead.Broadcast(*Filename, Section, Key);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	return true;
 }
@@ -2547,7 +2560,10 @@ bool FConfigCacheIni::GetSection( const TCHAR* Section, TArray<FString>& Result,
 		Result.Add(FString::Printf(TEXT("%s=%s"), *It.Key().ToString(), *It.Value().GetValue()));
 	}
 
+	FCoreDelegates::TSOnConfigSectionRead().Broadcast(*Filename, Section);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::OnConfigSectionRead.Broadcast(*Filename, Section);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	return true;
 }
@@ -2572,7 +2588,7 @@ FConfigSection* FConfigCacheIni::GetSectionPrivate( const TCHAR* Section, const 
 
 	if (Sec)
 	{
-		FCoreDelegates::OnConfigSectionRead.Broadcast(*Filename, Section);
+		FCoreDelegates::TSOnConfigSectionRead().Broadcast(*Filename, Section);
 	}
 
 	return Sec;
@@ -2589,7 +2605,10 @@ bool FConfigCacheIni::DoesSectionExist(const TCHAR* Section, const FString& File
 
 	if (bReturnVal)
 	{
+		FCoreDelegates::TSOnConfigSectionNameRead().Broadcast(*Filename, Section);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FCoreDelegates::OnConfigSectionNameRead.Broadcast(*Filename, Section);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	return bReturnVal;
@@ -2750,7 +2769,10 @@ bool FConfigCacheIni::GetSectionNames( const FString& Filename, TArray<FString>&
 		{
 			out_SectionNames.Add(It.Key());
 
+			FCoreDelegates::TSOnConfigSectionNameRead().Broadcast(*Filename, *It.Key());
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			FCoreDelegates::OnConfigSectionNameRead.Broadcast(*Filename, *It.Key());
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		bResult = true;
 	}
@@ -2793,7 +2815,10 @@ bool FConfigCacheIni::GetPerObjectConfigSections( const FString& Filename, const
 					out_SectionNames.Insert(SectionName,0);
 					bResult = true;
 
+					FCoreDelegates::TSOnConfigSectionNameRead().Broadcast(*Filename, *SectionName);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					FCoreDelegates::OnConfigSectionNameRead.Broadcast(*Filename, *SectionName);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				}
 			}
 		}
@@ -2944,7 +2969,10 @@ int32 FConfigCacheIni::GetArray
 
 	if (out_Arr.Num())
 	{
+		FCoreDelegates::TSOnConfigValueRead().Broadcast(*Filename, Section, Key);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FCoreDelegates::OnConfigValueRead.Broadcast(*Filename, Section, Key);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	return out_Arr.Num();
@@ -3660,9 +3688,12 @@ bool FConfigCacheIni::CreateGConfigFromSaved(const TCHAR* Filename)
 	MemoryReader << Names;// << ExtraData.Data;
 
 	// now let the delegates pull their data out, after GConfig is set up
-//	FCoreDelegates::AccessExtraBinaryConfigData.Broadcast(ExtraData);
+//	FCoreDelegates::TSAccessExtraBinaryConfigData().Broadcast(ExtraData);
 
+	FCoreDelegates::TSConfigReadyForUse().Broadcast();
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::ConfigReadyForUse.Broadcast();
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	FMemory::Free(PreloadedData);
 	return true;
@@ -3775,7 +3806,10 @@ void FConfigCacheIni::InitializeConfigSystem()
 			GConfig = new FConfigCacheIni(EConfigCacheType::Temporary);
 			GConfig->SerializeStateForBootstrap_Impl(MemoryReader);
 			GConfig->bIsReadyForUse = true;
+			FCoreDelegates::TSConfigReadyForUse().Broadcast();
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			FCoreDelegates::ConfigReadyForUse.Broadcast();
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			return;
 		}
 		else
@@ -3825,7 +3859,10 @@ void FConfigCacheIni::InitializeConfigSystem()
 	// now we can make use of GConfig
 	GConfig->bIsReadyForUse = true;
 
+	FCoreDelegates::TSConfigReadyForUse().Broadcast();
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::ConfigReadyForUse.Broadcast();
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 
 const FString& FConfigCacheIni::GetCustomConfigString()

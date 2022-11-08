@@ -957,6 +957,7 @@ EPixelFormatChannelFlags GetPixelFormatValidChannels(EPixelFormat InPixelFormat)
 		EPixelFormatChannelFlags::R,		// PF_R8_SINT
 		EPixelFormatChannelFlags::R,		// PF_R64_UINT
 		EPixelFormatChannelFlags::RGB,		// PF_R9G9B9EXP5
+		EPixelFormatChannelFlags::None,		// PF_P010
 	};
 	static_assert(UE_ARRAY_COUNT(PixelFormatToChannelFlags) == (uint8)PF_MAX, "Missing pixel format");
 	return (InPixelFormat < PF_MAX) ? PixelFormatToChannelFlags[(uint8)InPixelFormat] : EPixelFormatChannelFlags::None;
@@ -1104,19 +1105,14 @@ RENDERCORE_API bool MobileRequiresSceneDepthAux(const FStaticShaderPlatform Plat
 	static const auto CVarMobileHDR = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.MobileHDR"));
 	const bool bMobileHDR = (CVarMobileHDR && CVarMobileHDR->GetValueOnAnyThread() != 0);
 
-	// SceneDepth is used on most mobile platforms when forward shading is enabled and always on IOS.
+	// SceneDepthAux is used on tiled GPUs (iOS, Android) with forward shading and on iOS only with deferred
 	if (IsMetalMobilePlatform(Platform))
 	{
 		return true;
 	}
-	else if (IsMobileDeferredShadingEnabled(Platform) && IsAndroidOpenGLESPlatform(Platform) && !GSupportsShaderDepthStencilFetch)
+	else if (bMobileHDR && !IsMobileDeferredShadingEnabled(Platform))
 	{
-		return true;
-	}
-	else if (!IsMobileDeferredShadingEnabled(Platform) && bMobileHDR)
-	{
-		// SceneDepthAux disabled when MobileHDR=false for non-IOS
-		return IsAndroidOpenGLESPlatform(Platform) || IsVulkanMobilePlatform(Platform) || IsSimulatedPlatform(Platform);
+		return (IsAndroidOpenGLESPlatform(Platform) || IsVulkanMobilePlatform(Platform));
 	}
 	return false;
 }

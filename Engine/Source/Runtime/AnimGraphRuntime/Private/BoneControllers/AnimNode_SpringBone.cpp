@@ -12,10 +12,10 @@
 // FAnimNode_SpringBone
 
 FAnimNode_SpringBone::FAnimNode_SpringBone()
-	: MaxDisplacement(0.0f)
-	, SpringStiffness(50.0f)
-	, SpringDamping(4.0f)
-	, ErrorResetThresh(256.0f)
+	: MaxDisplacement(0.0)
+	, SpringStiffness(50.0)
+	, SpringDamping(4.0)
+	, ErrorResetThresh(256.0)
 	, BoneLocation(FVector::ZeroVector)
 	, BoneVelocity(FVector::ZeroVector)
 	, OwnerVelocity(FVector::ZeroVector)
@@ -140,10 +140,10 @@ void FAnimNode_SpringBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 
 			// Integrate velocity
 			// Make sure damping with variable frame rate actually dampens velocity. Otherwise Spring will go nuts.
-			float const CutOffDampingValue = 1.f / FixedTimeStep;
+			double const CutOffDampingValue = 1.0 / FixedTimeStep;
 			if (SpringDamping > CutOffDampingValue)
 			{
-				float const SafetyScale = CutOffDampingValue / SpringDamping;
+				double const SafetyScale = CutOffDampingValue / SpringDamping;
 				BoneVelocity += SafetyScale * (Acceleration * FixedTimeStep);
 			}
 			else
@@ -152,7 +152,7 @@ void FAnimNode_SpringBone::EvaluateSkeletalControl_AnyThread(FComponentSpacePose
 			}
 
 			// Clamp velocity to something sane (|dX/dt| <= ErrorResetThresh)
-			float const BoneVelocityMagnitude = BoneVelocity.Size();
+			double const BoneVelocityMagnitude = BoneVelocity.Size();
 			if (BoneVelocityMagnitude * FixedTimeStep > ErrorResetThresh)
 			{
 				BoneVelocity *= (ErrorResetThresh / (BoneVelocityMagnitude * FixedTimeStep));

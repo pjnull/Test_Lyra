@@ -13,12 +13,15 @@
 #include "String/Find.h"
 #include "String/LexFromString.h"
 #include "TestCommon/CoreUtilities.h"
+#include "TestRunnerOutputDeviceError.h"
 
 #if WITH_APPLICATION_CORE
 #include "HAL/PlatformApplicationMisc.h"
 #endif
 
+#include "Misc/CoreDelegates.h"
 #include <catch2/catch_session.hpp>
+#include <catch2/internal/catch_assertion_handler.hpp>
 
 #include <iostream>
 
@@ -53,7 +56,7 @@ public:
 
 	void SleepOnInit() const;
 
-	void GlobalSetup() const;
+	void GlobalSetup();
 	void GlobalTeardown() const;
 	void Terminate() const;
 
@@ -73,11 +76,13 @@ private:
 
 	TArray<const ANSICHAR*> CatchArgs;
 	FStringBuilderBase ExtraArgs;
+	FTestRunnerOutputDeviceError ErrorOutputDevice;
 	bool bGlobalSetup = true;
 	bool bLogOutput = false;
 	bool bDebugMode = false;
 	bool bMultiThreaded = false;
 	bool bWaitForInputToTerminate = false;
+	bool bAttachToDebugger = false;
 	int32 SleepOnInitSeconds = 0;
 };
 
@@ -153,6 +158,10 @@ void FTestRunner::ParseCommandLine(TConstArrayView<const ANSICHAR*> Args)
 		{
 			bWaitForInputToTerminate = true;
 		}
+		else if (Arg == ANSITEXTVIEW("--attach-to-debugger"))
+		{
+			bAttachToDebugger = true;
+		}
 		else
 		{
 			CatchArgs.Add(Arg.GetData());
@@ -172,8 +181,18 @@ void FTestRunner::SleepOnInit() const
 	}
 }
 
-void FTestRunner::GlobalSetup() const
+void FTestRunner::GlobalSetup()
 {
+	if (bAttachToDebugger)
+	{
+		FPlatformMisc::LocalPrint(TEXT("Waiting for debugger..."));
+		while (!FPlatformMisc::IsDebuggerPresent())
+		{
+			FPlatformProcess::Sleep(0.1f);
+		}
+		UE_DEBUG_BREAK();
+	}
+
 	if (!bGlobalSetup)
 	{
 		return;
@@ -190,7 +209,19 @@ void FTestRunner::GlobalSetup() const
 	GError = FPlatformApplicationMisc::GetErrorOutputDevice();
 #else
 	GError = FPlatformOutputDevices::GetError();
+	ErrorOutputDevice.SetDeviceError(GError);
+	GError = &ErrorOutputDevice;
 #endif
+	
+	//forward unhandled `ensure` to catch to force tests to fail. test will continue to execute
+	//this does bypass the error reporting, crash reporter and etc
+	FCoreDelegates::OnHandleSystemEnsure.AddLambda([this]()
+		{
+			FString Error = GErrorHist;
+			Catch::AssertionInfo info{ "", CATCH_INTERNAL_LINEINFO, "", Catch::ResultDisposition::Normal };
+			Catch::AssertionReaction reaction;
+			Catch::getResultCapture().handleMessage(info, Catch::ResultWas::ExplicitFailure, StringCast<ANSICHAR>(*Error).Get(), reaction);
+		});
 
 	if (bLogOutput || bDebugMode)
 	{
@@ -222,6 +253,12 @@ void FTestRunner::GlobalTeardown() const
 	{
 		return;
 	}
+	
+	//only set the GError back if it was replaced
+	if (GError == &ErrorOutputDevice)
+	{
+		GError = ErrorOutputDevice.GetDeviceError();
+	}
 
 	for (FName ModuleName : GetGlobalModuleNames())
 	{
@@ -232,8 +269,6 @@ void FTestRunner::GlobalTeardown() const
 	}
 
 	CleanupPlatform();
-
-	FCommandLine::Reset();
 }
 
 void FTestRunner::Terminate() const
@@ -281,9 +316,10 @@ int RunTests(int32 ArgC, const ANSICHAR* ArgV[])
 	{
 		TestRunner.GlobalTeardown();
 		TestRunner.Terminate();
-		RequestEngineExit(TEXT("Exiting"));
 		FModuleManager::Get().UnloadModulesAtShutdown();
+		RequestEngineExit(TEXT("Exiting"));
 	};
 
-	return TestRunner.RunCatchSession();
+	int CatchReturn = TestRunner.RunCatchSession();
+	return CatchReturn;
 }

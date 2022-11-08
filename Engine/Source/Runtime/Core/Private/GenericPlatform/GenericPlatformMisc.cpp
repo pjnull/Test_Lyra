@@ -39,6 +39,7 @@
 #include "Misc/UProjectInfo.h"
 #include "Internationalization/Culture.h"
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "Misc/CoreDelegates.h"
 
 #if UE_ENABLE_ICU
 	THIRD_PARTY_INCLUDES_START
@@ -444,6 +445,39 @@ FString FSHA256Signature::ToString() const
 	return LocalHashStr;
 }
 
+const TCHAR* LexToString(ENetworkConnectionStatus EnumVal)
+{
+	switch (EnumVal)
+	{
+	case ENetworkConnectionStatus::Unknown:		return TEXT("Unknown");
+	case ENetworkConnectionStatus::Disabled:	return TEXT("Disabled");
+	case ENetworkConnectionStatus::Local:		return TEXT("Local");
+	case ENetworkConnectionStatus::Connected:	return TEXT("Connected");
+	}
+
+	checkNoEntry();
+	return TEXT("Unknown");
+}
+
+ENetworkConnectionStatus FGenericPlatformMisc::GetNetworkConnectionStatus()
+{
+	return CurrentNetworkConnectionStatus;
+}
+
+void FGenericPlatformMisc::SetNetworkConnectionStatus(ENetworkConnectionStatus NewNetworkConnectionStatus)
+{
+	const ENetworkConnectionStatus OldNetworkConnectionStatus = CurrentNetworkConnectionStatus;
+
+	if (OldNetworkConnectionStatus != NewNetworkConnectionStatus)
+	{
+		CurrentNetworkConnectionStatus = NewNetworkConnectionStatus;
+
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_FGenericPlatformMisc_SetNetworkConnectionStatus);
+
+		FCoreDelegates::OnNetworkConnectionStatusChanged.Broadcast(OldNetworkConnectionStatus, NewNetworkConnectionStatus);
+	}
+}
+
 /* ENetworkConnectionType interface
  *****************************************************************************/
 
@@ -486,6 +520,8 @@ FString FSHA256Signature::ToString() const
 #endif	//#if !UE_BUILD_SHIPPING
 
 EDeviceScreenOrientation FGenericPlatformMisc::AllowedDeviceOrientation = EDeviceScreenOrientation::Unknown;
+
+ENetworkConnectionStatus FGenericPlatformMisc::CurrentNetworkConnectionStatus = ENetworkConnectionStatus::Connected;
 
 struct FGenericPlatformMisc::FStaticData
 {
@@ -1280,6 +1316,12 @@ const TCHAR* FGenericPlatformMisc::ProjectDir()
 		{
 			// monolithic, game-agnostic executables, the ini is in Engine/Config/Platform
 			ProjectDir = FString::Printf(TEXT("../../../Engine/Programs/%s/"), FApp::GetProjectName());
+
+			// however, if it was staged, that directory won't exist, so look in the normal staged location
+			if (!FPlatformFileManager::Get().GetPlatformFile().DirectoryExists(*ProjectDir))
+			{
+				ProjectDir = FString::Printf(TEXT("../../../%s/"), FApp::GetProjectName());
+			}
 		}
 		else
 		{

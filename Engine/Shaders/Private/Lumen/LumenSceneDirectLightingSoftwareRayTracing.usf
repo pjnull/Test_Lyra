@@ -17,6 +17,7 @@
 #include "LumenTracingCommon.ush"
 #include "../DistanceFieldShadowingShared.ush"
 #include "LumenSceneDirectLightingPerLightShadowCommon.ush"
+#include "../LightDataUniforms.ush"
 
 // Bias
 float HeightfieldShadowRayBias;
@@ -189,7 +190,7 @@ void LumenSceneDirectLightingTraceDistanceFieldShadowsCS(
 
 	if (!ShadowMaskRay.bShadowFactorComplete)
 	{
-		FDeferredLightData LightData = LoadLightData(LIGHT_TYPE);
+		const FDeferredLightData LightData = InitDeferredLightFromUniforms(LIGHT_TYPE);
 
 		FLumenCardData CardData = GetLumenCardData(CardPage.CardIndex);
 		FLumenSurfaceCacheData SurfaceCacheData = GetSurfaceCacheData(CardData, CardUV, AtlasUV);

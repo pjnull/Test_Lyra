@@ -23,6 +23,7 @@
 #include "Serialization/MemoryWriter.h"
 
 #include "ProfilingDebugging/CsvProfiler.h"
+#include "Animation/AnimationDecompression.h"
 
 #include "AnimCompressionTypes.generated.h"
 
@@ -225,9 +226,11 @@ public:
 
 	/** Number of keys within the (non-uniform) RawAnimationData tracks */
 	
-	UE_DEPRECATED(5.0, "NumberOfFrames has been replaced with NumberOfKeys")
+	UE_DEPRECATED(5.0, "NumberOfFrames has been replaced with NumberOfKeys and GetNumberOfFrames")
 	int32 NumberOfFrames;
 	int32 NumberOfKeys;
+
+	int32 GetNumberOfFrames() const { return FMath::Max(NumberOfKeys - 1, 1); }
 
 	bool bIsValidAdditive;
 
@@ -237,6 +240,8 @@ public:
 	FString Name;
 	FString FullName;
 	FName   AnimFName;
+
+	FFrameRate SampledFrameRate;
 
 	FCancelCompressionSignal IsCancelledSignal;
 
@@ -824,6 +829,7 @@ namespace UE::Anim::Compression {
 }
 #endif // WITH_EDITOR
 
+UE_DEPRECATED(5.1, "Signature of DecompressPose has been deprecated, use UE::Anim::Decompression::DecompressPose instead")
 extern void DecompressPose(FCompactPose& OutPose,
 							const FCompressedAnimSequence& CompressedData,
 							const FAnimExtractContext& ExtractionContext,
@@ -835,6 +841,7 @@ extern void DecompressPose(FCompactPose& OutPose,
 							FName SourceName,
 							const FRootMotionReset& RootMotionReset);
 
+UE_DEPRECATED(5.1, "Signature of DecompressPose has been deprecated, use UE::Anim::Decompression::DecompressPose instead")
 extern void DecompressPose(	FCompactPose& OutPose,
 							const FCompressedAnimSequence& CompressedData,
 							const FAnimExtractContext& ExtractionContext,

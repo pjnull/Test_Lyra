@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Horde.Build.Acls;
 using Horde.Build.Jobs;
@@ -20,7 +21,7 @@ namespace Horde.Build.Streams
 {
 	using ProjectId = StringId<IProject>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 
 	/// <summary>
 	/// Controller for the /api/v1/streams endpoint
@@ -31,21 +32,22 @@ namespace Horde.Build.Streams
 	public class StreamsController : HordeControllerBase
 	{
 		private readonly StreamService _streamService;
+		private readonly ICommitService _commitService;
 		private readonly ITemplateCollection _templateCollection;
 		private readonly IJobStepRefCollection _jobStepRefCollection;
-		private readonly IPerforceService _perforceService;
 		private readonly IUserCollection _userCollection;
 		private readonly AclService _aclService;
+
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public StreamsController(AclService aclService, StreamService streamService, ITemplateCollection templateCollection, IJobStepRefCollection jobStepRefCollection, IUserCollection userCollection, IPerforceService perforceService)
+		public StreamsController(AclService aclService, StreamService streamService, ICommitService commitService, ITemplateCollection templateCollection, IJobStepRefCollection jobStepRefCollection, IUserCollection userCollection)
 		{
 			_streamService = streamService;
+			_commitService = commitService;
 			_templateCollection = templateCollection;
 			_jobStepRefCollection = jobStepRefCollection;
 			_userCollection = userCollection;
-			_perforceService = perforceService;
 			_aclService = aclService;
 		}
 
@@ -78,6 +80,34 @@ namespace Horde.Build.Streams
 		}
 
 		/// <summary>
+		/// Query all the streams for a particular project.
+		/// </summary>
+		/// <param name="projectIds">Unique id of the project to query</param>
+		/// <param name="filter">Filter for the properties to return</param>
+		/// <returns>Information about all the projects</returns>
+		[HttpGet]
+		[Route("/api/v2/streams")]
+		[ProducesResponseType(typeof(List<GetStreamResponse>), 200)]
+		public async Task<ActionResult<List<object>>> GetStreamsAsyncV2([FromQuery(Name = "ProjectId")] string[] projectIds, [FromQuery] PropertyFilter? filter = null)
+		{
+			ProjectId[] projectIdValues = Array.ConvertAll(projectIds, x => new ProjectId(x));
+
+			List<IStream> streams = await _streamService.GetStreamsAsync(projectIdValues);
+			ProjectPermissionsCache permissionsCache = new ProjectPermissionsCache();
+
+			List<GetStreamResponseV2> responses = new List<GetStreamResponseV2>();
+			foreach (IStream stream in streams)
+			{
+				if (await _streamService.AuthorizeAsync(stream, AclAction.ViewStream, User, permissionsCache))
+				{
+					GetStreamResponseV2 response = new GetStreamResponseV2(stream, false);
+					responses.Add(response);
+				}
+			}
+			return responses.OrderBy(x => x.Id).Select(x => PropertyFilter.Apply(x, filter)).ToList();
+		}
+
+		/// <summary>
 		/// Retrieve information about a specific stream.
 		/// </summary>
 		/// <param name="streamId">Id of the stream to get information about</param>
@@ -104,6 +134,34 @@ namespace Horde.Build.Streams
 		}
 
 		/// <summary>
+		/// Retrieve information about a specific stream.
+		/// </summary>
+		/// <param name="streamId">Id of the stream to get information about</param>
+		/// <param name="config">The client's cached config revision. If this matches value matches the current config version of the stream, the config object will be omitted from the response.</param>
+		/// <param name="filter">Filter for the properties to return</param>
+		/// <returns>Information about the requested project</returns>
+		[HttpGet]
+		[Route("/api/v2/streams/{streamId}/config")]
+		[ProducesResponseType(typeof(GetStreamResponseV2), 200)]
+		public async Task<ActionResult<object>> GetStreamAsyncV2(StreamId streamId, [FromQuery] string? config = null, [FromQuery] PropertyFilter? filter = null)
+		{
+			IStream? stream = await _streamService.GetStreamAsync(streamId);
+			if (stream == null)
+			{
+				return NotFound(streamId);
+			}
+
+			ProjectPermissionsCache permissionsCache = new ProjectPermissionsCache();
+			if (!await _streamService.AuthorizeAsync(stream, AclAction.ViewStream, User, permissionsCache))
+			{
+				return Forbid(AclAction.ViewStream, streamId);
+			}
+
+			bool includeConfig = !String.Equals(config, stream.ConfigRevision, StringComparison.Ordinal); 
+			return PropertyFilter.Apply(new GetStreamResponseV2(stream, includeConfig), filter);
+		}
+
+		/// <summary>
 		/// Create a stream response object, including all the templates
 		/// </summary>
 		/// <param name="stream">Stream to create response for</param>
@@ -114,13 +172,13 @@ namespace Horde.Build.Streams
 			using IScope scope = GlobalTracer.Instance.BuildSpan("CreateGetStreamResponse").StartActive();
 			scope.Span.SetTag("streamId", stream.Id);
 			
-			bool bIncludeAcl = stream.Acl != null && await _streamService.AuthorizeAsync(stream, AclAction.ViewPermissions, User, cache);
+			bool includeAcl = stream.Acl != null && await _streamService.AuthorizeAsync(stream, AclAction.ViewPermissions, User, cache);
 
 			List<GetTemplateRefResponse> apiTemplateRefs = new List<GetTemplateRefResponse>();
-			foreach (KeyValuePair<TemplateRefId, TemplateRef> pair in stream.Templates)
+			foreach (KeyValuePair<TemplateId, ITemplateRef> pair in stream.Templates)
 			{
 				using IScope templateScope = GlobalTracer.Instance.BuildSpan("CreateGetStreamResponse.Template").StartActive();
-				templateScope.Span.SetTag("templateName", pair.Value.Name);
+				templateScope.Span.SetTag("templateName", pair.Value.Config.Name);
 				
 				if (await _streamService.AuthorizeAsync(stream, pair.Value, AclAction.ViewTemplate, User, cache))
 				{
@@ -128,40 +186,29 @@ namespace Horde.Build.Streams
 					
 					if (template != null)						
 					{
-						TemplateRef tref = pair.Value;
+						ITemplateRef tref = pair.Value;
 
 						List<GetTemplateStepStateResponse>? stepStates = null;
 						if (tref.StepStates != null)
 						{
 							for (int i = 0; i < tref.StepStates.Count; i++)
 							{
-								TemplateStepState state = tref.StepStates[i];
-
-								if (state.PausedByUserId == null)
-								{
-									continue;
-								}
+								ITemplateStep state = tref.StepStates[i];
 
 								stepStates ??= new List<GetTemplateStepStateResponse>();
 
-								GetThinUserInfoResponse? pausedByUserInfo = null;
-								if (state.PausedByUserId != null)
-								{
-									pausedByUserInfo = new GetThinUserInfoResponse(await _userCollection.GetCachedUserAsync(state.PausedByUserId));
-								}
-
+								GetThinUserInfoResponse? pausedByUserInfo = new GetThinUserInfoResponse(await _userCollection.GetCachedUserAsync(state.PausedByUserId));
 								stepStates.Add(new GetTemplateStepStateResponse(state, pausedByUserInfo));
-
 							}
 						}
 
-						bool bIncludeTemplateAcl = pair.Value.Acl != null && await _streamService.AuthorizeAsync(stream, pair.Value, AclAction.ViewPermissions, User, cache);
-						apiTemplateRefs.Add(new GetTemplateRefResponse(pair.Key, pair.Value, template, stepStates, bIncludeTemplateAcl));
+						bool includeTemplateAcl = pair.Value.Acl != null && await _streamService.AuthorizeAsync(stream, pair.Value, AclAction.ViewPermissions, User, cache);
+						apiTemplateRefs.Add(new GetTemplateRefResponse(pair.Key, pair.Value, template, stepStates, includeTemplateAcl));
 					}
 				}
 			}
 
-			return stream.ToApiResponse(bIncludeAcl, apiTemplateRefs);
+			return stream.ToApiResponse(includeAcl, apiTemplateRefs);
 		}
 
 		/// <summary>
@@ -171,12 +218,13 @@ namespace Horde.Build.Streams
 		/// <param name="min">The starting changelist number</param>
 		/// <param name="max">The ending changelist number</param>
 		/// <param name="results">Number of results to return</param>
+		/// <param name="tags">Tags to filter the changes returned</param>
 		/// <param name="filter">The filter to apply to the results</param>
 		/// <returns>Http result code</returns>
 		[HttpGet]
 		[Route("/api/v1/streams/{streamId}/changes")]
-		[ProducesResponseType(typeof(List<GetChangeSummaryResponse>), 200)]
-		public async Task<ActionResult<List<object>>> GetChangesAsync(StreamId streamId, [FromQuery] int? min = null, [FromQuery] int? max = null, [FromQuery] int results = 50, PropertyFilter? filter = null)
+		[ProducesResponseType(typeof(List<GetCommitResponse>), 200)]
+		public async Task<ActionResult<List<object>>> GetChangesAsync(StreamId streamId, [FromQuery] int? min = null, [FromQuery] int? max = null, [FromQuery] int results = 50, [FromQuery] string? tags = null, PropertyFilter? filter = null)
 		{
 			IStream? stream = await _streamService.GetStreamAsync(streamId);
 			if (stream == null)
@@ -188,18 +236,19 @@ namespace Horde.Build.Streams
 				return Forbid(AclAction.ViewChanges, streamId);
 			}
 
-			string? perforceUser = User.GetPerforceUser();
-			if(perforceUser == null)
+			List<CommitTag>? commitTags = null;
+			if (tags != null)
 			{
-				return BadRequest("Current user does not have an associated Perforce user");
+				commitTags = tags.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(x => new CommitTag(x)).ToList();
 			}
 
-			List<ChangeSummary> commits = await _perforceService.GetChangesAsync(stream.ClusterName, stream.Name, min, max, results, perforceUser);
+			List<ICommit> commits = await _commitService.GetCollection(stream).FindAsync(min, max, results, commitTags).ToListAsync();
 
-			List<GetChangeSummaryResponse> responses = new List<GetChangeSummaryResponse>();
-			foreach (ChangeSummary commit in commits)
+			List<GetCommitResponse> responses = new List<GetCommitResponse>();
+			foreach (ICommit commit in commits)
 			{
-				responses.Add(new GetChangeSummaryResponse(commit));
+				IUser? author = await _userCollection.GetCachedUserAsync(commit.AuthorId);
+				responses.Add(new GetCommitResponse(commit, author!, null, null));
 			}
 			return responses.ConvertAll(x => PropertyFilter.Apply(x, filter));
 		}
@@ -213,7 +262,7 @@ namespace Horde.Build.Streams
 		/// <returns>Http result code</returns>
 		[HttpGet]
 		[Route("/api/v1/streams/{streamId}/changes/{changeNumber}")]
-		[ProducesResponseType(typeof(GetChangeDetailsResponse), 200)]
+		[ProducesResponseType(typeof(GetCommitResponse), 200)]
 		public async Task<ActionResult<object>> GetChangeDetailsAsync(StreamId streamId, int changeNumber, PropertyFilter? filter = null)
 		{
 			IStream? stream = await _streamService.GetStreamAsync(streamId);
@@ -226,19 +275,17 @@ namespace Horde.Build.Streams
 				return Forbid(AclAction.ViewChanges, streamId);
 			}
 
-			string? perforceUser = User.GetPerforceUser();
-			if(perforceUser == null)
-			{
-				return BadRequest("Current user does not have an associated Perforce user");
-			}
-
-			ChangeDetails? changeDetails = await _perforceService.GetChangeDetailsAsync(stream.ClusterName, stream.Name, changeNumber, perforceUser);
+			ICommit? changeDetails = await _commitService.GetCollection(stream).GetAsync(changeNumber);
 			if(changeDetails == null)
 			{
 				return NotFound("CL {Change} not found in stream {StreamId}", changeNumber, streamId);
 			}
 
-			return PropertyFilter.Apply(new GetChangeDetailsResponse(changeDetails), filter);
+			IUser? author = await _userCollection.GetCachedUserAsync(changeDetails.AuthorId);
+			IReadOnlyList<CommitTag> tags = await changeDetails.GetTagsAsync(HttpContext.RequestAborted);
+			IReadOnlyList<string> files = await changeDetails.GetFilesAsync(CancellationToken.None);
+
+			return PropertyFilter.Apply(new GetCommitResponse(changeDetails, author!, tags, files), filter);
 		}
 
 		/// <summary>
@@ -266,7 +313,7 @@ namespace Horde.Build.Streams
 				return Forbid(AclAction.ViewJob, streamId);
 			}
 
-			TemplateRefId templateIdValue = new TemplateRefId(templateId);
+			TemplateId templateIdValue = new TemplateId(templateId);
 
 			List<IJobStepRef> steps = await _jobStepRefCollection.GetStepsForNodeAsync(streamId, templateIdValue, step, change, true, count);
 			return steps.ConvertAll(x => PropertyFilter.Apply(new GetJobStepRefResponse(x), filter));
@@ -305,7 +352,7 @@ namespace Horde.Build.Streams
 		[HttpGet]
 		[Route("/api/v1/streams/{streamId}/templates/{templateId}")]
 		[ProducesResponseType(typeof(List<GetTemplateResponse>), 200)]
-		public async Task<ActionResult<object>> GetTemplateAsync(StreamId streamId, TemplateRefId templateId, [FromQuery] PropertyFilter? filter = null)
+		public async Task<ActionResult<object>> GetTemplateAsync(StreamId streamId, TemplateId templateId, [FromQuery] PropertyFilter? filter = null)
 		{
 			IStream? stream = await _streamService.GetStreamAsync(streamId);
 			if (stream == null)
@@ -313,7 +360,7 @@ namespace Horde.Build.Streams
 				return NotFound(streamId);
 			}
 
-			TemplateRef? templateRef;
+			ITemplateRef? templateRef;
 			if (!stream.Templates.TryGetValue(templateId, out templateRef))
 			{
 				return NotFound(streamId, templateId);
@@ -338,7 +385,7 @@ namespace Horde.Build.Streams
 		[HttpPut]
 		[Authorize]
 		[Route("/api/v1/streams/{streamId}/templates/{templateRefId}")]
-		public async Task<ActionResult> UpdateStreamTemplateRefAsync(StreamId streamId, TemplateRefId templateRefId, [FromBody] UpdateTemplateRefRequest update)
+		public async Task<ActionResult> UpdateStreamTemplateRefAsync(StreamId streamId, TemplateId templateRefId, [FromBody] UpdateTemplateRefRequest update)
 		{
 			if (!await _aclService.AuthorizeAsync(AclAction.AdminWrite, User))
 			{
@@ -359,8 +406,6 @@ namespace Horde.Build.Streams
 			await _streamService.TryUpdateTemplateRefAsync(stream, templateRefId, update.StepStates);
 
 			return Ok();
-
 		}
-
 	}
 }

@@ -2,6 +2,7 @@
 #include "ChaosCloth/ChaosClothingSimulationCollider.h"
 #include "ChaosCloth/ChaosClothingSimulationSolver.h"
 #include "ChaosCloth/ChaosClothingSimulationCloth.h"
+#include "ChaosCloth/ChaosClothingSimulationMesh.h"
 #include "ChaosCloth/ChaosClothPrivate.h"
 #include "Chaos/Capsule.h"
 #include "Chaos/Plane.h"
@@ -11,10 +12,8 @@
 #include "Chaos/Convex.h"
 #include "Chaos/Levelset.h"
 #include "Chaos/ImplicitObjectTransformed.h"
-#include "ClothingSimulation.h" // For context
 #include "ClothingAsset.h"
 #include "Engine/SkeletalMesh.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "PhysicsEngine/AggregateGeom.h"
 #include "HAL/PlatformMath.h"
@@ -30,6 +29,35 @@ namespace ClothingSimulationColliderConsoleVariables
 {
 	TAutoConsoleVariable<bool> CVarUseOptimizedTaperedCapsule(TEXT("p.ChaosCloth.UseOptimizedTaperedCapsule"), true, TEXT("Use the optimized TaperedCapsule code instead of using a tapered cylinder and two spheres"));
 }
+
+struct FClothingSimulationCollider::FLODData
+{
+	FClothCollisionData ClothCollisionData;
+	int32 NumGeometries;  // Number of collision bodies
+	TMap<FSolverClothPair, int32> Offsets;  // Solver particle offset
+
+	FLODData() : NumGeometries(0) {}
+
+	void Add(
+		FClothingSimulationSolver* Solver,
+		FClothingSimulationCloth* Cloth,
+		const FClothCollisionData& InClothCollisionData,
+		const TArray<FLevelSetCollisionData>& InLevelSetCollisionData,
+		const FReal InScale = 1.f,
+		const TArray<int32>& UsedBoneIndices = TArray<int32>());
+	void Remove(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth);
+
+	void Update(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, const FTransform& ComponentTransform, const TArray<FTransform>& BoneTransforms);
+
+	void Enable(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, bool bEnable);
+
+	void ResetStartPose(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth);
+
+	FORCEINLINE static int32 GetMappedBoneIndex(const TArray<int32>& UsedBoneIndices, int32 BoneIndex)
+	{
+		return UsedBoneIndices.IsValidIndex(BoneIndex) ? UsedBoneIndices[BoneIndex] : INDEX_NONE;
+	}
+};
 
 void FClothingSimulationCollider::FLODData::Add(
 	FClothingSimulationSolver* Solver,
@@ -316,7 +344,11 @@ void FClothingSimulationCollider::FLODData::Remove(FClothingSimulationSolver* So
 	Offsets.Remove(FSolverClothPair(Solver, Cloth));
 }
 
-void FClothingSimulationCollider::FLODData::Update(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, const FClothingSimulationContextCommon* Context)
+void FClothingSimulationCollider::FLODData::Update(
+	FClothingSimulationSolver* Solver,
+	FClothingSimulationCloth* Cloth,
+	const FTransform& ComponentTransform,
+	const TArray<FTransform>& BoneTransforms)
 {
 	check(Solver);
 	check(Cloth);
@@ -327,9 +359,7 @@ void FClothingSimulationCollider::FLODData::Update(FClothingSimulationSolver* So
 		const Softs::FSolverRigidTransform3* BaseTransforms = Solver->GetCollisionBaseTransforms(Offset);
 		Softs::FSolverRigidTransform3* const CollisionTransforms = Solver->GetCollisionTransforms(Offset);
 
-		const TArrayView<const FTransform> BoneTransforms = Context ? Context->BoneTransforms : TArrayView<const FTransform>();
-
-		FTransform ComponentToLocalSpaceReal = Context ? Context->ComponentToWorld : FTransform::Identity;
+		FTransform ComponentToLocalSpaceReal = ComponentTransform;
 		ComponentToLocalSpaceReal.AddToTranslation(-Solver->GetLocalSpaceLocation());
 		const Softs::FSolverTransform3 ComponentToLocalSpace(ComponentToLocalSpaceReal);  // LWC, now in local space, therefore it is safe to use the solver transform type
 	
@@ -366,37 +396,63 @@ void FClothingSimulationCollider::FLODData::ResetStartPose(FClothingSimulationSo
 	}
 }
 
-FClothingSimulationCollider::FClothingSimulationCollider(
-	const UClothingAssetCommon* InAsset,
-	const USkeletalMeshComponent* InSkeletalMeshComponent,
-	bool bInUseLODIndexOverride,
-	int32 InLODIndexOverride)
-	: Asset(InAsset)
-	, SkeletalMeshComponent(InSkeletalMeshComponent)
-	, CollisionData(nullptr)
-	, bUseLODIndexOverride(bInUseLODIndexOverride)
-	, LODIndexOverride(InLODIndexOverride)
-	, Scale(1.f)
+FClothingSimulationCollider::FClothingSimulationCollider(const UPhysicsAsset* InPhysicsAsset, const FReferenceSkeleton* InReferenceSkeleton)
+	: PhysicsAsset(InPhysicsAsset)
+	, ReferenceSkeleton(InReferenceSkeleton)
 {
 	// Prepare LOD array
-	const int32 NumLODs = Asset ? Asset->LodData.Num() : 0;
-	LODData.SetNum((int32)ECollisionDataType::LODs + NumLODs);
+	// Note: There aren't any collision LODs stored with this constructor version anymore,
+	//       it's only this physics asset's and external collisions.
+	const int32 NumLODData = (int32)ECollisionDataType::LODs;
+	LODData.Reserve(NumLODData);
+	for (int32 Index = 0; Index < NumLODData; ++Index)
+	{
+		LODData.Add(MakeUnique<FLODData>());
+	}
+}
+
+FClothingSimulationCollider::FClothingSimulationCollider(
+	const UClothingAssetCommon* InAsset,
+	const USkeletalMeshComponent* /*InSkeletalMeshComponent*/,
+	bool /*bInUseLODIndexOverride*/,
+	int32 /*InLODIndexOverride*/)
+	: PhysicsAsset(InAsset->PhysicsAsset)
+	, ReferenceSkeleton(&CastChecked<USkeletalMesh>(InAsset->GetOuter())->GetRefSkeleton())
+{
+	// Prepare LOD array
+	const int32 NumLODs = InAsset ? InAsset->LodData.Num() : 0;
+	const int32 NumLODData = (int32)ECollisionDataType::LODs + NumLODs;
+	LODData.Reserve(NumLODData);
+	for (int32 Index = 0; Index < NumLODData; ++Index)
+	{
+		LODData.Add(MakeUnique<FLODData>());
+	}
 }
 
 FClothingSimulationCollider::~FClothingSimulationCollider()
 {
 }
 
+int32 FClothingSimulationCollider::GetNumGeometries() const
+{
+	int32 NumGeometries = 0;
+	for (const TUniquePtr<FLODData>& LODDatum : LODData)
+	{
+		NumGeometries += LODDatum->NumGeometries;
+	}
+	return NumGeometries;
+}
+
 FClothCollisionData FClothingSimulationCollider::GetCollisionData(const FClothingSimulationSolver* Solver, const FClothingSimulationCloth* Cloth) const
 {
 	FClothCollisionData ClothCollisionData;
-	ClothCollisionData.Append(LODData[(int32)ECollisionDataType::LODless].ClothCollisionData);
-	ClothCollisionData.Append(LODData[(int32)ECollisionDataType::External].ClothCollisionData);
+	ClothCollisionData.Append(LODData[(int32)ECollisionDataType::LODless]->ClothCollisionData);
+	ClothCollisionData.Append(LODData[(int32)ECollisionDataType::External]->ClothCollisionData);
 
 	const int32 LODIndex = LODIndices.FindChecked(FSolverClothPair(Solver, Cloth));
 	if (LODIndex >= (int32)ECollisionDataType::LODs)
 	{
-		ClothCollisionData.Append(LODData[LODIndex].ClothCollisionData);
+		ClothCollisionData.Append(LODData[LODIndex]->ClothCollisionData);
 	}
 	return ClothCollisionData;
 }
@@ -406,25 +462,18 @@ void FClothingSimulationCollider::ExtractPhysicsAssetCollision(FClothCollisionDa
 	ClothCollisionData.Reset();
 	UsedBoneIndices.Reset();
 
-	if (!Asset)
+	if (PhysicsAsset)
 	{
-		return;
-	}
+		UsedBoneIndices.Reserve(PhysicsAsset->SkeletalBodySetups.Num());
 
-	if (const UPhysicsAsset* const PhysAsset = Asset->PhysicsAsset)
-	{
-		const USkeletalMesh* const TargetMesh = CastChecked<USkeletalMesh>(Asset->GetOuter());
-
-		UsedBoneIndices.Reserve(PhysAsset->SkeletalBodySetups.Num());
-
-		for (const USkeletalBodySetup* BodySetup : PhysAsset->SkeletalBodySetups)
+		for (const USkeletalBodySetup* BodySetup : PhysicsAsset->SkeletalBodySetups)
 		{
 			if (!BodySetup)
 			{
 				continue;
 			}
 
-			const int32 MeshBoneIndex = TargetMesh->GetRefSkeleton().FindBoneIndex(BodySetup->BoneName);
+			const int32 MeshBoneIndex = ReferenceSkeleton ? ReferenceSkeleton->FindBoneIndex(BodySetup->BoneName) : INDEX_NONE;
 			const int32 MappedBoneIndex = UsedBoneIndices.Add(MeshBoneIndex);
 			
 			// Add capsules
@@ -570,20 +619,19 @@ void FClothingSimulationCollider::ExtractPhysicsAssetCollision(FClothCollisionDa
 					LevelSetCollisions.Add({ LevelSetElem.GetLevelSet(), LevelSetElem.GetTransform(), MappedBoneIndex });
 				}
 			}
-
 		}  // End for PhysAsset->SkeletalBodySetups
-	}  // End if Asset->PhysicsAsset
+	}  // End if PhysicsAsset
 }
 
 
 int32 FClothingSimulationCollider::GetNumGeometries(int32 InSlotIndex) const
 {
-	return LODData.IsValidIndex(InSlotIndex) ? LODData[InSlotIndex].NumGeometries : 0;
+	return LODData.IsValidIndex(InSlotIndex) ? LODData[InSlotIndex]->NumGeometries : 0;
 }
 
 int32 FClothingSimulationCollider::GetOffset(const FClothingSimulationSolver* Solver, const FClothingSimulationCloth* Cloth, int32 InSlotIndex) const
 {
-	const int32* const Offset = LODData.IsValidIndex(InSlotIndex) ? LODData[InSlotIndex].Offsets.Find(FSolverClothPair(Solver, Cloth)) : nullptr;
+	const int32* const Offset = LODData.IsValidIndex(InSlotIndex) ? LODData[InSlotIndex]->Offsets.Find(FSolverClothPair(Solver, Cloth)) : nullptr;
 	return Offset ? *Offset : INDEX_NONE;
 }
 
@@ -599,8 +647,8 @@ bool FClothingSimulationCollider::GetOffsetAndNumGeometries(const FClothingSimul
 
 	if (LODData.IsValidIndex(SlotIndex))
 	{
-		OutOffset = LODData[SlotIndex].Offsets.FindChecked(FSolverClothPair(Solver, Cloth));
-		OutNumGeometries = LODData[SlotIndex].NumGeometries;
+		OutOffset = LODData[SlotIndex]->Offsets.FindChecked(FSolverClothPair(Solver, Cloth));
+		OutNumGeometries = LODData[SlotIndex]->NumGeometries;
 	}
 
 	return OutOffset != INDEX_NONE && OutNumGeometries > 0;
@@ -610,6 +658,7 @@ void FClothingSimulationCollider::Add(FClothingSimulationSolver* Solver, FClothi
 {
 	check(Solver);
 	check(Cloth);
+	check(Cloth->GetMesh());
 
 	// Can't add a collider twice to the same solver/cloth pair
 	check(!LODIndices.Find(FSolverClothPair(Solver, Cloth)));
@@ -619,16 +668,16 @@ void FClothingSimulationCollider::Add(FClothingSimulationSolver* Solver, FClothi
 	LODIndex = INDEX_NONE;
 
 	// Initialize scale
-	const FClothingSimulationContextCommon* const Context = SkeletalMeshComponent ? static_cast<const FClothingSimulationContextCommon*>(SkeletalMeshComponent->GetClothingSimulationContext()) : nullptr;
-	const FVec3 Scale3D = Context ? (FVec3)Context->ComponentToWorld.GetScale3D() : FVec3(1.f);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	const FVec3 Scale3D = (FVec3)Cloth->GetMesh()->GetComponentToWorldTransform().GetScale3D();
 	UE_CLOG(FMath::Abs(Scale3D.X - Scale3D.Y) > KINDA_SMALL_NUMBER || FMath::Abs(Scale3D.X - Scale3D.Z) > KINDA_SMALL_NUMBER,
 		LogChaosCloth, Warning, TEXT(
-			"Actor '%s' component '%s' has a non uniform scale, and has a cloth simulation attached. "
+			"Object '%s' has a non uniform scale, and has a cloth simulation attached. "
 			"The collision volumes might no longer correctly match the shape of the mesh. "
 			"Please update this component transform scale with the same value for all scale axis."),
-		SkeletalMeshComponent->GetOwner() ? *SkeletalMeshComponent->GetOwner()->GetName() : TEXT("None"),
-		*SkeletalMeshComponent->GetName());
+		*Cloth->GetMesh()->GetDebugName());
 	Scale = Scale3D.X;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	// Create physics asset collisions, this will affect all LODs, so store it at index 0
 	FClothCollisionData PhysicsAssetCollisionData;
@@ -636,39 +685,16 @@ void FClothingSimulationCollider::Add(FClothingSimulationSolver* Solver, FClothi
 	TArray<int32> UsedBoneIndices;
 	ExtractPhysicsAssetCollision(PhysicsAssetCollisionData, LevelSetCollisions, UsedBoneIndices);
 
-	LODData[(int32)ECollisionDataType::LODless].Add(Solver, Cloth, PhysicsAssetCollisionData, LevelSetCollisions, Scale, UsedBoneIndices);
-
-	// Create legacy asset LOD collisions
-	const int32 NumLODs = Asset ? Asset->LodData.Num() : 0;
-	for (int32 Index = 0; Index < NumLODs; ++Index)
-	{
-		// Warn about legacy apex collisions
-		const FClothCollisionData& AssetCollisionData = Asset->LodData[Index].CollisionData;
-		UE_CLOG(AssetCollisionData.Spheres.Num() > 0 || AssetCollisionData.SphereConnections.Num() > 0 || AssetCollisionData.Convexes.Num() > 0,
-			LogChaosCloth, Warning, TEXT(
-				"Actor '%s' component '%s' has %d sphere, %d capsule, and %d convex collision objects for "
-				"physics authored as part of a LOD construct, probably by the Apex cloth authoring system. "
-				"This is deprecated. Please update your asset!"),
-			SkeletalMeshComponent->GetOwner() ? *SkeletalMeshComponent->GetOwner()->GetName() : TEXT("None"),
-			*SkeletalMeshComponent->GetName(),
-			AssetCollisionData.Spheres.Num(),
-			AssetCollisionData.SphereConnections.Num(),
-			AssetCollisionData.Convexes.Num());
-
-		const TArray<FLevelSetCollisionData> AssetLevelSetCollisions;		// Shouldn't be any level set collider on legacy asset
-
-		// Add legacy collision
-		LODData[(int32)ECollisionDataType::LODs + Index].Add(Solver, Cloth, AssetCollisionData, AssetLevelSetCollisions, Scale, Asset->UsedBoneIndices);
-	}
+	LODData[(int32)ECollisionDataType::LODless]->Add(Solver, Cloth, PhysicsAssetCollisionData, LevelSetCollisions, Scale, UsedBoneIndices);
 }
 
 void FClothingSimulationCollider::Remove(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth)
 {
 	LODIndices.Remove(FSolverClothPair(Solver, Cloth));
 
-	for (FLODData& LODDatum: LODData)
+	for (TUniquePtr<FLODData>& LODDatum: LODData)
 	{
-		LODDatum.Remove(Solver, Cloth);
+		LODDatum->Remove(Solver, Cloth);
 	}
 }
 
@@ -687,7 +713,7 @@ void FClothingSimulationCollider::PreUpdate(FClothingSimulationSolver* Solver, F
 	// TODO: Get level sets?
 	const TArray<FLevelSetCollisionData> LevelSetCollisions;
 
-	LODData[(int32)ECollisionDataType::External].Add(Solver, Cloth, CollisionData ? *CollisionData : FClothCollisionData(), LevelSetCollisions);
+	LODData[(int32)ECollisionDataType::External]->Add(Solver, Cloth, CollisionData ? *CollisionData : FClothCollisionData(), LevelSetCollisions);
 	
 	// TODO: Find a better way in case the same number but different collisions are being re-added (hash collision data? Provide user dirty function?)
 	bHasExternalCollisionChanged =
@@ -699,21 +725,25 @@ void FClothingSimulationCollider::Update(FClothingSimulationSolver* Solver, FClo
 {
 	check(Solver);
 	check(Cloth);
+	check(Cloth->GetMesh());
 	TRACE_CPUPROFILER_EVENT_SCOPE(FClothingSimulationCollider_Update);
 	SCOPE_CYCLE_COUNTER(STAT_ChaosClothingSimulationColliderUpdate);
 
 	// Update the collision transforms
 	// Note: All the LODs are updated at once, so that the previous transforms are always correct during LOD switching
-	const FClothingSimulationContextCommon* const Context = SkeletalMeshComponent ? static_cast<const FClothingSimulationContextCommon*>(SkeletalMeshComponent->GetClothingSimulationContext()) : nullptr;
-	for (FLODData& LODDatum : LODData)
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	const FTransform& ComponentTransform = Cloth->GetMesh()->GetComponentToWorldTransform();
+	const TArray<FTransform>& BoneTransforms = Cloth->GetMesh()->GetBoneTransforms();
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	for (TUniquePtr<FLODData>& LODDatum : LODData)
 	{
-		LODDatum.Update(Solver, Cloth, Context);
+		LODDatum->Update(Solver, Cloth, ComponentTransform, BoneTransforms);
 	}
 
 	// Update current LOD index
 	int32& LODIndex = LODIndices.FindChecked(FSolverClothPair(Solver, Cloth));
 	const int32 PrevLODIndex = LODIndex;
-	LODIndex = (int32)ECollisionDataType::LODs + (bUseLODIndexOverride ? LODIndexOverride : Cloth ? Cloth->GetLODIndex(Solver) : INDEX_NONE);
+	LODIndex = (int32)ECollisionDataType::LODs + (Cloth ? Cloth->GetLODIndex(Solver) : INDEX_NONE);
 	if (!LODData.IsValidIndex(LODIndex))
 	{
 		LODIndex = (int32)ECollisionDataType::LODs + INDEX_NONE;
@@ -723,10 +753,10 @@ void FClothingSimulationCollider::Update(FClothingSimulationSolver* Solver, FClo
 	if (bHasExternalCollisionChanged)
 	{
 		// Enable non LOD collisions at first initialization
-		LODData[(int32)ECollisionDataType::External].Enable(Solver, Cloth, true);
+		LODData[(int32)ECollisionDataType::External]->Enable(Solver, Cloth, true);
 
 		// Update initial state for collisions
-		LODData[(int32)ECollisionDataType::External].ResetStartPose(Solver, Cloth);
+		LODData[(int32)ECollisionDataType::External]->ResetStartPose(Solver, Cloth);
 	}
 
 	if (LODIndex != PrevLODIndex)
@@ -734,25 +764,25 @@ void FClothingSimulationCollider::Update(FClothingSimulationSolver* Solver, FClo
 		if (PrevLODIndex == INDEX_NONE)  // First run
 		{
 			// Enable non LOD collisions at first initialization
-			LODData[(int32)ECollisionDataType::LODless].Enable(Solver, Cloth, true);
+			LODData[(int32)ECollisionDataType::LODless]->Enable(Solver, Cloth, true);
 
 			// Update initial state for collisions
-			LODData[(int32)ECollisionDataType::LODless].ResetStartPose(Solver, Cloth);
+			LODData[(int32)ECollisionDataType::LODless]->ResetStartPose(Solver, Cloth);
 		}
 		else if (PrevLODIndex >= (int32)ECollisionDataType::LODs)
 		{
 			// Disable previous LOD
-			LODData[PrevLODIndex].Enable(Solver, Cloth, false);
+			LODData[PrevLODIndex]->Enable(Solver, Cloth, false);
 		}
 		if (LODIndex >= (int32)ECollisionDataType::LODs)
 		{
 			// Enable new LOD
-			LODData[LODIndex].Enable(Solver, Cloth, true);
+			LODData[LODIndex]->Enable(Solver, Cloth, true);
 
 			if (PrevLODIndex == INDEX_NONE)
 			{
 				// Update initial state for collisions
-				LODData[LODIndex].ResetStartPose(Solver, Cloth);
+				LODData[LODIndex]->ResetStartPose(Solver, Cloth);
 			}
 		}
 	}
@@ -760,9 +790,9 @@ void FClothingSimulationCollider::Update(FClothingSimulationSolver* Solver, FClo
 
 void FClothingSimulationCollider::ResetStartPose(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth)
 {
-	for (FLODData& LODDatum : LODData)
+	for (TUniquePtr<FLODData>& LODDatum : LODData)
 	{
-		LODDatum.ResetStartPose(Solver, Cloth);
+		LODDatum->ResetStartPose(Solver, Cloth);
 	}
 }
 

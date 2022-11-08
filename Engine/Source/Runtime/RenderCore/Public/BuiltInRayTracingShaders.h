@@ -28,45 +28,11 @@ public:
 	{}
 };
 
-class RENDERCORE_API UE_DEPRECATED(5.1, "Please use an explicit ray generation shader instead.") FOcclusionMainRG : public FBuiltInRayTracingShader
-{
-	DECLARE_GLOBAL_SHADER(FOcclusionMainRG);
-	SHADER_USE_ROOT_PARAMETER_STRUCT(FOcclusionMainRG, FBuiltInRayTracingShader);
-
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_BUFFER_SRV(RaytracingAccelerationStructure, TLAS)
-		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FBasicRayData>, Rays)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<uint>, OcclusionOutput)
-	END_SHADER_PARAMETER_STRUCT()
-};
-
-class RENDERCORE_API UE_DEPRECATED(5.1, "Please use an explicit ray generation shader instead.") FIntersectionMainRG : public FBuiltInRayTracingShader
-{
-	DECLARE_GLOBAL_SHADER(FIntersectionMainRG);
-	SHADER_USE_ROOT_PARAMETER_STRUCT(FIntersectionMainRG, FBuiltInRayTracingShader);
-
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_BUFFER_SRV(RaytracingAccelerationStructure, TLAS)
-		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<FBasicRayData>, Rays)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<FIntersectionPayload>, IntersectionOutput)
-	END_SHADER_PARAMETER_STRUCT()
-};
-
-class UE_DEPRECATED(5.1, "Please use an explicit ray generation and hit shaders instead.") FIntersectionMainCHS : public FBuiltInRayTracingShader
-{
-	DECLARE_EXPORTED_SHADER_TYPE(FIntersectionMainCHS, Global, RENDERCORE_API);
-public:
-
-	FIntersectionMainCHS() = default;
-	FIntersectionMainCHS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
-		: FBuiltInRayTracingShader(Initializer)
-	{}
-};
-
 class FDefaultMainCHS : public FBuiltInRayTracingShader
 {
 	DECLARE_EXPORTED_SHADER_TYPE(FDefaultMainCHS, Global, RENDERCORE_API);
 public:
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId);
 
 	FDefaultMainCHS() = default;
 	FDefaultMainCHS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
@@ -78,6 +44,7 @@ class FDefaultMainCHSOpaqueAHS : public FBuiltInRayTracingShader
 {
 	DECLARE_EXPORTED_SHADER_TYPE(FDefaultMainCHSOpaqueAHS, Global, RENDERCORE_API);
 public:
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId);
 
 	FDefaultMainCHSOpaqueAHS() = default;
 	FDefaultMainCHSOpaqueAHS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
@@ -89,6 +56,7 @@ class FDefaultPayloadMS : public FBuiltInRayTracingShader
 {
 	DECLARE_EXPORTED_SHADER_TYPE(FDefaultPayloadMS, Global, RENDERCORE_API);
 public:
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId);
 
 	FDefaultPayloadMS() = default;
 	FDefaultPayloadMS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
@@ -100,6 +68,7 @@ class FPackedMaterialClosestHitPayloadMS : public FBuiltInRayTracingShader
 {
 	DECLARE_EXPORTED_SHADER_TYPE(FPackedMaterialClosestHitPayloadMS, Global, RENDERCORE_API);
 public:
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId);
 
 	FPackedMaterialClosestHitPayloadMS() = default;
 	FPackedMaterialClosestHitPayloadMS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)

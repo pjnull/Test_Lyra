@@ -18,26 +18,31 @@ void FFacebookPermissions::Setup()
 {
 	///////////////////////////////////////////////
 	// Read Permissions
-	SharingPermissionsMap.Add(EOnlineSharingCategory::ReadPosts, {TEXT(PERM_READ_STREAM)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::Friends, {TEXT(PERM_READ_FRIENDS)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::Email, {TEXT(PERM_READ_EMAIL)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::Mailbox, {TEXT(PERM_READ_MAILBOX)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::OnlineStatus, {TEXT(PERM_READ_STATUS), TEXT(PERM_READ_PRESENCE)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::ProfileInfo, {TEXT(PERM_PUBLIC_PROFILE)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::LocationInfo, {TEXT(PERM_READ_CHECKINS), TEXT(PERM_READ_HOMETOWN)});
-
-	///////////////////////////////////////////////
-	// Publish Permissions
-	SharingPermissionsMap.Add(EOnlineSharingCategory::SubmitPosts, {TEXT(PERM_PUBLISH_ACTION)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::ManageFriends, {TEXT(PERM_MANAGE_FRIENDSLIST)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::AccountAdmin, {TEXT(PERM_MANAGE_NOTIFICATIONS)});
-	SharingPermissionsMap.Add(EOnlineSharingCategory::Events, {TEXT(PERM_CREATE_EVENT), TEXT(PERM_RSVP_EVENT)});
+	SharingPermissionsMap.Add(EOnlineSharingCategory::Friends, { TEXT(PERM_READ_FRIENDS) });
+	SharingPermissionsMap.Add(EOnlineSharingCategory::Email, { TEXT(PERM_READ_EMAIL) });
+	SharingPermissionsMap.Add(EOnlineSharingCategory::ProfileInfo, { TEXT(PERM_PUBLIC_PROFILE), TEXT(PERM_PUBLIC_GAMING_PROFILE) });
 }
 
 void FFacebookPermissions::Reset()
 {
 	GrantedPerms.Empty();
 	DeclinedPerms.Empty();
+}
+
+EOnlineSharingCategory FFacebookPermissions::GetCategoryFromFacebookPermission(const FString& FacebookPermission) const
+{
+	EOnlineSharingCategory Cat = EOnlineSharingCategory::None;
+	for (const auto& Iter : SharingPermissionsMap)
+	{
+		EOnlineSharingCategory TmpCat = Iter.Key;
+		const TArray<FString>& TmpValue = Iter.Value;
+		if (TmpValue.Contains(FacebookPermission))
+		{
+			Cat = TmpCat;
+			break;
+		}
+	}
+	return Cat;
 }
 
 bool FFacebookPermissions::RefreshPermissions(const FString& NewJsonStr)
@@ -54,17 +59,7 @@ bool FFacebookPermissions::RefreshPermissions(const FString& NewJsonStr)
 			const FString Declined(TEXT(PERM_DECLINED));
 			for (const FFacebookPermissionsJson::FFacebookPermissionJson& Perm : Data.Permissions)
 			{
-				EOnlineSharingCategory Cat = EOnlineSharingCategory::None;
-				for (const auto& Iter : SharingPermissionsMap)
-				{
-					EOnlineSharingCategory TmpCat = Iter.Key;
-					const TArray<FString>& TmpValue = Iter.Value;
-					if (TmpValue.Contains(Perm.Name))
-					{
-						Cat = TmpCat;
-						break;
-					}
-				}
+				const EOnlineSharingCategory Cat = GetCategoryFromFacebookPermission(Perm.Name);
 
 				if (Cat != EOnlineSharingCategory::None)
 				{
@@ -72,12 +67,12 @@ bool FFacebookPermissions::RefreshPermissions(const FString& NewJsonStr)
 					if (Perm.Status == Granted)
 					{
 						NewPerm.Status = EOnlineSharingPermissionState::Granted;
-						GrantedPerms.Add(NewPerm);
+						GrantedPerms.Add(MoveTemp(NewPerm));
 					}
 					else if (Perm.Status == Declined)
 					{
 						NewPerm.Status = EOnlineSharingPermissionState::Declined;
-						DeclinedPerms.Add(NewPerm);
+						DeclinedPerms.Add(MoveTemp(NewPerm));
 					}
 					else
 					{
@@ -94,6 +89,42 @@ bool FFacebookPermissions::RefreshPermissions(const FString& NewJsonStr)
 	}
 
 	return false;
+}
+
+void FFacebookPermissions::RefreshPermissions(const TArray<FString>& GrantedPermissions, const TArray<FString>& DeclinedPermissions)
+{
+	GrantedPerms.Empty(GrantedPermissions.Num());
+	DeclinedPerms.Empty(DeclinedPermissions.Num());
+
+	for (const FString& PermissionName : GrantedPermissions)
+	{
+		const EOnlineSharingCategory Cat = GetCategoryFromFacebookPermission(PermissionName);
+
+		if (Cat != EOnlineSharingCategory::None)
+		{
+			FSharingPermission NewPerm(PermissionName, Cat);
+			GrantedPerms.Add(MoveTemp(NewPerm));
+		}
+		else
+		{
+			UE_LOG_ONLINE_SHARING(Warning, TEXT("Permission not mapped to any category %s"), *PermissionName);
+		}
+	}
+
+	for (const FString& PermissionName : DeclinedPermissions)
+	{
+		const EOnlineSharingCategory Cat = GetCategoryFromFacebookPermission(PermissionName);
+
+		if (Cat != EOnlineSharingCategory::None)
+		{
+			FSharingPermission NewPerm(PermissionName, Cat);
+			DeclinedPerms.Add(MoveTemp(NewPerm));
+		}
+		else
+		{
+			UE_LOG_ONLINE_SHARING(Warning, TEXT("Permission not mapped to any category %s"), *PermissionName);
+		}
+	}
 }
 
 bool FFacebookPermissions::HasPermission(EOnlineSharingCategory RequestedPermission, TArray<FSharingPermission>& OutMissingPermissions) const
@@ -154,6 +185,11 @@ FOnlineSharingFacebookCommon::~FOnlineSharingFacebookCommon()
 			IdentityInt->ClearOnLoginStatusChangedDelegate_Handle(i, LoginStatusChangedDelegates[i]);
 		}
 	}
+}
+
+void FOnlineSharingFacebookCommon::SetCurrentPermissions(const TArray<FString>& GrantedPermissions, const TArray<FString>& DeclinedPermissions)
+{
+	CurrentPermissions.RefreshPermissions(GrantedPermissions, DeclinedPermissions);
 }
 
 void FOnlineSharingFacebookCommon::OnLoginStatusChanged(int32 LocalUserNum, ELoginStatus::Type OldStatus, ELoginStatus::Type NewStatus, const FUniqueNetId& UserId)

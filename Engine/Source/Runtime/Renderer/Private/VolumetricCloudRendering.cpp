@@ -240,7 +240,10 @@ static bool ShouldUseComputeForCloudTracing(const FStaticFeatureLevel InFeatureL
 	// So in this case, when capturing such a sky light, we must disabled the compute path.
 	const bool bMSAAEnabled = GetDefaultMSAACount(InFeatureLevel) > 1;
 
-	return !CVarVolumetricCloudDisableCompute.GetValueOnRenderThread() && RHIIsTypedUAVLoadSupported(PF_FloatRGBA) && RHIIsTypedUAVLoadSupported(PF_G16R16F) && !bMSAAEnabled;
+	return !CVarVolumetricCloudDisableCompute.GetValueOnRenderThread()
+		&& UE::PixelFormat::HasCapabilities(PF_FloatRGBA, EPixelFormatCapabilities::TypedUAVLoad)
+		&& UE::PixelFormat::HasCapabilities(PF_G16R16F, EPixelFormatCapabilities::TypedUAVLoad)
+		&& !bMSAAEnabled;
 }
 
 static bool ShouldUseComputeCloudEmptySpaceSkipping()
@@ -566,7 +569,7 @@ FORCEINLINE bool IsVolumetricCloudMaterialSupported(const EShaderPlatform Platfo
 
 FORCEINLINE bool IsMaterialCompatibleWithVolumetricCloud(const FMaterialShaderParameters& Material, const EShaderPlatform Platform)
 {
-	return IsVolumetricCloudMaterialSupported(Platform) && Material.MaterialDomain == MD_Volume;
+	return IsVolumetricCloudMaterialSupported(Platform) && Material.bIsUsedWithVolumetricCloud && Material.MaterialDomain == MD_Volume;
 }
 
 
@@ -2273,6 +2276,35 @@ void FSceneRenderer::RenderVolumetricCloudsInternal(FRDGBuilder& GraphBuilder, F
 	check(CloudRC.CloudVolumeMaterialProxy);
 
 	FMaterialRenderProxy* CloudVolumeMaterialProxy = CloudRC.CloudVolumeMaterialProxy;
+
+#if !UE_BUILD_SHIPPING
+	{
+		const FMaterialRenderProxy* MaterialRenderProxy = nullptr;
+		const FMaterial* MaterialResource = &CloudVolumeMaterialProxy->GetMaterialWithFallback(Scene->GetFeatureLevel(), MaterialRenderProxy);
+		MaterialRenderProxy = MaterialRenderProxy ? MaterialRenderProxy : CloudVolumeMaterialProxy;
+
+		if (!MaterialResource->IsUsedWithVolumetricCloud())
+		{
+			// This is not a material designed to run with volumetric cloud.
+			OnGetOnScreenMessages.AddLambda([](FScreenMessageWriter& ScreenMessageWriter)->void
+				{
+					static const FText Message = NSLOCTEXT("Renderer", "MaterialNotVolumetricCloud", "A material assigned on a volumetric cloud component does not have the UsedWithVolumetricCloud flag set.");
+					ScreenMessageWriter.DrawLine(Message);
+				});
+			return;
+		}
+		if (MaterialResource->GetMaterialDomain() != MD_Volume)
+		{
+			// This is not a material designed to run with volumetric cloud.
+			OnGetOnScreenMessages.AddLambda([](FScreenMessageWriter& ScreenMessageWriter)->void
+				{
+					static const FText Message = NSLOCTEXT("Renderer", "MaterialNotVolumetricDomain", "A material assigned on a volumetric cloud component does not have the Volumetric domain set.");
+					ScreenMessageWriter.DrawLine(Message);
+				});
+			return;
+		}
+	}
+#endif
 
 	// Copy parameters to lambda
 	const bool bShouldViewRenderVolumetricRenderTarget = CloudRC.bShouldViewRenderVolumetricRenderTarget;

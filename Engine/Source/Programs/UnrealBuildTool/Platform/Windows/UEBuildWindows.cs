@@ -190,6 +190,14 @@ namespace UnrealBuildTool
 		public string? CompilerVersion = null;
 
 		/// <summary>
+		/// True if we should use the Clang linker (LLD) when we are compiling with Clang, or Intel linker (xilink\xilib) when we are compiling with Intel oneAPI, otherwise we use the MSVC linker.
+		/// </summary>
+		[ConfigFile(ConfigHierarchyType.Engine, "/Script/WindowsTargetPlatform.WindowsTargetSettings", "bAllowClangLinker")]
+		[XmlConfigFile(Category = "WindowsPlatform")]
+		[CommandLine("-ClangLinker")]
+		public bool bAllowClangLinker = false;
+		
+		/// <summary>
 		/// The specific Windows SDK version to use. This may be a specific version number (for example, "8.1", "10.0" or "10.0.10150.0"), or the string "Latest", to select the newest available version.
 		/// By default, and if it is available, we use the Windows SDK version indicated by WindowsPlatform.DefaultWindowsSdkVersion (otherwise, we use the latest version).
 		/// </summary>
@@ -592,6 +600,11 @@ namespace UnrealBuildTool
 			get { return Inner.bUseCPPWinRT; }
 		}
 
+		public bool bAllowClangLinker
+		{
+			get { return Inner.bAllowClangLinker; }
+		}
+
 		public bool bEnableRayTracing
 		{
 			get { return Inner.bEnableRayTracing; }
@@ -833,17 +846,7 @@ namespace UnrealBuildTool
 	}
 
 	class WindowsPlatform : UEBuildPlatform
-	{
-		/// <summary>
-		/// True if we should use the Clang linker (LLD) when we are compiling with Clang, otherwise we use the MSVC linker
-		/// </summary>
-		public static readonly bool bAllowClangLinker = false;
-
-		/// <summary>
-		/// True if we should use the Intel linker (xilink\xilib) when we are compiling with Intel oneAPI, otherwise we use the MSVC linker
-		/// </summary>
-		public static readonly bool bAllowIntelLinker = true;
-		
+	{		
 		MicrosoftPlatformSDK SDK;
 
 		/// <summary>
@@ -875,7 +878,7 @@ namespace UnrealBuildTool
 		[SupportedOSPlatform("windows")]
 		protected virtual VCEnvironment CreateVCEnvironment(TargetRules Target)
 		{
-			return VCEnvironment.Create(Target.WindowsPlatform.Compiler, Target.WindowsPlatform.ToolChain, Platform, Target.WindowsPlatform.Architecture, Target.WindowsPlatform.CompilerVersion, Target.WindowsPlatform.WindowsSdkVersion, null, Target.WindowsPlatform.bUseCPPWinRT, Logger);
+			return VCEnvironment.Create(Target.WindowsPlatform.Compiler, Target.WindowsPlatform.ToolChain, Platform, Target.WindowsPlatform.Architecture, Target.WindowsPlatform.CompilerVersion, Target.WindowsPlatform.WindowsSdkVersion, null, Target.WindowsPlatform.bUseCPPWinRT, Target.WindowsPlatform.bAllowClangLinker, Logger);
 		}
 
 		/// <summary>
@@ -891,7 +894,7 @@ namespace UnrealBuildTool
 
 			// Disable Simplygon support if compiling against the NULL RHI.
 			if (Target.GlobalDefinitions.Contains("USE_NULL_RHI=1"))
-			{				
+			{
 				Target.bCompileCEF3 = false;
 			}
 			
@@ -899,7 +902,10 @@ namespace UnrealBuildTool
 			// as normal.
 			if (Target.StaticAnalyzer == StaticAnalyzer.Clang)
 			{
-				Target.WindowsPlatform.Compiler = WindowsCompiler.Clang;
+				if (!Target.WindowsPlatform.Compiler.IsClang())
+				{
+					Target.WindowsPlatform.Compiler = WindowsCompiler.Clang;
+				}
 				Target.StaticAnalyzer = StaticAnalyzer.Default;
 			}
 			else if (Target.StaticAnalyzer != StaticAnalyzer.None && 
@@ -924,13 +930,6 @@ namespace UnrealBuildTool
 			// Disable PCHs for PVS studio analyzer.
 			if (Target.StaticAnalyzer == StaticAnalyzer.PVSStudio)
 			{
-				Target.bUsePCHFiles = false;
-			}
-			
-			// @todo: Override PCH settings
-			if (Target.WindowsPlatform.Compiler == WindowsCompiler.Intel)
-			{
-				Target.bUseSharedPCHs = false;
 				Target.bUsePCHFiles = false;
 			}
 
@@ -1325,12 +1324,6 @@ namespace UnrealBuildTool
 					Rules.DynamicallyLoadedModuleNames.Remove("VulkanRHI");
 					Rules.DynamicallyLoadedModuleNames.Add("VulkanShaderFormat");
 				}
-			}
-
-			if (ModuleName == "D3D11RHI")
-			{
-				// To enable platform specific D3D11 RHI Types
-				Rules.PrivateIncludePaths.Add("Runtime/Windows/D3D11RHI/Private/Windows");
 			}
 
 			// Delay-load D3D12 so we can use the latest features and still run on downlevel versions of the OS

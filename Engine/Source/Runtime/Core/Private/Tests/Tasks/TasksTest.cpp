@@ -693,45 +693,37 @@ namespace UE { namespace TasksTests
 
 	IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTasksDependenciesTest, "System.Core.Tasks.Dependencies", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter);
 
-	template<uint64 NumBranches, uint64 NumLoops, uint64 NumTasks>
+	template<uint64 NumBranches, uint64 NumTasks>
 	void DependenciesPerfTest()
 	{
-		auto Branch = []
+
+		TArray<TTask<FTaskEvent>> Branches;
+		Branches.Reserve(NumBranches);
+		for (uint64 BranchIndex = 0; BranchIndex != NumBranches; ++BranchIndex)
 		{
-			FTask Joiner;
-			for (uint64 LoopIndex = 0; LoopIndex != NumLoops; ++LoopIndex)
+			auto Branch = []
 			{
 				TArray<FTask> Tasks;
 				Tasks.Reserve(NumTasks);
 				for (uint64 TaskIndex = 0; TaskIndex != NumTasks; ++TaskIndex)
 				{
-					if (Joiner.IsValid())
-					{
-						Tasks.Add(Launch(UE_SOURCE_LOCATION, [] { /*FPlatformProcess::YieldCycles(100000);*/ }, Joiner));
-					}
-					else
-					{
-						Tasks.Add(Launch(UE_SOURCE_LOCATION, [] { /*FPlatformProcess::YieldCycles(100000);*/ }));
-					}
+					Tasks.Add(Launch(UE_SOURCE_LOCATION, [] { /*FPlatformProcess::YieldCycles(100000);*/ }));
 				}
-				Joiner = Launch(UE_SOURCE_LOCATION, [] {}, Tasks);
-			}
-			return Joiner;
-		};
+				FTaskEvent Joiner{ UE_SOURCE_LOCATION };
+				Joiner.AddPrerequisites(Tasks);
+				Joiner.Trigger();
+				return Joiner;
+			};
 
-		TArray<TTask<FTask>> Branches;
-		Branches.Reserve(NumBranches);
-		for (uint64 BranchIndex = 0; BranchIndex != NumBranches; ++BranchIndex)
-		{
 			Branches.Add(Launch(UE_SOURCE_LOCATION, MoveTemp(Branch)));
 		}
-		TArray<FTask> BranchTasks;
+		TArray<FTaskEvent> BranchTasks;
 		BranchTasks.Reserve(NumBranches);
-		for (TTask<FTask>& Task : Branches)
+		for (TTask<FTaskEvent>& Task : Branches)
 		{
 			BranchTasks.Add(Task.GetResult());
 		}
-		Wait(Branches);
+		Wait(BranchTasks);
 	}
 
 	bool FTasksDependenciesTest::RunTest(const FString& Parameters)
@@ -870,7 +862,7 @@ namespace UE { namespace TasksTests
 			Task.Wait();
 		}
 
-		UE_BENCHMARK(5, DependenciesPerfTest<50, 5, 50>);
+		UE_BENCHMARK(5, DependenciesPerfTest<150, 150>);
 
 		return true;
 	}
@@ -1317,6 +1309,24 @@ namespace UE { namespace TasksTests
 		// usage example
 		CVarPtr->Set(TEXT("Normal"));
 		Launch(UE_SOURCE_LOCATION, [] {}, CVar.GetTaskPriority(), CVar.GetExtendedTaskPriority()).Wait();
+
+		return true;
+	}
+
+	// test Pipe support for `-nothreading` config (`FPlatformProcess::SupportsMultithreading()` is false)
+	IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTasksPipeNoThreadingTest, "System.Core.Tasks.PipeNoThreading", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter);
+
+	bool FTasksPipeNoThreadingTest::RunTest(const FString& Parameters)
+	{
+		if (FPlatformProcess::SupportsMultithreading())
+		{
+			return true; // run with `-nothreading` for this test to make any sense
+		}
+
+		FPipe Pipe{ UE_SOURCE_LOCATION };
+		Pipe.Launch(UE_SOURCE_LOCATION, [] {});
+		FTask FinalTask = Pipe.Launch(UE_SOURCE_LOCATION, [] {});
+		check(FinalTask.Wait(FTimespan::FromMilliseconds(1.0)));
 
 		return true;
 	}

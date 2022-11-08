@@ -699,9 +699,22 @@ TSharedPtr<FRigTreeElement> SRigHierarchyTreeView::FindItemAtPosition(FVector2D 
 		ItemsPanel->ArrangeChildren(MyGeometry, ArrangedChildren, true);
 
 		const int32 Index = ItemsPanel->FindChildUnderPosition(ArrangedChildren, InScreenSpacePosition); 
-		if(ItemsSource->IsValidIndex(Index))
+		if(ArrangedChildren.IsValidIndex(Index))
 		{
-			return ItemsSource->operator[](Index);
+			TSharedRef<SRigHierarchyItem> ItemWidget = StaticCastSharedRef<SRigHierarchyItem>(ArrangedChildren[Index].Widget);
+			if(ItemWidget->WeakRigTreeElement.IsValid())
+			{
+				const FRigElementKey Key = ItemWidget->WeakRigTreeElement.Pin()->Key;
+				const TSharedPtr<FRigTreeElement>* ResultPtr = ItemsSource->FindByPredicate([Key](const TSharedPtr<FRigTreeElement>& Item) -> bool
+				{
+					return Item->Key == Key;
+				});
+				
+				if(ResultPtr)
+				{
+					return *ResultPtr;
+				}
+			}
 		}
 	}
 	return TSharedPtr<FRigTreeElement>();

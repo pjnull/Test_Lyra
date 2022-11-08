@@ -238,8 +238,16 @@ bool FOnlineSubsystemEOS::PlatformCreate()
 	PlatformOptions.Flags = bOverlayAllowed ? OverlayFlags : EOS_PF_DISABLE_OVERLAY;
 	// Make the cache directory be in the user's writable area
 
-	const FString CacheDir = EOSSDKManager->GetCacheDirBase() / ArtifactName / EOSSettings.CacheDir;
-	FCStringAnsi::Strncpy(PlatformOptions.CacheDirectoryAnsi, TCHAR_TO_UTF8(*CacheDir), EOS_OSS_STRING_BUFFER_LENGTH);
+	if (FPlatformMisc::IsCacheStorageAvailable())
+	{
+		const FString CacheDir = EOSSDKManager->GetCacheDirBase() / ArtifactName / EOSSettings.CacheDir;
+		FCStringAnsi::Strncpy(PlatformOptions.CacheDirectoryAnsi, TCHAR_TO_UTF8(*CacheDir), EOS_OSS_STRING_BUFFER_LENGTH);
+	}
+	else
+	{
+		PlatformOptions.CacheDirectory = nullptr;
+	}
+
 	FCStringAnsi::Strncpy(PlatformOptions.EncryptionKeyAnsi, TCHAR_TO_UTF8(*ArtifactSettings.EncryptionKey), EOS_ENCRYPTION_KEY_MAX_BUFFER_LEN);
 
 #if WITH_EOS_RTC
@@ -409,8 +417,17 @@ bool FOnlineSubsystemEOS::Init()
 	UserManager = MakeShareable(new FUserManagerEOS(this));
 	UserManager->Init();
 	SessionInterfacePtr = MakeShareable(new FOnlineSessionEOS(this));
-	// Set the bucket id to use for all sessions based upon the name and version to avoid upgrade issues
-	SessionInterfacePtr->Init(EOSSDKManager->GetProductName() + TEXT("_") + FString::FromInt(GetBuildUniqueId()));
+	// Set the bucket id to use for all sessions based upon the Build Id to avoid upgrade issues
+	FString BucketIdStr = FString::FromInt(GetBuildUniqueId());
+	if (BucketIdStr.Len() > EOS_OSS_BUCKET_ID_STRING_LENGTH)
+	{
+		FString NewBucketIdStr = BucketIdStr.Left(EOS_OSS_BUCKET_ID_STRING_LENGTH);
+
+		UE_LOG_ONLINE(Warning, TEXT("[FOnlineSubsystemEOS::Init] Default BucketId [%s] is too long (%d characters) and will be shortened to fit the limit (%d characters). New BucketId is [%s]"), *BucketIdStr, BucketIdStr.Len(), EOS_OSS_BUCKET_ID_STRING_LENGTH, *NewBucketIdStr);
+
+		BucketIdStr = MoveTemp(NewBucketIdStr);		
+	}
+	SessionInterfacePtr->Init(BucketIdStr);
 	StatsInterfacePtr = MakeShareable(new FOnlineStatsEOS(this));
 	LeaderboardsInterfacePtr = MakeShareable(new FOnlineLeaderboardsEOS(this));
 	AchievementsInterfacePtr = MakeShareable(new FOnlineAchievementsEOS(this));

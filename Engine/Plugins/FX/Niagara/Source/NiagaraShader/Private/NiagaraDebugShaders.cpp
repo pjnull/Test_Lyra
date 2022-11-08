@@ -9,6 +9,7 @@
 
 #include "PipelineStateCache.h"
 #include "RenderGraphBuilder.h"
+#include "RenderGraphUtils.h"
 #include "ScreenPass.h"
 
 int GNiagaraGpuComputeDebug_ShowNaNInf = 1;
@@ -200,8 +201,8 @@ void NiagaraDebugShaders::DrawDebugLines(
 	const uint32 LineInstanceCount, FRDGBufferRef LineBuffer
 )
 {
-	TShaderMapRef<FNiagaraDebugDrawLineVS> VertexShader(View.ShaderMap);
-	TShaderMapRef<FNiagaraDebugDrawLinePS> PixelShader(View.ShaderMap);
+	TShaderMapRef<FNiagaraDebugDrawLineVS> VertexShader(GetGlobalShaderMap(View.GetFeatureLevel()));
+	TShaderMapRef<FNiagaraDebugDrawLinePS> PixelShader(GetGlobalShaderMap(View.GetFeatureLevel()));
 
 	FNiagaraDebugDrawLineParameters* PassParameters = GraphBuilder.AllocParameters<FNiagaraDebugDrawLineParameters>();
 	PassParameters->VSParameters.View					= View.ViewUniformBuffer;
@@ -243,8 +244,8 @@ void NiagaraDebugShaders::DrawDebugLines(
 
 void NiagaraDebugShaders::DrawDebugLines(FRDGBuilder& GraphBuilder, const FViewInfo& View, FRDGTextureRef SceneColor, FRDGTextureRef SceneDepth, FRDGBufferRef ArgsBuffer, FRDGBufferRef LineBuffer)
 {
-	TShaderMapRef<FNiagaraDebugDrawLineVS> VertexShader(View.ShaderMap);
-	TShaderMapRef<FNiagaraDebugDrawLinePS> PixelShader(View.ShaderMap);
+	TShaderMapRef<FNiagaraDebugDrawLineVS> VertexShader(GetGlobalShaderMap(View.GetFeatureLevel()));
+	TShaderMapRef<FNiagaraDebugDrawLinePS> PixelShader(GetGlobalShaderMap(View.GetFeatureLevel()));
 
 	FNiagaraDebugDrawLineIndirectParameters* PassParameters = GraphBuilder.AllocParameters<FNiagaraDebugDrawLineIndirectParameters>();
 	PassParameters->AccessIndirectDrawArgsBuffer		= ArgsBuffer;

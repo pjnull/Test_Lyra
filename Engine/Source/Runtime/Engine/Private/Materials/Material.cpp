@@ -78,6 +78,9 @@
 #include "Materials/MaterialExpressionDivide.h"
 #include "Materials/MaterialExpressionComponentMask.h"
 #include "Materials/MaterialExpressionSingleLayerWaterMaterialOutput.h"
+#include "Materials/MaterialExpressionVolumetricAdvancedMaterialInput.h"
+#include "Materials/MaterialExpressionVolumetricAdvancedMaterialOutput.h"
+#include "Materials/MaterialExpressionCloudLayer.h"
 #include "Materials/MaterialExpressionStrata.h"
 #include "Materials/StrataMaterial.h"
 #include "Materials/MaterialExpressionThinTranslucentMaterialOutput.h"
@@ -988,6 +991,7 @@ UMaterial::UMaterial(const FObjectInitializer& ObjectInitializer)
 	BlendableOutputAlpha = false;
 	bIsBlendable = true;
 	bEnableStencilTest = false;
+	bUsedWithVolumetricCloud = false;
 
 	bUseEmissiveForDynamicAreaLighting = false;
 	RefractionDepthBias = 0.0f;
@@ -1363,6 +1367,7 @@ bool UMaterial::GetUsageByFlag(EMaterialUsage Usage) const
 		case MATUSAGE_LidarPointCloud: UsageValue = bUsedWithLidarPointCloud; break;
 		case MATUSAGE_VirtualHeightfieldMesh: UsageValue = bUsedWithVirtualHeightfieldMesh; break;
 		case MATUSAGE_Nanite: UsageValue = bUsedWithNanite; break;
+		case MATUSAGE_VolumetricCloud: UsageValue = bUsedWithVolumetricCloud; break;
 		default: UE_LOG(LogMaterial, Fatal,TEXT("Unknown material usage: %u"), (int32)Usage);
 	};
 	return UsageValue;
@@ -1474,6 +1479,13 @@ bool UMaterial::SetTextureParameterValueEditorOnly(FName ParameterName, class UT
 }
 
 bool UMaterial::SetRuntimeVirtualTextureParameterValueEditorOnly(FName ParameterName, class URuntimeVirtualTexture* InValue)
+{
+	FMaterialParameterMetadata Meta;
+	Meta.Value = InValue;
+	return SetParameterValueEditorOnly(ParameterName, Meta);
+}
+
+bool UMaterial::SetSparseVolumeTextureParameterValueEditorOnly(FName ParameterName, class USparseVolumeTexture* InValue)
 {
 	FMaterialParameterMetadata Meta;
 	Meta.Value = InValue;
@@ -1599,6 +1611,10 @@ void UMaterial::SetUsageByFlag(EMaterialUsage Usage, bool NewValue)
 		{
 			bUsedWithNanite = NewValue; break;
 		}
+		case MATUSAGE_VolumetricCloud:
+		{
+			bUsedWithVolumetricCloud = NewValue; break;
+		}
 		default: UE_LOG(LogMaterial, Fatal, TEXT("Unknown material usage: %u"), (int32)Usage);
 	};
 #if WITH_EDITOR
@@ -1631,6 +1647,7 @@ FString UMaterial::GetUsageName(EMaterialUsage Usage) const
 		case MATUSAGE_LidarPointCloud: UsageName = TEXT("bUsedWithLidarPointCloud"); break;
 		case MATUSAGE_VirtualHeightfieldMesh: UsageName = TEXT("bUsedWithVirtualHeightfieldMesh"); break;
 		case MATUSAGE_Nanite: UsageName = TEXT("bUsedWithNanite"); break;
+		case MATUSAGE_VolumetricCloud: UsageName = TEXT("bUsedWithVolumetricCloud"); break;
 		default: UE_LOG(LogMaterial, Fatal,TEXT("Unknown material usage: %u"), (int32)Usage);
 	};
 	return UsageName;
@@ -2759,12 +2776,8 @@ void UMaterial::Serialize(FArchive& Ar)
 
 			// Now force the material to recompile and we use a hash of the original StateId.
 			// This is to avoid having different StateId each time we load the material and to not forever recompile it,i.e. use a cached version.
-			uint32 HashBuffer[5];
-			FSHA1::HashBuffer(&StateId, sizeof(FGuid), reinterpret_cast<uint8*>(HashBuffer));
-			StateId.A = HashBuffer[0];
-			StateId.B = HashBuffer[1];
-			StateId.C = HashBuffer[2];
-			StateId.D = HashBuffer[3];
+			static FGuid VolumeExtinctionBecomesRGBConversionGuid(TEXT("2768E88D-9B58-4C53-9CB9-75696D1DF0CD"));
+			ReleaseResourcesAndMutateDDCKey(VolumeExtinctionBecomesRGBConversionGuid);
 		}
 	}
 #endif // WITH_EDITORONLY_DATA
@@ -3131,12 +3144,59 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 		UMaterialExpressionBreakMaterialAttributes* BreakMatAtt = NewObject<UMaterialExpressionBreakMaterialAttributes>(this);
 		MoveConnectionTo(EditorOnly->MaterialAttributes, BreakMatAtt, 0);
 
+		// Check if Anisotropy input is actually used/connected
+		// This is needed/important as if anisotropy is connected a converted material becomes 'complex' instead of 'single'. 
+		// Since this path uses material attributes, there is no direct way to evaluate if anisotropy is connected or not. To find this,
+		// we loop over all the material attribute make/set nodes to figure out if the anisotropy value is ever set.
+		bool bIsAnisotropyConnected = false;
+		{
+			// Gather 'make' attributes nodes
+			{
+				TArray<UMaterialExpressionMakeMaterialAttributes*> MakeAttributeExpressions;
+				GetAllExpressionsInMaterialAndFunctionsOfType<UMaterialExpressionMakeMaterialAttributes>(MakeAttributeExpressions);
+				for (UMaterialExpressionMakeMaterialAttributes* Expression : MakeAttributeExpressions)
+				{
+					bIsAnisotropyConnected = Expression->GetExpressionInput(MP_Anisotropy) != nullptr;
+					if (bIsAnisotropyConnected)
+					{
+						break;
+					}
+				}
+			}
+
+			// Gather 'set' attributes nodes
+			if (!bIsAnisotropyConnected)
+			{
+				const FGuid AnisotropyGuid = FMaterialAttributeDefinitionMap::GetID(MP_Anisotropy);
+				TArray<UMaterialExpressionSetMaterialAttributes*> SetAttributeExpressions;
+				GetAllExpressionsInMaterialAndFunctionsOfType<UMaterialExpressionSetMaterialAttributes>(SetAttributeExpressions);
+				for (UMaterialExpressionSetMaterialAttributes* Expression : SetAttributeExpressions)
+				{
+					for (const FGuid& AttributeGuid : Expression->AttributeSetTypes)
+					{
+						if (AttributeGuid == AnisotropyGuid)
+						{
+							bIsAnisotropyConnected = true;
+							break;
+						}
+					}
+					if (bIsAnisotropyConnected)
+					{
+						break;
+					}
+				}
+			}
+		}
+
 		ConvertNode = NewObject<UMaterialExpressionStrataLegacyConversion>(this);
 		ConvertNode->BaseColor.Connect(0, BreakMatAtt);
 		ConvertNode->Metallic.Connect(1, BreakMatAtt);
 		ConvertNode->Specular.Connect(2, BreakMatAtt);
 		ConvertNode->Roughness.Connect(3, BreakMatAtt);
-		ConvertNode->Anisotropy.Connect(4, BreakMatAtt);
+		if (bIsAnisotropyConnected)
+		{
+			ConvertNode->Anisotropy.Connect(4, BreakMatAtt);
+		}
 		ConvertNode->EmissiveColor.Connect(5, BreakMatAtt);
 		ConvertNode->Normal.Connect(8, BreakMatAtt);
 		ConvertNode->Tangent.Connect(9, BreakMatAtt);
@@ -3470,12 +3530,8 @@ void UMaterial::ConvertMaterialToStrataMaterial()
 	{
 		// Now force the material to recompile and we use a hash of the original StateId.
 		// This is to avoid having different StateId each time we load the material and to not forever recompile it, i.e. use a cached version.
-		uint32 HashBuffer[5];
-		FSHA1::HashBuffer(&StateId, sizeof(FGuid), reinterpret_cast<uint8*>(HashBuffer));
-		StateId.A = HashBuffer[0];
-		StateId.B = HashBuffer[1];
-		StateId.C = HashBuffer[2];
-		StateId.D = HashBuffer[3];
+		static FGuid LegacyToStrataConversionGuid(TEXT("0DAD35FE-21AE-4274-8B41-6C9D47285D8A"));
+		ReleaseResourcesAndMutateDDCKey(LegacyToStrataConversionGuid);
 	}
 
 	// For rebuild the shading mode since we have change it
@@ -3772,6 +3828,20 @@ void UMaterial::PostLoad()
 	}
 
 #endif // WITH_EDITOR
+
+#if WITH_EDITORONLY_DATA
+	if (MaterialDomain == MD_Volume && UE5MainVer < FUE5MainStreamObjectVersion::MaterialHasIsUsedWithVolumetricCloudFlag)
+	{
+		bUsedWithVolumetricCloud = HasAnyExpressionsInMaterialAndFunctionsOfType<UMaterialExpressionCloudSampleAttribute>()
+								|| HasAnyExpressionsInMaterialAndFunctionsOfType<UMaterialExpressionVolumetricAdvancedMaterialOutput>()
+								|| HasAnyExpressionsInMaterialAndFunctionsOfType<UMaterialExpressionVolumetricAdvancedMaterialInput>();
+		if (bUsedWithVolumetricCloud)
+		{
+			static FGuid BackwardsCompatibilityUsedWithVolumetricCloudConversionGuid(TEXT("6F6336BF-D377-4FA5-9887-A7457BE6DE92"));
+			ReleaseResourcesAndMutateDDCKey(BackwardsCompatibilityUsedWithVolumetricCloudConversionGuid);
+		}
+	}
+#endif
 
 	// Strata materials conversion needs to be done after expressions are cached, otherwise material function won't have 
 	// valid inputs in certain cases
@@ -4199,7 +4269,7 @@ bool UMaterial::CanEditChange(const FProperty* InProperty) const
 
 		if (FCString::Strncmp(*PropertyName, TEXT("bUsedWith"), 9) == 0)
 		{
-			return MaterialDomain == MD_DeferredDecal || MaterialDomain == MD_Surface;
+			return MaterialDomain == MD_DeferredDecal || MaterialDomain == MD_Surface || MaterialDomain == MD_Volume;
 		}
 		else if (PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UMaterial, bUsesDistortion))
 		{
@@ -5864,9 +5934,9 @@ bool UMaterial::RecursiveGetExpressionChain(
 						{
 							bool bUseInputA = StaticSwitchExp->DefaultValue;
 							FName StaticSwitchExpName = StaticSwitchExp->ParameterName;
-							for (int32 CheckIdx = 0; CheckIdx < InStaticParameterSet->EditorOnly.StaticSwitchParameters.Num(); CheckIdx++)
+							for (int32 CheckIdx = 0; CheckIdx < InStaticParameterSet->StaticSwitchParameters.Num(); CheckIdx++)
 							{
-								FStaticSwitchParameter& SwitchParam = InStaticParameterSet->EditorOnly.StaticSwitchParameters[CheckIdx];
+								FStaticSwitchParameter& SwitchParam = InStaticParameterSet->StaticSwitchParameters[CheckIdx];
 								if (SwitchParam.ParameterInfo.Name == StaticSwitchExpName)
 								{
 									// Found it...

@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "TakeRecorderLevelVisibilitySource.h"
+#include "AssetRegistry/AssetData.h"
 #include "TakesUtils.h"
 
 #include "TakeRecorderSources.h"
@@ -59,7 +60,7 @@ UTakeRecorderLevelVisibilitySource::UTakeRecorderLevelVisibilitySource(const FOb
 	: Super(ObjInit)
 {}
 
-TArray<UTakeRecorderSource*> UTakeRecorderLevelVisibilitySource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InMasterSequence, FManifestSerializer* InManifestSerializer)
+TArray<UTakeRecorderSource*> UTakeRecorderLevelVisibilitySource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InRootSequence, FManifestSerializer* InManifestSerializer)
 {
 	UWorld* World = TakeRecorderSourcesUtils::GetSourceWorld(InSequence);
 
@@ -91,17 +92,17 @@ TArray<UTakeRecorderSource*> UTakeRecorderLevelVisibilitySource::PreRecording(UL
 	}
 
 	UMovieScene* MovieScene = InSequence->GetMovieScene();
-	for (auto MasterTrack : MovieScene->GetMasterTracks())
+	for (auto Track : MovieScene->GetTracks())
 	{
-		if (MasterTrack->IsA(UMovieSceneLevelVisibilityTrack::StaticClass()) && MasterTrack->GetDisplayName().EqualTo(LevelVisibilityTrackName))
+		if (Track->IsA(UMovieSceneLevelVisibilityTrack::StaticClass()) && Track->GetDisplayName().EqualTo(LevelVisibilityTrackName))
 		{
-			CachedLevelVisibilityTrack = Cast<UMovieSceneLevelVisibilityTrack>(MasterTrack);
+			CachedLevelVisibilityTrack = Cast<UMovieSceneLevelVisibilityTrack>(Track);
 		}
 	}
 
 	if (!CachedLevelVisibilityTrack.IsValid())
 	{
-		CachedLevelVisibilityTrack = MovieScene->AddMasterTrack<UMovieSceneLevelVisibilityTrack>();
+		CachedLevelVisibilityTrack = MovieScene->AddTrack<UMovieSceneLevelVisibilityTrack>();
 		CachedLevelVisibilityTrack->SetDisplayName(LevelVisibilityTrackName);
 	}
 
@@ -141,7 +142,7 @@ void UTakeRecorderLevelVisibilitySource::AddContentsToFolder(UMovieSceneFolder* 
 {
 	if (CachedLevelVisibilityTrack.IsValid())
 	{
-		InFolder->AddChildMasterTrack(CachedLevelVisibilityTrack.Get());
+		InFolder->AddChildTrack(CachedLevelVisibilityTrack.Get());
 	}
 }
 

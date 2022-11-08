@@ -1,14 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-import { CollapseAllVisibility, DefaultButton, DetailsHeader, DetailsList, DetailsListLayoutMode, DetailsRow, FocusZone, FocusZoneDirection, IColumn, IconButton, IDetailsListProps, mergeStyleSets, PrimaryButton, ScrollablePane, ScrollbarVisibility, SelectionMode, Spinner, SpinnerSize, Stack, Text } from '@fluentui/react';
+import { CollapseAllVisibility, DefaultButton, DetailsHeader, DetailsList, DetailsListLayoutMode, DetailsRow, FocusZone, FocusZoneDirection, FontIcon, IColumn, IconButton, IDetailsListProps, mergeStyleSets, PrimaryButton, ScrollablePane, ScrollbarVisibility, SelectionMode, Spinner, SpinnerSize, Stack, Text } from '@fluentui/react';
 import { action, observable } from 'mobx';
 import { observer } from 'mobx-react-lite';
 import moment from "moment-timezone";
 import { default as React, useEffect, useState } from 'react';
 import { Link, useLocation } from "react-router-dom";
 import backend, { useBackend } from "../backend";
-import { GetIssueResponse, GetStepResponse, JobData, JobQuery, JobStepOutcome, LabelData, LabelOutcome, LabelState, ProjectData, StepData, StreamData } from "../backend/Api";
-import dashboard from "../backend/Dashboard";
+import { GetIssueResponse, GetStepResponse, JobData, JobQuery, JobState, JobStepOutcome, LabelData, LabelOutcome, LabelState, ProjectData, StepData, StreamData } from "../backend/Api";
+import dashboard, { StatusColor } from "../backend/Dashboard";
 import graphCache, { GraphQuery } from '../backend/GraphCache';
 import { useWindowSize } from '../base/utilities/hooks';
 import { displayTimeZone, getElapsedString, getShortNiceTime } from '../base/utilities/timeUtils';
@@ -405,7 +405,7 @@ class UserJobsHandler {
       const maxJobs = 100;
 
       try {
-         let filter = "id,streamId,name,change,preflightChange,templateId,templateHash,graphHash,startedByUserInfo,createTime,state,arguments,updateTime,labels,defaultLabel,batches";
+         let filter = "id,streamId,name,change,preflightChange,templateId,templateHash,graphHash,startedByUserInfo,createTime,state,arguments,updateTime,labels,defaultLabel,batches,autoSubmit,autoSubmitChange,preflightDescription";
 
          const query: JobQuery = {
             filter: filter,
@@ -577,11 +577,12 @@ const JobsPanel: React.FC<{ includeOtherPreflights: boolean }> = observer(({ inc
    let columns: IColumn[] = [
       { key: 'jobview_column1', name: 'Status', minWidth: 16, maxWidth: 16 },
       { key: 'jobview_column2', name: 'Change', minWidth: 220, maxWidth: 220 },
-      { key: 'jobview_column3', name: 'Labels', minWidth: 440, maxWidth: 440 },
-      { key: 'jobview_column4', name: 'Steps', minWidth: 380, maxWidth: 380 },
-      { key: 'jobview_column5', name: 'StartedBy', minWidth: 140, maxWidth: 140 },
-      { key: 'jobview_column6', name: 'Time', minWidth: 130, maxWidth: 130 },
-      { key: 'jobview_column7', name: 'Dismiss', minWidth: 32, maxWidth: 32 },
+      { key: 'jobview_column3', name: 'Submit', minWidth: 140, maxWidth: 140 },
+      { key: 'jobview_column4', name: 'Labels', minWidth: 420, maxWidth: 420 },
+      { key: 'jobview_column5', name: 'Steps', minWidth: 380, maxWidth: 380 },
+      { key: 'jobview_column6', name: 'StartedBy', minWidth: 140, maxWidth: 140 },
+      { key: 'jobview_column7', name: 'Time', minWidth: 130, maxWidth: 130 },
+      { key: 'jobview_column8', name: 'Dismiss', minWidth: 32, maxWidth: 32 },
 
    ];
 
@@ -774,9 +775,48 @@ const JobsPanel: React.FC<{ includeOtherPreflights: boolean }> = observer(({ inc
 
       }
 
-      if (column!.name === "Job") {
-         return <Stack verticalAlign="center" verticalFill={true} tokens={{ childrenGap: 12 }}>
+      if (column!.name === "Submit") {
+         
+         if (!job.autoSubmit) {
+            return null;
+         }
 
+         let message = "";
+         let url = "";
+
+         const colors = dashboard.getStatusColors();
+         let color = colors.get(StatusColor.Ready);
+
+         if (job.state !== JobState.Complete) {
+            message = "Submit Pending";
+            color = colors.get(StatusColor.Running);
+         } else {
+
+            if (!job.autoSubmitChange) {
+               message = "Submit Failed";
+               color = colors.get(StatusColor.Failure);
+            } else {
+               color = colors.get(StatusColor.Success);
+               message = `Submitted\nCL ${job.autoSubmitChange}`;
+               if (dashboard.swarmUrl) {
+                  url = `${dashboard.swarmUrl}/change/${job.autoSubmitChange}`;
+               }
+            }
+         }
+
+         if (!message) {
+            return null;
+         }
+
+         const style = { fontSize: 13, color: color, paddingTop: 2 };
+
+         const icon = <Stack className="horde-no-darktheme"><FontIcon style={style} iconName="Square" /></Stack>;
+
+         return <Stack horizontalAlign="start" verticalAlign="center" verticalFill={true} tokens={{ childrenGap: 12 }}>
+            <Stack horizontal verticalAlign='center' verticalFill={true} tokens={{ childrenGap: 6 }}>
+               {!url && <Stack horizontal verticalAlign='center' verticalFill={true} tokens={{ childrenGap: 8 }}>{icon}<Stack><Text style={{ fontSize: 11 }}>{message}</Text></Stack></Stack>}
+               {!!url && <Stack horizontal verticalAlign='center' verticalFill={true} tokens={{ childrenGap: 8 }}>{icon}<Stack style={{textAlign: "left"}}><a href={url} target="_blank" rel="noreferrer" onClick={ev => ev?.stopPropagation()}><Text variant="tiny" style={{whiteSpace: "pre" }}>{message}</Text></a></Stack></Stack>}
+            </Stack>
          </Stack>
       }
 
@@ -976,7 +1016,7 @@ const JobsPanel: React.FC<{ includeOtherPreflights: boolean }> = observer(({ inc
                   </Stack>
                   <Stack grow />
                   <Stack>
-                     
+
                      {!!jobItems.length && <PrimaryButton text="Clear All" style={{ fontFamily: "Horde Open Sans SemiBold", fontSize: 10, padding: 8, height: "24px", minWidth: "48px" }} onClick={() => { dashboard.clearPinnedJobs() }} />}
                   </Stack>
                </Stack>

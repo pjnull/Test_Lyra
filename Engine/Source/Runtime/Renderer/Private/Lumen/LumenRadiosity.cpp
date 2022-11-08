@@ -223,7 +223,9 @@ namespace LumenRadiosity
 
 	bool UseTemporalAccumulation()
 	{
-		return GLumenRadiosityTemporalAccumulation != 0 && RHIIsTypedUAVLoadSupported(Lumen::GetIndirectLightingAtlasFormat()) && RHIIsTypedUAVLoadSupported(Lumen::GetNumFramesAccumulatedAtlasFormat());
+		return GLumenRadiosityTemporalAccumulation != 0
+			&& UE::PixelFormat::HasCapabilities(Lumen::GetIndirectLightingAtlasFormat(), EPixelFormatCapabilities::TypedUAVLoad)
+			&& UE::PixelFormat::HasCapabilities(Lumen::GetNumFramesAccumulatedAtlasFormat(), EPixelFormatCapabilities::TypedUAVLoad);
 	}
 }
 
@@ -383,6 +385,7 @@ class FLumenRadiosityDistanceFieldTracingCS : public FGlobalShader
 	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+		OutEnvironment.SetDefine(TEXT("USE_GLOBAL_GPU_SCENE_DATA"), 1);
 		OutEnvironment.SetDefine(TEXT("ENABLE_DYNAMIC_SKY_LIGHT"), 1);
 		OutEnvironment.CompilerFlags.Add(CFLAG_Wave32);
 	}
@@ -423,6 +426,11 @@ class FLumenRadiosityHardwareRayTracing : public FLumenHardwareRayTracingShaderB
 		FLumenHardwareRayTracingShaderBase::ModifyCompilationEnvironment(Parameters, ShaderDispatchType, Lumen::ESurfaceCacheSampling::HighResPages, OutEnvironment);
 		OutEnvironment.SetDefine(TEXT("THREADGROUP_SIZE"), GetGroupSize());
 		OutEnvironment.SetDefine(TEXT("ENABLE_DYNAMIC_SKY_LIGHT"), 1);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::LumenMinimal;
 	}
 
 	static int32 GetGroupSize()

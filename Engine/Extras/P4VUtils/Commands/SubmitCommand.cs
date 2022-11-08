@@ -69,7 +69,7 @@ namespace P4VUtils.Commands
 			// Parse command lines
 			if (args.Length < 3)
 			{
-				logger.LogError("Not enough args for command, tool is now exiting");
+				logger.LogError("Error: Not enough args for command, tool is now exiting");
 				return 1;
 			}
 
@@ -81,7 +81,7 @@ namespace P4VUtils.Commands
 			{
 				if (!int.TryParse(args[index], out int changeNumber))
 				{
-					logger.LogError("'{Argument}' is not a numbered changelist, tool is now exiting", args[index]);
+					logger.LogError("Error: '{Argument}' is not a numbered changelist, tool is now exiting", args[index]);
 					return 1;
 				}
 
@@ -90,7 +90,7 @@ namespace P4VUtils.Commands
 
 			if (changelistsToSubmit.Count == 0)
 			{
-				logger.LogError("No changelists to submit were provided, tool is now exiting");
+				logger.LogError("Error: No changelists to submit were provided, tool is now exiting");
 				return 1;
 			}
 
@@ -104,7 +104,7 @@ namespace P4VUtils.Commands
 			using IPerforceConnection perforceConnection = await PerforceConnection.CreateAsync(settings, logger);
 			if (perforceConnection == null)
 			{
-				logger.LogError("Failed to connect to Perforce, tool is now exiting");
+				logger.LogError("Error: Failed to connect to Perforce, tool is now exiting");
 				return 1;
 			}
 
@@ -116,7 +116,7 @@ namespace P4VUtils.Commands
 				int changeNumber = changelistsToSubmit[index];
 				if(await ProcessChangelist(perforceConnection, changeNumber, logger) == false)
 				{
-					logger.LogError("Failed to process {Changelist}, tool is now exiting", changeNumber);
+					logger.LogError("\nError: Failed to process CL {Changelist}, tool is now exiting", changeNumber);
 					return 1;
 				}
 			}
@@ -131,7 +131,7 @@ namespace P4VUtils.Commands
 		{
 			if (perforceConnection == null || perforceConnection.Settings == null || perforceConnection.Settings.ClientName == null)
 			{
-				logger.LogError("Invalid Perforce connection!");
+				logger.LogError("Error: Invalid Perforce connection!");
 				return false;
 			}
 
@@ -154,7 +154,7 @@ namespace P4VUtils.Commands
 				// So we should check for shelved files now and early out before the virtualization process runs.
 				if (await DoesChangelistHaveShelvedFiles(perforceConnection, changeNumber) == true)
 				{
-					logger.LogError("Changelist {Change} has shelved files and cannot be submitted", changeNumber);
+					logger.LogError("Error: Changelist {Change} has shelved files and cannot be submitted", changeNumber);
 					return false;
 				}
 
@@ -176,7 +176,7 @@ namespace P4VUtils.Commands
 					if (!String.IsNullOrEmpty(engineRoot))
 					{
 						logger.NewLine();
-						logger.LogInformation("Attempting to virtualize packages in project '{Project}' via the engine installation '{Engine}'", project.Key, engineRoot);
+						logger.LogInformation("Attempting to virtualize packages in project '{Project}' using the engine installation '{Engine}'", project.Key, engineRoot);
 						// @todo Many projects can share the same engine install, and technically UnrealVirtualizationTool
 						// supports the virtualization files from many projects at the same time. We could consider doing
 						// this pass per engine install rather than per project? At the very least we should only 'build'
@@ -208,7 +208,7 @@ namespace P4VUtils.Commands
 					}
 					else
 					{
-						logger.LogError("Failed to find engine root for project {Project}", project.Key);
+						logger.LogError("Error: Failed to find engine root for project {Project}", project.Key);
 						return false;
 					}
 				}
@@ -235,7 +235,7 @@ namespace P4VUtils.Commands
 					PerforceResponse updateResponse = await perforceConnection.TryUpdateChangeAsync(UpdateChangeOptions.None, changeRecord, CancellationToken.None);
 					if (!updateResponse.Succeeded)
 					{
-						logger.LogError("Failed to remove the virtualization tags!");
+						logger.LogError("Error: Failed to remove the virtualization tags!");
 					}
 					logger.LogInformation("Virtualization tags have been removed.");
 
@@ -271,108 +271,74 @@ namespace P4VUtils.Commands
 		private static async Task<bool> ValidateOrBuildVirtualizationTool(string engineRoot, ILogger logger)
 		{
 			// Check to see if the precompiled binaries for the  editor and virtualization tool are available
-			bool hasEditorPCB = IsPrecompiledVersionAvailable(engineRoot, "UnrealEditor", logger);
-			bool hasToolPCB = IsPrecompiledVersionAvailable(engineRoot, "UnrealVirtualizationTool", logger);
 
-			// If the editor is not a precompiled binary, then we know that the user has compiled it locally.
-			// This means that even if we have a precompiled version of UnrealVirtualizationTool we cannot
-			// use it as it's virtualization process might be 'out of date' compared to the locally compiled
-			// editor.
-			// This means we can only use the precompiled binary for UnrealVirtualizationTool if UnrealEditor
-			// is also a precompiled binary.
-			if (hasEditorPCB && hasToolPCB)
+			if (!IsSourceCodeAvaliable(engineRoot))
 			{
-				logger.LogInformation("Using a precompiled binary version of UnrealVirtualizationTool");
-				return true;
+				if (DoesEngineToolExist(engineRoot, "UnrealVirtualizationTool"))
+				{
+					logger.LogInformation("Using a precompiled binary version of UnrealVirtualizationTool");
+					return true;
+				}
+				else
+				{
+					logger.LogError("Error: No source code and no precompiled binary of UnrealVirtualizationTool found");
+					return false;
+				}
 			}
-			else if (hasToolPCB)
+			else
 			{
-				// Let the user know why we are compiling UnrealVirtualizationTool even though there is a precompiled
-				// version available.
-				logger.LogInformation("Cannot use the precompiled version of UnrealVirtualizationTool as the UnrealEditor has been locally compiled");
-			}
+				// Since we have no good way to determine if an exe was from the PCB or not, if we have
+				// source code we will just have to build the tool anyway for safety.
+				// Once this is fixed we should use the old logic which was to use the PCB version of
+				// UnrealVirtualizationTool if the editor was a PCB version and only to recompile it 
+				// once we detect that the editor has been compiled locally.
 
-			// We must try to build the tool locally, if the user does not have a valid code compilation 
-			// tool chain installed then UnrealBuildTool will give them errors.
-			return await BuildVirtualizationTool(engineRoot, logger);
+				// We must try to build the tool locally, if the user does not have a valid code compilation 
+				// tool chain installed then UnrealBuildTool will give them errors.
+				return await BuildVirtualizationTool(engineRoot, logger);
+			}
 		}
 
 		/// <summary>
-		/// Checks if there is a precompiled version of a given program available for use.
+		/// Checks to see if the user has source code synced or not.
+		/// To make this assumption we check to see if we can find the UnrealBuildTool project. If we can
+		/// then it is a fair bet that the user can compile code, if they do not have the project then
+		/// they probably can't.
 		/// </summary>
 		/// <param name="engineRoot">Root path of the engine we want to build the tool for</param>
-		/// <param name="programName">Name of the program to check for</param>
-		/// <param name="logger">Interface for logging</param>
-		/// <returns>True if there is a version of the program that was precompiled, otherwise false</returns>
-		private static bool IsPrecompiledVersionAvailable(string engineRoot, string programName, ILogger logger)
+		/// <returns>True if source code is present, otherwise false</returns>
+		private static bool IsSourceCodeAvaliable(string engineRoot)
 		{
-			// Depending on how a program is set up it might have a .version file or a .target file that contains info
-			// about the exe itself. From this we can find a JSON property "IsPromotedBuild" which when none zero 
-			// means that the build was precompiled.
-			// This isn't the most robust check but should work for now until we can add an 'offical' codified way to
-			// check for precompiled binaries.
+			string versionPath = String.Format(@"{0}\Engine\Source\Programs\UnrealBuildTool\UnrealBuildTool.csproj", engineRoot);
 
-			// First we check for a .version file for the given program
-			string versionPath = String.Format(@"{0}\Engine\Binaries\Win64\{1}.version", engineRoot, programName);
-			
 			if (System.IO.File.Exists(versionPath))
-			{ 
-				using (StreamReader inputStream = new StreamReader(versionPath))
-				{
-					string jsonObject = inputStream.ReadToEnd();
-
-					BuildVersion? buildVersion = null;
-					try
-					{
-						buildVersion = JsonSerializer.Deserialize<BuildVersion>(jsonObject);
-					}
-					catch (System.Text.Json.JsonException)
-					{
-						// No need to print the exception as the user will not be expected to fix the file, a warning will be shown below
-					}
-
-					if (buildVersion == null || buildVersion.IsPromotedBuild == null)
-					{
-						logger.LogWarning("Unable to read build version from '{FilePath}'", versionPath);
-					}
-					else if (buildVersion.IsPromotedBuild != 0)
-					{
-						return true;
-					}
-				}
-			}
-
-			// We failed to find what we needed from the .version file, so try the .target file instead
-			string targetPath = String.Format(@"{0}\Engine\Binaries\Win64\{1}.target", engineRoot, programName);
-
-			if (System.IO.File.Exists(targetPath))
 			{
-				using (StreamReader inputStream = new StreamReader(targetPath))
-				{
-					string jsonObject = inputStream.ReadToEnd();
-
-					TargetBuildVersion? targetBuildVersion = null;
-					try
-					{
-						targetBuildVersion = JsonSerializer.Deserialize<TargetBuildVersion>(jsonObject);
-					}
-					catch (System.Text.Json.JsonException)
-					{
-						// No need to print the exception as the user will not be expected to fix the file, a warning will be shown below
-					}
-					
-					if (targetBuildVersion == null || targetBuildVersion.Version == null || targetBuildVersion.Version.IsPromotedBuild == null)
-					{
-						logger.LogWarning("Unable to read build version from '{FilePath}'", targetPath);
-					}
-					else if (targetBuildVersion.Version.IsPromotedBuild != 0)
-					{
-						return true;
-					}
-				}
+				return true;
 			}
+			else
+			{
+				return false;
+			}
+		}
 
-			return false;
+		/// <summary>
+		/// Checks if the given tool exists in the engine binaries or not
+		/// </summary>
+		/// <param name="engineRoot">Root path of the engine we want to build the tool for</param>
+		/// <param name="toolName">The name of the tool to look for</param>
+		/// <returns>TRue if the exe for the tool already exists, otherwise false</returns>
+		private static bool DoesEngineToolExist(string engineRoot, string toolName)
+		{
+			string toolPath = String.Format(@"{0}\Engine\Binaries\Win64\{1}.exe", engineRoot, toolName);
+
+			if (System.IO.File.Exists(toolPath))
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
 
 		/// <summary>
@@ -412,7 +378,7 @@ namespace P4VUtils.Commands
 						await bufferedOutput.CopyToAsync(stdOutput, CancellationToken.None);
 					}
 
-					logger.LogError("Failed to build UnrealVirtualizationTool");
+					logger.LogError("Error: Failed to build UnrealVirtualizationTool");
 					return false;
 				}
 			}
@@ -444,7 +410,7 @@ namespace P4VUtils.Commands
 
 				if (Process.ExitCode != 0)
 				{
-					logger.LogError("UnrealVirtualizationTool failed!");
+					logger.LogError("Error: UnrealVirtualizationTool failed!");
 					return false;
 				}
 			}
@@ -530,15 +496,19 @@ namespace P4VUtils.Commands
 			bool successfulSubmit = submitResponses.All(x => x.Succeeded);
 			if (successfulSubmit)
 			{
-				// @todo The submit API really should return the number that the changelist was finally submit as so that
-				// we can log that here instead.
-				logger.LogInformation("Successfully submited changelist {Change}", changeNumber);
+				// The submit request will return a number of records. One for the original changelist (null)
+				// one for each submitted file (all null) and the last record detailing the submitted changelist.
+				// So we can just grab the submitted changelist number from the last record.
+
+				PerforceResponse<SubmitRecord> submittedResponse = submitResponses[submitResponses.Count - 1];
+				logger.LogInformation("Successfully submited CL {SrcCL} as CL {DstCL}", changeNumber, submittedResponse.Data.SubmittedChangeNumber);
+				
 				return true;
 			}
 			else
 			{
 				// Log every response that was a failure and has an error message associated with it
-				logger.LogError("ERROR - Submit failed due to:");
+				logger.LogError("Error: Submit failed due to:");
 				foreach (PerforceResponse<SubmitRecord> response in submitResponses)
 				{
 					if (response.Failed && response.Error != null)
@@ -570,7 +540,7 @@ namespace P4VUtils.Commands
 			}
 			catch (Exception)
 			{
-				logger.LogError("Failed to get the description {Change} so we can edit it", changeNumber);
+				logger.LogError("Error: Failed to get the description {Change} so we can edit it", changeNumber);
 				return null;
 			}
 
@@ -588,7 +558,7 @@ namespace P4VUtils.Commands
 			}
 			else
 			{
-				logger.LogError("Failed to edit the description of {Change} due to\n{Message}", changeNumber, updateResponse.Error!.ToString());
+				logger.LogError("Error: Failed to edit the description of {Change} due to\n{Message}", changeNumber, updateResponse.Error!.ToString());
 				return null;
 			}
 		}
@@ -610,13 +580,13 @@ namespace P4VUtils.Commands
 			}
 			catch (Exception)
 			{
-				logger.LogError("Failed to find changelist {Change}", changeNumber);
+				logger.LogError("Error: Failed to find changelist {Change}", changeNumber);
 				return null;
 			}
 
 			if (changeRecord.Files.Count == 0)
 			{
-				logger.LogError("Changelist {Change} is empty, cannot submit", changeNumber);
+				logger.LogError("Error: Changelist {Change} is empty, cannot submit", changeNumber);
 				return null;
 			}
 
@@ -734,7 +704,7 @@ namespace P4VUtils.Commands
 			if (!String.IsNullOrEmpty(engineIdentifier))
 			{
 				string engineRoot = GetEngineRootDirFromIdentifier(engineIdentifier, logger);
-				if (!String.IsNullOrEmpty(engineIdentifier))
+				if (!String.IsNullOrEmpty(engineRoot))
 				{
 					return engineRoot;
 				}
@@ -811,7 +781,7 @@ namespace P4VUtils.Commands
 			}
 			catch (Exception ex)
 			{
-				logger.LogError("Failed to parse {File} to find the engine association due to: {Reason}", projectFilePath, ex.Message);
+				logger.LogError("Error: Failed to parse {File} to find the engine association due to: {Reason}", projectFilePath, ex.Message);
 			}
 
 			// @todo In the native version if there is no identifier we will try to

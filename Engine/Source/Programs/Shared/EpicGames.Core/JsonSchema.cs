@@ -303,7 +303,7 @@ namespace EpicGames.Core
 
 			string selector = $"//member[@name='P:{type.FullName}.{name}']/summary";
 
-			XmlNode node = xmlDoc.SelectSingleNode(selector);
+			XmlNode? node = xmlDoc.SelectSingleNode(selector);
 			if (node == null)
 			{
 				return null;
@@ -359,6 +359,10 @@ namespace EpicGames.Core
 			if (type == typeof(DateTime) || type == typeof(DateTimeOffset))
 			{
 				return new JsonSchemaString(JsonSchemaStringFormat.DateTime);
+			}
+			if (type == typeof(TimeSpan))
+			{
+				return new JsonSchemaString();
 			}
 
 			Type[] interfaceTypes = type.GetInterfaces();

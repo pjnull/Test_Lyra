@@ -29,8 +29,10 @@ class ENGINE_API ASkeletalMeshActor : public AActor
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Animation, AdvancedDisplay)
 	uint32 bShouldDoAnimNotifies:1;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	uint32 bWakeOnLevelStart_DEPRECATED:1;
+#endif
 
 private:
 	UPROPERTY(Category = SkeletalMeshActor, VisibleAnywhere, BlueprintReadOnly, meta = (ExposeFunctionCategories = "Mesh,Components|SkeletalMesh,Animation,Physics", AllowPrivateAccess = "true"))
@@ -83,9 +85,6 @@ public:
 	//~ End AActor Interface
 
 private:
-	// utility function to see if it can play animation or not
-	bool CanPlayAnimation(class UAnimSequenceBase* AnimAssetBase=NULL) const;
-
 	// currently actively playing montage
 	TMap<FName, TWeakObjectPtr<class UAnimMontage>> CurrentlyPlayingMontages;
 

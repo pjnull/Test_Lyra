@@ -900,6 +900,7 @@ void UControlRigBlueprint::PostLoad()
 		PatchBoundVariables();
 		PatchPropagateToChildren();
 		PatchParameterNodesOnLoad();
+		PatchLinksWithCast();
 
 #if WITH_EDITOR
 
@@ -2099,6 +2100,8 @@ TArray<FString> UControlRigBlueprint::GeneratePythonCommands(const FString InNew
 	InternalCommands.Add(TEXT("library_controller = blueprint.get_controller(library)"));
 	InternalCommands.Add(TEXT("hierarchy = blueprint.hierarchy"));
 	InternalCommands.Add(TEXT("hierarchy_controller = hierarchy.get_controller()"));
+	InternalCommands.Add(TEXT("blueprint.set_auto_vm_recompile(False)"));
+	
 
 	// Hierarchy
 	InternalCommands.Append(Hierarchy->GetController(true)->GeneratePythonCommands());
@@ -2244,6 +2247,7 @@ TArray<FString> UControlRigBlueprint::GeneratePythonCommands(const FString InNew
 					{
 
 						bool bHitFirstExecute = false;
+						bool bRenamedExecute = false;
 						for (auto Pin : EntryNode->GetPins())
 						{
 							if (Pin->GetDirection() != ERigVMPinDirection::Output)
@@ -2256,6 +2260,14 @@ TArray<FString> UControlRigBlueprint::GeneratePythonCommands(const FString InNew
 								if(!bHitFirstExecute)
 								{
 									bHitFirstExecute = true;
+									if (Pin->GetName() != FRigVMStruct::ExecuteContextName.ToString())
+									{
+										bRenamedExecute = true;
+										InternalCommands.Add(FString::Printf(TEXT("blueprint.get_controller_by_name('%s').rename_exposed_pin('%s', '%s')"),
+											*Graph->GetGraphName(),
+											*FRigVMStruct::ExecuteContextName.ToString(),
+											*Pin->GetName()));
+									}
 									continue;
 								}
 							}
@@ -2283,6 +2295,14 @@ TArray<FString> UControlRigBlueprint::GeneratePythonCommands(const FString InNew
 								if(!bHitFirstExecute)
 								{
 									bHitFirstExecute = true;
+									if (!bRenamedExecute && Pin->GetName() != FRigVMStruct::ExecuteContextName.ToString())
+									{
+										bRenamedExecute = true;
+										InternalCommands.Add(FString::Printf(TEXT("blueprint.get_controller_by_name('%s').rename_exposed_pin('%s', '%s')"),
+											*Graph->GetGraphName(),
+											*FRigVMStruct::ExecuteContextName.ToString(),
+											*Pin->GetName()));
+									}
 									continue;
 								}
 							}
@@ -2314,6 +2334,8 @@ TArray<FString> UControlRigBlueprint::GeneratePythonCommands(const FString InNew
 	InternalCommands.Add(FString::Printf(TEXT("blueprint.set_preview_mesh(unreal.load_object(name='%s', outer=None))"),
 		*PreviewMeshPath));
 #endif
+
+	InternalCommands.Add(TEXT("blueprint.set_auto_vm_recompile(True)"));
 
 	// Split multiple commands into different array elements
 	TArray<FString> InnerFunctionCmds;
@@ -2652,6 +2674,10 @@ void UControlRigBlueprint::PostTransacted(const FTransactionObjectEvent& Transac
 		if (PropertiesChanged.Contains(GET_MEMBER_NAME_CHECKED(UControlRigBlueprint, RigVMClient)) ||
 			PropertiesChanged.Contains(GET_MEMBER_NAME_CHECKED(UControlRigBlueprint, UbergraphPages)))
 		{
+			UbergraphPages.RemoveAll([](const UEdGraph* UberGraph) -> bool
+			{
+ 				return UberGraph == nullptr || !IsValid(UberGraph);
+			});
 			RigVMClient.PostTransacted(TransactionEvent);
 
 			RecompileVM();
@@ -4518,6 +4544,64 @@ void UControlRigBlueprint::PatchTemplateNodesWithPreferredPermutation()
 #endif
 }
 
+void UControlRigBlueprint::PatchLinksWithCast()
+{
+#if WITH_EDITOR
+
+	{
+		TGuardValue<bool> DisableAutoCompile(bAutoRecompileVM, false);
+
+		// find all links containing a cast
+		TArray<TTuple<URigVMGraph*,TWeakObjectPtr<URigVMLink>,FString,FString>> LinksWithCast;
+		for (URigVMGraph* Graph : GetAllModels())
+		{
+			for(URigVMLink* Link : Graph->GetLinks())
+			{
+				const URigVMPin* SourcePin = Link->GetSourcePin();
+				const URigVMPin* TargetPin = Link->GetTargetPin();
+				const TRigVMTypeIndex SourceTypeIndex = SourcePin->GetTypeIndex();
+				const TRigVMTypeIndex TargetTypeIndex = TargetPin->GetTypeIndex();
+
+				if(SourceTypeIndex != TargetTypeIndex)
+				{
+					if(!FRigVMRegistry::Get().CanMatchTypes(SourceTypeIndex, TargetTypeIndex, true))
+					{
+						LinksWithCast.Emplace(Graph, TWeakObjectPtr<URigVMLink>(Link), SourcePin->GetPinPath(), TargetPin->GetPinPath());
+					}
+				}
+			}
+		}
+
+		// remove all of those links
+		for(const auto& Tuple : LinksWithCast)
+		{
+			URigVMController* Controller = GetController(Tuple.Get<0>());
+
+			if(URigVMLink* Link = Tuple.Get<1>().Get())
+			{
+				// the link may be detached, attach it first so that removal works.
+				const URigVMPin* SourcePin = Link->GetSourcePin();
+				URigVMPin* TargetPin = Link->GetTargetPin();
+				if(!SourcePin->IsLinkedTo(TargetPin))
+				{
+					const TArray<URigVMLink*> LinksToReattach = {Link};
+					Controller->ReattachLinksToPinObjects(true, &LinksToReattach, true, false, false);
+				}
+			}
+			
+			Controller->BreakLink(Tuple.Get<2>(), Tuple.Get<3>(), false);
+
+			// notify the user that the link has been broken.
+			UE_LOG(LogControlRigDeveloper, Warning,
+				TEXT("A link was removed in %s (%s) - it contained different types on source and target pin (former cast link?)."),
+				*Controller->GetGraph()->GetNodePath(),
+				*URigVMLink::GetPinPathRepresentation(Tuple.Get<2>(), Tuple.Get<3>())
+			);
+		}
+	}
+#endif
+}
+
 void UControlRigBlueprint::PropagatePoseFromInstanceToBP(UControlRig* InControlRig)
 {
 	check(InControlRig);
@@ -4719,6 +4803,7 @@ void UControlRigBlueprint::HandleHierarchyModified(ERigHierarchyNotification InN
 		}
 		case ERigHierarchyNotification::ElementAdded:
 		case ERigHierarchyNotification::ParentChanged:
+		case ERigHierarchyNotification::ElementReordered:
 		case ERigHierarchyNotification::HierarchyReset:
 		{
 			Modify();

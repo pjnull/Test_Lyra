@@ -362,6 +362,7 @@ protected:
 
 		// -- Create Overlays
 		const int32 NumUVLayers = MeshIn.NumUVLayers();
+		const int32 NumWeightMaps = MeshIn.NumWeightMapLayers();
 
 		MeshOut.EnableAttributes(); // by default 1-UV layer and 1-normal layer
 
@@ -384,17 +385,20 @@ protected:
 		}
 
 		// create UV overlays 
-		MeshOut.Attributes()->SetNumUVLayers(NumUVLayers);
+		MeshOut.Attributes()->SetNumUVLayers(FMath::Max(1, NumUVLayers));
 		// reserve space in any new UV layers.
-		for (int32 i = 1; i < NumUVLayers; ++i)
+		for (int32 i = 1; i < NumUVLayers; ++i)		//-V654 //-V621 (The static analyzer complains if it knows NumUVLayers is 0 for a given SrcMeshType)
 		{
 			MeshOut.Attributes()->GetUVLayer(i)->InitializeTriangles(MeshOut.MaxTriangleID());
 		}
 
 		// create color overlay
-		MeshOut.Attributes()->EnablePrimaryColors();
-		ColorOverlay = MeshOut.Attributes()->PrimaryColors();
-		ColorOverlay->InitializeTriangles(MeshOut.MaxTriangleID());
+		if (MeshIn.HasColors())
+		{
+			MeshOut.Attributes()->EnablePrimaryColors();
+			ColorOverlay = MeshOut.Attributes()->PrimaryColors();
+			ColorOverlay->InitializeTriangles(MeshOut.MaxTriangleID());
+		}
 
 		// always enable Material ID if there are any attributes
 		MeshOut.Attributes()->EnableMaterialID();
@@ -407,7 +411,7 @@ protected:
 
 
 		// populate UV overlays
-		for (int UVLayerIndex = 0; UVLayerIndex < NumUVLayers; UVLayerIndex++)
+		for (int UVLayerIndex = 0; UVLayerIndex < NumUVLayers; UVLayerIndex++)	//-V654 //-V621 (The static analyzer complains if it knows NumUVLayers is 0 for a given SrcMeshType)
 		{
 			auto UVFuture = Async(EAsyncExecution::ThreadPool, [&, UVLayerIndex]()
 				{
@@ -503,6 +507,28 @@ protected:
 				});
 			Pending.Add(MoveTemp(MaterialFuture));
 		}
+
+		//populate WeightMap attribute
+		MeshOut.Attributes()->SetNumWeightLayers(NumWeightMaps);
+		for (int WeightMapIndex = 0; WeightMapIndex < NumWeightMaps; WeightMapIndex++)	//-V654 //-V621 (The static analyzer complains if it knows NumWeightMaps is 0 for a given SrcMeshType)
+		{
+			auto WeightMapFuture = Async(EAsyncExecution::ThreadPool, [this, &MeshIn, &MeshOut, WeightMapIndex]()
+			{
+				FDynamicMeshWeightAttribute* WeightMapAttrib = MeshOut.Attributes()->GetWeightLayer(WeightMapIndex);
+
+				for (int32 VertexID : MeshOut.VertexIndicesItr())
+				{
+					SrcVertIDType SrcVertID = MyBase::ToSrcVertIDMap[VertexID];
+					float Weight = MeshIn.GetVertexWeight(WeightMapIndex, SrcVertID);
+					WeightMapAttrib->SetValue(VertexID, &Weight);
+				}
+
+				WeightMapAttrib->SetName( MeshIn.GetWeightMapName(WeightMapIndex) );
+			});
+			Pending.Add(MoveTemp(WeightMapFuture));
+		}
+
+		// TODO: PolyGroup layers
 
 		// wait for all work to be done
 		for (TFuture<void>& Future : Pending)

@@ -104,6 +104,8 @@ EMovieSceneChannelProxyType  UMovieSceneAudioSection::CacheChannelProxy()
 	FMovieSceneChannelProxyData Channels;
 
 	UMovieSceneAudioTrack* AudioTrack = Cast<UMovieSceneAudioTrack>(GetOuter());
+	UMovieScene* MovieScene = AudioTrack ? Cast<UMovieScene>(AudioTrack->GetOuter()) : nullptr;
+	const bool bHasAttachData = MovieScene && MovieScene->ContainsTrack(*AudioTrack);
 
 #if WITH_EDITOR
 
@@ -111,7 +113,7 @@ EMovieSceneChannelProxyType  UMovieSceneAudioSection::CacheChannelProxy()
 	Channels.Add(SoundVolume,     EditorData.Data[0], TMovieSceneExternalValue<float>());
 	Channels.Add(PitchMultiplier, EditorData.Data[1], TMovieSceneExternalValue<float>());
 
-	if (AudioTrack && AudioTrack->IsAMasterTrack())
+	if (bHasAttachData)
 	{
 		Channels.Add(AttachActorData, EditorData.Data[2]);
 	}
@@ -120,7 +122,7 @@ EMovieSceneChannelProxyType  UMovieSceneAudioSection::CacheChannelProxy()
 
 	Channels.Add(SoundVolume);
 	Channels.Add(PitchMultiplier);
-	if (AudioTrack && AudioTrack->IsAMasterTrack())
+	if (bHasAttachData)
 	{
 		Channels.Add(AttachActorData);
 	}

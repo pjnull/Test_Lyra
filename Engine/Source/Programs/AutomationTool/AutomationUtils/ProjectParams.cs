@@ -374,6 +374,8 @@ namespace AutomationTool
 			this.DeviceNames = InParams.DeviceNames;
 			this.ServerDevice = InParams.ServerDevice;
             this.NullRHI = InParams.NullRHI;
+			this.WriteBackMetadataToAssetRegistry = InParams.WriteBackMetadataToAssetRegistry;
+			this.RetainStagedDirectory = InParams.RetainStagedDirectory;
             this.FakeClient = InParams.FakeClient;
             this.EditorTest = InParams.EditorTest;
             this.RunAutomationTests = InParams.RunAutomationTests;
@@ -577,7 +579,8 @@ namespace AutomationTool
 			string SessionLabel = null,
 			ParamList<string> InMapsToRebuildLightMaps = null,
             ParamList<string> InMapsToRebuildHLOD = null,
-            ParamList<string> TitleID = null
+            ParamList<string> TitleID = null,
+            bool? RetainStagedDirectory = null
 			)
 		{
 			//
@@ -704,7 +707,7 @@ namespace AutomationTool
 			this.Clean = GetOptionalParamValueIfNotSpecified(Command, Clean, this.Clean, "clean", null);
 			this.SignPak = ParseParamValueIfNotSpecified(Command, SignPak, "signpak", String.Empty);
 			this.SignedPak = !String.IsNullOrEmpty(this.SignPak) || GetParamValueIfNotSpecified(Command, SignedPak, this.SignedPak, "signedpak");
-			if (string.IsNullOrEmpty(this.SignPak))
+			if (string.IsNullOrEmpty(this.SignPak) && RawProjectPath != null)
 			{
 				this.SignPak = Path.Combine(RawProjectPath.Directory.FullName, @"Restricted\NoRedist\Build\Keys.txt");
 				if (!File.Exists(this.SignPak))
@@ -730,6 +733,10 @@ namespace AutomationTool
 				this.AdditionalCookerOptions += " -ZenStore";
 			}
 			this.NoZenAutoLaunch = ParseParamValueIfNotSpecified(Command, NoZenAutoLaunch, "NoZenAutoLaunch", String.Empty);
+			if (string.IsNullOrEmpty(this.NoZenAutoLaunch) && GetParamValueIfNotSpecified(Command, null, false, "NoZenAutoLaunch"))
+			{
+				this.NoZenAutoLaunch = "127.0.0.1";
+			}
 			if (!string.IsNullOrEmpty(this.NoZenAutoLaunch) && this.Cook && !this.SkipCook)
 			{
 				this.AdditionalCookerOptions += string.Format(" -NoZenAutoLaunch={0}", this.NoZenAutoLaunch);
@@ -938,6 +945,8 @@ namespace AutomationTool
 			this.SpecifiedArchitecture = ParseParamValueIfNotSpecified(Command, SpecifiedArchitecture, "specifiedarchitecture", String.Empty);
 			this.UbtArgs = ParseParamValueIfNotSpecified(Command, UbtArgs, "ubtargs", String.Empty);
 			this.AdditionalPackageOptions = ParseParamValueIfNotSpecified(Command, AdditionalPackageOptions, "AdditionalPackageOptions", String.Empty);
+			this.WriteBackMetadataToAssetRegistry = ParseParamValueIfNotSpecified(Command, WriteBackMetadataToAssetRegistry, "WriteBackMetadataToAssetRegistry", String.Empty);
+			this.RetainStagedDirectory = GetParamValueIfNotSpecified(Command, RetainStagedDirectory, this.RetainStagedDirectory, "RetainStagedDirectory");
 
 			// -trace can be used with or without a value
 			if (Trace != null || GetParamValueIfNotSpecified(Command, null, false, "trace"))
@@ -2122,6 +2131,12 @@ namespace AutomationTool
         [Help("nullrhi", "add -nullrhi to the client commandlines")]
         public bool NullRHI;
 
+        [Help("WriteBackMetadataToAssetRegistry", "Passthru to iostore staging, see IoStoreUtilities.cpp")]
+        public string WriteBackMetadataToAssetRegistry;
+
+        [Help("RetainStagedDirectory", "If set, retain the staged directory for platforms that modify the I/O store containers for deployment. This is necessary for using the reference container for patch preventing on such platforms.")]
+        public bool RetainStagedDirectory;
+
         /// <summary>
         /// Run:adds ?fake to the server URL
         /// </summary>
@@ -3088,7 +3103,7 @@ namespace AutomationTool
 				CommandUtils.LogLog("DirectoriesToCook={0}", DirectoriesToCook.ToString());
                 CommandUtils.LogLog("DDCGraph={0}", DDCGraph);
                 CommandUtils.LogLog("CulturesToCook={0}", CommandUtils.IsNullOrEmpty(CulturesToCook) ? "<Not Specified> (Use Defaults)" : CulturesToCook.ToString());
-				CommandUtils.LogLog("EditorTargets={0}", EditorTargets.ToString());
+				CommandUtils.LogLog("EditorTargets={0}", EditorTargets?.ToString());
 				CommandUtils.LogLog("Foreign={0}", Foreign);
 				CommandUtils.LogLog("IsCodeBasedProject={0}", IsCodeBasedProject.ToString());
 				CommandUtils.LogLog("IsProgramTarget={0}", IsProgramTarget.ToString());
@@ -3128,6 +3143,8 @@ namespace AutomationTool
 				CommandUtils.LogLog("Package={0}", Package);
 				CommandUtils.LogLog("ForcePackageData={0}", ForcePackageData);
 				CommandUtils.LogLog("NullRHI={0}", NullRHI);
+				CommandUtils.LogLog("WriteBackMetadataToAssetRegistry={0}", WriteBackMetadataToAssetRegistry);
+				CommandUtils.LogLog("RetainStagedDirectory={0}", RetainStagedDirectory);
 				CommandUtils.LogLog("FakeClient={0}", FakeClient);
                 CommandUtils.LogLog("EditorTest={0}", EditorTest);
                 CommandUtils.LogLog("RunAutomationTests={0}", RunAutomationTests); 

@@ -326,7 +326,7 @@ bool FGameplayAbilityRepAnimMontageNetSerializer::IsEqual(FNetSerializationConte
 		}
 
 		// Forward to normal StructNetSerializer
-		FNetIsEqualArgs IsEqualArgs = {};
+		FNetIsEqualArgs IsEqualArgs = Args;
 		IsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForBase;
 		IsEqualArgs.Source0 = NetSerializerValuePointer(&Value0.GameplayAbilityRepAnimMontage);
 		IsEqualArgs.Source1 = NetSerializerValuePointer(&Value1.GameplayAbilityRepAnimMontage);
@@ -336,7 +336,7 @@ bool FGameplayAbilityRepAnimMontageNetSerializer::IsEqual(FNetSerializationConte
 			return false;
 		}
 
-		if (Value0.ReplicationFlags != Value1.ReplicationFlags || Value0.Position != Value1.ReplicationFlags || Value0.SectionIdToPlay != Value1.SectionIdToPlay)
+		if (Value0.ReplicationFlags != Value1.ReplicationFlags || Value0.Position != Value1.Position || Value0.SectionIdToPlay != Value1.SectionIdToPlay)
 		{
 			return false;
 		}
@@ -347,10 +347,11 @@ bool FGameplayAbilityRepAnimMontageNetSerializer::IsEqual(FNetSerializationConte
 		const SourceType& SourceValue1 = *reinterpret_cast<const SourceType*>(Args.Source1);
 
 		// Forward to normal StructNetSerializer
-		FNetIsEqualArgs IsEqualArgs ={};
+		FNetIsEqualArgs IsEqualArgs = Args;
 		IsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForBase;
 		IsEqualArgs.Source0 = Args.Source0;
 		IsEqualArgs.Source1 = Args.Source1;
+
 		if (!StructNetSerializer->IsEqual(Context, IsEqualArgs))
 		{
 			return false;
@@ -446,6 +447,9 @@ void FGameplayAbilityRepAnimMontageNetSerializer::FNetSerializerRegistryDelegate
 	const FReplicationStateDescriptor* Descriptor = StructNetSerializerConfigForBase.StateDescriptor.GetReference();
 	check(Descriptor != nullptr);
 
+	// Verify traits
+	ValidateForwardingNetSerializerTraits(&UE_NET_GET_SERIALIZER(FGameplayAbilityRepAnimMontageNetSerializer), Descriptor->Traits);
+	
 	// Validate our assumptions regarding quantized state size and alignment.
 	constexpr SIZE_T OffsetOfGameplayAbilityRepAnimMontage = offsetof(FQuantizedType, GameplayAbilityRepAnimMontage);
 	if ((sizeof(FQuantizedType::GameplayAbilityRepAnimMontage) < Descriptor->InternalSize) || (((OffsetOfGameplayAbilityRepAnimMontage/Descriptor->InternalAlignment)*Descriptor->InternalAlignment) != OffsetOfGameplayAbilityRepAnimMontage))

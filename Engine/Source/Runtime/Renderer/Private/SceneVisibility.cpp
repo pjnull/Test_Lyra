@@ -795,7 +795,7 @@ static void PrimitiveCullTask(FThreadSafeCounter& NumCulledPrimitives, const FSc
 						if (Flags.bUseCustomCulling &&
 							((Scene->PrimitiveOcclusionFlags[Index] & CustomVisibilityFlags) == CustomVisibilityFlags))
 						{
-							VisibilityId = Scene->PrimitiveVisibilityIds[Index].ByteIndex;
+							VisibilityId = Scene->Primitives[Index]->Proxy->GetVisibilityId();
 						}
 
 						bIsVisible = !bPartiallyOutside || IsPrimitiveVisible(View, PermutedPlanePtr, Bounds, VisibilityId, Flags);
@@ -2276,6 +2276,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 	FRelevancePrimSet<FPrimitiveLODMask> PrimitivesLODMask; // group both lod mask with primitive index to be able to properly merge them in the view
 
 	uint16 CombinedShadingModelMask;
+	uint8 StrataBSDFCountMask;
 	bool bUsesGlobalDistanceField;
 	bool bUsesLightingChannels;
 	bool bTranslucentSurfaceLighting;
@@ -2285,6 +2286,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 	bool bSceneHasSkyMaterial;
 	bool bHasSingleLayerWaterMaterial;
 	bool bHasTranslucencySeparateModulation;
+	bool bHasStandardTranslucencyModulation;
 
 	FRelevancePacket(
 		FRHICommandListImmediate& InRHICmdList,
@@ -2313,6 +2315,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		, bHasDistortionPrimitives(false)
 		, bHasCustomDepthPrimitives(false)
 		, CombinedShadingModelMask(0)
+		, StrataBSDFCountMask(0)
 		, bUsesGlobalDistanceField(false)
 		, bUsesLightingChannels(false)
 		, bTranslucentSurfaceLighting(false)
@@ -2322,6 +2325,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		, bSceneHasSkyMaterial(false)
 		, bHasSingleLayerWaterMaterial(false)
 		, bHasTranslucencySeparateModulation(false)
+		, bHasStandardTranslucencyModulation(false)
 	{
 	}
 
@@ -2335,9 +2339,11 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 	void ComputeRelevance()
 	{
 		CombinedShadingModelMask = 0;
+		StrataBSDFCountMask = 0;
 		bSceneHasSkyMaterial = 0;
 		bHasSingleLayerWaterMaterial = 0;
 		bHasTranslucencySeparateModulation = 0;
+		bHasStandardTranslucencyModulation = 0;
 		bUsesGlobalDistanceField = false;
 		bUsesLightingChannels = false;
 		bTranslucentSurfaceLighting = false;
@@ -2426,7 +2432,12 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 				{
 					if (ViewRelevance.bNormalTranslucency)
 					{
-						TranslucentPrimCount.Add(ETranslucencyPass::TPT_StandardTranslucency, ViewRelevance.bUsesSceneColorCopy);
+						TranslucentPrimCount.Add(ETranslucencyPass::TPT_TranslucencyStandard, ViewRelevance.bUsesSceneColorCopy);
+					}
+
+					if (ViewRelevance.bNormalTranslucency && ViewRelevance.bTranslucencyModulate && View.Family->AllowStandardTranslucencySeparated())
+					{
+						TranslucentPrimCount.Add(ETranslucencyPass::TPT_TranslucencyStandardModulate, ViewRelevance.bUsesSceneColorCopy);
 					}
 
 					if (ViewRelevance.bSeparateTranslucency)
@@ -2434,7 +2445,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 						TranslucentPrimCount.Add(ETranslucencyPass::TPT_TranslucencyAfterDOF, ViewRelevance.bUsesSceneColorCopy);
 					}
 
-					if (ViewRelevance.bSeparateTranslucencyModulate)
+					if (ViewRelevance.bSeparateTranslucency && ViewRelevance.bTranslucencyModulate)
 					{
 						TranslucentPrimCount.Add(ETranslucencyPass::TPT_TranslucencyAfterDOFModulate, ViewRelevance.bUsesSceneColorCopy);
 					}
@@ -2457,6 +2468,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 			}
 			
 			CombinedShadingModelMask |= ViewRelevance.ShadingModelMask;
+			StrataBSDFCountMask |= ViewRelevance.StrataBSDFCountMask;
 			bUsesGlobalDistanceField |= ViewRelevance.bUsesGlobalDistanceField;
 			bUsesLightingChannels |= ViewRelevance.bUsesLightingChannels;
 			bTranslucentSurfaceLighting |= ViewRelevance.bTranslucentSurfaceLighting;
@@ -2465,7 +2477,8 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 			bUsesCustomStencil |= (ViewRelevance.CustomDepthStencilUsageMask & (1 << 1)) > 0;
 			bSceneHasSkyMaterial |= ViewRelevance.bUsesSkyMaterial;
 			bHasSingleLayerWaterMaterial |= ViewRelevance.bUsesSingleLayerWaterMaterial;
-			bHasTranslucencySeparateModulation |= ViewRelevance.bSeparateTranslucencyModulate;
+			bHasStandardTranslucencyModulation |= ViewRelevance.bNormalTranslucency && ViewRelevance.bTranslucencyModulate && View.Family->AllowStandardTranslucencySeparated();
+			bHasTranslucencySeparateModulation |= ViewRelevance.bSeparateTranslucency && ViewRelevance.bTranslucencyModulate;
 
 			if (ViewRelevance.bRenderCustomDepth)
 			{
@@ -2771,12 +2784,17 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 									DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::TranslucencyStandard);
 								}
 
+								if (ViewRelevance.bNormalTranslucency && ViewRelevance.bTranslucencyModulate && View.Family->AllowStandardTranslucencySeparated())
+								{
+									DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::TranslucencyStandardModulate);
+								}
+
 								if (ViewRelevance.bSeparateTranslucency)
 								{
 									DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::TranslucencyAfterDOF);
 								}
 
-								if (ViewRelevance.bSeparateTranslucencyModulate)
+								if (ViewRelevance.bSeparateTranslucency && ViewRelevance.bTranslucencyModulate)
 								{
 									DrawCommandPacket.AddCommandsForMesh(PrimitiveIndex, PrimitiveSceneInfo, StaticMeshRelevance, StaticMesh, Scene, bCanCache, EMeshPass::TranslucencyAfterDOFModulate);
 								}
@@ -2917,6 +2935,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		WriteView.bSceneHasSkyMaterial |= bSceneHasSkyMaterial;
 		WriteView.bHasSingleLayerWaterMaterial |= bHasSingleLayerWaterMaterial;
 		WriteView.bHasTranslucencySeparateModulation |= bHasTranslucencySeparateModulation;
+		WriteView.bHasStandardTranslucencyModulation |= bHasStandardTranslucencyModulation;
 		VisibleDynamicPrimitivesWithSimpleLights.AppendTo(WriteView.VisibleDynamicPrimitivesWithSimpleLights);
 		WriteView.NumVisibleDynamicPrimitives += NumVisibleDynamicPrimitives;
 		WriteView.NumVisibleDynamicEditorPrimitives += NumVisibleDynamicEditorPrimitives;
@@ -2926,6 +2945,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		WriteView.CustomDepthStencilValues.Append(CustomDepthStencilValues);
 		WriteView.bUsesCustomDepth |= bUsesCustomDepth;
 		WriteView.bUsesCustomStencil |= bUsesCustomStencil;
+		WriteView.StrataViewData.MaxBSDFCount = FMath::Max(WriteView.StrataViewData.MaxBSDFCount, 8u - FMath::CountLeadingZeros8(StrataBSDFCountMask));
 		DirtyIndirectLightingCacheBufferPrimitives.AppendTo(WriteView.DirtyIndirectLightingCacheBufferPrimitives);
 
 		WriteView.MeshDecalBatches.Append(MeshDecalBatches);
@@ -3252,13 +3272,19 @@ void ComputeDynamicMeshRelevance(EShadingPath ShadingPath, bool bAddLightmapDens
 				View.NumVisibleDynamicMeshElements[EMeshPass::TranslucencyStandard] += NumElements;
 			}
 
+			if (ViewRelevance.bNormalTranslucency && ViewRelevance.bTranslucencyModulate && View.Family->AllowStandardTranslucencySeparated())
+			{
+				PassMask.Set(EMeshPass::TranslucencyStandardModulate);
+				View.NumVisibleDynamicMeshElements[EMeshPass::TranslucencyStandardModulate] += NumElements;
+			}
+
 			if (ViewRelevance.bSeparateTranslucency)
 			{
 				PassMask.Set(EMeshPass::TranslucencyAfterDOF);
 				View.NumVisibleDynamicMeshElements[EMeshPass::TranslucencyAfterDOF] += NumElements;
 			}
 
-			if (ViewRelevance.bSeparateTranslucencyModulate)
+			if (ViewRelevance.bSeparateTranslucency && ViewRelevance.bTranslucencyModulate)
 			{
 				PassMask.Set(EMeshPass::TranslucencyAfterDOFModulate);
 				View.NumVisibleDynamicMeshElements[EMeshPass::TranslucencyAfterDOFModulate] += NumElements;
@@ -4024,10 +4050,10 @@ void FSceneRenderer::PreVisibilityFrameSetup(FRDGBuilder& GraphBuilder, const FS
 	if (Scene && Views.Num())
 	{
 		const int32 ReferenceViewIndex = 0;
-		FViewInfo& ReferenceView = Views[ReferenceViewIndex];
-		FRayTracingScene& RayTracingScene = Scene->RayTracingScene;
+		const FViewInfo& ReferenceView = Views[ReferenceViewIndex];
 
 		Scene->RayTracingScene.InitPreViewTranslation(ReferenceView.ViewMatrices);
+		Scene->RayTracingScene.bNeedsDebugInstanceGPUSceneIndexBuffer = IsRayTracingInstanceOverlapEnabled(ReferenceView);
 	}
 #endif
 
@@ -5200,10 +5226,6 @@ void FDeferredShadingSceneRenderer::InitViews(FRDGBuilder& GraphBuilder, const F
 		for (int32 ViewIndex = Views.Num() - 1; ViewIndex >= 0; --ViewIndex)
 		{
 			FViewInfo& View = Views[ViewIndex];
-
-#if RHI_RAYTRACING
-			View.IESLightProfileResource = View.ViewState ? &View.ViewState->IESLightProfileResources : nullptr;
-#endif
 			// Set the pre-exposure before initializing the constant buffers.
 			if (View.ViewState)
 			{

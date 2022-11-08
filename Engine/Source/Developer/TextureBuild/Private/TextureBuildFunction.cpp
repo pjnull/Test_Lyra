@@ -95,6 +95,7 @@ static FTextureBuildSettings ReadBuildSettingsFromCompactBinary(const FCbObjectV
 	ReadCbField(ColorAdjustmentCbObj["AdjustMinAlpha"], ColorAdjustment.AdjustMinAlpha);
 	ReadCbField(ColorAdjustmentCbObj["AdjustMaxAlpha"], ColorAdjustment.AdjustMaxAlpha);
 	BuildSettings.bUseNewMipFilter = Object["bUseNewMipFilter"].AsBool(BuildSettings.bUseNewMipFilter);
+	BuildSettings.bNormalizeNormals = Object["bNormalizeNormals"].AsBool(BuildSettings.bNormalizeNormals);
 	BuildSettings.bDoScaleMipsForAlphaCoverage = Object["bDoScaleMipsForAlphaCoverage"].AsBool(BuildSettings.bDoScaleMipsForAlphaCoverage);
 	ReadCbField(Object["AlphaCoverageThresholds"], BuildSettings.AlphaCoverageThresholds);
 	ReadCbField(Object["MipSharpening"], BuildSettings.MipSharpening);
@@ -135,9 +136,6 @@ static FTextureBuildSettings ReadBuildSettingsFromCompactBinary(const FCbObjectV
 	ReadCbField(Object["CompositePower"], BuildSettings.CompositePower);
 	ReadCbField(Object["LODBias"], BuildSettings.LODBias);
 	ReadCbField(Object["LODBiasWithCinematicMips"], BuildSettings.LODBiasWithCinematicMips);
-	ReadCbField(Object["TopMipSize"], BuildSettings.TopMipSize);
-	ReadCbField(Object["VolumeSizeZ"], BuildSettings.VolumeSizeZ);
-	ReadCbField(Object["ArraySlices"], BuildSettings.ArraySlices);
 	BuildSettings.bStreamable_Unused = Object["bStreamable"].AsBool(BuildSettings.bStreamable_Unused);
 	BuildSettings.bVirtualStreamable = Object["bVirtualStreamable"].AsBool(BuildSettings.bVirtualStreamable);
 	BuildSettings.bChromaKeyTexture = Object["bChromaKeyTexture"].AsBool(BuildSettings.bChromaKeyTexture);
@@ -158,6 +156,9 @@ static FTextureBuildSettings ReadBuildSettingsFromCompactBinary(const FCbObjectV
 	BuildSettings.bOodleUsesRDO = Object["bOodleUsesRDO"].AsBool(BuildSettings.bOodleUsesRDO);
 	BuildSettings.OodleRDO = Object["OodleRDO"].AsUInt8(BuildSettings.OodleRDO);
 	ReadCbField(Object["OodleTextureSdkVersion"], BuildSettings.OodleTextureSdkVersion);
+	ReadCbField(Object["TextureAddressModeX"], BuildSettings.TextureAddressModeX);
+	ReadCbField(Object["TextureAddressModeY"], BuildSettings.TextureAddressModeY);
+	ReadCbField(Object["TextureAddressModeZ"], BuildSettings.TextureAddressModeZ);
 
 	return BuildSettings;
 }

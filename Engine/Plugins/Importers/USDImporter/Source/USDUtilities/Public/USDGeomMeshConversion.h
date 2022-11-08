@@ -220,24 +220,41 @@ namespace UsdUtils
 	 */
 	struct FUsdPrimMaterialSlot
 	{
+		/**
+		 * Path to the prims that contain this material assignment (e.g. '/Root/my_cube' or '/Root/my_cube/geomsubset_0'.
+		 * This is a set because this single material slot in UE may be merged from N identical prims.
+		 */
+		TSet<FString> PrimPaths;
+
 		/** What this represents depends on AssignedMaterialType */
 		FString MaterialSource;
 		EPrimAssignmentType AssignmentType = EPrimAssignmentType::None;
+		bool bMeshIsDoubleSided = false;
 
 		friend bool operator==( const FUsdPrimMaterialSlot& Lhs, const FUsdPrimMaterialSlot& Rhs )
 		{
-			return Lhs.AssignmentType == Rhs.AssignmentType && Lhs.MaterialSource.Equals( Rhs.MaterialSource, ESearchCase::CaseSensitive );
+			return Lhs.AssignmentType == Rhs.AssignmentType &&
+				   Lhs.MaterialSource.Equals( Rhs.MaterialSource, ESearchCase::CaseSensitive ) &&
+				   Lhs.bMeshIsDoubleSided == Rhs.bMeshIsDoubleSided;
 		}
 
 		friend uint32 GetTypeHash( const FUsdPrimMaterialSlot& Slot )
 		{
-			return HashCombine( GetTypeHash( Slot.MaterialSource ), static_cast<uint32>(Slot.AssignmentType) );
+			return HashCombine(
+				Slot.bMeshIsDoubleSided,
+				HashCombine(
+					GetTypeHash( Slot.MaterialSource ),
+					static_cast<uint32>(Slot.AssignmentType)
+				)
+			);
 		}
 
 		friend FArchive& operator<<( FArchive& Ar, FUsdPrimMaterialSlot& Slot )
 		{
 			Ar << Slot.MaterialSource;
 			Ar << Slot.AssignmentType;
+			Ar << Slot.bMeshIsDoubleSided;
+			Ar << Slot.PrimPaths;
 
 			return Ar;
 		}
@@ -311,10 +328,23 @@ namespace UsdUtils
 	 *                        when authoring the material binding relationships, e.g. whether we author them inside variants or not
 	 * @param bUsePayload - Should be True if the Stage was exported using payload files to store the actual Mesh prims. Also dictates minor
 	 *                      behaviors when authoring the material binding relationships.
-	 * @param bRemoveUnrealMaterials - Whether to remove the `unrealMaterial` attributes after replacing them with material bindings.
-	 *                                 Important because the `unrealMaterial` attributes will be used as a higher priority when determining material assignments
 	 */
-	USDUTILITIES_API void ReplaceUnrealMaterialsWithBaked( const UE::FUsdStage& Stage, const UE::FSdfLayer& LayerToAuthorIn, const TMap<FString, FString>& BakedMaterials, bool bIsAssetLayer, bool bUsePayload, bool bRemoveUnrealMaterials );
+	USDUTILITIES_API void ReplaceUnrealMaterialsWithBaked(
+		const UE::FUsdStage& Stage,
+		const UE::FSdfLayer& LayerToAuthorIn,
+		const TMap<FString, FString>& BakedMaterials,
+		bool bIsAssetLayer,
+		bool bUsePayload
+	);
+	UE_DEPRECATED( 5.2, "The bRemoveUnrealMaterials parameter is now deprecated as removing the UE material assignments is no longer needed" )
+	USDUTILITIES_API void ReplaceUnrealMaterialsWithBaked(
+		const UE::FUsdStage& Stage,
+		const UE::FSdfLayer& LayerToAuthorIn,
+		const TMap<FString, FString>& BakedMaterials,
+		bool bIsAssetLayer,
+		bool bUsePayload,
+		bool bRemoveUnrealMaterials
+	);
 
 	/**
 	 * Hashes the attributes of the GeomMesh at the given prim path on the Stage at TimeCode

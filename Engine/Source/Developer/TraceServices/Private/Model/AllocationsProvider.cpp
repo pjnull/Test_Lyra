@@ -1433,6 +1433,20 @@ void FAllocationsProvider::EditFree(double Time, uint32 CallstackId, uint64 Addr
 	{
 		INSIGHTS_SLOW_CHECK(!AllocationPtr->IsHeap());
 	}
+	if (!AllocationPtr)
+	{
+		++FreeErrors;
+		if (FreeErrors <= MaxLogMessagesPerErrorType)
+		{
+			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] Invalid FREE event (Address=0x%llX, RootHeap=%u, Time=%f)! A fake alloc will be created with size 0."), Address, RootHeap, Time);
+		}
+		// Fake the missing alloc.
+		constexpr uint64 FakeAllocSize = 0;
+		constexpr uint32 FakeAllocAlignment = 0;
+		EditAlloc(Time, CallstackId, Address, FakeAllocSize, FakeAllocAlignment, RootHeap);
+		SbTree[RootHeap]->SetTimeForEvent(EventIndex[RootHeap], Time); // for the case where the free event is first event in a new SbTree column after adding the fake alloc
+		AllocationPtr = LiveAllocs[RootHeap]->Remove(Address); // we take ownership of AllocationPtr
+	}
 	if (AllocationPtr)
 	{
 		check(EventIndex[RootHeap] > AllocationPtr->StartEventIndex);
@@ -1574,6 +1588,8 @@ void FAllocationsProvider::EditMarkAllocationAsHeap(double Time, uint64 Address,
 			UE_LOG(LogTraceServices, Error, TEXT("[MemAlloc] HeapMarkAlloc: Could not find address 0x%llX (Heap=%u, Flags=%u, Time=%f)!"), Address, Heap, uint32(Flags), Time);
 		}
 	}
+
+	++HeapCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1814,7 +1830,7 @@ void FAllocationsProvider::EditOnAnalysisCompleted(double Time)
 	{
 		TotalEventCount += EventIndex[RootHeap];
 	}
-	UE_LOG(LogTraceServices, Log, TEXT("[MemAlloc] Analysis Completed (%llu events, %llu allocs, %llu frees)"), TotalEventCount, AllocCount, FreeCount);
+	UE_LOG(LogTraceServices, Log, TEXT("[MemAlloc] Analysis Completed (%llu events, %llu allocs, %llu frees, %llu heaps)"), TotalEventCount, AllocCount, FreeCount, HeapCount);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

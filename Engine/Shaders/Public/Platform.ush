@@ -102,10 +102,6 @@
 #define COMPILER_FORCE_WAVE32_MODE
 #endif
 
-#ifndef PLATFORM_SUPPORTS_SRV_UB
-#define PLATFORM_SUPPORTS_SRV_UB 0
-#endif
-
 #ifndef PLATFORM_SUPPORTS_ROV
 #define PLATFORM_SUPPORTS_ROV 0
 #define RasterizerOrderedTexture2D RWTexture2D
@@ -172,13 +168,6 @@
 #if !COMPILER_HLSLCC
 #error "Missing COMPILER_HLSLCC define!"
 #endif
-#endif
-
-
-#if PLATFORM_SUPPORTS_SRV_UB
-#define PLATFORM_SUPPORTS_SRV_UB_MACRO(...) __VA_ARGS__
-#else
-#define PLATFORM_SUPPORTS_SRV_UB_MACRO(...)
 #endif
 
 #ifndef PLATFORM_SUPPORTS_CALLABLE_SHADERS
@@ -366,6 +355,22 @@
 #endif
 
 // ---------------------------------------------------- Platform dependent supports
+
+// Type macros for Uniform Buffer code generation.
+// Hides the platform specific 'half' and 'fixed' support but has to extend to all types and dimensions
+#if (FEATURE_LEVEL == FEATURE_LEVEL_ES3_1)
+	#define UB_INT(Dim)         int##Dim
+	#define UB_UINT(Dim)        uint##Dim
+	#define UB_FLOAT(Dim)       float##Dim
+	#define UB_HALF_FLOAT(Dim)  half##Dim
+	#define UB_FIXED_FLOAT(Dim) fixed##Dim
+#else
+	#define UB_INT(Dim)         int##Dim
+	#define UB_UINT(Dim)        uint##Dim
+	#define UB_FLOAT(Dim)       float##Dim
+	#define UB_HALF_FLOAT(Dim)  float##Dim
+	#define UB_FIXED_FLOAT(Dim) float##Dim
+#endif
 
 // On mobile use interpolator for ClipDistance as it does not work/supported on all mobile platforms
 #if (FEATURE_LEVEL == FEATURE_LEVEL_ES3_1)

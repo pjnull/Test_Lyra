@@ -24,8 +24,112 @@ namespace Horde.Build.Jobs
 	using PoolId = StringId<IPool>;
 	using SessionId = ObjectId<ISession>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 	using UserId = ObjectId<IUser>;
+
+	/// <summary>
+	/// Options for creating a new job
+	/// </summary>
+	public class CreateJobOptions
+	{
+		/// <summary>
+		/// Optional changelist to preflight
+		/// </summary>
+		public int? PreflightChange { get; set; }
+
+		/// <summary>
+		/// Optional cloned preflight changelist
+		/// </summary>
+		public int? ClonedPreflightChange { get; set; }
+
+		/// <summary>
+		/// Description for the change being preflighted
+		/// </summary>
+		public string? PreflightDescription { get; set; }
+
+		/// <summary>
+		/// User that started the job
+		/// </summary>
+		public UserId? StartedByUserId { get; set; }
+
+		/// <summary>
+		/// Priority of the job
+		/// </summary>
+		public Priority? Priority { get; set; }
+
+		/// <summary>
+		/// Whether to automatically submit the preflighted change on completion
+		/// </summary>
+		public bool? AutoSubmit { get; set; }
+
+		/// <summary>
+		/// Whether to update issues based on the outcome of this job
+		/// </summary>
+		public bool? UpdateIssues { get; set; }
+
+		/// <summary>
+		/// Whether to promote issues based on the outcome of this job by default
+		/// </summary>
+		public bool? PromoteIssuesByDefault { get; set; }
+
+		/// <summary>
+		/// List of downstream job triggers
+		/// </summary>
+		public List<ChainedJobTemplateConfig> JobTriggers { get; } = new List<ChainedJobTemplateConfig>();
+
+		/// <summary>
+		/// Whether to show badges in UGS for this job
+		/// </summary>
+		public bool ShowUgsBadges { get; set; }
+
+		/// <summary>
+		/// Whether to show alerts in UGS for this job
+		/// </summary>
+		public bool ShowUgsAlerts { get; set; }
+
+		/// <summary>
+		/// Notification channel for this job
+		/// </summary>
+		public string? NotificationChannel { get; set; }
+
+		/// <summary>
+		/// Notification channel filter for this job
+		/// </summary>
+		public string? NotificationChannelFilter { get; set; }
+
+		/// <summary>
+		/// Arguments for the job
+		/// </summary>
+		public List<string> Arguments { get; } = new List<string>();
+
+		/// <summary>
+		/// Environment variables for the job
+		/// </summary>
+		public Dictionary<string, string> Environment { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>
+		/// Default constructor
+		/// </summary>
+		public CreateJobOptions()
+		{
+		}
+
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public CreateJobOptions(TemplateRefConfig templateRefConfig)
+		{
+			PromoteIssuesByDefault = templateRefConfig.PromoteIssuesByDefault;
+			if (templateRefConfig.ChainedJobs != null)
+			{
+				JobTriggers.AddRange(templateRefConfig.ChainedJobs);
+			}
+			ShowUgsBadges = templateRefConfig.ShowUgsBadges;
+			ShowUgsAlerts = templateRefConfig.ShowUgsAlerts;
+			NotificationChannel = templateRefConfig.NotificationChannel;
+			NotificationChannelFilter = templateRefConfig.NotificationChannelFilter;
+		}
+	}
 
 	/// <summary>
 	/// Interface for a collection of job documents
@@ -43,22 +147,9 @@ namespace Horde.Build.Jobs
 		/// <param name="name">Name of the job</param>
 		/// <param name="change">The change to build</param>
 		/// <param name="codeChange">The corresponding code changelist number</param>
-		/// <param name="preflightChange">Optional changelist to preflight</param>
-		/// <param name="clonedPreflightChange">Optional cloned preflight changelist</param>
-		/// <param name="preflightDescription">Description for the change being preflighted</param>
-		/// <param name="startedByUserId">User that started the job</param>
-		/// <param name="priority">Priority of the job</param>
-		/// <param name="autoSubmit">Whether to automatically submit the preflighted change on completion</param>
-		/// <param name="updateIssues">Whether to update issues based on the outcome of this job</param>
-		/// <param name="promoteIssuesByDefault">Whether to promote issues based on the outcome of this job by default</param>
-		/// <param name="jobTriggers">List of downstream job triggers</param>
-		/// <param name="showUgsBadges">Whether to show badges in UGS for this job</param>
-		/// <param name="showUgsAlerts">Whether to show alerts in UGS for this job</param>
-		/// <param name="notificationChannel">Notification channel for this job</param>
-		/// <param name="notificationChannelFilter">Notification channel filter for this job</param>
-		/// <param name="arguments">Arguments for the job</param>
+		/// <param name="options">Additional options for the new job</param>
 		/// <returns>The new job document</returns>
-		Task<IJob> AddAsync(JobId jobId, StreamId streamId, TemplateRefId templateRefId, ContentHash templateHash, IGraph graph, string name, int change, int codeChange, int? preflightChange, int? clonedPreflightChange, string? preflightDescription, UserId? startedByUserId, Priority? priority, bool? autoSubmit, bool? updateIssues, bool? promoteIssuesByDefault, List<ChainedJobTemplate>? jobTriggers, bool showUgsBadges, bool showUgsAlerts, string? notificationChannel, string? notificationChannelFilter, List<string>? arguments);
+		Task<IJob> AddAsync(JobId jobId, StreamId streamId, TemplateId templateRefId, ContentHash templateHash, IGraph graph, string name, int change, int codeChange, CreateJobOptions options);
 
 		/// <summary>
 		/// Gets a job with the given unique id
@@ -110,7 +201,7 @@ namespace Horde.Build.Jobs
 		/// <param name="indexHint">Name of index to be specified as a hint to the database query planner</param>
 		/// <param name="excludeUserJobs">Whether to exclude user jobs from the find</param>
 		/// <returns>List of jobs matching the given criteria</returns>
-		Task<List<IJob>> FindAsync(JobId[]? jobIds = null, StreamId? streamId = null, string? name = null, TemplateRefId[]? templates = null, int? minChange = null, int? maxChange = null, int? preflightChange = null, bool? preflightOnly = null, UserId? preflightStartedByUser = null, UserId? startedByUser = null, DateTimeOffset? minCreateTime = null, DateTimeOffset? maxCreateTime = null, DateTimeOffset? modifiedBefore = null, DateTimeOffset? modifiedAfter = null, int? index = null, int? count = null, bool consistentRead = true, string? indexHint = null, bool? excludeUserJobs = null);
+		Task<List<IJob>> FindAsync(JobId[]? jobIds = null, StreamId? streamId = null, string? name = null, TemplateId[]? templates = null, int? minChange = null, int? maxChange = null, int? preflightChange = null, bool? preflightOnly = null, UserId? preflightStartedByUser = null, UserId? startedByUser = null, DateTimeOffset? minCreateTime = null, DateTimeOffset? maxCreateTime = null, DateTimeOffset? modifiedBefore = null, DateTimeOffset? modifiedAfter = null, int? index = null, int? count = null, bool consistentRead = true, string? indexHint = null, bool? excludeUserJobs = null);
 
 		/// <summary>
 		/// Searches for jobs in a specified stream and templates
@@ -123,7 +214,7 @@ namespace Horde.Build.Jobs
 		/// <param name="index">Index of the first result to return</param>
 		/// <param name="count">Number of results to return</param>
 		/// <param name="consistentRead">If the database read should be made to the replica server</param>
-		Task<List<IJob>> FindLatestByStreamWithTemplatesAsync(StreamId streamId, TemplateRefId[] templates, UserId? preflightStartedByUser = null, DateTimeOffset? maxCreateTime = null, DateTimeOffset? modifiedAfter = null, int? index = null, int? count = null, bool consistentRead = false);
+		Task<List<IJob>> FindLatestByStreamWithTemplatesAsync(StreamId streamId, TemplateId[] templates, UserId? preflightStartedByUser = null, DateTimeOffset? maxCreateTime = null, DateTimeOffset? modifiedAfter = null, int? index = null, int? count = null, bool consistentRead = false);
 
 		/// <summary>
 		/// Updates a new job
@@ -141,7 +232,7 @@ namespace Horde.Build.Jobs
 		/// <param name="arguments">New arguments for the job</param>
 		/// <param name="labelIdxToTriggerId">New trigger ID for a label in the job</param>
 		/// <param name="jobTrigger">New downstream job id</param>
-		Task<IJob?> TryUpdateJobAsync(IJob job, IGraph graph, string? name = null, Priority? priority = null, bool? autoSubmit = null, int? autoSubmitChange = null, string? autoSubmitMessage = null, UserId? abortedByUserId = null, ObjectId? notificationTriggerId = null, List<Report>? reports = null, List<string>? arguments = null, KeyValuePair<int, ObjectId>? labelIdxToTriggerId = null, KeyValuePair<TemplateRefId, JobId>? jobTrigger = null);
+		Task<IJob?> TryUpdateJobAsync(IJob job, IGraph graph, string? name = null, Priority? priority = null, bool? autoSubmit = null, int? autoSubmitChange = null, string? autoSubmitMessage = null, UserId? abortedByUserId = null, ObjectId? notificationTriggerId = null, List<Report>? reports = null, List<string>? arguments = null, KeyValuePair<int, ObjectId>? labelIdxToTriggerId = null, KeyValuePair<TemplateId, JobId>? jobTrigger = null);
 
 		/// <summary>
 		/// Updates the state of a batch

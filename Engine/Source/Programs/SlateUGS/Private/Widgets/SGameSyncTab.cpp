@@ -14,11 +14,11 @@
 #include "Widgets/SScheduledSyncWindow.h"
 #include "Widgets/SLogWidget.h"
 #include "Widgets/Layout/SHeader.h"
-#include "Widgets/Testing/STestSuite.h"
-#include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Colors/SSimpleGradient.h"
 #include "Widgets/Images/SThrobber.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SSeparator.h"
+#include "Widgets/Views/SListView.h"
 
 #include "SlateUGSStyle.h"
 
@@ -30,6 +30,7 @@
 namespace
 {
 	const FName HordeTableColumnStatus(TEXT("Status"));
+	const FName HordeTableColumnType(TEXT("Type"));
 	const FName HordeTableColumnChange(TEXT("Change"));
 	const FName HordeTableColumnTime(TEXT("Time"));
 	const FName HordeTableColumnAuthor(TEXT("Author"));
@@ -45,31 +46,6 @@ void SBuildDataRow::Construct(const FArguments& InArgs, const TSharedRef<STableV
 
 TSharedRef<SWidget> SBuildDataRow::GenerateWidgetForColumn(const FName& ColumnId) // Todo: maybe can refactor some of this code so there's less duplication by using the root SWidget class on different types
 {
-	if (ColumnId == HordeTableColumnEditor)
-	{
-		// Todo: replace this dummy badge data with the real thing
-		return SNew(SHorizontalBox)
-			+SHorizontalBox::Slot()
-			[
-				SNew(SHordeBadge)
-				.Text(FText::FromString("Editor Win64"))
-				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
-			]
-			+SHorizontalBox::Slot()
-			.Padding(2.0f, 0.0f)
-			[
-				SNew(SHordeBadge)
-				.Text(FText::FromString("Editor Mac"))
-				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
-			]
-			+SHorizontalBox::Slot()
-			[
-				SNew(SHordeBadge)
-				.Text(FText::FromString("Editor Linux"))
-				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
-			];
-	}
-
 	if (ColumnId == HordeTableColumnStatus)
 	{
 		TSharedRef<SImage> StatusCircle = SNew(SImage).Image(FSlateUGSStyle::Get().GetBrush("Icons.FilledCircle"));
@@ -106,6 +82,40 @@ TSharedRef<SWidget> SBuildDataRow::GenerateWidgetForColumn(const FName& ColumnId
 			];
 	}
 
+	if (ColumnId == HordeTableColumnType)
+	{
+		bool bIsCode    = CurrentItem->ChangeType.bContainsCode;
+		bool bIsContent = CurrentItem->ChangeType.bContainsContent;
+
+		TSharedRef<SHorizontalBox> TypeBadges = SNew(SHorizontalBox);
+
+		if (bIsCode)
+		{
+			TypeBadges->AddSlot()
+			.Padding(1.0f, 0.0f)
+			.HAlign(HAlign_Center)
+			[
+				SNew(SHordeBadge)
+				.Text(FText::FromString("Code"))
+				.BadgeState(EBadgeState::Pending)
+			];
+		}
+
+		if (bIsContent)
+		{
+			TypeBadges->AddSlot()
+			.Padding(1.0f, 0.0f)
+			.HAlign(HAlign_Center)
+			[
+				SNew(SHordeBadge)
+				.Text(FText::FromString("Content"))
+				.BadgeState(EBadgeState::Pending)
+			];
+		}
+
+		return TypeBadges;
+	}
+
 	TSharedRef<STextBlock> TextItem = SNew(STextBlock);
 	if (ColumnId == HordeTableColumnChange)
 	{
@@ -126,6 +136,38 @@ TSharedRef<SWidget> SBuildDataRow::GenerateWidgetForColumn(const FName& ColumnId
 			.Replace(TEXT("\r"), TEXT(" "))
 			.Replace(TEXT("\n"), TEXT(" ")); // Todo: replacing both with spaces causes lots of double spaces, maybe filter that out?
 		TextItem->SetText(FText::FromString(Description));
+	}
+	if (ColumnId == HordeTableColumnEditor)
+	{
+		// Todo: replace this dummy badge data with the real thing
+		return SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			[
+				SNew(SHordeBadge)
+				.Text(FText::FromString("Editor Win64"))
+				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
+			]
+			+SHorizontalBox::Slot()
+			.Padding(2.0f, 0.0f)
+			[
+				SNew(SHordeBadge)
+				.Text(FText::FromString("Editor Mac"))
+				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
+			]
+			+SHorizontalBox::Slot()
+			[
+				SNew(SHordeBadge)
+				.Text(FText::FromString("Editor Linux"))
+				.BadgeState(static_cast<EBadgeState>(FMath::RandRange(0, 4)))
+			];
+	}
+
+	if (CurrentItem->bSyncingPrecompiled)
+	{
+		if (!CurrentItem->bHasZippedBinaries)
+		{
+			TextItem->SetColorAndOpacity(FLinearColor(0.1f, 0.1f, 0.1f));
+		}
 	}
 
 	if (CurrentItem->bCurrentlySynced)
@@ -195,7 +237,7 @@ TSharedRef<SWidget> SGameSyncTab::MakeSyncButtonDropdown()
 		FText::FromString(TEXT("Setup Schedule Sync")),
 		FText::FromString(TEXT("Setup a schedule sync to run at specific time")),
 		FSlateIcon(),
-		FUIAction(FExecuteAction::CreateLambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SScheduledSyncWindow).Tab(Tab), Tab->GetTabArgs().GetOwnerWindow(), false); } )),
+		FUIAction(FExecuteAction::CreateLambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SScheduledSyncWindow, Tab), Tab->GetTabArgs().GetOwnerWindow(), false); } )),
 		NAME_None,
 		EUserInterfaceActionType::Button
 	);
@@ -203,9 +245,9 @@ TSharedRef<SWidget> SGameSyncTab::MakeSyncButtonDropdown()
 	return MenuBuilder.MakeWidget();
 }
 
-void SGameSyncTab::Construct(const FArguments& InArgs)
+void SGameSyncTab::Construct(const FArguments& InArgs, UGSTab* InTab)
 {
-	Tab = InArgs._Tab;
+	Tab = InTab;
 
 	this->ChildSlot
 	[
@@ -332,7 +374,7 @@ void SGameSyncTab::Construct(const FArguments& InArgs)
 						.Text(LOCTEXT("Filter", "Filter"))
 						.Icon(FSlateUGSStyle::Get().GetBrush("Icons.Filter"))
 						// Todo: this is probably the wrong "Filter" button. The functionality below should probably be in the settings dropdown
-						.OnClicked_Lambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SSyncFilterWindow).Tab(Tab), Tab->GetTabArgs().GetOwnerWindow(), false); return FReply::Handled(); })
+						.OnClicked_Lambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SSyncFilterWindow, Tab), Tab->GetTabArgs().GetOwnerWindow(), false); return FReply::Handled(); })
 					]
 					+SHorizontalBox::Slot()
 					.AutoWidth()
@@ -341,7 +383,7 @@ void SGameSyncTab::Construct(const FArguments& InArgs)
 						SNew(SSimpleButton)
 						.Text(LOCTEXT("Settings", "Settings"))
 						.Icon(FSlateUGSStyle::Get().GetBrush("Icons.Settings"))
-						.OnClicked_Lambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SSettingsWindow).Tab(Tab), Tab->GetTabArgs().GetOwnerWindow(), false); return FReply::Handled(); })
+						.OnClicked_Lambda([this] { FSlateApplication::Get().AddModalWindow(SNew(SSettingsWindow, Tab), Tab->GetTabArgs().GetOwnerWindow(), false); return FReply::Handled(); })
 					]
 				]
 			]
@@ -484,6 +526,9 @@ void SGameSyncTab::Construct(const FArguments& InArgs)
 					+SHeaderRow::Column(HordeTableColumnStatus)
 					.DefaultLabel(LOCTEXT("HordeHeaderStatus", ""))
 					.FixedWidth(35.0f)
+					+SHeaderRow::Column(HordeTableColumnType)
+					.DefaultLabel(LOCTEXT("HordeHeaderType", "Type"))
+					.FixedWidth(150.0f)
 					+SHeaderRow::Column(HordeTableColumnChange)
 					.DefaultLabel(LOCTEXT("HordeHeaderChange", "Change"))
 					.FixedWidth(75.0f)
@@ -497,7 +542,7 @@ void SGameSyncTab::Construct(const FArguments& InArgs)
 					.DefaultLabel(LOCTEXT("HordeHeaderDescription", "Description"))
 					+SHeaderRow::Column(HordeTableColumnEditor)
 					.DefaultLabel(LOCTEXT("HordeHeaderEditor", "Editor"))
-					.FillWidth(0.45f)
+					.FillWidth(0.5f)
 				)
 			]
 			// Log

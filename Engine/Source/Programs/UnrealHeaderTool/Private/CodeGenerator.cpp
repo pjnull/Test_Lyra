@@ -3457,6 +3457,11 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 			{
 				FString VariableType = Parameter.TypeVariableRef(true);
 				FString ExtractedType = Parameter.TypeOriginal();
+
+				if (Parameter.bIsEnumAsByte)
+				{
+					ExtractedType = Parameter.TypeOriginal(true);
+				}
 				FString ParameterCast = FString::Printf(TEXT("*(%s*)"), *ExtractedType);
 
 				RigVMStubProlog.Add(FString::Printf(TEXT("%s %s = %sRigVMMemoryHandles[%d].GetData(false%s);"),
@@ -3639,7 +3644,13 @@ void FNativeClassHeaderGenerator::ExportGeneratedStructBodyMacros(FOutputDevice&
 		if (bGenerateFastArraySerializerTypeDefinition)
 		{
 			OutFlags |= EExportClassOutFlags::NeedsFastArrayHeaders;
-			Out.Logf(TEXT("UE_NET_IMPLEMENT_FASTARRAY(%s);\r\n"), *StructNameCPP);
+			// The preprocessor conditional is written here instead of in FastArraySerializerImplementation.h
+			// since it may evaluate differently in different modules, triggering warnings in IncludeTool.
+			Out.Logf(TEXT("#if defined(UE_NET_HAS_IRIS_FASTARRAY_BINDING) && UE_NET_HAS_IRIS_FASTARRAY_BINDING\r\n"));
+			Out.Logf(TEXT("\tUE_NET_IMPLEMENT_FASTARRAY(%s);\r\n"), *StructNameCPP);
+			Out.Logf(TEXT("#else\r\n"));
+			Out.Logf(TEXT("\tUE_NET_IMPLEMENT_FASTARRAY_STUB(%s);\r\n"), *StructNameCPP);
+			Out.Logf(TEXT("#endif\r\n"));
 		}
 	}
 
@@ -7004,7 +7015,7 @@ void PrepareTypesForParsing(TArray<FUnrealPackageDefinitionInfo*>& PackageDefs)
 	// Does nothing now
 }
 
-void TopologicalRecursion(FUnrealSourceFile& First, FUnrealSourceFile& Visit)
+void TopologicalRecursion(FUnrealSourceFile& First, FUnrealSourceFile& Visit, TSet<FUnrealSourceFile*> SignaledFiles)
 {
 	check(Visit.GetTopologicalState() == ETopologicalState::Temporary);
 	for (FHeaderProvider& Header : Visit.GetIncludes())
@@ -7013,10 +7024,15 @@ void TopologicalRecursion(FUnrealSourceFile& First, FUnrealSourceFile& Visit)
 		{
 			if (Include->GetTopologicalState() == ETopologicalState::Temporary)
 			{
+				if (SignaledFiles.Contains(Include))
+				{
+					break;
+				}
+				SignaledFiles.Add(Include);
 				UE_LOG(LogCompile, Error, TEXT("%s includes/requires %s"), *Visit.GetFilename(), *Include->GetFilename());
 				if (&First != Include)
 				{
-					TopologicalRecursion(First, *Include);
+					TopologicalRecursion(First, *Include, SignaledFiles);
 				}
 				break;
 			}
@@ -7070,7 +7086,8 @@ void TopologicalSort(TArray<FUnrealSourceFile*>& OrderedSourceFiles)
 			if (FUnrealSourceFile* Recusion = TopologicalVisit(OrderedSourceFiles, *SourceFile))
 			{
 				UE_LOG(LogCompile, Error, TEXT("Circular dependency detected:"));
-				TopologicalRecursion(*Recusion, *Recusion);
+				TSet<FUnrealSourceFile*> SignaledFiles;
+				TopologicalRecursion(*Recusion, *Recusion, SignaledFiles);
 				FResults::SetResult(ECompilationResult::OtherCompilationError);
 				bCircularDependencyDetected = true;
 			}

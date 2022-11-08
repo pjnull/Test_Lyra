@@ -19,12 +19,19 @@
 #include "MoviePipelineImageSequenceOutput.h"
 #include "MoviePipelineOutputSetting.h"
 #include "MoviePipelinePIEExecutor.h"
+#include "MoviePipelinePrimaryConfig.h"
 #include "MoviePipelineQueue.h"
 
 
 URenderGridMoviePipelineRenderJob* URenderGridMoviePipelineRenderJob::Create(URenderGridQueue* Queue, URenderGridJob* Job, const UE::RenderGrid::FRenderGridQueueCreateArgs& Args)
 {
-	if (!IsValid(Queue) || !IsValid(Job) || !IsValid(Args.RenderGrid))
+	if (!IsValid(Queue) || !IsValid(Job))
+	{
+		return nullptr;
+	}
+
+	URenderGrid* RenderGrid = Args.RenderGrid.Get();
+	if (!IsValid(RenderGrid))
 	{
 		return nullptr;
 	}
@@ -37,7 +44,7 @@ URenderGridMoviePipelineRenderJob* URenderGridMoviePipelineRenderJob::Create(URe
 
 	URenderGridMoviePipelineRenderJob* RenderJob = NewObject<URenderGridMoviePipelineRenderJob>(Queue);
 	RenderJob->RenderGridJob = Job;
-	RenderJob->RenderGrid = Args.RenderGrid;
+	RenderJob->RenderGrid = RenderGrid;
 	RenderJob->PipelineQueue = NewObject<UMoviePipelineQueue>(RenderJob);
 	RenderJob->PipelineExecutor = NewObject<UMoviePipelineExecutorBase>(RenderJob, PipelineExecutor);
 	RenderJob->PipelineExecutorJob = nullptr;
@@ -58,7 +65,7 @@ URenderGridMoviePipelineRenderJob* URenderGridMoviePipelineRenderJob::Create(URe
 	}
 
 
-	ULevelSequence* JobSequence = Job->GetSequence();
+	ULevelSequence* JobSequence = Job->GetLevelSequence();
 	if (!IsValid(JobSequence) || !Job->GetSequenceStartFrame().IsSet() || !Job->GetSequenceEndFrame().IsSet() || (Job->GetSequenceStartFrame().Get(0) >= Job->GetSequenceEndFrame().Get(0)))
 	{
 		return RenderJob;
@@ -67,7 +74,7 @@ URenderGridMoviePipelineRenderJob* URenderGridMoviePipelineRenderJob::Create(URe
 	UMoviePipelineExecutorJob* NewJob = UMoviePipelineEditorBlueprintLibrary::CreateJobFromSequence(RenderJob->PipelineQueue, JobSequence);
 	RenderJob->PipelineExecutorJob = NewJob;
 
-	UMoviePipelineMasterConfig* JobRenderPreset = Job->GetRenderPreset();
+	UMoviePipelinePrimaryConfig* JobRenderPreset = Job->GetRenderPreset();
 	if (IsValid(JobRenderPreset))
 	{
 		NewJob->SetConfiguration(JobRenderPreset);
@@ -298,7 +305,8 @@ void URenderGridMoviePipelineRenderJob::ExecuteFinished(UMoviePipelineExecutorBa
 
 URenderGridQueue* URenderGridQueue::Create(const UE::RenderGrid::FRenderGridQueueCreateArgs& Args)
 {
-	if (!IsValid(Args.RenderGrid))
+	URenderGrid* RenderGrid = Args.RenderGrid.Get();
+	if (!IsValid(RenderGrid))
 	{
 		return nullptr;
 	}
@@ -306,12 +314,15 @@ URenderGridQueue* URenderGridQueue::Create(const UE::RenderGrid::FRenderGridQueu
 	URenderGridQueue* RenderQueue = NewObject<URenderGridQueue>(GetTransientPackage());
 	RenderQueue->Args = Args;
 	RenderQueue->Queue = MakeShareable(new UE::RenderGrid::Private::FRenderGridGenericExecutionQueue);
-	RenderQueue->RenderGrid = Args.RenderGrid;
+	RenderQueue->RenderGrid = RenderGrid;
 	RenderQueue->bCanceled = false;
 
-	for (const TObjectPtr<URenderGridJob> Job : Args.RenderGridJobs)
+	for (const TStrongObjectPtr<URenderGridJob>& JobPtr : Args.RenderGridJobs)
 	{
-		RenderQueue->AddJob(Job);
+		if (URenderGridJob* Job = JobPtr.Get(); IsValid(Job))
+		{
+			RenderQueue->AddJob(Job);
+		}
 	}
 	return RenderQueue;
 }
@@ -385,6 +396,99 @@ FString URenderGridQueue::GetJobStatus(URenderGridJob* Job) const
 		}
 	}
 	return TEXT("");
+}
+
+TArray<URenderGridJob*> URenderGridQueue::GetJobs() const
+{
+	TArray<URenderGridJob*> Jobs;
+	Jobs.Reserve(Entries.Num());
+	for (const TTuple<TObjectPtr<URenderGridJob>, TObjectPtr<URenderGridMoviePipelineRenderJob>> EntryEntry : Entries)
+	{
+		if (const TObjectPtr<URenderGridJob> Job = EntryEntry.Key; IsValid(Job))
+		{
+			if (const TObjectPtr<URenderGridMoviePipelineRenderJob> Entry = EntryEntry.Value; IsValid(Entry))
+			{
+				if (Entry->CanExecute())
+				{
+					Jobs.Add(Job);
+				}
+			}
+		}
+	}
+	return Jobs;
+}
+
+int32 URenderGridQueue::GetJobsCount() const
+{
+	int32 JobsCount = 0;
+	for (const TTuple<TObjectPtr<URenderGridJob>, TObjectPtr<URenderGridMoviePipelineRenderJob>> EntryEntry : Entries)
+	{
+		if (const TObjectPtr<URenderGridJob> Job = EntryEntry.Key; IsValid(Job))
+		{
+			if (const TObjectPtr<URenderGridMoviePipelineRenderJob> Entry = EntryEntry.Value; IsValid(Entry))
+			{
+				if (Entry->CanExecute())
+				{
+					JobsCount++;
+				}
+			}
+		}
+	}
+	return JobsCount;
+}
+
+int32 URenderGridQueue::GetJobsRemainingCount() const
+{
+	if (bCanceled)
+	{
+		return 0;
+	}
+
+	int32 JobsCount = 0;
+	for (const TObjectPtr<URenderGridJob> Job : RemainingJobs)
+	{
+		if (const TObjectPtr<URenderGridMoviePipelineRenderJob>* EntryPtr = Entries.Find(Job))
+		{
+			if (const TObjectPtr<URenderGridMoviePipelineRenderJob> Entry = *EntryPtr; IsValid(Entry))
+			{
+				if (Entry->CanExecute())
+				{
+					JobsCount++;
+				}
+			}
+		}
+	}
+	return JobsCount + 1; // one is removed when it starts rendering, but this job is still remaining of course, so let's add 1 here
+}
+
+int32 URenderGridQueue::GetJobsCompletedCount() const
+{
+	return (GetJobsCount() - GetJobsRemainingCount());
+}
+
+float URenderGridQueue::GetStatusPercentage() const
+{
+	if (bCanceled)
+	{
+		return 100.0;
+	}
+
+	double JobsCount = GetJobsCount();
+	if (JobsCount <= 0)
+	{
+		return 0.0;
+	}
+	double RemainingCount = GetJobsRemainingCount() - 0.5; // rendering a job, but we can't get the progression from the job, so let's say we're halfway there (0.0 started, 0.5 halfway, 1.0 finished)
+	return FMath::Clamp(100.0 - ((RemainingCount / JobsCount) * 100), 0.0, 100.0);
+}
+
+FString URenderGridQueue::GetStatus() const
+{
+	if (bCanceled)
+	{
+		return TEXT("Done");
+	}
+	return TEXT("Rendering...");
 }
 
 
@@ -482,7 +586,10 @@ void URenderGridQueue::OnFinish()
 	bool bSuccess = !bCanceled;
 	Cancel();// to prevent any new jobs from being added to it
 
-	RenderGrid->EndBatchRender(this);
+	if (Args.bIsBatchRender)
+	{
+		RenderGrid->EndBatchRender(this);
+	}
 
 	UE::RenderGrid::Private::FRenderGridUtils::RestoreFpsLimit(PreviousFrameLimitSettings);
 	PreviousFrameLimitSettings = FRenderGridPreviousEngineFpsSettings();

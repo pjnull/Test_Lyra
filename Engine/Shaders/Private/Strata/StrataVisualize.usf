@@ -20,6 +20,18 @@
 // This is for the fxc compiler to compile faster.
 #define STRATA_VIZ_MAX_BSDF 2
 
+void PrintBool(inout FShaderPrintContext Ctx, bool In)
+{
+	if (In)
+	{
+		Print(Ctx, TEXT("Yes  "), FontGreen);
+	}
+	else
+	{
+		Print(Ctx, TEXT("No   "), FontRed);
+	}
+}
+
 void DrawReferentialTWS(float3 P /*In Translated World Space*/, float3 X, float3 Y, float3 N, float3 InColor)
 {
 	const float Size = 10.f;
@@ -91,22 +103,6 @@ void DrawPixelFootprint(float3 P, float3 dPdx, float3 dPdy, uint2 PixelCoord)
 uint BSDFIndex;
 RWBuffer<uint> RWPositionOffsetBuffer;
 
-// View mode:
-// 1: Plot a single pixel
-// 2: Color code the number of BSDFs (green -> red)
-// 3: Add layer visualization
-void PrintBool(inout FShaderPrintContext Ctx, bool In, FFontColor InColor)
-{
-	if (In)
-	{
-		Print(Ctx, TEXT("Yes  "), FontGreen);
-	}
-	else
-	{
-		Print(Ctx, TEXT("No   "), FontRed);
-	}
-}
-
 void PrintPixelType(inout FShaderPrintContext Ctx, in FStrataPixelHeader Header, FFontColor InColor)
 {
 	if (IsSimpleMaterial(Header))			Print(Ctx, TEXT("Simple  "), InColor);
@@ -171,7 +167,7 @@ void PrintBSDF(inout FShaderPrintContext Context, inout FStrataAddressing Strata
 
 			Print(Context, TEXT("Slab "), FontBSDFType);
 			Newline(Context, RectMax);
-			Print(Context, TEXT(" NormalID Aniso TopLayer Scattering SingleScatt. IsThin WeightV "), FontBSDFStateName);
+			Print(Context, TEXT(" NormalID Aniso TopLayer Scattering SimpleVolume IsThin WeightV "), FontBSDFStateName);
 			if (!bGreyWeightV)
 			{
 				Print(Context, TEXT("           "), FontBSDFStateName);
@@ -183,12 +179,12 @@ void PrintBSDF(inout FShaderPrintContext Context, inout FStrataAddressing Strata
 			Newline(Context, RectMax);
 
 			Print(Context, TEXT(" "), FontSilver);
-			Print(Context, BSDF_GETSHAREDLOCALBASISID(BSDF), FontBSDF, 2, 1);			Print(Context, TEXT("       "), FontSilver);
-			PrintBool(Context, BSDF_GETHASANISOTROPY(BSDF), FontBSDF);					Print(Context, TEXT(" "), FontSilver);
-			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF), FontBSDF);						Print(Context, TEXT("    "), FontSilver);
-			PrintBool(Context, BSDF_GETSSSTYPE(BSDF) != SSS_TYPE_INVALID, FontBSDF);	Print(Context, TEXT("      "), FontSilver);
-			PrintBool(Context, BSDF_GETISSIMPLEVOLUME(BSDF), FontBSDF);					Print(Context, TEXT("        "), FontSilver);
-			PrintBool(Context, BSDF_GETISTHIN(BSDF), FontBSDF);							Print(Context, TEXT("  "), FontSilver);
+			Print(Context, BSDF_GETSHAREDLOCALBASISID(BSDF), FontBSDF, 2, 1);	Print(Context, TEXT("       "), FontSilver);
+			PrintBool(Context, BSDF_GETHASANISOTROPY(BSDF));					Print(Context, TEXT(" "));
+			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF));						Print(Context, TEXT("    "));
+			PrintBool(Context, BSDF_GETSSSTYPE(BSDF) != SSS_TYPE_INVALID);		Print(Context, TEXT("      "));
+			PrintBool(Context, BSDF_GETISSIMPLEVOLUME(BSDF));					Print(Context, TEXT("        "));
+			PrintBool(Context, BSDF_GETISTHIN(BSDF));							Print(Context, TEXT("  "));
 
 			// View Weight
 			{
@@ -268,16 +264,18 @@ void PrintBSDF(inout FShaderPrintContext Context, inout FStrataAddressing Strata
 			{
 				const FStrataSubsurfaceHeader SSSHeader = StrataLoadSubsurfaceHeader(Strata.MaterialTextureArray, Strata.FirstSliceStoringStrataSSSData, StrataAddressing.PixelCoords);
 				Print(Context, TEXT(" SSS Type    "), FontBSDFPropName);	PrintSSSType(Context, BSDF_GETSSSTYPE(BSDF), BSDF_GETISSIMPLEVOLUME(BSDF), BSDF_GETISTHIN(BSDF), FontYellow);	Newline(Context, RectMax);
-
 				if (BSDF_GETSSSTYPE(BSDF) == SSS_TYPE_WRAP)
 				{
-					Print(Context, TEXT(" SSS Opacity "), FontBSDFPropName);	Print(Context, StrataSubSurfaceHeaderGetWrapOpacity(SSSHeader), FontBSDFPropValu);	Newline(Context, RectMax);
+					const float Opacity = StrataSubSurfaceHeaderGetWrapOpacity(SSSHeader);
+					Print(Context, TEXT(" SSS Opacity "), FontBSDFPropName);	Print(Context, Opacity, FontBSDFPropValu);	Newline(Context, RectMax);
 				}
-
 				if (BSDF_GETSSSTYPE(BSDF) == SSS_TYPE_DIFFUSION_PROFILE && BSDF_GETISSIMPLEVOLUME(BSDF) == 0)
 				{
-					Print(Context, TEXT(" SSS ID.     "), FontBSDFPropName);	Print(Context, SLAB_SSSPROFILEID(BSDF), FontBSDFPropValu);			Newline(Context, RectMax);
-					Print(Context, TEXT(" SSS Radius  "), FontBSDFPropName);	Print(Context, SLAB_SSSPROFILERADIUSSCALE(BSDF), FontBSDFPropValu);	Newline(Context, RectMax);
+					const uint ProfileId = StrataSubSurfaceHeaderGetProfileId(SSSHeader);
+					const float RadiusScale = StrataSubSurfaceHeaderGetProfileRadiusScale(SSSHeader);
+
+					Print(Context, TEXT(" SSS ID.     "), FontBSDFPropName);	Print(Context, ProfileId, FontBSDFPropValu);	Newline(Context, RectMax);
+					Print(Context, TEXT(" SSS Radius  "), FontBSDFPropName);	Print(Context, RadiusScale, FontBSDFPropValu);	Newline(Context, RectMax);
 				}
 				else
 				{
@@ -304,8 +302,8 @@ void PrintBSDF(inout FShaderPrintContext Context, inout FStrataAddressing Strata
 
 			Print(Context, TEXT(" "), FontSilver);
 			Print(Context, BSDF_GETSHAREDLOCALBASISID(BSDF), FontBSDF);
-			PrintBool(Context, BSDF_GETHASANISOTROPY(BSDF), FontBSDF);
-			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF), FontBSDF);
+			PrintBool(Context, BSDF_GETHASANISOTROPY(BSDF));
+			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF));
 			if (BSDF_GETHASGREYWEIGHT_V(BSDF))
 			{
 				Print(Context, BSDF.LuminanceWeightV.x, FontSilver);
@@ -336,7 +334,7 @@ void PrintBSDF(inout FShaderPrintContext Context, inout FStrataAddressing Strata
 
 			Print(Context, TEXT(" "), FontSilver);
 			Print(Context, BSDF_GETSHAREDLOCALBASISID(BSDF), FontBSDF);
-			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF), FontBSDF);
+			PrintBool(Context, BSDF_GETISTOPLAYER(BSDF));
 			if (BSDF_GETHASGREYWEIGHT_V(BSDF))
 			{
 				Print(Context, BSDF.LuminanceWeightV.x, FontSilver);
@@ -444,6 +442,28 @@ void PrintPixel(uint2 InCoord, float3 InWorldPosition, float3 V)
 		Print(Context, TEXT("BSDF"), FontBSDFCount);
 		Print(Context, TEXT(" - "), FontWhite);
 		PrintPixelType(Context, Header, FontLightRed);
+		if (bIsSingleMaterial)
+		{
+		#if STRATA_DEFERRED_SHADING
+			uint OptimisedLegacyMode = (Header.SharedLocalBasesTypes_PackedHeader >> (HEADER_SINGLEENCODING_BIT_COUNT)) & HEADER_SINGLE_OPTLEGACYMODE_BIT_MASK;
+			if (OptimisedLegacyMode ==SINGLE_OPTLEGACYMODE_CLEARCOAT)
+			{
+				Print(Context, TEXT(" - Legecy Clear-Coat"), FontLightRed);
+			}
+			else if (OptimisedLegacyMode ==SINGLE_OPTLEGACYMODE_CLOTH)
+			{
+				Print(Context, TEXT(" - Legecy Cloth"), FontLightRed);
+			}
+			else if (OptimisedLegacyMode ==SINGLE_OPTLEGACYMODE_SSSWRAP)
+			{
+				Print(Context, TEXT(" - Legecy SSS-Wrap"), FontLightRed);
+			}
+			else if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_SSSPROFILE)
+			{
+				Print(Context, TEXT(" - Legecy SSS-Profile"), FontLightRed);
+			}
+		#endif
+		}
 		Newline(Context, RectMax);
 
 		Print(Context, TEXT(" AO    IndIrr TopRoughness PreShadow ZeroShadow ContacShadow Ind.Occluder HasSSS"), FontHeaderStateName);
@@ -453,11 +473,11 @@ void PrintPixel(uint2 InCoord, float3 InWorldPosition, float3 V)
 		Print(Context, IrradianceAndOcclusion.MaterialAO, FontHeaderPropValue, 5, 3);					Print(Context, TEXT(" "));
 		Print(Context, IrradianceAndOcclusion.IndirectIrradiance, FontHeaderPropValue, 6, 3);			Print(Context, TEXT(" "));
 		Print(Context, TopLayerData.Roughness, FontHeaderPropValue, 5, 3);								Print(Context, TEXT("        "));
-		PrintBool(Context, HasPrecShadowMask(Header), FontHeaderPropValue);								Print(Context, TEXT("     "));
-		PrintBool(Context, HasZeroPrecShadowMask(Header), FontHeaderPropValue);							Print(Context, TEXT("      "));
-		PrintBool(Context, DoesCastContactShadow(Header), FontHeaderPropValue);							Print(Context, TEXT("        "));
-		PrintBool(Context, HasDynamicIndirectShadowCasterRepresentation(Header), FontHeaderPropValue);	Print(Context, TEXT("        "));
-		PrintBool(Context, HasSubsurface(Header), FontHeaderPropValue);
+		PrintBool(Context, HasPrecShadowMask(Header));													Print(Context, TEXT("     "));
+		PrintBool(Context, HasZeroPrecShadowMask(Header));												Print(Context, TEXT("      "));
+		PrintBool(Context, DoesCastContactShadow(Header));												Print(Context, TEXT("        "));
+		PrintBool(Context, HasDynamicIndirectShadowCasterRepresentation(Header));						Print(Context, TEXT("        "));
+		PrintBool(Context, HasSubsurface(Header));
 		Newline(Context, RectMax);
 		Newline(Context);
 		
@@ -495,7 +515,7 @@ void PrintPixel(uint2 InCoord, float3 InWorldPosition, float3 V)
 		const bool bHasSSSData = StrataSubSurfaceHeaderGetIsValid(SSSHeader);
 
 		const uint TopLayerDataBytes = 4;	// bytes 
-		const uint SSSDataBytes = 8;	    // bytes 
+		const uint SSSDataBytes = 8;
 
 		const uint HeaderSize =  FootPrint_PostHeader - FootPrint_Start;
 		const uint BSDFsSize  =  FootPrint_PostBSDFs - FootPrint_PostHeader;
@@ -563,7 +583,7 @@ void MaterialPrintInfoCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Material Visualize
 
-#if SHADER_MATERIALVISUALIZE
+#if SHADER_MATERIALCOUNT
 
 uint ViewMode;
 
@@ -583,29 +603,33 @@ void VisualizeMaterialPS(
 
 	FStrataAddressing StrataAddressing = GetStrataPixelDataByteOffset(PixelPosDynRes, uint2(View.BufferSizeAndInvSize.xy), Strata.MaxBytesPerPixel);
 	FStrataPixelHeader Header = UnpackStrataHeaderIn(Strata.MaterialTextureArray, StrataAddressing, Strata.TopLayerTexture);
-	bool bStrataMaterial = Header.BSDFCount > 0;
+	const bool bStrataMaterial = Header.BSDFCount > 0;
 
 	OutColor = 0;
+	OutColor.w = 0.1f;
 
 	// BSDF count
-	if (ViewMode == 2)
+	const float MaxBSDFCount = 4.f;
+	if (Header.BSDFCount > 0)
 	{
-		OutColor.w = 0.1f;
-		if (Header.BSDFCount > 0)
-		{
-			const float BSDFCost = saturate(float(Header.BSDFCount) / 4.f);
-			OutColor.xyz = ColorMapTurbo(BSDFCost);
-		}
+		const float BSDFCost = saturate(float(Header.BSDFCount) / MaxBSDFCount);
+		OutColor.xyz = ColorMapTurbo(BSDFCost);
 	}
-	else
+
+	// Print Legend
+	if (all(uint2(SVPos.xy) == uint2(0,0)))
 	{
-		OutColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
+		FShaderPrintContext Context = InitShaderPrintContext(true, uint2(50, 50));
+		Print(Context, TEXT("1 BSDF"), InitFontColor(ColorMapTurbo(1 / MaxBSDFCount))); Newline(Context);
+		Print(Context, TEXT("2 BSDF"), InitFontColor(ColorMapTurbo(2 / MaxBSDFCount))); Newline(Context);
+		Print(Context, TEXT("3 BSDF"), InitFontColor(ColorMapTurbo(3 / MaxBSDFCount))); Newline(Context);
+		Print(Context, TEXT("4 BSDF"), InitFontColor(ColorMapTurbo(4 / MaxBSDFCount))); Newline(Context);
 	}
 }
-#endif // SHADER_MATERIALVISUALIZE
+#endif // SHADER_MATERIALCOUNT
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// Material Visualize
+// Advanced Material Visualize
 
 #define BSDF_ELEMENT_SIZE 210
 #define BSDF_ELEMENT_STARTX 100.0f + 450.0f
@@ -642,13 +666,13 @@ void MaterialDebugStrataTreeCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	FStrataPixelHeader Header = UnpackStrataHeaderIn(Strata.MaterialTextureArray, StrataAddressing, Strata.TopLayerTexture);
 	if (Header.BSDFCount > 0)
 	{
-		const int SliceStoringDebugStrataTree = Strata.SliceStoringDebugStrataTree + STRATA_BASE_PASS_MRT_OUTPUT_COUNT;
+		const int SliceStoringDebugStrataTreeData = Strata.SliceStoringDebugStrataTreeData;
 
 		FStrataTreeHeader StrataTreeHeader = (FStrataTreeHeader)0;
 		StrataUnpackInStrataTreeHeader(
 			Strata.MaterialTextureArray,
 			StrataTreeHeader,
-			SliceStoringDebugStrataTree);
+			SliceStoringDebugStrataTreeData);
 
 		FShaderPrintContext Context;
 		Context = InitShaderPrintContext(true, uint2(50, 50));
@@ -688,7 +712,7 @@ void MaterialDebugStrataTreeCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 					i,
 					Strata.MaterialTextureArray,
 					StrataTreeHeader,
-					SliceStoringDebugStrataTree);
+					SliceStoringDebugStrataTreeData);
 
 				Print(Context, TEXT("OperatorIndex = "), FontCyan);
 				Print(Context, i, FontCyan, 2, 0);
@@ -773,7 +797,7 @@ void MaterialDebugStrataTreeCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 					i,
 					Strata.MaterialTextureArray,
 					StrataTreeHeader,
-					SliceStoringDebugStrataTree);
+					SliceStoringDebugStrataTreeData);
 
 				const bool bActive = any(BSDF.LuminanceWeightV > 0.0);
 				FFontColor BSDFFont = FontDarkRed;
@@ -844,7 +868,7 @@ void MaterialDebugStrataTreeCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 				OperatorIndex,
 				Strata.MaterialTextureArray,
 				StrataTreeHeader,
-				SliceStoringDebugStrataTree);
+				SliceStoringDebugStrataTreeData);
 
 			Context = InitShaderPrintContext(true, uint2(PrintPosStack[StackPtr]));
 			if (Op.Type == STRATA_OPERATOR_WEIGHT)
@@ -1272,13 +1296,13 @@ void MaterialDebugStrataTreePS(
 			OutColor = float4(1.0f, 1.0f, 1.0f, 0.5f);							// Operator/BSDF separator
 		}
 
-		const int SliceStoringDebugStrataTree = Strata.SliceStoringDebugStrataTree + STRATA_BASE_PASS_MRT_OUTPUT_COUNT;
+		const int SliceStoringDebugStrataTreeData = Strata.SliceStoringDebugStrataTreeData;
 
 		FStrataTreeHeader StrataTreeHeader = (FStrataTreeHeader)0;
 		StrataUnpackInStrataTreeHeader(
 			Strata.MaterialTextureArray,
 			StrataTreeHeader,
-			SliceStoringDebugStrataTree);
+			SliceStoringDebugStrataTreeData);
 
 
 		float2 Pos = float2(BSDF_ELEMENT_STARTX, BSDF_ELEMENT_STARTY);
@@ -1298,7 +1322,7 @@ void MaterialDebugStrataTreePS(
 					i,
 					Strata.MaterialTextureArray,
 					StrataTreeHeader,
-					SliceStoringDebugStrataTree);
+					SliceStoringDebugStrataTreeData);
 
 				//if (BSDF.Coverage > 0.0f)
 				{
@@ -1347,13 +1371,13 @@ void MaterialDebugStrataTreePS(
 					i,
 					Strata.MaterialTextureArray,
 					StrataTreeHeader,
-					SliceStoringDebugStrataTree);
+					SliceStoringDebugStrataTreeData);
 
 				FStrataOperator Op = StrataUnpackInStrataTreeOperator(
 					BSDF.OperatorIndex,
 					Strata.MaterialTextureArray,
 					StrataTreeHeader,
-					SliceStoringDebugStrataTree);
+					SliceStoringDebugStrataTreeData);
 
 				const uint LayerDepth = Op.LayerDepth;
 
@@ -1383,3 +1407,184 @@ void MaterialDebugStrataTreePS(
 }
 
 #endif // SHADER_DEBUGSTRATATREE_PS
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Material Print
+
+#if SHADER_SYSTEMINFO
+uint bAdvancedDebugEnabled;
+uint bEnergyConservation;
+uint bEnergyPreservation;
+uint bDbufferPass;
+uint ClassificationCMask;
+uint ClassificationAsync;
+uint Classification8bits;
+uint bRoughRefraction;
+uint bTileOverflowUseMaterialData;
+float TileOverflowRatio;
+Buffer<uint> ClassificationTileDrawIndirectBuffer;
+
+uint GetTileCount(uint InType)
+{
+	return ClassificationTileDrawIndirectBuffer[InType * 4 + 1];
+}
+
+[numthreads(1, 1, 1)]
+void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+{
+	// Print Legend
+	if (all(DispatchThreadId == 0))
+	{
+		FFontColor TitleColor  = FontYellow;
+		FFontColor LegendColor = FontWhite;
+		FFontColor ValueColor  = FontOrange;
+		FShaderPrintContext Context = InitShaderPrintContext(true, uint2(50, 50));
+
+		// General
+		Print(Context, TEXT("General"), TitleColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" Max byte per pixel : "), LegendColor); 
+		Print(Context, Strata.MaxBytesPerPixel, ValueColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" Shading quality    : "), LegendColor);
+		Print(Context, uint(STRATA_SHADING_QUALITY), ValueColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" Rough diffuse      : "), LegendColor);
+		PrintBool(Context, Strata.bRoughDiffuse);
+		Newline(Context);
+
+		Print(Context, TEXT(" Energy conservation: "), LegendColor);
+		PrintBool(Context, bEnergyConservation);
+		Newline(Context);
+
+		Print(Context, TEXT(" Energy preservation: "), LegendColor);
+		PrintBool(Context, bEnergyPreservation);
+		Newline(Context);
+
+		Print(Context, TEXT(" Tile overflow mat. : "), LegendColor);
+		PrintBool(Context, bTileOverflowUseMaterialData);
+		Newline(Context); 
+
+		Print(Context, TEXT(" Tile overflow      : "), LegendColor);
+		Print(Context, TileOverflowRatio, ValueColor, 3, 1);
+		Print(Context, TEXT(" ["), LegendColor);
+		Print(Context, TileOverflowRatio +1, ValueColor, 2, 0);
+		Print(Context, TEXT(" BSDFs]"), LegendColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" DBuffer pass       : "), LegendColor);
+		PrintBool(Context, bDbufferPass);
+		Newline(Context);
+
+		Print(Context, TEXT(" Rough refraction   : "), LegendColor);
+		PrintBool(Context, bRoughRefraction);
+		Newline(Context);
+
+		Newline(Context);
+
+		// Classification
+		Print(Context, TEXT("Classification"), TitleColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" Tile Size          : "), LegendColor);
+		Print(Context, Strata.TileSize, ValueColor, 1, 0);
+		Print(Context, TEXT("x"), LegendColor);
+		Print(Context, Strata.TileSize, ValueColor, 1, 0);
+		Newline(Context);
+
+		Print(Context, TEXT(" Tile Count         : "), LegendColor);
+		Print(Context, Strata.TileCount.x, ValueColor, 3, 0);
+		Print(Context, TEXT("x"), LegendColor);
+		Print(Context, Strata.TileCount.y, ValueColor, 3, 0);
+		Newline(Context);
+
+		Print(Context, TEXT(" CMask              : "), LegendColor);
+		PrintBool(Context, ClassificationCMask);
+		Newline(Context);
+
+		Print(Context, TEXT(" Async              : "), LegendColor);
+		PrintBool(Context, ClassificationAsync);
+		Newline(Context);
+
+		Print(Context, TEXT(" 8-bits coord       : "), LegendColor);
+		PrintBool(Context, Classification8bits);
+		Newline(Context);
+
+		Newline(Context);
+
+		// Material tiles
+		Print(Context, TEXT("Material Tiles"), TitleColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" # Simple tiles     : "), LegendColor);
+		Print(Context, GetTileCount(STRATA_TILE_TYPE_SIMPLE), ValueColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" # Single tiles     : "), LegendColor);
+		Print(Context, GetTileCount(STRATA_TILE_TYPE_SINGLE), ValueColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" # Complex tiles    : "), LegendColor);
+		Print(Context, GetTileCount(STRATA_TILE_TYPE_COMPLEX), ValueColor);
+		Newline(Context);
+
+		Newline(Context);
+
+		// Rough tiles
+		if (bRoughRefraction)
+		{
+			Print(Context, TEXT("Rough Refraction Tiles"), TitleColor);
+			Newline(Context);
+
+			Print(Context, TEXT(" # Rough refract.   : "), LegendColor);
+			Print(Context, GetTileCount(STRATA_TILE_TYPE_ROUGH_REFRACT), ValueColor);
+			Newline(Context);
+
+			Print(Context, TEXT(" # Rough r. w/o SSS : "), LegendColor);
+			Print(Context, GetTileCount(STRATA_TILE_TYPE_ROUGH_REFRACT_SSS_WITHOUT), ValueColor);
+			Newline(Context);
+
+			Newline(Context);
+		}
+
+		// DBuffer Tiles
+		if (bDbufferPass)
+		{
+			Print(Context, TEXT("Decal Tiles"), TitleColor);
+			Newline(Context);
+
+			Print(Context, TEXT(" # Simple tiles     : "), LegendColor);
+			Print(Context, GetTileCount(STRATA_TILE_TYPE_DECAL_SIMPLE), ValueColor);
+			Newline(Context);
+
+			Print(Context, TEXT(" # Single tiles     : "), LegendColor);
+			Print(Context, GetTileCount(STRATA_TILE_TYPE_DECAL_SINGLE), ValueColor);
+			Newline(Context);
+
+			Print(Context, TEXT(" # Complex tiles    : "), LegendColor);
+			Print(Context, GetTileCount(STRATA_TILE_TYPE_DECAL_COMPLEX), ValueColor);
+			Newline(Context);
+
+			Newline(Context);
+		}
+
+		// Debug
+		Print(Context, TEXT("Debug"), TitleColor);
+		Newline(Context);
+
+		Print(Context, TEXT(" Adv. debug         : "), LegendColor);
+		PrintBool(Context, bAdvancedDebugEnabled);
+		Newline(Context);
+
+		Print(Context, TEXT(" Layer peel index   : "), LegendColor);
+		Print(Context, Strata.PeelLayersAboveDepth, ValueColor);
+		Newline(Context);
+
+		Newline(Context);
+	}
+}
+#endif // SHADER_SYSTEMINFO

@@ -16,6 +16,8 @@
 #include "Animation/AnimationPoseData.h"
 #include "Animation/BlendProfile.h"
 #include "Animation/MirrorDataTable.h"
+#include "SkeletonRemappingRegistry.h"
+#include "SkeletonRemapping.h"
 
 DEFINE_LOG_CATEGORY(LogAnimation);
 DEFINE_LOG_CATEGORY(LogRootMotion);
@@ -1493,6 +1495,46 @@ void FAnimationRuntime::GetKeyIndicesFromTime(int32& OutKeyIndex1, int32& OutKey
 	OutAlpha = (float)Alpha;
 }
 
+void FAnimationRuntime::GetKeyIndicesFromTime(int32& OutKeyIndex1, int32& OutKeyIndex2, float& OutAlpha, const double Time, const FFrameRate& FrameRate, const int32 NumberOfKeys)
+{
+	// Check for 1-frame, before-first-frame and after-last-frame cases.
+	if (Time <= 0.0 || NumberOfKeys == 1)
+	{
+		OutKeyIndex1 = 0;
+		OutKeyIndex2 = 0;
+		OutAlpha = 0.0f;
+		return;
+	}
+
+	const FFrameTime FrameTime = FrameRate.AsFrameTime(Time);
+	const FFrameTime LastFrameTimeIndex = FFrameTime(NumberOfKeys - 1);
+	if (FrameTime >= LastFrameTimeIndex)
+	{
+		OutKeyIndex1 = LastFrameTimeIndex.FrameNumber.Value;
+		OutKeyIndex2 = 0;
+		OutAlpha = 0.0f;
+		return;
+	}
+
+	// Find the integer part (ensuring within range) and that gives us the 'starting' key index.
+	const int32 KeyIndex1 = FMath::Clamp<int32>(FrameTime.GetFrame().Value, 0, NumberOfKeys - 1); 
+
+	// The alpha (fractional part) is then just the remainder.
+	const float Alpha = FrameTime.GetSubFrame();
+
+	int32 KeyIndex2 = KeyIndex1 + 1;
+
+	// If we have gone over the end, do different things in case of looping
+	if (KeyIndex2 == NumberOfKeys)
+	{
+		KeyIndex2 = KeyIndex1;
+	}
+
+	OutKeyIndex1 = KeyIndex1;
+	OutKeyIndex2 = KeyIndex2;
+	OutAlpha = Alpha;
+}
+
 FTransform FAnimationRuntime::GetComponentSpaceRefPose(const FCompactPoseBoneIndex& CompactPoseBoneIndex, const FBoneContainer& BoneContainer)
 {
 	FCompactPoseBoneIndex CurrentIndex = CompactPoseBoneIndex;
@@ -2558,10 +2600,10 @@ void FAnimationRuntime::RetargetBoneTransform(const USkeleton* SourceSkeleton, c
 	if (SourceSkeleton)
 	{
 		const USkeleton* TargetSkeleton = RequiredBones.GetSkeletonAsset();
-		const FSkeletonRemapping* SkeletonRemapping = TargetSkeleton->GetSkeletonRemapping(SourceSkeleton);
+		const FSkeletonRemapping& SkeletonRemapping = UE::Anim::FSkeletonRemappingRegistry::Get().GetRemapping(SourceSkeleton, TargetSkeleton);
 
 		const int32 TargetSkeletonBoneIndex = RequiredBones.GetSkeletonIndex(BoneIndex);
-		const int32 SourceSkeletonBoneIndex = (SkeletonRemapping) ? SkeletonRemapping->GetSourceSkeletonBoneIndex(TargetSkeletonBoneIndex) : SkeletonBoneIndex;
+		const int32 SourceSkeletonBoneIndex = SkeletonRemapping.IsValid() ? SkeletonRemapping.GetSourceSkeletonBoneIndex(TargetSkeletonBoneIndex) : SkeletonBoneIndex;
 
 		switch (TargetSkeleton->GetBoneTranslationRetargetingMode(TargetSkeletonBoneIndex))
 		{
@@ -2595,9 +2637,9 @@ void FAnimationRuntime::RetargetBoneTransform(const USkeleton* SourceSkeleton, c
 
 					// Remap the base pose onto the target skeleton so that we are working entirely in target space
 					FTransform BaseTransform = AuthoredOnRefSkeleton[SourceSkeletonBoneIndex];
-					if (SkeletonRemapping)
+					if (SkeletonRemapping.RequiresReferencePoseRetarget())
 					{
-						BaseTransform = SkeletonRemapping->RetargetBoneTransformToTargetSkeleton(TargetSkeletonBoneIndex, BaseTransform);
+						BaseTransform = SkeletonRemapping.RetargetBoneTransformToTargetSkeleton(TargetSkeletonBoneIndex, BaseTransform);
 					}
 
 					// Apply the retargeting as if it were an additive difference between the current skeleton and the retarget skeleton. 

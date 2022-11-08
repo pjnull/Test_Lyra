@@ -316,7 +316,7 @@ template <typename ID3D1xShaderReflection, typename D3D1x_SHADER_DESC, typename 
 
 			if (bGlobalCB)
 			{
-				if (ShouldUseStableConstantBuffer(Input))
+				if (UE::ShaderCompilerCommon::ShouldUseStableConstantBuffer(Input))
 				{
 					// Each member found in the global constant buffer means it was not in RootParametersStructure or
 					// it would have been moved by ShaderParameterParser.ParseAndModify().
@@ -360,7 +360,7 @@ template <typename ID3D1xShaderReflection, typename D3D1x_SHADER_DESC, typename 
 					}
 				}
 			}
-			else if (bIsRootCB && ShouldUseStableConstantBuffer(Input))
+			else if (bIsRootCB && UE::ShaderCompilerCommon::ShouldUseStableConstantBuffer(Input))
 			{
 				if (CBIndex == FShaderParametersMetadata::kRootCBufferBindingIndex)
 				{
@@ -434,17 +434,7 @@ template <typename ID3D1xShaderReflection, typename D3D1x_SHADER_DESC, typename 
 			const bool bIsVendorParameter = bIsAMDTexExtension || bIsAMDSmpExtension;
 
 			const uint32 BindCount = 1;
-			EShaderParameterType ParameterType = EShaderParameterType::Num;
-			if (BindDesc.Type == D3D_SIT_SAMPLER)
-			{
-				ParameterType = EShaderParameterType::Sampler;
-				NumSamplers = FMath::Max(NumSamplers, BindDesc.BindPoint + BindCount);
-			}
-			else // D3D_SIT_TEXTURE
-			{
-				ParameterType = EShaderParameterType::SRV;
-				NumSRVs = FMath::Max(NumSRVs, BindDesc.BindPoint + BindCount);
-			}
+			const EShaderParameterType ParameterType = (BindDesc.Type == D3D_SIT_SAMPLER) ? EShaderParameterType::Sampler : EShaderParameterType::SRV;
 
 			if (bIsVendorParameter)
 			{
@@ -453,10 +443,12 @@ template <typename ID3D1xShaderReflection, typename D3D1x_SHADER_DESC, typename 
 			else if (ParameterType == EShaderParameterType::Sampler)
 			{
 				HandleReflectedShaderSampler(FString(BindDesc.Name), BindDesc.BindPoint, Output);
+				NumSamplers = FMath::Max(NumSamplers, BindDesc.BindPoint + BindCount);
 			}
 			else
 			{
 				HandleReflectedShaderResource(FString(BindDesc.Name), BindDesc.BindPoint, Output);
+				NumSRVs = FMath::Max(NumSRVs, BindDesc.BindPoint + BindCount);
 			}
 		}
 		else if (BindDesc.Type == D3D_SIT_UAV_RWTYPED || BindDesc.Type == D3D_SIT_UAV_RWSTRUCTURED ||
@@ -499,9 +491,8 @@ template <typename ID3D1xShaderReflection, typename D3D1x_SHADER_DESC, typename 
 			else
 			{
 				HandleReflectedShaderUAV(FString(BindDesc.Name), BindDesc.BindPoint, Output);
+				NumUAVs = FMath::Max(NumUAVs, BindDesc.BindPoint + BindCount);
 			}
-
-			NumUAVs = FMath::Max(NumUAVs, BindDesc.BindPoint + BindCount);
 		}
 		else if (BindDesc.Type == D3D_SIT_STRUCTURED || BindDesc.Type == D3D_SIT_BYTEADDRESS)
 		{

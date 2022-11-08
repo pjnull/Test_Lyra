@@ -48,6 +48,7 @@
 #include "Misc/StringBuilder.h"
 #include "ProfilingDebugging/CookStats.h"
 #include "UObject/ArchiveCookContext.h"
+#include "TextureBuildUtilities.h"
 #include "VT/VirtualTextureDataBuilder.h"
 #include "VT/LightmapVirtualTexture.h"
 #include "TextureCompiler.h"
@@ -257,6 +258,18 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 		Ar << TempGuid;
 	}
 
+	if ( Settings.bCubemap && Settings.bUseNewMipFilter )
+	{
+		if ( ( Settings.MipGenSettings >= TMGS_Sharpen0 && Settings.MipGenSettings <= TMGS_Sharpen10 ) ||
+			( Settings.MipGenSettings >= TMGS_Blur1 && Settings.MipGenSettings <= TMGS_Blur5 ) )
+		{
+			// @todo SerializeForKey these can go away whenever we bump the overall ddc key
+			// behavior of mip filter changed so modify the key :
+			TempGuid = FGuid(0xB0420236,0x90064562,0x9C1F10B8,0x2771C31F);
+			Ar << TempGuid;			
+		}
+	}
+
 	if ( Settings.MaxTextureResolution != FTextureBuildSettings::MaxTextureResolutionDefault &&
 		( Settings.MipGenSettings == TMGS_LeaveExistingMips || Settings.bDoScaleMipsForAlphaCoverage ) )
 	{
@@ -282,9 +295,18 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 
 	// do not change key if old mip filter is used for old textures
 	// @todo SerializeForKey these can go away whenever we bump the overall ddc key
+	// instead just serialize bool 
 	if (Settings.bUseNewMipFilter)
 	{
 		TempGuid = FGuid(0x27B79A99, 0xE1A5458E, 0xAB619475, 0xCD01AD2A);
+		Ar << TempGuid;
+	}
+	
+	// @todo SerializeForKey these can go away whenever we bump the overall ddc key
+	// instead just serialize bool bNormalizeNormals
+	if ( Settings.bNormalizeNormals )
+	{
+		TempGuid = FGuid(0x0F5221F6,0x992344D3,0x9C3CCED9,0x4AF08FB8);
 		Ar << TempGuid;
 	}
 
@@ -299,6 +321,16 @@ static void SerializeForKey(FArchive& Ar, const FTextureBuildSettings& Settings)
 	if (Settings.CompressionCacheId.IsValid())
 	{
 		TempGuid = Settings.CompressionCacheId; Ar << TempGuid;
+	}
+
+	if ( Settings.bUseNewMipFilter )
+	{
+		// @todo SerializeForKey : TextureAddressModeX is only used if bUseNewMipFilter is true
+		//	so we hide it in here to avoid changing more DDC keys
+		// todo: when there is an overall DDC key bump, remove ths if on NewFilter so this is just always written
+		TempByte = Settings.TextureAddressModeX; Ar << TempByte;
+		TempByte = Settings.TextureAddressModeY; Ar << TempByte;
+		TempByte = Settings.TextureAddressModeZ; Ar << TempByte;
 	}
 
 	// Note - compression quality is added to the DDC by the formats (based on whether they
@@ -839,6 +871,7 @@ static void GetTextureBuildSettings(
 
 	OutBuildSettings.CompressionCacheId = Texture.CompressionCacheId;
 	OutBuildSettings.bUseNewMipFilter = Texture.bUseNewMipFilter;
+	OutBuildSettings.bNormalizeNormals = Texture.bNormalizeNormals && Texture.IsNormalMap();
 	OutBuildSettings.bComputeBokehAlpha = (Texture.LODGroup == TEXTUREGROUP_Bokeh);
 	OutBuildSettings.bReplicateAlpha = false;
 	OutBuildSettings.bReplicateRed = false;
@@ -1014,6 +1047,10 @@ static void GetTextureBuildSettings(
 		OutBuildSettings.VirtualTextureTileSize = 0;
 		OutBuildSettings.VirtualTextureBorderSize = 0;
 	}
+	
+	OutBuildSettings.TextureAddressModeX = Texture.GetTextureAddressX();
+	OutBuildSettings.TextureAddressModeY = Texture.GetTextureAddressY();
+	OutBuildSettings.TextureAddressModeZ = Texture.GetTextureAddressZ();
 
 	// By default, initialize settings for layer0
 	FinalizeBuildSettingsForLayer(Texture, 0, &TargetPlatform, InEncodeSpeed, OutBuildSettings, OutBuildResultMetadata);
@@ -1123,6 +1160,25 @@ static void GetBuildSettingsPerFormat(
 		{
 			FTextureBuildSettings& OutSettings = OutSettingPerLayer.Add_GetRef(SourceBuildSettings);
 			OutSettings.TextureFormatName = PlatformFormatsPerLayer[LayerIndex];
+
+			if (OutSettings.bVirtualStreamable)
+			{
+				// Virtual textures always strip the child format prefix prior to actual encode since
+				// VTs never tile. We do this here so that we can end up with the same DDC keys and
+				// avoid re-encoding the same texture N times under different keys.
+				// This is the same code used at the end of FVirtualTextureDataBuilder::BuildSourcePixels
+				FName TextureFormatPrefix;
+				FName TextureFormatName = UE::TextureBuildUtilities::TextureFormatRemovePrefixFromName(OutSettings.TextureFormatName, TextureFormatPrefix);
+
+				if (TextureFormatPrefix.IsNone())
+				{
+					OutSettings.TextureFormatName = TextureFormatName;
+				}
+				else
+				{
+					OutSettings.TextureFormatName = *(TextureFormatPrefix.ToString() + TextureFormatName.ToString());
+				}
+			}
 
 			FTexturePlatformData::FTextureEncodeResultMetadata* OutResultMetadata = nullptr;
 			if (OutResultMetadataPerLayer)
@@ -2109,18 +2165,16 @@ int32 FTexturePlatformData::GetNumNonStreamingMips(bool bIsStreamingPossible) co
 		NumNonStreamingMips = FMath::Max(NumNonStreamingMips, (int32)GetNumMipsInTail());
 		NumNonStreamingMips = FMath::Max(NumNonStreamingMips, UTexture2D::GetStaticMinTextureResidentMipCount());
 		NumNonStreamingMips = FMath::Min(NumNonStreamingMips, MipCount);
-		int32 BlockSizeX = GPixelFormats[PixelFormat].BlockSizeX;
-		int32 BlockSizeY = GPixelFormats[PixelFormat].BlockSizeY;
-		if (BlockSizeX > 1 || BlockSizeY > 1)
+
+		if ( RequiresBlock4Alignment(PixelFormat) )
 		{
-			// ensure the top non-streamed mip size is >= BlockSize (and a multiple of block size!)
-			// @todo Oodle : only do for BCN, not for ASTC
+			// ensure the top non-streamed mip (and all streamed mips) size is >= BlockSize (and a multiple of block size!)
 			
 			// note: this is not right for non pow 2; NeverStream should set !bIsStreamingPossible in that case
 			if ( FMath::IsPowerOfTwo(Mips[0].SizeX) && FMath::IsPowerOfTwo(Mips[0].SizeY) )
 			{
-				NumNonStreamingMips = FMath::Max<int32>(NumNonStreamingMips, MipCount - FPlatformMath::FloorLog2(Mips[0].SizeX / BlockSizeX));
-				NumNonStreamingMips = FMath::Max<int32>(NumNonStreamingMips, MipCount - FPlatformMath::FloorLog2(Mips[0].SizeY / BlockSizeY));
+				NumNonStreamingMips = FMath::Max<int32>(NumNonStreamingMips, MipCount - FPlatformMath::FloorLog2(Mips[0].SizeX / 4));
+				NumNonStreamingMips = FMath::Max<int32>(NumNonStreamingMips, MipCount - FPlatformMath::FloorLog2(Mips[0].SizeY / 4));
 			}
 			else
 			{
@@ -2431,6 +2485,8 @@ static void SerializePlatformData(
 		if (bStreamable)
 	#endif
 		{
+			check(Texture->IsPossibleToStream());
+
 			int32 NumNonStreamingMips = PlatformData->GetNumNonStreamingMips(/*bIsStreamingPossible*/ true);
 			// NumMips has been reduced by FirstMipToSerialize (LODBias)
 			NumNonStreamingMips = FMath::Min(NumNonStreamingMips, NumMips);
@@ -2447,6 +2503,16 @@ static void SerializePlatformData(
 
 			// OptionalMips must be streaming mips.
 			check(OptionalMips <= FirstInlineMip);
+		#endif
+
+		#if WITH_EDITOR
+			// Record the use of streaming mips on the owner.
+			if (NumNonStreamingMips < NumMips)
+			{
+				// Use FindChecked because this was previously added and set to false.
+				const FString PlatformName = Ar.CookingTarget()->PlatformName();
+				Texture->DidSerializeStreamingMipsForPlatform.FindChecked(PlatformName) = true;
+			}
 		#endif
 		}
 	}
@@ -2923,9 +2989,12 @@ void UTextureCube::GetMipData(int32 FirstMipToLoad, void** OutMipData)
 	}
 }
 
-void UTexture::UpdateCachedLODBias()
+int32 UTexture::CalculateLODBias(bool bWithCinematicMipBias) const
 {
-	CachedCombinedLODBias = UDeviceProfileManager::Get().GetActiveProfile()->GetTextureLODSettings()->CalculateLODBias(this);
+	// Async caching of PlatformData must be done before calling this
+	//	if you call while async CachePlatformData is in progress, you get garbage out
+
+	return UDeviceProfileManager::Get().GetActiveProfile()->GetTextureLODSettings()->CalculateLODBias(this,bWithCinematicMipBias);
 }
 
 #if WITH_EDITOR
@@ -3116,8 +3185,6 @@ void UTexture::CachePlatformData(bool bAsyncCache, bool bAllowAsyncBuild, bool b
 			// If there is no source art available, create an empty platform data container.
 			PlatformDataLink = new FTexturePlatformData();
 		}
-
-		UpdateCachedLODBias();
 	}
 }
 
@@ -3436,6 +3503,7 @@ void UTexture::FinishCachePlatformData()
 			if ( RunningPlatformData == NULL )
 			{
 				// begin cache never called
+				//  do a non-async cache :
 				CachePlatformData();
 			}
 			else
@@ -3446,7 +3514,8 @@ void UTexture::FinishCachePlatformData()
 		}
 	}
 
-	UpdateCachedLODBias();
+	// FinishCachePlatformData is not reliably called
+	//  this is not a good place to put code that finalizes caching
 }
 
 void UTexture::ForceRebuildPlatformData(uint8 InEncodeSpeedOverride /* =255 ETextureEncodeSpeedOverride::Disabled */)
@@ -3539,7 +3608,6 @@ void UTexture::SerializeCookedPlatformData(FArchive& Ar)
 #if WITH_EDITOR
 	if (Ar.IsCooking() && Ar.IsPersistent())
 	{
-		bCookedIsStreamable.Reset();
 		if (Ar.CookingTarget()->AllowAudioVisualData())
 		{
 			TArray<FTexturePlatformData*> PlatformDataToSerialize;
@@ -3615,16 +3683,14 @@ void UTexture::SerializeCookedPlatformData(FArchive& Ar)
 				}
 			}
 
+			// set DidSerializeStreamingMipsForPlatform to false, then it will change to true if any SerializeCooked makes streaming mips
+			const FString PlatformName = Ar.CookingTarget()->PlatformName();
+			DidSerializeStreamingMipsForPlatform.Add( PlatformName, false );
+
+			// this iteration is over NumLayers :
 			for (FTexturePlatformData* PlatformDataToSave : PlatformDataToSerialize)
 			{
 				PlatformDataToSave->FinishCache();
-
-				// Update bCookedIsStreamable for later use in IsCandidateForTextureStreaming
-				FStreamableRenderResourceState State;
-				if (GetStreamableRenderResourceState(PlatformDataToSave, State))
-				{
-					bCookedIsStreamable = !bCookedIsStreamable.IsSet() ? State.bSupportsStreaming : (*bCookedIsStreamable || State.bSupportsStreaming);
-				}
 
 				FName PixelFormatName = PixelFormatEnum->GetNameByValue(PlatformDataToSave->PixelFormat);
 				Ar << PixelFormatName;

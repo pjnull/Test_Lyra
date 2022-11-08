@@ -4,6 +4,7 @@
 
 #include "Engine/SkinnedAssetCommon.h"
 #include "UnrealUSDWrapper.h"
+#include "USDAssetImportData.h"
 #include "USDAttributeUtils.h"
 #include "USDConversionUtils.h"
 #include "USDLayerUtils.h"
@@ -2127,30 +2128,48 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 
 	FScopedUsdAllocs Allocs;
 
+#if WITH_EDITOR
+	// Handle material overrides
 	if ( const UGeometryCacheComponent* GeometryCacheComponent = Cast<const UGeometryCacheComponent>( MeshComponent ) )
 	{
-		const TArray<UMaterialInterface*>& Overrides = MeshComponent->OverrideMaterials;
-		for ( int32 MatIndex = 0; MatIndex < Overrides.Num(); ++MatIndex )
+		if ( const UGeometryCache* GeometryCache = GeometryCacheComponent->GetGeometryCache() )
 		{
-			UMaterialInterface* Override = Overrides[ MatIndex ];
-			if ( !Override )
+			const TArray<UMaterialInterface*>& Overrides = MeshComponent->OverrideMaterials;
+			for ( int32 MatIndex = 0; MatIndex < Overrides.Num(); ++MatIndex )
 			{
-				continue;
+				UMaterialInterface* Override = Overrides[ MatIndex ];
+				if ( !Override )
+				{
+					continue;
+				}
+
+				UUsdMeshAssetImportData* ImportData = Cast<UUsdMeshAssetImportData>( GeometryCache->AssetImportData.Get() );
+				if ( !ImportData )
+				{
+					return false;
+				}
+
+				if ( const FUsdPrimPathList* SourcePrimPaths = ImportData->MaterialSlotToPrimPaths.Find( MatIndex ) )
+				{
+					for ( const FString& PrimPath : SourcePrimPaths->PrimPaths )
+					{
+						pxr::SdfPath OverridePrimPath = UnrealToUsd::ConvertPath( *PrimPath ).Get();
+						pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
+						UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
+					}
+				}
 			}
-
-			pxr::SdfPath OverridePrimPath = UsdPrim.GetPath();
-
-			pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
-			UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
 		}
 	}
 	else if ( const UStaticMeshComponent* StaticMeshComponent = Cast<const UStaticMeshComponent>( MeshComponent ) )
 	{
-#if WITH_EDITOR
 		if ( UStaticMesh* Mesh = StaticMeshComponent->GetStaticMesh() )
 		{
-			int32 NumLODs = Mesh->GetNumLODs();
-			const bool bHasLODs = NumLODs > 1;
+			UUsdMeshAssetImportData* ImportData = Cast<UUsdMeshAssetImportData>( Mesh->AssetImportData.Get() );
+			if ( !ImportData )
+			{
+				return false;
+			}
 
 			const TArray<UMaterialInterface*>& Overrides = MeshComponent->OverrideMaterials;
 			for ( int32 MatIndex = 0; MatIndex < Overrides.Num(); ++MatIndex )
@@ -2161,7 +2180,7 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 					continue;
 				}
 
-				for ( int32 LODIndex = 0; LODIndex < NumLODs; ++LODIndex )
+				for ( int32 LODIndex = 0; LODIndex < Mesh->GetNumLODs(); ++LODIndex )
 				{
 					int32 NumSections = Mesh->GetNumSections( LODIndex );
 					const bool bHasSubsets = NumSections > 1;
@@ -2174,40 +2193,19 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 							continue;
 						}
 
-						pxr::SdfPath OverridePrimPath = UsdPrim.GetPath();
-
-						// If we have only 1 LOD, the asset's DefaultPrim will be the Mesh prim directly.
-						// If we have multiple, the default prim won't have any schema, but will contain separate
-						// Mesh prims for each LOD named "LOD0", "LOD1", etc., switched via a "LOD" variant set
-						if ( bHasLODs )
+						if ( const FUsdPrimPathList* SourcePrimPaths = ImportData->MaterialSlotToPrimPaths.Find( SectionMatIndex ) )
 						{
-							OverridePrimPath = OverridePrimPath.AppendPath( UnrealToUsd::ConvertPath( *FString::Printf( TEXT( "LOD%d" ), LODIndex ) ).Get() );
-						}
-
-						// If our LOD has only one section, its material assignment will be authored directly on the Mesh prim.
-						// If it has more than one material slot, we'll author UsdGeomSubset for each LOD Section, and author the material
-						// assignment there
-						if ( bHasSubsets )
-						{
-							// Assume the UE sections are in the same order as the USD ones
-							std::vector<pxr::UsdGeomSubset> GeomSubsets = pxr::UsdShadeMaterialBindingAPI( UsdPrim ).GetMaterialBindSubsets();
-							if ( SectionIndex < GeomSubsets.size() )
+							for ( const FString& PrimPath : SourcePrimPaths->PrimPaths )
 							{
-								OverridePrimPath = OverridePrimPath.AppendChild( GeomSubsets[ SectionIndex ].GetPrim().GetName() );
-							}
-							else
-							{
-								OverridePrimPath = OverridePrimPath.AppendPath( UnrealToUsd::ConvertPath( *FString::Printf( TEXT( "Section%d" ), SectionIndex ) ).Get() );
+								pxr::SdfPath OverridePrimPath = UnrealToUsd::ConvertPath( *PrimPath ).Get();
+								pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
+								UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
 							}
 						}
-
-						pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
-						UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
 					}
 				}
 			}
 		}
-#endif // WITH_EDITOR
 	}
 	else if ( const USkinnedMeshComponent* SkinnedMeshComponent = Cast<const USkinnedMeshComponent>( MeshComponent ) )
 	{
@@ -2217,10 +2215,16 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 			return false;
 		}
 
-		if ( const USkinnedAsset* SkinnedAsset = SkinnedMeshComponent->GetSkinnedAsset())
+		if ( const USkeletalMesh* SkeletalMesh = Cast<USkeletalMesh>( SkinnedMeshComponent->GetSkinnedAsset() ) )
 		{
-			FSkeletalMeshRenderData* RenderData = SkinnedAsset->GetResourceForRendering();
+			FSkeletalMeshRenderData* RenderData = SkeletalMesh->GetResourceForRendering();
 			if ( !RenderData )
+			{
+				return false;
+			}
+
+			UUsdMeshAssetImportData* ImportData = Cast<UUsdMeshAssetImportData>( SkeletalMesh->GetAssetImportData() );
+			if ( !ImportData )
 			{
 				return false;
 			}
@@ -2229,21 +2233,6 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 			if ( LodRenderData.Num() == 0 )
 			{
 				return false;
-			}
-
-			int32 NumLODs = SkinnedAsset->GetLODNum();
-			const bool bHasLODs = NumLODs > 1;
-
-			FString MeshName;
-			if ( !bHasLODs )
-			{
-				for ( const pxr::UsdPrim& Child : UsdPrim.GetChildren() )
-				{
-					if ( pxr::UsdGeomMesh Mesh{ Child } )
-					{
-						MeshName = UsdToUnreal::ConvertToken( Child.GetName() );
-					}
-				}
 			}
 
 			const TArray<UMaterialInterface*>& Overrides = MeshComponent->OverrideMaterials;
@@ -2255,14 +2244,14 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 					continue;
 				}
 
-				for ( int32 LODIndex = 0; LODIndex < NumLODs; ++LODIndex )
+				for ( int32 LODIndex = 0; LODIndex < SkeletalMesh->GetLODNum(); ++LODIndex )
 				{
 					if ( !LodRenderData.IsValidIndex( LODIndex ) )
 					{
 						continue;
 					}
 
-					const FSkeletalMeshLODInfo* LODInfo = SkinnedAsset->GetLODInfo( LODIndex );
+					const FSkeletalMeshLODInfo* LODInfo = SkeletalMesh->GetLODInfo( LODIndex );
 
 					const TArray<FSkelMeshRenderSection>& Sections = LodRenderData[ LODIndex ].RenderSections;
 					int32 NumSections = Sections.Num();
@@ -2283,44 +2272,21 @@ bool UnrealToUsd::ConvertMeshComponent( const pxr::UsdStageRefPtr& Stage, const 
 							continue;
 						}
 
-						pxr::SdfPath OverridePrimPath = UsdPrim.GetPath();
-
-						// If we have only 1 LOD, the asset's DefaultPrim will be a SkelRoot, and the Mesh will be a subprim
-						// with the same name.If we have the default prim is also the SkelRoot, but will contain separate
-						// Mesh prims for each LOD named "LOD0", "LOD1", etc., switched via a "LOD" variant set
-						if ( bHasLODs )
+						if ( const FUsdPrimPathList* SourcePrimPaths = ImportData->MaterialSlotToPrimPaths.Find( SectionMatIndex ) )
 						{
-							OverridePrimPath = OverridePrimPath.AppendPath( UnrealToUsd::ConvertPath( *FString::Printf( TEXT( "LOD%d" ), LODIndex ) ).Get() );
-						}
-						else
-						{
-							OverridePrimPath = OverridePrimPath.AppendElementString( UnrealToUsd::ConvertString( *MeshName ).Get() );
-						}
-
-						// If our LOD has only one section, its material assignment will be authored directly on the Mesh prim.
-						// If it has more than one material slot, we'll author UsdGeomSubset for each LOD Section, and author the material
-						// assignment there
-						if ( bHasSubsets )
-						{
-							// Assume the UE sections are in the same order as the USD ones
-							std::vector<pxr::UsdGeomSubset> GeomSubsets = pxr::UsdShadeMaterialBindingAPI( UsdPrim ).GetMaterialBindSubsets();
-							if ( SectionIndex < GeomSubsets.size() )
+							for ( const FString& PrimPath : SourcePrimPaths->PrimPaths )
 							{
-								OverridePrimPath = OverridePrimPath.AppendChild( GeomSubsets[ SectionIndex ].GetPrim().GetName() );
-							}
-							else
-							{
-								OverridePrimPath = OverridePrimPath.AppendPath( UnrealToUsd::ConvertPath( *FString::Printf( TEXT( "Section%d" ), SectionIndex ) ).Get() );
+								pxr::SdfPath OverridePrimPath = UnrealToUsd::ConvertPath( *PrimPath ).Get();
+								pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
+								UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
 							}
 						}
-
-						pxr::UsdPrim MeshPrim = Stage->OverridePrim( OverridePrimPath );
-						UE::USDPrimConversionImpl::Private::AuthorMaterialOverride( MeshPrim, Override->GetPathName() );
 					}
 				}
 			}
 		}
 	}
+#endif // WITH_EDITOR
 
 	return true;
 }
@@ -2455,6 +2421,7 @@ namespace UE
 			void ConvertFoliageInstances(
 				const FFoliageInfo& Info,
 				const TSet<int32>& UEInstances,
+				const FTransform& UEWorldToFoliageActor,
 				const FUsdStageInfo& StageInfo,
 				int PrototypeIndex,
 				pxr::VtArray<int>& ProtoIndices,
@@ -2477,8 +2444,8 @@ namespace UE
 					const FFoliageInstancePlacementInfo* Instance = &Info.Instances[ InstanceIndex ];
 
 					// Convert axes
-					FTransform UETransform{ Instance->Rotation, (FVector)Instance->Location, (FVector)Instance->DrawScale3D };
-					FTransform USDTransform = UsdUtils::ConvertAxes( StageInfo.UpAxis == EUsdUpAxis::ZAxis, UETransform );
+					FTransform UEWorldTransform{ Instance->Rotation, (FVector)Instance->Location, (FVector)Instance->DrawScale3D };
+					FTransform USDTransform = UsdUtils::ConvertAxes( StageInfo.UpAxis == EUsdUpAxis::ZAxis, UEWorldTransform * UEWorldToFoliageActor );
 
 					FVector Translation = USDTransform.GetTranslation();
 					FQuat Rotation = USDTransform.GetRotation();
@@ -2525,6 +2492,10 @@ bool UnrealToUsd::ConvertInstancedFoliageActor( const AInstancedFoliageActor& Ac
 
 	TSet<FFoliageInstanceBaseId> HandledComponents;
 
+	// It seems like the foliage instance transforms are actually world transforms, so to get them into the coordinate space of the generated
+	// point instancer, we'll have to concatenate with the inverse the foliage actor's ActorToWorld transform
+	FTransform UEWorldToFoliageActor = Actor.GetTransform().Inverse();
+
 	int PrototypeIndex = 0;
 	for ( const TPair<UFoliageType*, TUniqueObj<FFoliageInfo>>& FoliagePair : Actor.GetFoliageInfos() )
 	{
@@ -2545,7 +2516,17 @@ bool UnrealToUsd::ConvertInstancedFoliageActor( const AInstancedFoliageActor& Ac
 
 			if ( const TSet<int32>* InstanceSet = Info.ComponentHash.Find( ComponentId ) )
 			{
-				UE::USDPrimConversionImpl::Private::ConvertFoliageInstances( Info, *InstanceSet, StageInfo, PrototypeIndex, ProtoIndices, Positions, Orientations, Scales );
+				UE::USDPrimConversionImpl::Private::ConvertFoliageInstances(
+					Info,
+					*InstanceSet,
+					UEWorldToFoliageActor,
+					StageInfo,
+					PrototypeIndex,
+					ProtoIndices,
+					Positions,
+					Orientations,
+					Scales
+				);
 			}
 		}
 
@@ -2564,7 +2545,17 @@ bool UnrealToUsd::ConvertInstancedFoliageActor( const AInstancedFoliageActor& Ac
 				}
 
 				const TSet<int32>& InstanceSet = Pair.Value;
-				UE::USDPrimConversionImpl::Private::ConvertFoliageInstances( Info, InstanceSet, StageInfo, PrototypeIndex, ProtoIndices, Positions, Orientations, Scales );
+				UE::USDPrimConversionImpl::Private::ConvertFoliageInstances(
+					Info,
+					InstanceSet,
+					UEWorldToFoliageActor,
+					StageInfo,
+					PrototypeIndex,
+					ProtoIndices,
+					Positions,
+					Orientations,
+					Scales
+				);
 			}
 		}
 

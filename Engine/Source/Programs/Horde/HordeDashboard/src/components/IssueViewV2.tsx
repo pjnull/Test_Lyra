@@ -5,7 +5,7 @@ import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import backend from "../backend";
-import { CreateExternalIssueResponse, CreateJobRequest, EventSeverity, GetChangeSummaryResponse, GetExternalIssueProjectResponse, GetExternalIssueResponse, GetIssueResponse, GetIssueSpanResponse, GetIssueStepResponse, GetIssueStreamResponse, GetLogEventResponse, GetTemplateRefResponse, GetThinUserInfoResponse, GetUserResponse, IssueSeverity, TemplateData, UpdateIssueRequest } from "../backend/Api";
+import { CreateExternalIssueResponse, CreateJobRequest, EventSeverity, GetChangeSummaryResponse, GetExternalIssueProjectResponse, GetExternalIssueResponse, GetIssueResponse, GetIssueSpanResponse, GetIssueStepResponse, GetIssueStreamResponse, GetLogEventResponse, GetTemplateRefResponse, GetThinUserInfoResponse, GetUserResponse, IssueSeverity, UpdateIssueRequest } from "../backend/Api";
 import dashboard, { StatusColor } from "../backend/Dashboard";
 import { projectStore } from "../backend/ProjectStore";
 import templateCache from '../backend/TemplateCache';
@@ -868,6 +868,9 @@ const StreamCanvas: React.FC = () => {
                      color = colors.get(StatusColor.Failure)!;
                   }
 
+                  if (details.issue?.quarantinedByUserInfo && index && step.severity === IssueSeverity.Unspecified) {
+                     color = colors.get(StatusColor.Success)!;
+                  }
 
                   let baseTime = details.fakeCLTimes.get(step.change)!.getTime() / 1000;
 
@@ -1167,7 +1170,7 @@ const IssueHeader: React.FC = () => {
    const jiraStatus = jiraIssue?.resolutionName ?? jiraIssue?.statusName ?? "";
 
    return <Stack horizontal tokens={{ childrenGap: 48 }} >
-      {(!!jiraIssue || !!issue.quarantineTimeUtc) && <Stack style={{ width: 340, padding: 0 }} tokens={{ childrenGap: 12 }}>
+      {(!!jiraIssue || !!issue.quarantineTimeUtc || !!issue.forceClosedByUserInfo) && <Stack style={{ width: 340, padding: 0 }} tokens={{ childrenGap: 12 }}>
          {!!jiraIssue && <Stack tokens={{ childrenGap: 4 }}>
             {renderSummaryItem(`Jira`, jiraIssue.key, jiraIssue.link!, !!jiraIssue.resolutionName)}
             {(!!jiraAssignee) && renderSummaryItem(`Jira Assignee`, jiraAssignee, jiraIssue!.link!, !!jiraIssue!.resolutionName)}
@@ -1175,6 +1178,9 @@ const IssueHeader: React.FC = () => {
          </Stack>}
          {!!issue.quarantinedByUserInfo && <Stack>
             {renderSummaryItem(`Quarantined By`, `${issue.quarantinedByUserInfo.name} on ${getShortNiceTime(issue.quarantineTimeUtc)}`)}
+         </Stack>}
+         {!!issue.forceClosedByUserInfo && <Stack>
+            {renderSummaryItem(`Force Closed By`, `${issue.forceClosedByUserInfo.name}`)}
          </Stack>}
       </Stack>}
       {!!issue.description && <Stack>
@@ -1189,7 +1195,7 @@ const IssueSummaryPanel: React.FC = () => {
 
    const issue = details.issue!;
 
-   if (!issue || (!details.jiraIssue && !issue.description && !issue.quarantinedByUserInfo)) {
+   if (!issue || (!details.jiraIssue && !issue.description && !issue.quarantinedByUserInfo && !issue.forceClosedByUserInfo)) {
       return null;
    }
 
@@ -1240,6 +1246,8 @@ const errorStyles = mergeStyleSets({
 
 });
 
+// fixes issue with the lne items in stack doubling up with same key 
+let lineKey = 0;
 
 export const ErrorPane: React.FC<{ events?: GetLogEventResponse[]; onClose?: () => void }> = ({ events }) => {
 
@@ -1258,14 +1266,14 @@ export const ErrorPane: React.FC<{ events?: GetLogEventResponse[]; onClose?: () 
 
    const onRenderCell = (item?: GetLogEventResponse, index?: number, isScrolling?: boolean): JSX.Element => {
 
-
       if (!item) {
          return <div>???</div>;
       }
 
       const url = `/log/${item.logId}?lineindex=${item.lineIndex}`;
 
-      const lines = item.lines.filter(line => line.message?.trim().length).map(line => <Stack key={`errorpane_line_${item.lineIndex}`} styles={{ root: { paddingLeft: 8, paddingRight: 8, lineBreak: "anywhere", whiteSpace: "pre-wrap", lineHeight: 18, fontSize: 10, fontFamily: "Horde Cousine Regular, monospace, monospace" } }}> <Link className="log-link" to={url}>{renderLine(line, undefined, {})}</Link></Stack>);
+      const lines = item.lines.filter(line => line.message?.trim().length).map(line => <Stack key={`errorpane_line_${item.lineIndex}_${lineKey++}`} styles={{ root: { paddingLeft: 8, paddingRight: 8, lineBreak: "anywhere", whiteSpace: "pre-wrap", lineHeight: 18, fontSize: 10, fontFamily: "Horde Cousine Regular, monospace, monospace" } }}> <Link className="log-link" to={url}>{renderLine(line, undefined, {})}</Link></Stack>);
+
       return (<Stack className={errorStyles.itemCell} style={{ padding: 8 }}><Stack className={item.severity === EventSeverity.Warning ? errorStyles.gutterWarning : errorStyles.gutter} styles={{ root: { padding: 0, margin: 0 } }}>
          <Stack styles={{ root: { paddingLeft: 14 } }}>
             {lines}
@@ -1457,6 +1465,7 @@ const IssueCommandBar: React.FC = () => {
    const [externalIssueLinkShown, setExternalIssueLinkShown] = useState(false);
    const [externalIssueCreateShown, setExternalIssueCreateShown] = useState(false);
    const [quarantineShown, setQuarantineShown] = useState(false);
+   const [forceCloseShown, setForceCloseShown] = useState(false);
    const [testFixShown, setTestFixShown] = useState(false);
 
    const issue = details.issue!;
@@ -1608,11 +1617,6 @@ const IssueCommandBar: React.FC = () => {
 
    const moreList: IContextualMenuItem[] = [
       {
-         key: 'more_test_fix',
-         iconProps: { iconName: "Wrench" },
-         text: `Test Fix`,
-         onClick: () => { setTestFixShown(true); }
-      }, {
          key: 'more_history_link',
          iconProps: { iconName: "SearchTemplate" },
          text: `History`,
@@ -1624,8 +1628,17 @@ const IssueCommandBar: React.FC = () => {
          iconProps: { iconName: "Flash" },
          text: `Quarantine`,
          onClick: () => { setQuarantineShown(true); }
+      }, {
+         key: 'more_forceclose_link',
+         iconProps: { iconName: "Delete" },
+         text: `Force Close`,
+         onClick: () => { setForceCloseShown(true); }
+      }, {
+         key: 'more_test_fix',
+         iconProps: { iconName: "Wrench" },
+         text: `Test Fix`,
+         onClick: () => { setTestFixShown(true); }
       }];
-
 
 
    const moreItems: ICommandBarItemProps[] = [
@@ -1662,28 +1675,29 @@ const IssueCommandBar: React.FC = () => {
       {externalIssueLinkShown && <LinkExternalIssueModal onClose={() => { setExternalIssueLinkShown(false) }} />}
       {externalIssueCreateShown && <CreateExternalIssueModal onClose={() => { setExternalIssueCreateShown(false) }} />}
       {quarantineShown && <IssueQuarantineModal onClose={() => { setQuarantineShown(false) }} />}
+      {forceCloseShown && <IssueForceCloseModal onClose={() => { setForceCloseShown(false) }} />}
       {testFixShown && <TestFixModal onClose={() => { setTestFixShown(false) }} />}
 
       <Stack horizontal>
          <Stack>
-            <Stack styles={{ root: { paddingBottom: 8, paddingRight: 32 } }}>
+            <Stack styles={{ root: { paddingBottom: 0, paddingRight: 32 } }}>
                <Stack className={hordeClasses.commandBarSmall} horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
                   <Stack horizontal style={{ paddingLeft: 12 }}>
-                     <Stack horizontal verticalAlign="center" style={{ paddingTop: 4, paddingRight: 18 }}>
-                        {!!suspectRange && <a href={suspectRange} target="blank"> <Stack styles={{ root: { paddingTop: 3 } }}>
+                     <Stack horizontal verticalAlign="center" style={{paddingRight: 18 }}>
+                        {!!suspectRange && <a href={suspectRange} target="blank"> <Stack>
                            <CommandBarButton className={hordeClasses.commandBarSmall} styles={{ root: { padding: "10px 8px 10px 8px" } }} iconProps={{ iconName: "Locate" }} text="Suspects" />
                         </Stack>
                         </a>}
 
                      </Stack>
-                     <Stack horizontal verticalAlign="center" style={{ paddingTop: 2 }} tokens={{ childrenGap: 18 }}>
+                     <Stack horizontal verticalAlign="center" verticalFill={true} tokens={{ childrenGap: 18 }}>
                         <Stack>
                            <CommandBar styles={{ root: { height: 32, padding: 0, paddingRight: 8, paddingLeft: 16, backgroundColor: "unset" } }}
                               className={customClasses.actionBar}
                               items={commandItems}
                               onReduceData={() => undefined} />
                         </Stack>
-                        {canAck && <Stack className="horde-no-darktheme" style={{ paddingRight: 8, paddingTop: 8 }}>
+                        {canAck && <Stack className="horde-no-darktheme" style={{ paddingRight: 8 }}>
                            <PrimaryButton style={{ animationName: "red-pulse", animationDuration: "2s", animationIterationCount: "infinite", backgroundColor: "#FF0000", border: "1px solid #FF0000", padding: 0, paddingLeft: 4, paddingRight: 4, height: 22, fontWeight: "unset", fontSize: 12 }} text="Acknowledge" onClick={() => { setAckShown(true) }}></PrimaryButton>
                         </Stack>}
                         <Stack>
@@ -1780,13 +1794,13 @@ export const IssueModalV2: React.FC<{ popHistoryOnClose: boolean, issueId?: stri
          <Stack style={{ height: "100%" }}>
             <Stack style={{ flexBasis: "70px", flexShrink: 0 }}>
                <Stack horizontal styles={{ root: { padding: 8 } }} style={{ padding: 20, paddingBottom: 8 }}>
-                  <Stack horizontal style={{ paddingTop: 5, width: 1024 }} tokens={{ childrenGap: 24 }} verticalAlign="start">
+                  <Stack horizontal style={{ width: 1024 }} tokens={{ childrenGap: 24 }} verticalAlign="center" verticalFill={true}>
                      <Stack style={{ maxWidth: 880, lineBreak: "anywhere" }} >
                         <Text styles={{ root: { fontWeight: "unset", fontFamily: "Horde Open Sans SemiBold", fontSize: "15px", color: "#087BC4", textDecoration: details.issue?.resolvedAt ? "line-through" : undefined } }}>{title}</Text>
                      </Stack>
 
                      <Stack onClick={() => { setEditShown(true) }} style={{ cursor: "pointer" }}>
-                        <Icon styles={{ root: { margin: '0px', padding: '0px', paddingTop: "4px" } }} iconName="Edit" className={hordeClasses.iconBlue} />
+                        <Icon styles={{ root: { margin: '0px', padding: '0px', paddingTop: "0px" } }} iconName="Edit" className={hordeClasses.iconBlue} />
                      </Stack>
                      <Stack grow />
                   </Stack>
@@ -2857,10 +2871,95 @@ export const IssueQuarantineModal: React.FC<{ onClose: () => void }> = ({ onClos
 
 };
 
+
+export const IssueForceCloseModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+
+   const issue = details.issue!;
+   const issueId = issue.id;
+
+   const [state, setState] = useState<{ submitting?: boolean, forceClosed?: boolean, error?: string }>({ forceClosed: !!issue.forceClosedByUserInfo });
+
+   const onSave = async () => {
+
+      setState({ ...state, submitting: true });
+
+      try {
+
+         await backend.updateIssue(issueId, {
+            forceClosedById: state.forceClosed ? dashboard.userId : ""
+         });
+
+         details.refresh(issueId).finally(() => {
+            setState({ ...state, submitting: false, error: "" });
+            onClose();
+         })
+
+      } catch (reason) {
+
+         setState({ ...state, submitting: false, error: reason as string });
+      }
+
+   };
+
+
+   const height = state.error ? 260 : 240;
+
+   return <Modal className={hordeClasses.modal} isOpen={true} topOffsetFixed={true} styles={{ main: { padding: 8, width: 540, height: height, minHeight: height, hasBeenOpened: false, top: "24px", position: "absolute" } }} onDismiss={() => { onClose() }}>
+      <Stack horizontal styles={{ root: { padding: 8 } }}>
+         <Stack.Item grow={2}>
+            <Text variant="mediumPlus">Force Close Issue</Text>
+         </Stack.Item>
+         <Stack.Item grow={0}>
+            <IconButton
+               iconProps={{ iconName: 'Cancel' }}
+               ariaLabel="Close popup modal"
+               onClick={() => { onClose(); }}
+            />
+         </Stack.Item>
+      </Stack>
+
+      <Stack styles={{ root: { paddingLeft: 18, paddingRight: 18, width: 540, paddingTop: 12 } }}>
+         <Stack tokens={{ childrenGap: 12 }}>
+            {!!state.error && <MessageBar
+               messageBarType={MessageBarType.error}
+               isMultiline={false}> {state.error} </MessageBar>}
+            <Stack>
+               <Text variant="medium">Warning: Force closing issues without verification is not regular workflow.  It is intended for special cases, such as steps being removed from a job.  Please proceed with caution.</Text>
+            </Stack>
+            <Stack>
+               <Checkbox disabled={!!issue.forceClosedByUserInfo} label={!issue.forceClosedByUserInfo ? "Force Close Issue" : `Force Closed by ${issue.forceClosedByUserInfo.name}`}
+                  defaultChecked={state.forceClosed}
+                  onChange={(ev, newValue) => {
+                     setState({ ...state, forceClosed: !!newValue });
+                  }} />
+            </Stack>
+         </Stack>
+      </Stack>
+
+      <Stack tokens={{ childrenGap: 16 }} styles={{ root: { paddingTop: 32, paddingLeft: 8, paddingBottom: 8 } }}>
+         <Stack horizontal>
+            <Stack>
+            </Stack>
+            <Stack grow />
+            <Stack>
+               {!!issue.forceClosedByUserInfo && <Stack horizontal tokens={{ childrenGap: 12 }} style={{ paddingRight: 24 }}>                  
+                  <DefaultButton text="Ok" disabled={state.submitting} onClick={() => { onClose(); }} />
+               </Stack>}
+               {!issue.forceClosedByUserInfo && <Stack horizontal tokens={{ childrenGap: 12 }} style={{ paddingRight: 24 }}>
+                  <PrimaryButton text="Save" disabled={state.submitting ?? false} onClick={() => { onSave() }} />
+                  <DefaultButton text="Cancel" disabled={state.submitting} onClick={() => { onClose(); }} />
+               </Stack>}
+            </Stack>
+         </Stack>
+      </Stack>
+   </Modal>;
+
+};
+
 const TestFixModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
    const history = useHistory();
-   const [state, setState] = useState<{ loadingTemplates?: boolean, templates?: Map<string, TemplateData[]>, error?: string, submitting?: boolean, shelvedCL?: string, baseCL?: string, streamId?: string, templateId?: string, target?: string, updateIssues?: boolean }>({ updateIssues: true });
+   const [state, setState] = useState<{ loadingTemplates?: boolean, templates?: Map<string, GetTemplateRefResponse[]>, error?: string, submitting?: boolean, shelvedCL?: string, baseCL?: string, streamId?: string, templateId?: string, target?: string, updateIssues?: boolean }>({ updateIssues: true });
 
    const issue = details.issue!;
 
@@ -2885,7 +2984,7 @@ const TestFixModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
          const getTemplates = async () => {
 
-            const templateMap: Map<string, TemplateData[]> = new Map();
+            const templateMap: Map<string, GetTemplateRefResponse[]> = new Map();
 
             for (let i = 0; i < testStreams.length; i++) {
 
@@ -2972,7 +3071,7 @@ const TestFixModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
          error = "Target not set";
       }
 
-      const template = state.templates?.get(state.streamId!)?.find(t => t.ref?.id === state.templateId);
+      const template = state.templates?.get(state.streamId!)?.find(t => t.id === state.templateId);
       if (!template) {
          error = `Unable to find stream ${state.streamId} template ${state.templateId}`;
          console.log(state.templates?.get(state.streamId!));

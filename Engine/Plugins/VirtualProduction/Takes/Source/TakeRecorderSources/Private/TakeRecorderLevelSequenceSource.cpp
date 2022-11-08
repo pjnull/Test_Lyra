@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "TakeRecorderLevelSequenceSource.h"
+#include "AssetRegistry/AssetData.h"
 #include "TakesCoreLog.h"
 #include "TakesUtils.h"
 #include "Editor.h"
@@ -18,7 +19,7 @@ UTakeRecorderLevelSequenceSource::UTakeRecorderLevelSequenceSource(const FObject
 	TrackTint = FColor(164, 74, 74);
 }
 
-TArray<UTakeRecorderSource*> UTakeRecorderLevelSequenceSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InMasterSequence, FManifestSerializer* InManifestSerializer)
+TArray<UTakeRecorderSource*> UTakeRecorderLevelSequenceSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InRootSequence, FManifestSerializer* InManifestSerializer)
 {
 	UWorld* World = TakesUtils::GetFirstPIEWorld();
 	if (!World)

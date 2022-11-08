@@ -188,8 +188,6 @@ FVulkanCommandListContext::~FVulkanCommandListContext()
 	delete CommandBufferManager;
 	CommandBufferManager = nullptr;
 
-	LayoutManager.Destroy(*Device, Immediate ? &LayoutManager : nullptr);
-
 	delete UniformBufferUploader;
 	delete PendingGfxState;
 	delete PendingComputeState;
@@ -821,7 +819,11 @@ void FVulkanDynamicRHI::InitInstance()
 		GMaxTextureArrayLayers = Props.limits.maxImageArrayLayers;
 		GRHISupportsBaseVertexIndex = true;
 		GSupportsSeparateRenderTargetBlendState = true;
-		GRHISupportsSeparateDepthStencilCopyAccess = false;
+		GRHISupportsSeparateDepthStencilCopyAccess = Device->SupportsParallelRendering();
+		GRHIBindlessSupport = Device->SupportsBindless() ? RHIGetBindlessSupport(GMaxRHIShaderPlatform) : ERHIBindlessSupport::Unsupported;
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		GRHISupportsBindless = GRHIBindlessSupport != ERHIBindlessSupport::Unsupported;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		GRHIMaxDispatchThreadGroupsPerDimension.X = FMath::Min<uint32>(Limits.maxComputeWorkGroupCount[0], 0x7fffffff);
 		GRHIMaxDispatchThreadGroupsPerDimension.Y = FMath::Min<uint32>(Limits.maxComputeWorkGroupCount[1], 0x7fffffff);
@@ -1332,10 +1334,15 @@ FVulkanRHIImageViewInfo FVulkanDynamicRHI::RHIGetImageViewInfo(FRHITexture* InTe
 	return Info;
 }
 
+// todo-jn: deprecate
 VkImageLayout& FVulkanDynamicRHI::RHIFindOrAddLayoutRW(FRHITexture* InTexture, VkImageLayout LayoutIfNotFound)
 {
 	FVulkanTexture* VulkanTexture = ResourceCast(InTexture);
-	return GetDevice()->GetImmediateContext().GetLayoutManager().FindOrAddLayoutRW(*VulkanTexture, LayoutIfNotFound);
+	FVulkanCommandListContext& ImmediateContext = GetDevice()->GetImmediateContext();
+	FVulkanCmdBuffer* CmdBuffer = ImmediateContext.GetCommandBufferManager()->GetActiveCmdBuffer();
+	// Removing const to allow original functionality even when parallel rendering is enabled.
+	FVulkanImageLayout* VulkanImageLayout = const_cast<FVulkanImageLayout*>(CmdBuffer->GetLayoutManager().GetFullLayout(*VulkanTexture, true, LayoutIfNotFound));
+	return VulkanImageLayout->MainLayout;
 }
 
 void FVulkanDynamicRHI::RHISetImageLayout(VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout, const VkImageSubresourceRange& SubresourceRange)
@@ -1921,9 +1928,11 @@ void FVulkanDynamicRHI::RecreateSwapChain(void* NewNativeWindow)
 	}
 }
 
-void FVulkanDynamicRHI::VulkanSetImageLayout( VkCommandBuffer CmdBuffer, VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout, const VkImageSubresourceRange& SubresourceRange )
+void FVulkanDynamicRHI::VulkanSetImageLayout(VkCommandBuffer CmdBuffer, VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout, const VkImageSubresourceRange& SubresourceRange)
 {
-	::VulkanSetImageLayout( CmdBuffer, Image, OldLayout, NewLayout, SubresourceRange );
+	FVulkanPipelineBarrier Barrier;
+	Barrier.AddImageLayoutTransition(Image, OldLayout, NewLayout, SubresourceRange);
+	Barrier.Execute(CmdBuffer);
 }
 
 IRHITransientResourceAllocator* FVulkanDynamicRHI::RHICreateTransientResourceAllocator()

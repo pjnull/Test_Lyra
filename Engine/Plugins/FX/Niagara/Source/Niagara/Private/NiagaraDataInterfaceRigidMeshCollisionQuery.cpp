@@ -2,6 +2,7 @@
 
 #include "NiagaraDataInterfaceRigidMeshCollisionQuery.h"
 #include "Algo/ForEach.h"
+#include "Algo/RemoveIf.h"
 #include "Animation/SkeletalMeshActor.h"
 #include "AnimationRuntime.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -300,12 +301,24 @@ void CountCollisionPrimitives(TConstArrayView<TComponentType*> Components, uint3
 					++CapsuleCount;
 				}
 			}
+
+			// if we have no supported bodies associated with a mesh, but we want to collide with it, add a single box
+			if (BodySetup->AggGeom.ConvexElems.Num() == 0 &&
+				BodySetup->AggGeom.BoxElems.Num() == 0 &&
+				BodySetup->AggGeom.SphereElems.Num() == 0 &&
+				BodySetup->AggGeom.SphylElems.Num() == 0)
+			{
+				++BoxCount;
+			}
 		});
 
+		// suppress warning since we get it a lot
+		/*
 		if (HasConvexElements)
-		{
+		{			
 			UE_LOG(LogRigidMeshCollision, Warning, TEXT("Convex collision objects encountered and will be interpreted as a bounding box on %s"), *Component->GetOwner()->GetName());
 		}
+		*/
 	}
 }
 
@@ -416,6 +429,34 @@ void UpdateAssetArrays(TConstArrayView<TComponentType*> Components, const FVecto
 				FillCurrentTransforms(ElementTransform, CapsuleIndex, OutAssetArrays->CurrentTransform, OutAssetArrays->CurrentInverse);
 				++CapsuleIndex;
 			}
+		}
+
+		// if we have no supported bodies associated with a mesh, but we want to collide with it, add a single box
+		if (BodySetup->AggGeom.ConvexElems.Num() == 0 &&
+			BodySetup->AggGeom.BoxElems.Num() == 0 &&
+			BodySetup->AggGeom.SphereElems.Num() == 0 &&
+			BodySetup->AggGeom.SphylElems.Num() == 0)
+		{
+			FVector Extent;
+			FVector Center;
+		
+			FBoxSphereBounds Bounds = static_cast< USceneComponent* >(Component)->GetLocalBounds();
+			Extent = Bounds.BoxExtent;
+			Center = Bounds.Origin;
+			
+			if (InitializeStatics)
+			{			
+				// local bounds extent is half the world extents of the bounding box in local space
+				Extent *= 2;
+
+				OutAssetArrays->ElementExtent[BoxIndex] = FVector4f(Extent.X, Extent.Y, Extent.Z, 0);
+				OutAssetArrays->PhysicsType[BoxIndex] = true;
+				OutAssetArrays->ComponentIdIndex[BoxIndex] = ComponentIdIndex;
+			}
+			
+			const FTransform ElementTransform = FTransform(Center) * MeshTransform;
+			FillCurrentTransforms(ElementTransform, BoxIndex, OutAssetArrays->CurrentTransform, OutAssetArrays->CurrentInverse);
+			++BoxIndex;
 		}
 	};
 
@@ -560,6 +601,22 @@ void FNDIRigidMeshCollisionData::MergeActors(FMergedActorArray& MergedActors) co
 	Algo::ForEach(FoundActors, AppendActors);
 }
 
+bool FNDIRigidMeshCollisionData::TrimMissingActors()
+{
+	auto EvaluateWeakActor = [&](const TWeakObjectPtr<AActor>& ActorPtr)
+	{
+		return !ActorPtr.IsValid();
+	};
+
+	const int32 ExplicitActorCount = ExplicitActors.Num();
+	ExplicitActors.SetNum(Algo::StableRemoveIf(ExplicitActors, EvaluateWeakActor));
+
+	const int32 FoundActorCount = FoundActors.Num();
+	FoundActors.SetNum(Algo::StableRemoveIf(FoundActors, EvaluateWeakActor));
+
+	return ExplicitActorCount != ExplicitActors.Num() || FoundActorCount != FoundActors.Num();
+}
+
 void FNDIRigidMeshCollisionData::Init(int32 MaxNumPrimitives)
 {
 	const bool bHasActors = HasActors();
@@ -617,6 +674,8 @@ void FNDIRigidMeshCollisionData::Update(UNiagaraDataInterfaceRigidMeshCollisionQ
 
 	if (bHasActors)
 	{
+		bRequiresFullUpdate |= TrimMissingActors();
+
 		FMergedActorArray MergedActors;
 		MergeActors(MergedActors);
 
@@ -820,6 +879,50 @@ void UNiagaraDataInterfaceRigidMeshCollisionQuery::DrawDebugHud(UCanvas* Canvas,
 				DrawDebugCanvasCapsule(Canvas, CurrentTransform, HalfTotalLength, RadiusLength.X, FColor::Blue);
 			}
 		}
+
+		if (!InstanceData_GT->ExplicitActors.IsEmpty() || !InstanceData_GT->FoundActors.IsEmpty())
+		{
+			const UFont* Font = GEngine->GetMediumFont();
+			Canvas->SetDrawColor(FColor::White);
+
+			auto DrawDebugActor = [&](TWeakObjectPtr<AActor>& InWeakActor, const TCHAR* ActorSourceString)
+			{
+				if (AActor* Actor = InWeakActor.Get())
+				{
+					FVector ActorOrigin;
+					FVector ActorBoundsExtent;
+					Actor->GetActorBounds(true, ActorOrigin, ActorBoundsExtent);
+
+					const FMatrix CurrentTransform = FTranslationMatrix(ActorOrigin);
+					if (!ShouldClip(Canvas, CurrentTransform, FSphere(FVector::ZeroVector, ActorBoundsExtent.Size())))
+					{
+						DrawDebugCanvasWireBox(Canvas, CurrentTransform, FBox(-ActorBoundsExtent, ActorBoundsExtent), FColor::Yellow);
+
+						FString ActorLabel;
+#if WITH_EDITOR
+						ActorLabel = Actor->GetActorLabel();
+#endif
+						if (ActorLabel.Len() == 0)
+						{
+							ActorLabel = Actor->GetName();
+						}
+
+						const FVector ScreenLoc = Canvas->Project(ActorOrigin);
+						Canvas->DrawText(Font, FString::Printf(TEXT("RigidMeshDI[%s Actor] - %s"), ActorSourceString, *ActorLabel), ScreenLoc.X, ScreenLoc.Y);
+					}
+				}
+			};
+
+			for (TWeakObjectPtr<AActor>& ExplicitActor : InstanceData_GT->ExplicitActors)
+			{
+				DrawDebugActor(ExplicitActor, TEXT("Explicit"));
+			}
+
+			for (TWeakObjectPtr<AActor>& FoundActor : InstanceData_GT->FoundActors)
+			{
+				DrawDebugActor(FoundActor, TEXT("Found"));
+			}
+		}
 	}
 }
 #endif
@@ -942,6 +1045,7 @@ bool UNiagaraDataInterfaceRigidMeshCollisionQuery::CopyToInternal(UNiagaraDataIn
 	OtherTyped->ComponentTags = ComponentTags;
 	OtherTyped->SourceActors = SourceActors;
 	OtherTyped->OnlyUseMoveable = OnlyUseMoveable;
+	OtherTyped->UseComplexCollisions = UseComplexCollisions;
 	OtherTyped->GlobalSearchAllowed = GlobalSearchAllowed;
 	OtherTyped->GlobalSearchForced = GlobalSearchForced;
 	OtherTyped->GlobalSearchFallback_Unscripted = GlobalSearchFallback_Unscripted;
@@ -962,6 +1066,7 @@ bool UNiagaraDataInterfaceRigidMeshCollisionQuery::Equals(const UNiagaraDataInte
 		&& (OtherTyped->ComponentTags == ComponentTags)
 		&& (OtherTyped->SourceActors == SourceActors)
 		&& (OtherTyped->OnlyUseMoveable == OnlyUseMoveable)
+		&& (OtherTyped->UseComplexCollisions == UseComplexCollisions)
 		&& (OtherTyped->GlobalSearchAllowed == GlobalSearchAllowed)
 		&& (OtherTyped->GlobalSearchForced == GlobalSearchForced)
 		&& (OtherTyped->GlobalSearchFallback_Unscripted == GlobalSearchFallback_Unscripted)
@@ -1338,14 +1443,11 @@ void UNiagaraDataInterfaceRigidMeshCollisionQuery::GetParameterDefinitionHLSL(co
 {
 	Super::GetParameterDefinitionHLSL(ParamInfo, OutHLSL);
 
-	TMap<FString, FStringFormatArg> TemplateArgs =
+	const TMap<FString, FStringFormatArg> TemplateArgs =
 	{
 		{TEXT("ParameterName"),	ParamInfo.DataInterfaceHLSLSymbol},
 	};
-
-	FString TemplateFile;
-	LoadShaderSourceFile(NDIRigidMeshCollisionLocal::TemplateShaderFile, EShaderPlatform::SP_PCD3D_SM5, &TemplateFile, nullptr);
-	OutHLSL += FString::Format(*TemplateFile, TemplateArgs);
+	AppendTemplateHLSL(OutHLSL, NDIRigidMeshCollisionLocal::TemplateShaderFile, TemplateArgs);
 }
 
 bool UNiagaraDataInterfaceRigidMeshCollisionQuery::AppendCompileHash(FNiagaraCompileHashVisitor* InVisitor) const
@@ -1355,8 +1457,7 @@ bool UNiagaraDataInterfaceRigidMeshCollisionQuery::AppendCompileHash(FNiagaraCom
 		return false;
 	}
 
-	FSHAHash Hash = GetShaderFileHash(NDIRigidMeshCollisionLocal::TemplateShaderFile, EShaderPlatform::SP_PCD3D_SM5);
-	InVisitor->UpdateString(TEXT("NiagaraDataInterfaceRigidMeshCollisionQueryHLSLSource"), Hash.ToString());
+	InVisitor->UpdateShaderFile(NDIRigidMeshCollisionLocal::TemplateShaderFile);
 	InVisitor->UpdateShaderParameters<NDIRigidMeshCollisionLocal::FShaderParameters>();
 
 	return true;
@@ -1457,28 +1558,32 @@ void UNiagaraDataInterfaceRigidMeshCollisionQuery::ProvidePerInstanceDataForRend
 	{
 		if (const FNDIRigidMeshCollisionArrays* SourceArrayData = GameThreadData->AssetArrays.Get())
 		{
+			const int32 ElementCount = GameThreadData->AssetArrays->ElementOffsets.NumElements;
+
 			RenderThreadData->ElementOffsets = GameThreadData->AssetArrays->ElementOffsets;
 
 			// compact the world/inverse transforms
-			const int32 TransformVectorCount = GameThreadData->AssetArrays->MaxPrimitives * 3;
+			const int32 TransformVectorCount = ElementCount * 3;
 
 			auto CompactTransforms = [&](const TArray<FVector4f>& Current, const TArray<FVector4f>& Previous, TArray<FVector4f>& Compact)
 			{
-				Compact.Reset(2 * TransformVectorCount);
-				Compact.Append(Current);
-				Compact.SetNumUninitialized(TransformVectorCount, false);
-				Compact.Append(Previous);
-				Compact.SetNumUninitialized(2 * TransformVectorCount, false);
+				check(Current.Num() >= TransformVectorCount);
+				check(Previous.Num() >= TransformVectorCount);
+
+				Compact.Reset(2 * TransformVectorCount); // space for current and previous transforms
+				Compact.Append(Current.GetData(), TransformVectorCount);
+				Compact.Append(Previous.GetData(), TransformVectorCount);
 			};
 
 			CompactTransforms(GameThreadData->AssetArrays->CurrentTransform, GameThreadData->AssetArrays->PreviousTransform, RenderThreadData->WorldTransform);
 			CompactTransforms(GameThreadData->AssetArrays->CurrentInverse, GameThreadData->AssetArrays->PreviousInverse, RenderThreadData->InverseTransform);
 
-			RenderThreadData->ElementExtent = GameThreadData->AssetArrays->ElementExtent;
-			RenderThreadData->PhysicsType = GameThreadData->AssetArrays->PhysicsType;
-			RenderThreadData->ComponentIdIndex = GameThreadData->AssetArrays->ComponentIdIndex;
+			RenderThreadData->ElementExtent.Append(GameThreadData->AssetArrays->ElementExtent.GetData(), ElementCount);
+			RenderThreadData->PhysicsType.Append(GameThreadData->AssetArrays->PhysicsType.GetData(), ElementCount);
+			RenderThreadData->ComponentIdIndex.Append(GameThreadData->AssetArrays->ComponentIdIndex.GetData(), ElementCount);
+
 			RenderThreadData->UniqueComponentIds = GameThreadData->AssetArrays->UniqueCompnentId;
-			RenderThreadData->MaxPrimitiveCount = GameThreadData->AssetArrays->MaxPrimitives;
+			RenderThreadData->MaxPrimitiveCount = ElementCount;
 			RenderThreadData->AssetBuffer = GameThreadData->AssetBuffer;
 		}
 	}
@@ -1540,7 +1645,7 @@ bool UNiagaraDataInterfaceRigidMeshCollisionQuery::FindActors(UWorld* World, FND
 		ObjectParams.AddObjectTypesToQuery(Channel);
 
 		TArray<FOverlapResult> Overlaps;
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(NiagaraRigidMeshCollisionQuery), false);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(NiagaraRigidMeshCollisionQuery), UseComplexCollisions);
 
 		World->OverlapMultiByChannel(Overlaps, OverlapLocation, OverlapRotation, Channel, FCollisionShape::MakeBox(0.5f * OverlapExtent), Params);
 

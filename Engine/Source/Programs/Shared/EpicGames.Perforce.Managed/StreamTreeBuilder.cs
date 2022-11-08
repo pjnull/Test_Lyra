@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using EpicGames.Core;
 
 namespace EpicGames.Perforce.Managed
@@ -119,6 +120,42 @@ namespace EpicGames.Perforce.Managed
 				basePathToCount.TryGetValue(basePath, out int count);
 				basePathToCount[basePath] = count + 1;
 			}
+		}
+	}
+
+	/// <summary>
+	/// Helper variant of StreamTreeBuilder capable of adding files to tree using both client and depot file paths
+	/// </summary>
+	public class DepotStreamTreeBuilder : StreamTreeBuilder
+	{
+		public void AddFile(string clientFile, StreamFile depotFile)
+		{
+			if (clientFile[0] == '/')
+			{
+				// Strip any slash at the start
+				clientFile = clientFile[1..];
+			}
+			
+			StreamTreeBuilder currentStreamDirectory = this;
+			string[] pathFragments = clientFile.Split('/');
+
+			// Find stream tree builder for deepest path fragment
+			// and skip last fragment as that is the filename
+			for (int i = 0; i < pathFragments.Length - 1; i++)
+			{
+				string pathFragment = pathFragments[i];
+				Utf8String unescapedFragment = PerforceUtils.UnescapePath(pathFragment);
+
+				if (!currentStreamDirectory.NameToTreeBuilder.TryGetValue(unescapedFragment, out StreamTreeBuilder? nextStreamDirectory))
+				{
+					nextStreamDirectory = new StreamTreeBuilder();
+					currentStreamDirectory.NameToTreeBuilder.Add(unescapedFragment, nextStreamDirectory);
+				}
+				currentStreamDirectory = nextStreamDirectory;
+			}
+
+			string filename = PerforceUtils.UnescapePath(pathFragments[^1]); // Last fragment is filename
+			currentStreamDirectory.NameToFile[filename] = depotFile;
 		}
 	}
 }

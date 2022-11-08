@@ -2,23 +2,26 @@
 
 #include "UI/SRenderGridJobList.h"
 
-#include "Framework/Application/SlateApplication.h"
-#include "Layout/WidgetPath.h"
+#include "Commands/RenderGridEditorCommands.h"
 #include "UI/Components/SRenderGridDragHandle.h"
 #include "UI/Components/SRenderGridEditableTextBlock.h"
 #include "UI/Components/SRenderGridFileSelectorTextBlock.h"
 #include "RenderGrid/RenderGrid.h"
 #include "RenderGrid/RenderGridQueue.h"
 #include "IRenderGridEditor.h"
+#include "RenderGridUtils.h"
 
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Misc/MessageDialog.h"
 #include "MoviePipelineExecutor.h"
 #include "MoviePipelineOutputSetting.h"
+#include "MoviePipelinePrimaryConfig.h"
 #include "MoviePipelineQueue.h"
 #include "MovieScene.h"
 #include "PropertyCustomizationHelpers.h"
+#include "ScopedTransaction.h"
 #include "SlateOptMacros.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Styling/AppStyle.h"
 #include "Tracks/MovieSceneSubTrack.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -61,6 +64,9 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 void UE::RenderGrid::Private::SRenderGridJobList::Construct(const FArguments& InArgs, TSharedPtr<IRenderGridEditor> InBlueprintEditor)
 {
+	TSharedPtr<SWidget> BaseThis = AsShared();
+	TSharedPtr<SRenderGridJobList> This = StaticCastSharedPtr<SRenderGridJobList>(BaseThis);
+
 	BlueprintEditorWeakPtr = InBlueprintEditor;
 
 	Refresh();
@@ -118,12 +124,7 @@ void UE::RenderGrid::Private::SRenderGridJobList::Construct(const FArguments& In
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 			.Padding(0.f)
 			[
-				SAssignNew(RenderGridJobListWidget, SListView<URenderGridJob*>)
-				.ItemHeight(20.0f)
-				.OnGenerateRow(this, &SRenderGridJobList::HandleJobListGenerateRow)
-				.OnSelectionChanged(this, &SRenderGridJobList::HandleJobListSelectionChanged)
-				.SelectionMode(ESelectionMode::Multi)
-				.ClearSelectionOnClick(false)
+				SAssignNew(RenderGridJobListWidget, SRenderGridJobListTable, BlueprintEditorWeakPtr, This)
 				.ListItemsSource(&RenderGridJobs)
 				.HeaderRow(
 					SNew(SHeaderRow)
@@ -181,6 +182,58 @@ void UE::RenderGrid::Private::SRenderGridJobList::Construct(const FArguments& In
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION
+
+FReply UE::RenderGrid::Private::SRenderGridJobList::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+		{
+			FMenuBuilder MenuBuilder(true, BlueprintEditor->GetToolkitCommands());
+			{
+				MenuBuilder.BeginSection("RenderGridJobListRowContextMenuSection", LOCTEXT("RenderGridJobListRowContextMenuHeading", "Options"));
+				{
+					MenuBuilder.AddMenuEntry(
+						FRenderGridEditorCommands::Get().AddJob,
+						NAME_None,
+						TAttribute<FText>(),
+						TAttribute<FText>(),
+						FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Plus")
+					);
+
+					if (!BlueprintEditor->GetSelectedRenderGridJobs().IsEmpty())
+					{
+						MenuBuilder.AddMenuEntry(
+							FRenderGridEditorCommands::Get().DuplicateJob,
+							NAME_None,
+							TAttribute<FText>(),
+							TAttribute<FText>(),
+							FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Duplicate")
+						);
+
+						MenuBuilder.AddMenuEntry(
+							FRenderGridEditorCommands::Get().DeleteJob,
+							NAME_None,
+							TAttribute<FText>(),
+							TAttribute<FText>(),
+							FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Delete")
+						);
+					}
+				}
+				MenuBuilder.EndSection();
+			}
+			TSharedPtr<SWidget> MenuContent = MenuBuilder.MakeWidget();
+
+			if (MenuContent.IsValid() && (MouseEvent.GetEventPath() != nullptr))
+			{
+				FWidgetPath WidgetPath = *MouseEvent.GetEventPath();
+				FSlateApplication::Get().PushMenu(WidgetPath.Widgets.Last().Widget, WidgetPath, MenuContent.ToSharedRef(), MouseEvent.GetScreenSpacePosition(), FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu));
+			}
+			return FReply::Handled();
+		}
+	}
+	return SCompoundWidget::OnMouseButtonUp(MyGeometry, MouseEvent);
+}
 
 void UE::RenderGrid::Private::SRenderGridJobList::OnRenderGridJobCreated(URenderGridJob* Job)
 {
@@ -247,7 +300,6 @@ void UE::RenderGrid::Private::SRenderGridJobList::RemoveRenderStatusColumn()
 	RenderGridJobListWidget->GetHeaderRow()->RemoveColumn(FRenderGridJobListColumns::RenderingStatus);
 }
 
-
 void UE::RenderGrid::Private::SRenderGridJobList::OnObjectModified(UObject* Object)
 {
 	if (Cast<UMoviePipelineOutputSetting>(Object) || Cast<UMovieSceneSequence>(Object) || Cast<UMovieScene>(Object) || Cast<UMovieSceneTrack>(Object) || Cast<UMovieSceneSection>(Object) || Cast<UMovieSceneSubTrack>(Object) || Cast<UMovieSceneSubSection>(Object))
@@ -255,7 +307,6 @@ void UE::RenderGrid::Private::SRenderGridJobList::OnObjectModified(UObject* Obje
 		Refresh();
 	}
 }
-
 
 void UE::RenderGrid::Private::SRenderGridJobList::Refresh()
 {
@@ -309,15 +360,39 @@ void UE::RenderGrid::Private::SRenderGridJobList::RefreshHeaderEnabledCheckbox()
 	RenderGridJobEnabledHeaderCheckbox->SetIsChecked(GetDesiredHeaderEnabledCheckboxState());
 }
 
-TSharedRef<ITableRow> UE::RenderGrid::Private::SRenderGridJobList::HandleJobListGenerateRow(URenderGridJob* Item, const TSharedRef<STableViewBase>& OwnerTable)
-{
-	TSharedPtr<SWidget> BaseThis = AsShared();
-	TSharedPtr<SRenderGridJobList> This = StaticCastSharedPtr<SRenderGridJobList>(BaseThis);
 
-	return SNew(SRenderGridJobListTableRow, OwnerTable, BlueprintEditorWeakPtr, Item, This);
+void UE::RenderGrid::Private::SRenderGridJobListTable::Construct(const FArguments& InArgs, TWeakPtr<IRenderGridEditor> InBlueprintEditor, const TSharedPtr<SRenderGridJobList>& InJobListWidget)
+{
+	BlueprintEditorWeakPtr = InBlueprintEditor;
+	JobListWidget = InJobListWidget;
+
+	SListView::Construct(
+		SListView::FArguments()
+		.ListItemsSource(InArgs._ListItemsSource)
+		.HeaderRow(InArgs._HeaderRow)
+		.ItemHeight(20.0f)
+		.OnGenerateRow(this, &SRenderGridJobListTable::HandleJobListGenerateRow)
+		.OnSelectionChanged(this, &SRenderGridJobListTable::HandleJobListSelectionChanged)
+		.SelectionMode(ESelectionMode::Multi)
+		.ClearSelectionOnClick(false)
+	);
 }
 
-void UE::RenderGrid::Private::SRenderGridJobList::HandleJobListSelectionChanged(URenderGridJob* Item, ESelectInfo::Type SelectInfo)
+FReply UE::RenderGrid::Private::SRenderGridJobListTable::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		return JobListWidget->OnMouseButtonUp(MyGeometry, MouseEvent);
+	}
+	return SListView<URenderGridJob*>::OnMouseButtonUp(MyGeometry, MouseEvent);
+}
+
+TSharedRef<ITableRow> UE::RenderGrid::Private::SRenderGridJobListTable::HandleJobListGenerateRow(URenderGridJob* Item, const TSharedRef<STableViewBase>& OwnerTable)
+{
+	return SNew(SRenderGridJobListTableRow, OwnerTable, BlueprintEditorWeakPtr, Item, JobListWidget);
+}
+
+void UE::RenderGrid::Private::SRenderGridJobListTable::HandleJobListSelectionChanged(URenderGridJob* Item, ESelectInfo::Type SelectInfo)
 {
 	if (SelectInfo == ESelectInfo::Type::Direct)
 	{
@@ -325,7 +400,7 @@ void UE::RenderGrid::Private::SRenderGridJobList::HandleJobListSelectionChanged(
 	}
 	if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
 	{
-		BlueprintEditor->SetSelectedRenderGridJobs(RenderGridJobListWidget->GetSelectedItems());
+		BlueprintEditor->SetSelectedRenderGridJobs(GetSelectedItems());
 	}
 }
 
@@ -333,7 +408,7 @@ void UE::RenderGrid::Private::SRenderGridJobList::HandleJobListSelectionChanged(
 void UE::RenderGrid::Private::SRenderGridJobListTableRow::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTableView, TWeakPtr<IRenderGridEditor> InBlueprintEditor, URenderGridJob* InRenderGridJob, const TSharedPtr<SRenderGridJobList>& InJobListWidget)
 {
 	BlueprintEditorWeakPtr = InBlueprintEditor;
-	RenderGridJob = InRenderGridJob;
+	RenderGridJobWeakPtr = InRenderGridJob;
 	JobListWidget = InJobListWidget;
 
 	SMultiColumnTableRow<URenderGridJob*>::Construct(FSuperRowType::FArguments()
@@ -344,38 +419,11 @@ void UE::RenderGrid::Private::SRenderGridJobListTableRow::Construct(const FArgum
 
 FReply UE::RenderGrid::Private::SRenderGridJobListTableRow::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-	if (MouseEvent.GetEffectingButton() != EKeys::RightMouseButton)
+	if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 	{
-		return SMultiColumnTableRow<URenderGridJob*>::OnMouseButtonUp(MyGeometry, MouseEvent);
+		return JobListWidget->OnMouseButtonUp(MyGeometry, MouseEvent);
 	}
-
-	FMenuBuilder MenuBuilder(true, nullptr);
-	{
-		MenuBuilder.BeginSection("RenderGridJobListRowContextMenuSection", LOCTEXT("RenderGridJobListRowContextMenuHeading", "Options"));
-		{
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("DuplicateRenderGridJobListRowLabel", "Duplicate"),
-				LOCTEXT("DuplicateRenderGridJobListTooltip", "Creates a copy of the job and adds it to the grid."),
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Duplicate"),
-				FUIAction(FExecuteAction::CreateSP(this, &SRenderGridJobListTableRow::DuplicateJob))
-			);
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("DeleteRenderGridJobListRowLabel", "Delete"),
-				LOCTEXT("DeleteRenderGridJobListTooltip", "Removes the job from the grid."),
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Delete"),
-				FUIAction(FExecuteAction::CreateSP(this, &SRenderGridJobListTableRow::DeleteJob))
-			);
-		}
-		MenuBuilder.EndSection();
-	}
-	TSharedPtr<SWidget> MenuContent = MenuBuilder.MakeWidget();
-
-	if (MenuContent.IsValid() && (MouseEvent.GetEventPath() != nullptr))
-	{
-		FWidgetPath WidgetPath = *MouseEvent.GetEventPath();
-		FSlateApplication::Get().PushMenu(WidgetPath.Widgets.Last().Widget, WidgetPath, MenuContent.ToSharedRef(), MouseEvent.GetScreenSpacePosition(), FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu));
-	}
-	return FReply::Handled();
+	return SMultiColumnTableRow<URenderGridJob*>::OnMouseButtonUp(MyGeometry, MouseEvent);
 }
 
 TOptional<EItemDropZone> UE::RenderGrid::Private::SRenderGridJobListTableRow::OnCanAcceptDrop(const FDragDropEvent& InEvent, EItemDropZone InItemDropZone, URenderGridJob* InJob)
@@ -413,253 +461,274 @@ FReply UE::RenderGrid::Private::SRenderGridJobListTableRow::OnAcceptDrop(const F
 
 TSharedRef<SWidget> UE::RenderGrid::Private::SRenderGridJobListTableRow::GenerateWidgetForColumn(const FName& ColumnName)
 {
-	if (!IsValid(RenderGridJob))
+	if (URenderGridJob* Job = RenderGridJobWeakPtr.Get(); IsValid(Job))
 	{
-		return SNullWidget::NullWidget;
-	}
-
-	if (ColumnName == FRenderGridJobListColumns::DragDropHandle)
-	{
-		return SNew(SBox)
-			.Padding(FMargin(0.0f, 2.0f, 2.0f, 2.0f))
-			[
-				SNew(SScaleBox)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.Stretch(EStretch::ScaleToFit)
-				.StretchDirection(EStretchDirection::Both)
+		if (ColumnName == FRenderGridJobListColumns::DragDropHandle)
+		{
+			return SNew(SBox)
+				.Padding(FMargin(0.0f, 2.0f, 2.0f, 2.0f))
 				[
-					SNew(SRenderGridDragHandle<FRenderGridJobListTableRowDragDropOp>, RenderGridJob)
-					.Widget(SharedThis(this))
-				]
-			];
-	}
-	else if (ColumnName == FRenderGridJobListColumns::IsEnabled)
-	{
-		return SNew(SBox)
-			.HAlign(HAlign_Center)
-			[
-				SNew(SCheckBox)
-				.IsChecked(RenderGridJob->GetIsEnabled())
-				.OnCheckStateChanged_Lambda([this](ECheckBoxState State)
-				{
-					RenderGridJob->SetIsEnabled(State == ECheckBoxState::Checked);
-					if (JobListWidget.IsValid())
+					SNew(SScaleBox)
+					.HAlign(HAlign_Center)
+					.VAlign(VAlign_Center)
+					.Stretch(EStretch::ScaleToFit)
+					.StretchDirection(EStretchDirection::Both)
+					[
+						SNew(SRenderGridDragHandle<FRenderGridJobListTableRowDragDropOp>, Job)
+						.Widget(SharedThis(this))
+					]
+				];
+		}
+		else if (ColumnName == FRenderGridJobListColumns::IsEnabled)
+		{
+			return SNew(SBox)
+				.HAlign(HAlign_Center)
+				[
+					SNew(SCheckBox)
+					.IsChecked(Job->GetIsEnabled())
+					.OnCheckStateChanged_Lambda([this](ECheckBoxState State)
 					{
-						JobListWidget->RefreshHeaderEnabledCheckbox();
-					}
-					if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-					{
-						BlueprintEditor->MarkAsModified();
-					}
-				})
-			];
-	}
-	else if (ColumnName == FRenderGridJobListColumns::JobId)
-	{
-		return SNew(SRenderGridEditableTextBlock)
-			.Text(FText::FromString(RenderGridJob->GetJobId()))
-			.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
-			{
-				const FString OldJobId = RenderGridJob->GetJobId();
-				const FString NewJobId = URenderGridJob::PurgeJobIdOrReturnEmptyString(InLabel.ToString());
-				if (NewJobId.IsEmpty() || (RenderGridJob->GetJobId() == NewJobId))
-				{
-					return FText::FromString(OldJobId);
-				}
-
-				if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-				{
-					if (URenderGrid* Grid = BlueprintEditor->GetInstance(); IsValid(Grid))
-					{
-						if (Grid->DoesJobIdExist(NewJobId))
+						if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
 						{
-							const FText TitleText = LOCTEXT("JobIdNotUniqueTitle", "Duplicate Job IDs");
-							FMessageDialog::Open(
-								EAppMsgType::Ok,
-								FText::Format(LOCTEXT("JobIdNotUniqueMessage", "Job ID \"{0}\" is not unique."), FText::FromString(NewJobId)),
-								&TitleText);
+							{
+								FScopedTransaction Transaction(LOCTEXT("ChangeJobId", "Change Job Id"));
+								if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+								{
+									BlueprintEditor->MarkAsModified();
+								}
+								RenderGridJob->Modify();
+
+								RenderGridJob->SetIsEnabled(State == ECheckBoxState::Checked);
+							}
+
+							if (JobListWidget.IsValid())
+							{
+								JobListWidget->RefreshHeaderEnabledCheckbox();
+							}
+						}
+					})
+				];
+		}
+		else if (ColumnName == FRenderGridJobListColumns::JobId)
+		{
+			return SNew(SRenderGridEditableTextBlock)
+				.Text(FText::FromString(Job->GetJobId()))
+				.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						const FString OldJobId = RenderGridJob->GetJobId();
+						const FString NewJobId = FRenderGridUtils::PurgeJobIdOrReturnEmptyString(InLabel.ToString());
+						if (NewJobId.IsEmpty() || (RenderGridJob->GetJobId() == NewJobId))
+						{
 							return FText::FromString(OldJobId);
 						}
 
-						RenderGridJob->SetJobId(NewJobId);
-						BlueprintEditor->MarkAsModified();
-						return FText::FromString(RenderGridJob->GetJobId());
+						if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+						{
+							if (URenderGrid* Grid = BlueprintEditor->GetInstance(); IsValid(Grid))
+							{
+								if (Grid->DoesJobIdExist(NewJobId))
+								{
+									const FText TitleText = LOCTEXT("JobIdNotUniqueTitle", "Duplicate Job IDs");
+									FMessageDialog::Open(
+										EAppMsgType::Ok,
+										FText::Format(LOCTEXT("JobIdNotUniqueMessage", "Job ID \"{0}\" is not unique."), FText::FromString(NewJobId)),
+										&TitleText);
+									return FText::FromString(OldJobId);
+								}
+
+								FScopedTransaction Transaction(LOCTEXT("ChangeJobId", "Change Job Id"));
+								BlueprintEditor->MarkAsModified();
+								RenderGridJob->Modify();
+
+								RenderGridJob->SetJobId(NewJobId);
+								return FText::FromString(RenderGridJob->GetJobId());
+							}
+						}
+						return FText::FromString(OldJobId);
 					}
-				}
-				return FText::FromString(OldJobId);
-			});
-	}
-	else if (ColumnName == FRenderGridJobListColumns::JobName)
-	{
-		return SNew(SRenderGridEditableTextBlock)
-			.Text(FText::FromString(RenderGridJob->GetJobName()))
-			.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
-			{
-				RenderGridJob->SetJobName(InLabel.ToString());
-				if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-				{
-					BlueprintEditor->MarkAsModified();
-				}
-				return FText::FromString(RenderGridJob->GetJobName());
-			});
-	}
-	else if (ColumnName == FRenderGridJobListColumns::OutputDirectory)
-	{
-		return SNew(SRenderGridFileSelectorTextBlock)
-			.Text(FText::FromString(RenderGridJob->GetOutputDirectoryForDisplay()))
-			.FolderPath_Lambda([this]() -> FString
-			{
-				return RenderGridJob->GetOutputDirectory();
-			})
-			.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
-			{
-				RenderGridJob->SetOutputDirectory(InLabel.ToString());
-				if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-				{
-					BlueprintEditor->MarkAsModified();
-				}
-				return FText::FromString(RenderGridJob->GetOutputDirectoryForDisplay());
-			});
-	}
-	else if (ColumnName == FRenderGridJobListColumns::RenderPreset)
-	{
-		return SNew(SObjectPropertyEntryBox)
-			.AllowedClass(UMoviePipelineMasterConfig::StaticClass())
-			.ObjectPath_Lambda([this]() -> FString
-			{
-				if (UMoviePipelineMasterConfig* Preset = RenderGridJob->GetRenderPreset(); IsValid(Preset))
-				{
-					return Preset->GetPathName();
-				}
-				return FString();
-			})
-			.OnObjectChanged_Lambda([this](const FAssetData& AssetData) -> void
-			{
-				RenderGridJob->SetRenderPreset(nullptr);
-				if (UObject* AssetDataAsset = AssetData.GetAsset(); IsValid(AssetDataAsset))
-				{
-					if (UMoviePipelineMasterConfig* Preset = Cast<UMoviePipelineMasterConfig>(AssetDataAsset))
-					{
-						RenderGridJob->SetRenderPreset(Preset);
-					}
-				}
-				if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-				{
-					BlueprintEditor->MarkAsModified();
-					BlueprintEditor->OnRenderGridChanged().Broadcast();
-				}
-			})
-			.AllowClear(true)
-			.DisplayUseSelected(true)
-			.DisplayBrowse(true)
-			.DisplayThumbnail(false);
-	}
-	else if ((ColumnName == FRenderGridJobListColumns::StartFrame) || (ColumnName == FRenderGridJobListColumns::EndFrame))
-	{
-		FText Text;
-		if (TOptional<int32> Frame = ((ColumnName == FRenderGridJobListColumns::StartFrame) ? RenderGridJob->GetStartFrame() : RenderGridJob->GetEndFrame()))
-		{
-			Text = FText::AsNumber(*Frame);
+					return FText();
+				});
 		}
-		return SNew(SBox)
-			.VAlign(VAlign_Center)
-			//.HAlign(HAlign_Right)
-			.Padding(FMargin(10, 0))
-			[
-				SNew(STextBlock).Text(Text)
-			];
-	}
-	else if (ColumnName == FRenderGridJobListColumns::Tags)
-	{
-		//TODO: add support for tags
-	}
-	else if (ColumnName == FRenderGridJobListColumns::Resolution)
-	{
-		FIntPoint Resolution = RenderGridJob->GetOutputResolution();
-
-		FNumberFormattingOptions NumberFormattingOptions;
-		NumberFormattingOptions.UseGrouping = false;
-
-		FText ResolutionFormat = LOCTEXT("Resolution", "{Width} x {Height}");
-		FFormatNamedArguments ResolutionArguments;
-		ResolutionArguments.Add(TEXT("Width"), FText::AsNumber(Resolution.X, &NumberFormattingOptions));
-		ResolutionArguments.Add(TEXT("Height"), FText::AsNumber(Resolution.Y, &NumberFormattingOptions));
-		FText Text = FText::Format(ResolutionFormat, ResolutionArguments);
-
-		return SNew(SBox)
-			.VAlign(VAlign_Center)
-			.Padding(FMargin(10, 0))
-			[
-				SNew(STextBlock).Text(Text)
-			];
-	}
-	else if (ColumnName == FRenderGridJobListColumns::Duration)
-	{
-		FText Text;
-		if (TOptional<double> Duration = RenderGridJob->GetDurationInSeconds())
+		else if (ColumnName == FRenderGridJobListColumns::JobName)
 		{
-			FTimespan Timespan = FTimespan::FromSeconds(*Duration);
-			int32 Hours = static_cast<int32>(Timespan.GetTotalHours());
-			int32 Minutes = Timespan.GetMinutes();
-			int32 Seconds = Timespan.GetSeconds();
+			return SNew(SRenderGridEditableTextBlock)
+				.Text(FText::FromString(Job->GetJobName()))
+				.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						FScopedTransaction Transaction(LOCTEXT("ChangeJobName", "Change Job Name"));
+						if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+						{
+							BlueprintEditor->MarkAsModified();
+						}
+						RenderGridJob->Modify();
+
+						RenderGridJob->SetJobName(InLabel.ToString());
+						return FText::FromString(RenderGridJob->GetJobName());
+					}
+					return FText();
+				});
+		}
+		else if (ColumnName == FRenderGridJobListColumns::OutputDirectory)
+		{
+			return SNew(SRenderGridFileSelectorTextBlock)
+				.Text(FText::FromString(Job->GetOutputDirectoryForDisplay()))
+				.FolderPath_Lambda([this]() -> FString
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						return RenderGridJob->GetOutputDirectory();
+					}
+					return FString();
+				})
+				.OnTextCommitted_Lambda([this](const FText& InLabel, ETextCommit::Type InCommitInfo) -> FText
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						FScopedTransaction Transaction(LOCTEXT("ChangeJobOutputDirectory", "Change Job Output Directory"));
+						if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+						{
+							BlueprintEditor->MarkAsModified();
+						}
+						RenderGridJob->Modify();
+
+						RenderGridJob->SetOutputDirectory(InLabel.ToString());
+						return FText::FromString(RenderGridJob->GetOutputDirectoryForDisplay());
+					}
+					return FText();
+				});
+		}
+		else if (ColumnName == FRenderGridJobListColumns::RenderPreset)
+		{
+			return SNew(SObjectPropertyEntryBox)
+				.AllowedClass(UMoviePipelinePrimaryConfig::StaticClass())
+				.ObjectPath_Lambda([this]() -> FString
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						if (UMoviePipelinePrimaryConfig* Preset = RenderGridJob->GetRenderPreset(); IsValid(Preset))
+						{
+							return Preset->GetPathName();
+						}
+					}
+					return FString();
+				})
+				.OnObjectChanged_Lambda([this](const FAssetData& AssetData) -> void
+				{
+					if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+					{
+						{
+							FScopedTransaction Transaction(LOCTEXT("ChangeJobRenderPreset", "Change Job Render Preset"));
+							if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+							{
+								BlueprintEditor->MarkAsModified();
+							}
+							RenderGridJob->Modify();
+
+							RenderGridJob->SetRenderPreset(nullptr);
+							if (UObject* AssetDataAsset = AssetData.GetAsset(); IsValid(AssetDataAsset))
+							{
+								if (UMoviePipelinePrimaryConfig* Preset = Cast<UMoviePipelinePrimaryConfig>(AssetDataAsset))
+								{
+									RenderGridJob->SetRenderPreset(Preset);
+								}
+							}
+						}
+
+						if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
+						{
+							BlueprintEditor->OnRenderGridChanged().Broadcast();
+						}
+					}
+				})
+				.AllowClear(true)
+				.DisplayUseSelected(true)
+				.DisplayBrowse(true)
+				.DisplayThumbnail(false);
+		}
+		else if ((ColumnName == FRenderGridJobListColumns::StartFrame) || (ColumnName == FRenderGridJobListColumns::EndFrame))
+		{
+			FText Text;
+			if (TOptional<int32> Frame = ((ColumnName == FRenderGridJobListColumns::StartFrame) ? Job->GetStartFrame() : Job->GetEndFrame()))
+			{
+				Text = FText::AsNumber(*Frame);
+			}
+			return SNew(SBox)
+				.VAlign(VAlign_Center)
+				//.HAlign(HAlign_Right)
+				.Padding(FMargin(10, 0))
+				[
+					SNew(STextBlock).Text(Text)
+				];
+		}
+		else if (ColumnName == FRenderGridJobListColumns::Tags)
+		{
+			//TODO: add support for tags
+		}
+		else if (ColumnName == FRenderGridJobListColumns::Resolution)
+		{
+			FIntPoint Resolution = Job->GetOutputResolution();
 
 			FNumberFormattingOptions NumberFormattingOptions;
-			NumberFormattingOptions.MinimumIntegralDigits = 2;
-			NumberFormattingOptions.MaximumIntegralDigits = 2;
+			NumberFormattingOptions.UseGrouping = false;
 
-			FText TimespanFormat = NSLOCTEXT("Timespan", "Format_HoursMinutesSeconds", "{Hours}:{Minutes}:{Seconds}");
-			FFormatNamedArguments TimeArguments;
-			TimeArguments.Add(TEXT("Hours"), Hours);
-			TimeArguments.Add(TEXT("Minutes"), FText::AsNumber(Minutes, &NumberFormattingOptions));
-			TimeArguments.Add(TEXT("Seconds"), FText::AsNumber(Seconds, &NumberFormattingOptions));
-			Text = FText::Format(TimespanFormat, TimeArguments);
+			FText ResolutionFormat = LOCTEXT("Resolution", "{Width} x {Height}");
+			FFormatNamedArguments ResolutionArguments;
+			ResolutionArguments.Add(TEXT("Width"), FText::AsNumber(Resolution.X, &NumberFormattingOptions));
+			ResolutionArguments.Add(TEXT("Height"), FText::AsNumber(Resolution.Y, &NumberFormattingOptions));
+			FText Text = FText::Format(ResolutionFormat, ResolutionArguments);
+
+			return SNew(SBox)
+				.VAlign(VAlign_Center)
+				.Padding(FMargin(10, 0))
+				[
+					SNew(STextBlock).Text(Text)
+				];
 		}
-		return SNew(SBox)
-			.VAlign(VAlign_Center)
-			[
-				SNew(STextBlock).Text(Text)
-			];
-	}
-	else if (ColumnName == FRenderGridJobListColumns::RenderingStatus)
-	{
-		return SNew(SBox)
-			.VAlign(VAlign_Center)
-			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() -> FText
-				{
-					return GetRenderStatusText();
-				})
-			];
+		else if (ColumnName == FRenderGridJobListColumns::Duration)
+		{
+			FText Text;
+			if (TOptional<double> Duration = Job->GetDurationInSeconds())
+			{
+				FTimespan Timespan = FTimespan::FromSeconds(*Duration);
+				int32 Hours = static_cast<int32>(Timespan.GetTotalHours());
+				int32 Minutes = Timespan.GetMinutes();
+				int32 Seconds = Timespan.GetSeconds();
+
+				FNumberFormattingOptions NumberFormattingOptions;
+				NumberFormattingOptions.MinimumIntegralDigits = 2;
+				NumberFormattingOptions.MaximumIntegralDigits = 2;
+
+				FText TimespanFormat = NSLOCTEXT("Timespan", "Format_HoursMinutesSeconds", "{Hours}:{Minutes}:{Seconds}");
+				FFormatNamedArguments TimeArguments;
+				TimeArguments.Add(TEXT("Hours"), Hours);
+				TimeArguments.Add(TEXT("Minutes"), FText::AsNumber(Minutes, &NumberFormattingOptions));
+				TimeArguments.Add(TEXT("Seconds"), FText::AsNumber(Seconds, &NumberFormattingOptions));
+				Text = FText::Format(TimespanFormat, TimeArguments);
+			}
+			return SNew(SBox)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Text(Text)
+				];
+		}
+		else if (ColumnName == FRenderGridJobListColumns::RenderingStatus)
+		{
+			return SNew(SBox)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this]() -> FText
+					{
+						return GetRenderStatusText();
+					})
+				];
+		}
 	}
 	return SNullWidget::NullWidget;
-}
-
-void UE::RenderGrid::Private::SRenderGridJobListTableRow::DuplicateJob()
-{
-	if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-	{
-		if (URenderGrid* RenderGrid = BlueprintEditor->GetInstance(); IsValid(RenderGrid))
-		{
-			RenderGrid->DuplicateAndAddRenderGridJob(RenderGridJob);
-			BlueprintEditor->MarkAsModified();
-			BlueprintEditor->OnRenderGridChanged().Broadcast();
-		}
-	}
-}
-
-void UE::RenderGrid::Private::SRenderGridJobListTableRow::DeleteJob()
-{
-	if (const TSharedPtr<IRenderGridEditor> BlueprintEditor = BlueprintEditorWeakPtr.Pin())
-	{
-		if (URenderGrid* RenderGrid = BlueprintEditor->GetInstance(); IsValid(RenderGrid))
-		{
-			RenderGrid->RemoveRenderGridJob(RenderGridJob);
-			BlueprintEditor->MarkAsModified();
-			BlueprintEditor->OnRenderGridChanged().Broadcast();
-		}
-	}
 }
 
 FText UE::RenderGrid::Private::SRenderGridJobListTableRow::GetRenderStatusText() const
@@ -668,7 +737,10 @@ FText UE::RenderGrid::Private::SRenderGridJobListTableRow::GetRenderStatusText()
 	{
 		if (URenderGridQueue* RenderQueue = BlueprintEditor->GetBatchRenderQueue(); IsValid(RenderQueue))
 		{
-			return FText::FromString(RenderQueue->GetJobStatus(RenderGridJob));
+			if (URenderGridJob* RenderGridJob = RenderGridJobWeakPtr.Get(); IsValid(RenderGridJob))
+			{
+				return FText::FromString(RenderQueue->GetJobStatus(RenderGridJob));
+			}
 		}
 	}
 	return FText();

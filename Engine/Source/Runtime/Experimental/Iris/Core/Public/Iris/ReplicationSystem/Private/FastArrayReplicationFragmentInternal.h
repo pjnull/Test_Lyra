@@ -8,6 +8,7 @@
 #include "Iris/ReplicationState/Private/IrisFastArraySerializerInternal.h"
 #include "Iris/ReplicationState/PropertyReplicationState.h"
 #include "Iris/ReplicationState/ReplicationStateDescriptor.h"
+#include "Net/Core/Trace/NetDebugName.h"
 
 namespace UE {
 namespace Net {
@@ -52,9 +53,6 @@ namespace Private {
 /** Utility methods to behave similar to FastArraySerializer */
 struct FFastArrayReplicationFragmentHelper
 {
-	/** Create descriptor for the FastArray property if it does not already exist */
-	IRISCORE_API static TRefCountPtr<const FReplicationStateDescriptor> GetOrCreateDescriptorForFastArrayProperty(UObject* Object, FFragmentRegistrationContext& Context, int32 RepIndex);
-
 	/** Rebuild IndexMap for FastArrraySerializer */
 	template <typename FastArrayType, typename ItemArrayType>
 	static void ConditionalRebuildItemMap(FastArrayType& ArraySerializer, const ItemArrayType& Items);

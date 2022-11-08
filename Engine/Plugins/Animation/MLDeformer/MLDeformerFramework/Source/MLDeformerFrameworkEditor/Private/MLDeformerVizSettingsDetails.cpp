@@ -176,7 +176,7 @@ namespace UE::MLDeformer
 
 	bool FMLDeformerVizSettingsDetails::FilterAnimSequences(const FAssetData& AssetData, USkeleton* Skeleton)
 	{
-		if (Skeleton && Skeleton->IsCompatibleSkeletonByAssetData(AssetData))
+		if (Skeleton && Skeleton->IsCompatibleForEditor(AssetData))
 		{
 			return false;
 		}

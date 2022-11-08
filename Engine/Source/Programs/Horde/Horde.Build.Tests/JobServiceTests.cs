@@ -2,21 +2,26 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
+using EpicGames.Horde.Common;
 using Horde.Build.Agents;
 using Horde.Build.Agents.Pools;
 using Horde.Build.Jobs;
 using Horde.Build.Jobs.Graphs;
 using Horde.Build.Jobs.Templates;
 using Horde.Build.Logs;
+using Horde.Build.Perforce;
 using Horde.Build.Projects;
 using Horde.Build.Server;
 using Horde.Build.Streams;
 using Horde.Build.Users;
 using Horde.Build.Utilities;
 using HordeCommon;
+using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Horde.Build.Tests
@@ -25,7 +30,7 @@ namespace Horde.Build.Tests
 	using LogId = ObjectId<ILogFile>;
 	using ProjectId = StringId<IProject>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 
 	[TestClass]
 	public class JobServiceTests : TestSetup
@@ -34,25 +39,32 @@ namespace Horde.Build.Tests
 		public async Task TestChainedJobs()
 		{
 			ProjectId projectId = new ProjectId("ue5");
-			IProject? project = await ProjectService.Collection.AddOrUpdateAsync(projectId, "", "", 0, new ProjectConfig { Name = "UE5" });
+
+			const string ProjectConfigRevision = "projectconfig";
+			await ConfigCollection.AddConfigAsync(ProjectConfigRevision, new ProjectConfig { Name = "UE4" });
+			IProject? project = await ProjectService.Collection.AddOrUpdateAsync(projectId, ProjectConfigRevision, 0);
 			Assert.IsNotNull(project);
 
 			ITemplate template = await TemplateCollection.AddAsync("Test template");
 			IGraph graph = await GraphCollection.AddAsync(template);
 
-			TemplateRefId templateRefId1 = new TemplateRefId("template1");
-			TemplateRefId templateRefId2 = new TemplateRefId("template2");
+			TemplateId templateRefId1 = new TemplateId("template1");
+			TemplateId templateRefId2 = new TemplateId("template2");
 
 			StreamConfig streamConfig = new StreamConfig();
-			streamConfig.Templates.Add(new TemplateRefConfig { Id = templateRefId1, Name = "Test Template", ChainedJobs = new List<CreateChainedJobTemplateRequest> { new CreateChainedJobTemplateRequest { TemplateId = templateRefId2.ToString(), Trigger = "Setup Build" } } });
+			streamConfig.Templates.Add(new TemplateRefConfig { Id = templateRefId1, Name = "Test Template", ChainedJobs = new List<ChainedJobTemplateConfig> { new ChainedJobTemplateConfig { TemplateId = templateRefId2, Trigger = "Setup Build" } } });
 			streamConfig.Templates.Add(new TemplateRefConfig { Id = templateRefId2, Name = "Test Template" });
-			streamConfig.Tabs.Add(new CreateJobsTabRequest { Title = "foo", Templates = new List<TemplateRefId> { templateRefId1, templateRefId2 } });
+			streamConfig.Tabs.Add(new JobsTabConfig { Title = "foo", Templates = new List<TemplateId> { templateRefId1, templateRefId2 } });
 
 			StreamId streamId = new StreamId("ue5-main");
 			IStream? stream = await StreamService.GetStreamAsync(streamId);
 			stream = await CreateOrReplaceStreamAsync(new StreamId("ue5-main"), stream, projectId, streamConfig);
 
-			IJob job = await JobService.CreateJobAsync(null, stream!, templateRefId1, template.Id, graph, "Hello", 1234, 1233, 999, null, null, null, null, null, null, null, stream!.Templates[templateRefId1].ChainedJobs, true, true, null, null, new List<string>());
+			CreateJobOptions options = new CreateJobOptions();
+			options.PreflightChange = 999;
+			options.JobTriggers.AddRange(stream!.Templates[templateRefId1].Config.ChainedJobs!);
+
+			IJob job = await JobService.CreateJobAsync(null, stream!, templateRefId1, template.Id, graph, "Hello", 1234, 1233, options);
 			Assert.AreEqual(1, job.ChainedJobs.Count);
 
 			job = Deref(await JobService.UpdateBatchAsync(job, job.Batches[0].Id, LogId.GenerateNewId(), JobStepBatchState.Running));
@@ -69,6 +81,49 @@ namespace Horde.Build.Tests
 			Assert.AreEqual(chainedJob!.CodeChange, job!.CodeChange);
 			Assert.AreEqual(chainedJob!.PreflightChange, job!.PreflightChange);
 			Assert.AreEqual(chainedJob!.StartedByUserId, job!.StartedByUserId);
+		}
+
+		[TestMethod]
+		public async Task ChangeQueryTestAsync()
+		{
+			ProjectId projectId = new ProjectId("ue5");
+			const string ProjectConfigRevision = "projectconfig";
+			await ConfigCollection.AddConfigAsync(ProjectConfigRevision, new ProjectConfig { Name = "UE4" });
+			IProject? project = await ProjectService.Collection.AddOrUpdateAsync(projectId, ProjectConfigRevision, 0);
+			Assert.IsNotNull(project);
+
+			StreamId streamId = new StreamId("ue5-main");
+			const string StreamConfigRevision = "streamconfig";
+			await ConfigCollection.AddConfigAsync(StreamConfigRevision, new StreamConfig { });
+			IStream? stream = await CreateOrReplaceStreamAsync(streamId, null, projectId, new StreamConfig());
+			Assert.IsNotNull(stream);
+
+			IUser user = await UserCollection.FindOrAddUserByLoginAsync("Bob");
+
+			PerforceService.AddChange(streamId, 1000, user, "", new[] { "Foo.cpp" });
+			PerforceService.AddChange(streamId, 1001, user, "", new[] { "Bar.cpp" });
+			PerforceService.AddChange(streamId, 1002, user, "", new[] { "Baz.cpp" });
+			PerforceService.AddChange(streamId, 1003, user, "", new[] { "Foo.uasset" });
+			PerforceService.AddChange(streamId, 1004, user, "", new[] { "Foo.uasset" });
+
+			ICommitCollection commits = PerforceService.GetCommits(stream);
+
+			{
+				int? change = await JobService.EvaluateChangeQueryAsync(stream, new ChangeQueryConfig { CommitTag = CommitTag.Code }, null, commits, CancellationToken.None);
+				Assert.AreEqual(1002, change);
+			}
+			{
+				int? change = await JobService.EvaluateChangeQueryAsync(stream, new ChangeQueryConfig { CommitTag = CommitTag.Content }, null, commits, CancellationToken.None);
+				Assert.AreEqual(1004, change);
+			}
+			{
+				int? change = await JobService.EvaluateChangeQueryAsync(stream, new ChangeQueryConfig { CommitTag = CommitTag.Content, Condition = "tag.code == 1" }, new List<CommitTag> { CommitTag.Code }, commits, CancellationToken.None);
+				Assert.AreEqual(1004, change);
+			}
+			{
+				int? change = await JobService.EvaluateChangeQueryAsync(stream, new ChangeQueryConfig { CommitTag = CommitTag.Content, Condition = "tag.content == 1" }, new List<CommitTag> { CommitTag.Code }, commits, CancellationToken.None);
+				Assert.IsNull(change);
+			}
 		}
 
 		[TestMethod]
@@ -102,29 +157,22 @@ namespace Horde.Build.Tests
 		private async Task<IJob> CreatePreflightJob(Fixture fixture, string templateRefId, string templateHash, string startedByUserName, int preflightChange, string[] arguments)
 		{
 			IUser user = await UserCollection.FindOrAddUserByLoginAsync(startedByUserName);
+
+			CreateJobOptions options = new CreateJobOptions();
+			options.PreflightChange = preflightChange;
+			options.StartedByUserId = user.Id;
+			options.Arguments.AddRange(arguments);
+
 			return await JobService.CreateJobAsync(
 				jobId: JobId.GenerateNewId(),
 				stream: fixture!.Stream!,
-				templateRefId: new TemplateRefId(templateRefId),
+				templateRefId: new TemplateId(templateRefId),
 				templateHash: new ContentHash(Encoding.ASCII.GetBytes(templateHash)),
 				graph: fixture!.Graph,
 				name: "hello1",
 				change: 1000001,
 				codeChange: 1000002,
-				preflightChange: preflightChange,
-				clonedPreflightChange: null,
-				preflightDescription: null,
-				startedByUserId: user.Id,
-				priority: Priority.Normal,
-				null,
-				null,
-				null,
-				null,
-				false,
-				false,
-				null,
-				null,
-				arguments: new List<string>(arguments)
+				options
 			);
 		}
 		
@@ -155,10 +203,12 @@ namespace Horde.Build.Tests
 		[TestMethod]
 		public async Task TestRunEarly()
 		{
-			IAgent? agent = await AgentService.CreateAgentAsync("TestAgent", true, null, new List<StringId<IPool>> { new StringId<IPool>("win") });
+			IAgent? agent = await AgentService.CreateAgentAsync("TestAgent", true, new List<StringId<IPool>> { new StringId<IPool>("win") });
 			await AgentService.CreateSessionAsync(agent, AgentStatus.Ok, new List<string>(), new Dictionary<string, int>(), null);
 
-			IProject? project = await ProjectService.Collection.AddOrUpdateAsync(new ProjectId("ue5"), "", "", 0, new ProjectConfig { Name = "UE5" });
+			const string ProjectConfigRevision = "projectconfig";
+			await ConfigCollection.AddConfigAsync(ProjectConfigRevision, new ProjectConfig { Name = "UE4" });
+			IProject? project = await ProjectService.Collection.AddOrUpdateAsync(new ProjectId("ue5"), ProjectConfigRevision, 0);
 			Assert.IsNotNull(project);
 
 			StreamId streamId = new StreamId("ue5-main");
@@ -178,7 +228,11 @@ namespace Horde.Build.Tests
 
 			graph = await GraphCollection.AppendAsync(graph, new List<NewGroup> { groupA, groupB });
 
-			IJob job = await JobService.CreateJobAsync(null, stream!, new TemplateRefId("temp"), template.Id, graph, "Hello", 1234, 1233, 999, null, null, null, null, null, null, null, null, true, true, null, null, new List<string> { "-Target=Pak" });
+			CreateJobOptions options = new CreateJobOptions();
+			options.PreflightChange = 999;
+			options.Arguments.Add("-Target=Pak");
+
+			IJob job = await JobService.CreateJobAsync(null, stream!, new TemplateId("temp"), template.Id, graph, "Hello", 1234, 1233, options);
 
 			job = Deref(await JobService.UpdateBatchAsync(job, job.Batches[0].Id, LogId.GenerateNewId(), JobStepBatchState.Running));
 			job = Deref(await JobService.UpdateStepAsync(job, job.Batches[0].Id, job.Batches[0].Steps[0].Id, JobStepState.Running));

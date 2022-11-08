@@ -25,20 +25,26 @@ export const ChangeContextMenu: React.FC<{ target: ChangeContextMenuTarget, onDi
    if (jobChange === undefined) {
       jobChange = stepRef?.change ?? job.change!;
    }
-      
+
    let change = jobChange.toString();
    if (!stepRef && job?.preflightChange) {
       change = `PF ${job.preflightChange}`;
    }
 
-   const copyToClipboard = () => {
+   const copyToClipboard = (value: string | undefined) => {
+
+      if (!value) {
+         return;
+      }
+
       const el = document.createElement('textarea');
-      el.value = change.replace("PF", "");
+      el.value = value;
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');
       document.body.removeChild(el);
    }
+
 
    const menuItems: IContextualMenuItem[] = [];
 
@@ -70,14 +76,38 @@ export const ChangeContextMenu: React.FC<{ target: ChangeContextMenuTarget, onDi
       });
 
 
+   } else if (job.preflightDescription) {
+      menuItems.push({
+         key: "commit", onRender: () => {
+            return <Stack style={{ padding: 18, paddingTop: 18, paddingBottom: 18, maxWidth: 500 }} tokens={{ childrenGap: 12 }}>
+               <Stack horizontal tokens={{ childrenGap: 12 }}>
+                  <Text variant="small" style={{ fontFamily: "Horde Open Sans Bold" }}>Description:</Text>
+                  <Text variant="small" >{job.preflightDescription}</Text>
+               </Stack>
+            </Stack>
+         }
+      });
+
+      menuItems.push({
+         key: "commit_divider",
+         itemType: ContextualMenuItemType.Divider
+      });
+
    }
 
    menuItems.push({
       key: 'copy_to_clipboard',
       text: 'Copy CL to Clipboard',
-      onClick: () => copyToClipboard(),
+      onClick: () => copyToClipboard(change.replace("PF ", ""))
+   });
+
+   if (job) {
+      menuItems.push({
+         key: 'copy_job_to_clipboard',
+         text: 'Copy Job to Clipboard',
+         onClick: () => copyToClipboard(window.location.protocol + "//" + window.location.hostname + `/job/${job.id}`)
+      });
    }
-   );
 
    menuItems.push({ key: 'open_in_swarm', text: 'Open CL in Swarm', onClick: (ev) => { window.open(`${dashboard.swarmUrl}/changes/${change.replace("PF ", "")}`) } })
 
@@ -152,7 +182,7 @@ export const ChangeButton: React.FC<{ job?: JobData, stepRef?: GetJobStepRefResp
          <span ref={spanRef} style={{ padding: "2px 6px 2px 6px", height: "15px", cursor: "pointer" }} className={job.startedByUserInfo ? "cl-callout-button-user" : "cl-callout-button"} onClick={(ev) => { ev.stopPropagation(); ev.preventDefault(); setMenuShown(!menuShown) }} >{change}</span>
          {!hideAborted && <span ref={spanRef} style={{ padding: "2px 6px 2px 6px", height: "16px", cursor: "pointer", userSelect: "none", fontFamily: "Horde Open Sans SemiBold", fontSize: "10px", backgroundColor: colors.get(StatusColor.Failure), color: "rgb(255, 255, 255)" }} onClick={(ev) => { ev.preventDefault(); setMenuShown(!menuShown) }}>Aborted</span>}
       </Stack>
-      {menuShown && <ChangeContextMenu target={{ ref: spanRef }} job={job} commit={commit} stepRef={stepRef} rangeCL={rangeCL}  onDismiss={() => setMenuShown(false)} />}
+      {menuShown && <ChangeContextMenu target={{ ref: spanRef }} job={job} commit={commit} stepRef={stepRef} rangeCL={rangeCL} onDismiss={() => setMenuShown(false)} />}
    </div></Stack>);
 };
 

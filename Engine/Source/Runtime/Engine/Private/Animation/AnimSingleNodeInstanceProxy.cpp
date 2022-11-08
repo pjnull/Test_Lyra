@@ -178,7 +178,7 @@ void FAnimSingleNodeInstanceProxy::InternalBlendSpaceEvaluatePose(class UBlendSp
 {
 	FAnimationPoseData AnimationPoseData = { OutContext.Pose, OutContext.Curve, OutContext.CustomAttributes };
 
-	FAnimExtractContext ExtractionContext(CurrentTime, ShouldExtractRootMotion(), DeltaTimeRecord, bLooping);
+	FAnimExtractContext ExtractionContext(static_cast<double>(CurrentTime), ShouldExtractRootMotion(), DeltaTimeRecord, bLooping);
 
 	if (BlendSpace->IsValidAdditive())
 	{
@@ -192,7 +192,7 @@ void FAnimSingleNodeInstanceProxy::InternalBlendSpaceEvaluatePose(class UBlendSp
 #if WITH_EDITORONLY_DATA
 		if (BlendSpace->PreviewBasePose)
 		{
-			BlendSpace->PreviewBasePose->GetBonePose(AnimationPoseData, FAnimExtractContext(PreviewPoseCurrentTime));
+			BlendSpace->PreviewBasePose->GetBonePose(AnimationPoseData, FAnimExtractContext(static_cast<double>(PreviewPoseCurrentTime)));
 		}
 		else
 #endif // WITH_EDITORONLY_DATA
@@ -313,7 +313,7 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 		= false;
 #endif
 
-	if (Proxy->CurrentAsset != NULL && !Proxy->CurrentAsset->HasAnyFlags(RF_BeginDestroyed))
+	if (Proxy->CurrentAsset != nullptr && !Proxy->CurrentAsset->HasAnyFlags(RF_BeginDestroyed))
 	{
 		FAnimationPoseData OutputAnimationPoseData(Output);
 
@@ -324,7 +324,7 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 		}
 		else if (UAnimSequence* Sequence = Cast<UAnimSequence>(Proxy->CurrentAsset))
 		{
-			FAnimExtractContext ExtractionContext(Proxy->CurrentTime, Sequence->bEnableRootMotion, Proxy->DeltaTimeRecord, Proxy->bLooping);
+			FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Sequence->bEnableRootMotion, Proxy->DeltaTimeRecord, Proxy->bLooping);
 
 			if (Sequence->IsValidAdditive())
 			{
@@ -383,12 +383,12 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 			else*/
 			{
 				// if SkeletalMesh isn't there, we'll need to use skeleton
-				Streamable->GetAnimationPose(OutputAnimationPoseData, FAnimExtractContext(Proxy->CurrentTime, Streamable->bEnableRootMotion, Proxy->DeltaTimeRecord, Proxy->bLooping));
+				Streamable->GetAnimationPose(OutputAnimationPoseData, FAnimExtractContext(static_cast<double>(Proxy->CurrentTime), Streamable->bEnableRootMotion, Proxy->DeltaTimeRecord, Proxy->bLooping));
 			}
 		}
 		else if (UAnimComposite* Composite = Cast<UAnimComposite>(Proxy->CurrentAsset))
 		{
-			FAnimExtractContext ExtractionContext(Proxy->CurrentTime, Proxy->ShouldExtractRootMotion(), Proxy->DeltaTimeRecord, Proxy->bLooping);
+			FAnimExtractContext ExtractionContext(static_cast<double>(Proxy->CurrentTime), Proxy->ShouldExtractRootMotion(), Proxy->DeltaTimeRecord, Proxy->bLooping);
 			const FAnimTrack& AnimTrack = Composite->AnimationTrack;
 
 			// find out if this is additive animation
@@ -446,7 +446,7 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 					if (bCanProcessAdditiveAnimationsLocal && Montage->PreviewBasePose && Montage->GetPlayLength() > 0.f)
 					{
 						FAnimationPoseData LocalAnimationPoseData = { LocalSourcePose, LocalSourceCurve, LocalSourceAttributes };
-						Montage->PreviewBasePose->GetBonePose(LocalAnimationPoseData, FAnimExtractContext(Proxy->CurrentTime));
+						Montage->PreviewBasePose->GetBonePose(LocalAnimationPoseData, FAnimExtractContext(static_cast<double>(Proxy->CurrentTime)));
 					}
 					else
 #endif // WITH_EDITORONLY_DATA
@@ -477,10 +477,7 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 		// if it has a preview pose asset, we have to handle that after we do all animation
 		if (const UPoseAsset* PoseAsset = Proxy->CurrentAsset->PreviewPoseAsset)
 		{
-			USkeleton* MySkeleton = Proxy->CurrentAsset->GetSkeleton();
-
-			// if skeleton doesn't match it won't work
-			if (MySkeleton->IsCompatible(PoseAsset->GetSkeleton()))
+			if (PoseAsset->GetSkeleton() != nullptr)
 			{
 				const TArray<FSmartName>& PoseNames = PoseAsset->GetPoseNames();
 
@@ -566,7 +563,7 @@ void FAnimNode_SingleNode::Evaluate_AnyThread(FPoseContext& Output)
 void FAnimNode_SingleNode::Update_AnyThread(const FAnimationUpdateContext& Context)
 {
 	float NewPlayRate = Proxy->PlayRate;
-	UAnimSequence* PreviewBasePose = NULL;
+	UAnimSequence* PreviewBasePose = nullptr;
 
 	if (Proxy->bPlaying == false)
 	{
@@ -574,7 +571,7 @@ void FAnimNode_SingleNode::Update_AnyThread(const FAnimationUpdateContext& Conte
 		NewPlayRate = 0.f;
 	}
 
-	if(Proxy->CurrentAsset != NULL)
+	if(Proxy->CurrentAsset != nullptr)
 	{
 		UE::Anim::FAnimSyncGroupScope& SyncScope = Context.GetMessageChecked<UE::Anim::FAnimSyncGroupScope>();
 

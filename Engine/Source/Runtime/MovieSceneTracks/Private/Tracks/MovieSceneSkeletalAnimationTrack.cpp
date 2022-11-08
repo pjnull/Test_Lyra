@@ -382,7 +382,7 @@ static void CalculateDistanceMap(USkeletalMeshComponent* SkelMeshComp, UAnimSequ
 		FloatArray.SetNum(SecondAnimNumFrames);
 		float FirstAnimTime = FirstAnimIndex * FrameRateDiff + StartFirstAnimTime;
 		FirstAnimIndex += 1.0f;
-		FAnimExtractContext FirstExtractionContext(FirstAnimTime, false);
+		FAnimExtractContext FirstExtractionContext(static_cast<double>(FirstAnimTime), false);
 		FirstAnimSeq->GetAnimationPose(FirstAnimPoseData, FirstExtractionContext);
 		FirstMeshPoses.InitPose(FirstAnimPoseData.GetPose());
 		float SecondAnimIndex = 0.0f;
@@ -391,7 +391,7 @@ static void CalculateDistanceMap(USkeletalMeshComponent* SkelMeshComp, UAnimSequ
 			DistVal = 0.0f;
 			float SecondAnimTime = SecondAnimIndex * FrameRateDiff;
 			SecondAnimIndex += 1.0f;
-			FAnimExtractContext SecondExtractionContext(SecondAnimTime, false);
+			FAnimExtractContext SecondExtractionContext(static_cast<double>(SecondAnimTime), false);
 			SecondAnimSeq->GetAnimationPose(SecondAnimPoseData, SecondExtractionContext);
 			SecondMeshPoses.InitPose(SecondAnimPoseData.GetPose());
 
@@ -451,7 +451,7 @@ void UMovieSceneSkeletalAnimationTrack::SetUpRootMotions(bool bForce)
 
 		const FFrameRate MinDisplayRate(60, 1);
 
-		FFrameRate DisplayRate = MovieScene->GetDisplayRate().AsDecimal() < MinDisplayRate.AsDecimal() ? MinDisplayRate : MovieScene->GetDisplayRate();
+		FFrameRate DisplayRate =  MovieScene->GetDisplayRate().AsDecimal() < MinDisplayRate.AsDecimal() ? MinDisplayRate : MovieScene->GetDisplayRate();
 		FFrameRate TickResolution = MovieScene->GetTickResolution();
 		FFrameTime FrameTick = FFrameTime(FMath::Max(1, TickResolution.AsFrameNumber(1.0).Value / DisplayRate.AsFrameNumber(1.0).Value));
 		if (FrameTick.FrameNumber.Value == 0)
@@ -970,13 +970,13 @@ void UMovieSceneSkeletalAnimationTrack::MatchSectionByBoneTransform(bool bMatchW
 
 		if (FirstAnimSequence && SecondAnimSequence)
 		{
-			float FirstSectionTime = static_cast<float>(FirstSection->MapTimeToAnimation(CurrentFrame, FrameRate));
+			double FirstSectionTime = FirstSection->MapTimeToAnimation(CurrentFrame, FrameRate);
 			//use same index for all
 			int32 Index = CurrentSection->SetBoneIndexForRootMotionCalculations(bBlendFirstChildOfRoot);
 			FCompactPoseBoneIndex ParentIndex(Index);
 			
 			FTransform  FirstTransform = GetTransformForBoneRelativeToIndex(FirstAnimSequence, SkelMeshComp, BoneName, ParentIndex, FirstSectionTime);
-			float SecondSectionTime = static_cast<float>(CurrentSection->MapTimeToAnimation(CurrentFrame, FrameRate));
+			double SecondSectionTime = CurrentSection->MapTimeToAnimation(CurrentFrame, FrameRate);
 			FTransform  SecondTransform = GetTransformForBoneRelativeToIndex(SecondAnimSequence, SkelMeshComp, BoneName, ParentIndex,SecondSectionTime);
 			//Need to match the translations and rotations here 
 			//First need to get the correct rotation order based upon what's matching, otherwise if not all are matched 

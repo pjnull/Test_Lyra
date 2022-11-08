@@ -3,28 +3,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
+using EpicGames.Core;
 using EpicGames.Perforce;
 using Horde.Build.Perforce;
+using Horde.Build.Streams;
 using Horde.Build.Users;
 using Horde.Build.Utilities;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Horde.Build.Tests.Stubs.Services
 {
+	using StreamId = StringId<IStream>;
 	using UserId = ObjectId<IUser>;
-
-	static class PerforceExtensions
-	{
-		public static ChangeFile CreateChangeFile(string path)
-		{
-			return new ChangeFile(path, $"//UE5/Main/{path}", 0, 0, EpicGames.Core.Md5Hash.Zero, null!);
-		}
-
-		public static void Add(this List<ChangeFile> files, string path)
-		{
-			files.Add(CreateChangeFile(path));
-		}
-	}
 
 	class PerforceServiceStub : IPerforceService
 	{
@@ -44,14 +37,59 @@ namespace Horde.Build.Tests.Stubs.Services
 			}
 		}
 
-		readonly User _testUser = new User("TestUser");
+		public class Commit : ICommit
+		{
+			public StreamId StreamId { get; }
+			public int Number { get; }
+			public int OriginalChange { get; }
+			public UserId AuthorId { get; }
+			public UserId OwnerId { get; }
+			public string Description { get; }
+			public string BasePath => throw new NotImplementedException();
+			public DateTime DateUtc => throw new NotImplementedException();
+			public List<string> Files { get; }
+
+			public Commit(StreamId streamId, int number, int originalChange, UserId authorId, UserId ownerId, string description, List<string> files)
+			{
+				StreamId = streamId;
+				Number = number;
+				OriginalChange = originalChange;
+				AuthorId = authorId;
+				OwnerId = ownerId;
+				Description = description;
+				Files = files;
+			}
+
+			public ValueTask<IReadOnlyList<CommitTag>> GetTagsAsync(CancellationToken cancellationToken)
+			{
+				StreamConfig config = new StreamConfig();
+				Assert.IsTrue(config.TryGetCommitTagFilter(CommitTag.Code, out FileFilter? codeFilter));
+				Assert.IsTrue(config.TryGetCommitTagFilter(CommitTag.Content, out FileFilter? contentFilter));
+
+				List<CommitTag> tags = new List<CommitTag>();
+				if (codeFilter.ApplyTo(Files).Any())
+				{
+					tags.Add(CommitTag.Code);
+				}
+				if (contentFilter.ApplyTo(Files).Any())
+				{
+					tags.Add(CommitTag.Content);
+				}
+				return new ValueTask<IReadOnlyList<CommitTag>>(tags);
+			}
+
+			public ValueTask<IReadOnlyList<string>> GetFilesAsync(CancellationToken cancellationToken)
+			{
+				return new ValueTask<IReadOnlyList<string>>(Files);
+			}
+		}
 
 		class ChangeComparer : IComparer<int>
 		{
 			public int Compare(int x, int y) => y.CompareTo(x);
 		}
 
-		public Dictionary<string, SortedDictionary<int, ChangeDetails>> Changes { get; } = new Dictionary<string, SortedDictionary<int, ChangeDetails>>(StringComparer.OrdinalIgnoreCase);
+		public Dictionary<StreamId, SortedDictionary<int, Commit>> Changes { get; } = new Dictionary<StreamId, SortedDictionary<int, Commit>>();
 
 		readonly IUserCollection _userCollection;
 
@@ -60,35 +98,40 @@ namespace Horde.Build.Tests.Stubs.Services
 			_userCollection = userCollection;
 		}
 
-		public Task<IPerforceConnection?> GetServiceUserConnection(string? clusterName)
+		public Task<IPooledPerforceConnection> ConnectAsync(string? clusterName, string? userName, CancellationToken cancellationToken)
 		{
 			throw new NotImplementedException();
 		}
 
-		public async ValueTask<IUser> FindOrAddUserAsync(string clusterName, string userName)
+		public async ValueTask<IUser> FindOrAddUserAsync(string clusterName, string userName, CancellationToken cancellationToken)
 		{
 			return await _userCollection.FindOrAddUserByLoginAsync(userName);
 		}
 
-		public void AddChange(string streamName, int number, IUser author, string description, IEnumerable<string> files)
+		public void AddChange(StreamId streamId, int number, IUser author, string description, IEnumerable<string> files)
 		{
-			SortedDictionary<int, ChangeDetails>? streamChanges;
-			if (!Changes.TryGetValue(streamName, out streamChanges))
-			{
-				streamChanges = new SortedDictionary<int, ChangeDetails>(new ChangeComparer());
-				Changes[streamName] = streamChanges;
-			}
-			streamChanges.Add(number, new ChangeDetails(number, author, null!, description, files.Select(x => PerforceExtensions.CreateChangeFile(x)).ToList(), DateTime.Now));
+			AddChange(streamId, number, number, author, author, description, files);
 		}
 
-		public Task<List<ChangeSummary>> GetChangesAsync(string clusterName, string streamName, int? minChange, int? maxChange, int numResults, string? impersonateUser)
+		public void AddChange(StreamId streamId, int number, int originalNumber, IUser author, IUser owner, string description, IEnumerable<string> files)
 		{
-			List<ChangeSummary> results = new List<ChangeSummary>();
-
-			SortedDictionary<int, ChangeDetails>? streamChanges;
-			if (Changes.TryGetValue(streamName, out streamChanges) && streamChanges.Count > 0)
+			SortedDictionary<int, Commit>? streamChanges;
+			if (!Changes.TryGetValue(streamId, out streamChanges))
 			{
-				foreach (ChangeDetails details in streamChanges.Values)
+				streamChanges = new SortedDictionary<int, Commit>(new ChangeComparer());
+				Changes[streamId] = streamChanges;
+			}
+			streamChanges.Add(number, new Commit(streamId, number, originalNumber, author.Id, owner.Id, description, files.ToList()));
+		}
+
+		public Task<List<ICommit>> GetChangesAsync(IStream stream, int? minChange, int? maxChange, int? numResults, CancellationToken cancellationToken)
+		{
+			List<ICommit> results = new List<ICommit>();
+
+			SortedDictionary<int, Commit>? streamChanges;
+			if (Changes.TryGetValue(stream.Id, out streamChanges) && streamChanges.Count > 0)
+			{
+				foreach (Commit details in streamChanges.Values)
 				{
 					if (minChange.HasValue && details.Number < minChange)
 					{
@@ -96,9 +139,9 @@ namespace Horde.Build.Tests.Stubs.Services
 					}
 					if (!maxChange.HasValue || details.Number <= maxChange.Value)
 					{
-						results.Add(new ChangeSummary(details.Number, details.Author, "//...", details.Description));
+						results.Add(details);
 					}
-					if (numResults > 0 && results.Count >= numResults)
+					if (numResults != null && numResults > 0 && results.Count >= numResults)
 					{
 						break;
 					}
@@ -108,17 +151,17 @@ namespace Horde.Build.Tests.Stubs.Services
 			return Task.FromResult(results);
 		}
 
-		public Task<(CheckShelfResult, string?)> CheckShelfAsync(string clusterName, string streamName, int changeNumber, string? impersonateUser)
+		public Task<(CheckShelfResult, ShelfInfo?)> CheckShelfAsync(IStream stream, int changeNumber, CancellationToken cancellationToken)
 		{
 			throw new NotImplementedException();
 		}
 
-		public Task<List<ChangeDetails>> GetChangeDetailsAsync(string clusterName, string streamName, IReadOnlyList<int> changeNumbers, string? impersonateUser)
+		public Task<List<ICommit>> GetChangeDetailsAsync(IStream stream, IReadOnlyList<int> changeNumbers, CancellationToken cancellationToken)
 		{
-			List<ChangeDetails> results = new List<ChangeDetails>();
+			List<ICommit> results = new List<ICommit>();
 			foreach (int changeNumber in changeNumbers)
 			{
-				results.Add(Changes[streamName][changeNumber]);
+				results.Add(Changes[stream.Id][changeNumber]);
 			}
 			return Task.FromResult(results);
 		}
@@ -128,81 +171,89 @@ namespace Horde.Build.Tests.Stubs.Services
 			return Task.FromResult("bogus-ticket");
 		}
 
-		public Task<int> GetCodeChangeAsync(string clusterName, string streamName, int change)
-		{
-			int codeChange = 0;
-
-			SortedDictionary<int, ChangeDetails>? streamChanges;
-			if (Changes.TryGetValue(streamName, out streamChanges))
-			{
-				foreach (ChangeDetails details in streamChanges.Values)
-				{
-					if (details.Number <= change && details.Files.Any(x => x.Path.EndsWith(".h", StringComparison.OrdinalIgnoreCase) || x.Path.EndsWith(".cpp", StringComparison.OrdinalIgnoreCase)))
-					{
-						codeChange = details.Number;
-						break;
-					}
-				}
-			}
-
-			return Task.FromResult(codeChange);
-		}
-
-		public Task<int> CreateNewChangeAsync(string clusterName, string streamName, string path, string description)
-		{
-			ChangeDetails newChange = new ChangeDetails(Changes[streamName].First().Key + 1, _testUser, null!, description, new List<ChangeFile> { PerforceExtensions.CreateChangeFile(path) }, DateTime.Now);
-			Changes[streamName].Add(newChange.Number, newChange);
-			return Task.FromResult(newChange.Number);
-		}
-
-		public Task<List<FileSummary>> FindFilesAsync(string clusterName, IEnumerable<string> paths)
+		public Task<int> CreateNewChangeAsync(string clusterName, string streamName, string path, string description, CancellationToken cancellationToken)
 		{
 			throw new NotImplementedException();
 		}
 
-		public Task<byte[]> PrintAsync(string clusterName, string path)
+		public Task<(int? Change, string Message)> SubmitShelvedChangeAsync(IStream stream, int shelvedChange, int originalChange, CancellationToken cancellationToken)
 		{
 			throw new NotImplementedException();
 		}
 
-		public Task<(int? Change, string Message)> SubmitShelvedChangeAsync(string clusterName, int shelvedChange, int originalChange)
-		{
-			throw new NotImplementedException();
-		}
-
-		public Task<int> DuplicateShelvedChangeAsync(string clusterName, int shelvedChange)
+		public Task<int> DuplicateShelvedChangeAsync(string clusterName, int shelvedChange, CancellationToken cancellationToken)
 		{
 			return Task.FromResult(shelvedChange);
 		}
 
-		public Task DeleteShelvedChangeAsync(string clusterName, int shelvedChange)
+		public Task DeleteShelvedChangeAsync(string clusterName, int shelvedChange, CancellationToken cancellationToken)
 		{
 			return Task.CompletedTask;
 		}
 
-		public Task UpdateChangelistDescription(string clusterName, int change, string description)
+		public Task UpdateChangelistDescription(string clusterName, int change, Func<string, string> description, CancellationToken cancellationToken)
 		{
 			return Task.CompletedTask;
 		}
 
-		public Task<List<ChangeSummary>> GetChangesAsync(string clusterName, int? minChange, int? maxChange, int maxResults)
+		public Task<ICommit> GetChangeDetailsAsync(string clusterName, int changeNumber, CancellationToken cancellationToken)
 		{
 			throw new NotImplementedException();
 		}
 
-		public Task<ChangeDetails> GetChangeDetailsAsync(string clusterName, int changeNumber)
+		public Task<ICommit> GetChangeDetailsAsync(IStream stream, int changeNumber, CancellationToken cancellationToken)
 		{
-			throw new NotImplementedException();
+			return Task.FromResult<ICommit>(Changes[stream.Id][changeNumber]);
 		}
 
-		public Task<List<ChangeFile>> GetStreamSnapshotAsync(string clusterName, string streamName, int change)
+		class CommitCollection : ICommitCollection
 		{
-			throw new NotImplementedException();
+			readonly PerforceServiceStub _owner;
+			readonly IStream _stream;
+
+			public CommitCollection(PerforceServiceStub owner, IStream stream)
+			{
+				_owner = owner;
+				_stream = stream;
+			}
+
+			public Task<int> CreateNewAsync(string path, string description, CancellationToken cancellationToken = default)
+			{
+				throw new NotImplementedException();
+			}
+
+			public async IAsyncEnumerable<ICommit> FindAsync(int? minChange, int? maxChange, int? maxResults, IReadOnlyList<CommitTag>? tags, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+			{
+				foreach (ICommit commit in await _owner.GetChangesAsync(_stream, minChange, maxChange, null, cancellationToken))
+				{
+					if (tags != null && tags.Count > 0)
+					{
+						IReadOnlyList<CommitTag> commitTags = await commit.GetTagsAsync(cancellationToken);
+						if (!tags.Any(x => commitTags.Contains(x)))
+						{
+							continue;
+						}
+					}
+					yield return commit;
+				}
+			}
+
+			public async Task<ICommit> GetAsync(int changeNumber, CancellationToken cancellationToken = default)
+			{
+				List<ICommit> commits = await _owner.GetChangeDetailsAsync(_stream, new[] { changeNumber }, cancellationToken);
+				return commits[0];
+			}
+
+			public async Task<int> LatestNumberAsync(CancellationToken cancellationToken = default)
+			{
+				List<ICommit> commits = await _owner.GetChangesAsync(_stream, null, null, 1, cancellationToken);
+				return commits[0].Number;
+			}
 		}
 
-		public Task<ChangeDetails> GetChangeDetailsAsync(string clusterName, string streamName, int changeNumber)
+		public ICommitCollection GetCommits(IStream stream)
 		{
-			return Task.FromResult(Changes[streamName][changeNumber]);
+			return new CommitCollection(this, stream);
 		}
 	}
 }

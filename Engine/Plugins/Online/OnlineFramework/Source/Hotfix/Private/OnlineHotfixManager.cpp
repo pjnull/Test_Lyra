@@ -31,10 +31,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(OnlineHotfixManager)
 
-#ifdef WITH_ONLINETRACING
-#include "OnlineTracingModule.h"
-#endif
-
 DEFINE_LOG_CATEGORY(LogHotfixManager);
 
 /** This character must be between important pieces of file information (platform, initype, version) */
@@ -922,7 +918,6 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 	bool bUpdateLogSuppression = false;
 	bool bUpdateConsoleVariables = false;
 	bool bUpdateHttpConfigs = false;
-	bool bUpdateOnlineTracing = false;
 	TSet<FString> OnlineSubSections;
 	TSet<FString> UpdatedSectionNames;
 	// Find the set of object classes that were affected
@@ -979,12 +974,11 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 
 				if (bIsEngineIni)
 				{
-					// TODO replace all of this with bindees to FCoreDelegates::OnConfigSectionsChanged
+					// TODO replace all of this with bindees to FCoreDelegates::TSOnConfigSectionsChanged()
 					const TCHAR* LogConfigSection = TEXT("[Core.Log]");
 					const TCHAR* ConsoleVariableSection = TEXT("[ConsoleVariables]");
 					const TCHAR* HttpSection = TEXT("[HTTP"); // note "]" omitted on purpose since we want a partial match
 					const TCHAR* OnlineSubSectionKey = TEXT("[OnlineSubsystem"); // note "]" omitted on purpose since we want a partial match
-					const TCHAR* OnlineTracingSection = TEXT("[OnlineTracing]");
 					if (!bUpdateLogSuppression && FCString::Strnicmp(*IniData + StartIndex, LogConfigSection, FCString::Strlen(LogConfigSection)) == 0)
 					{
 						bUpdateLogSuppression = true;
@@ -996,10 +990,6 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 					else if (!bUpdateHttpConfigs &&	FCString::Strnicmp(*IniData + StartIndex, HttpSection, FCString::Strlen(HttpSection)) == 0)
 					{
 						bUpdateHttpConfigs = true;
-					}
-					else if (!bUpdateOnlineTracing && FCString::Strnicmp(*IniData + StartIndex, OnlineTracingSection, FCString::Strlen(OnlineTracingSection)) == 0)
-					{
-						bUpdateOnlineTracing = true;
 					}
 					else if (FCString::Strnicmp(*IniData + StartIndex, OnlineSubSectionKey, FCString::Strlen(OnlineSubSectionKey)) == 0)
 					{
@@ -1104,7 +1094,10 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 	}
 
 	const FString ConfigFileName = ConfigFile->Name.ToString();
+	FCoreDelegates::TSOnConfigSectionsChanged().Broadcast(ConfigFileName, UpdatedSectionNames);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	FCoreDelegates::OnConfigSectionsChanged.Broadcast(ConfigFileName, UpdatedSectionNames);
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	// Reload log suppression if configs changed
 	if (bUpdateLogSuppression)
@@ -1123,15 +1116,6 @@ bool UOnlineHotfixManager::HotfixIniFile(const FString& FileName, const FString&
 	{
 		FHttpModule::Get().UpdateConfigs();
 	}
-
-	// Reload configs for tracing system, this may init or tear it down if enable is toggled
-#ifdef WITH_ONLINETRACING
-	if (bUpdateOnlineTracing && 
-		FOnlineTracingModule::IsAvailable())
-	{
-		FOnlineTracingModule::Get().UpdateConfig();
-	}
-#endif
 
 	// Reload configs relevant to OSS config sections that were updated
 	IOnlineSubsystem* OnlineSub = IOnlineSubsystem::Get(OSSName.Len() ? FName(*OSSName, FNAME_Find) : NAME_None);

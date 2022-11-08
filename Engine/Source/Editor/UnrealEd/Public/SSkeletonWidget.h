@@ -72,7 +72,7 @@ public:
 
 		if (ColumnName == TEXT("Curretly Selected"))
 		{
-			return SAssignNew(Border1, SBorder) .Padding(2)
+			return SAssignNew(Border1, SBorder) .Padding(2.f)
 				.Content()
 				[
 					SNew(STextBlock)
@@ -83,7 +83,7 @@ public:
 		{
 			if (BonePair->Bone2 == NAME_None)
 			{
-				return SAssignNew(Border2, SBorder) .Padding(2)
+				return SAssignNew(Border2, SBorder) .Padding(2.f)
 					.ColorAndOpacity(FLinearColor(1.f, 0.f, 0.f))
 					.Content()
 					[
@@ -93,7 +93,7 @@ public:
 			}
 			else
 			{
-				return SAssignNew(Border2, SBorder) .Padding(2)
+				return SAssignNew(Border2, SBorder) .Padding(2.f)
 					.Content()
 					[
 						SNew(STextBlock)

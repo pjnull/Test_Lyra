@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Horde.Build.Users;
 using Horde.Build.Logs;
@@ -163,8 +164,8 @@ namespace Horde.Build.Ugs
 				foreach(IIssue issue in issues)
 				{
 					IIssueDetails details = await _issueService.GetIssueDetailsAsync(issue);
-					bool bNotify = userInfo != null && details.Suspects.Any(x => x.AuthorId == userInfo.Id);
-					responses.Add(await CreateIssueResponseAsync(details, bNotify));
+					bool notify = userInfo != null && details.Suspects.Any(x => x.AuthorId == userInfo.Id);
+					responses.Add(await CreateIssueResponseAsync(details, notify));
 				}
 			}
 			else
@@ -178,8 +179,8 @@ namespace Horde.Build.Ugs
 
 					if (cachedOpenIssue.ShowNotifications())
 					{
-						bool bNotify = userInfo != null && cachedOpenIssue.IncludeForUser(userInfo.Id);
-						responses.Add(await CreateIssueResponseAsync(cachedOpenIssue, bNotify));
+						bool notify = userInfo != null && cachedOpenIssue.IncludeForUser(userInfo.Id);
+						responses.Add(await CreateIssueResponseAsync(cachedOpenIssue, notify));
 					}
 				}
 			}
@@ -247,30 +248,31 @@ namespace Horde.Build.Ugs
 		/// Retrieve information about builds for a specific issue
 		/// </summary>
 		/// <param name="issueId">Id of the issue to get information about</param>
+		/// <param name="cancellationToken">Cancellation token for the request</param>
 		/// <returns>List of matching agents</returns>
 		[HttpGet]
 		[Route("/ugs/api/issues/{issueId}/diagnostics")]
 		[ProducesResponseType(typeof(List<GetUgsIssueDiagnosticResponse>), 200)]
-		public async Task<ActionResult<List<GetUgsIssueDiagnosticResponse>>> GetIssueDiagnosticsAsync(int issueId)
+		public async Task<ActionResult<List<GetUgsIssueDiagnosticResponse>>> GetIssueDiagnosticsAsync(int issueId, CancellationToken cancellationToken)
 		{
 			List<GetUgsIssueDiagnosticResponse> diagnostics = new List<GetUgsIssueDiagnosticResponse>();
 
 			Dictionary<LogId, ILogFile?> logFiles = new Dictionary<LogId, ILogFile?>();
 
 			List<IIssueSpan> spans = await _issueService.Collection.FindSpansAsync(issueId);
-			List<ILogEvent> events = await _logFileService.FindEventsForSpansAsync(spans.Select(x => x.Id), null, 0, count: 10);
+			List<ILogEvent> events = await _logFileService.FindEventsForSpansAsync(spans.Select(x => x.Id), null, 0, count: 10, cancellationToken);
 
 			foreach (ILogEvent logEvent in events)
 			{
 				ILogFile? logFile;
 				if(!logFiles.TryGetValue(logEvent.LogId, out logFile))
 				{
-					logFile = await _logFileService.GetLogFileAsync(logEvent.LogId);
+					logFile = await _logFileService.GetLogFileAsync(logEvent.LogId, cancellationToken);
 					logFiles.Add(logEvent.LogId, logFile);
 				}
 				if (logFile != null)
 				{
-					ILogEventData eventData = await _logFileService.GetEventDataAsync(logFile, logEvent.LineIndex, logEvent.LineCount);
+					ILogEventData eventData = await _logFileService.GetEventDataAsync(logFile, logEvent.LineIndex, logEvent.LineCount, cancellationToken);
 					long buildId = logEvent.LogId.GetHashCode();
 					Uri url = new Uri(_settings.DashboardUrl, $"log/{logEvent.LogId}?lineindex={logEvent.LineIndex}");
 
@@ -286,16 +288,16 @@ namespace Horde.Build.Ugs
 		/// Gets the URL for a failing step in the
 		/// </summary>
 		/// <param name="details">The issue to get a URL for</param>
-		/// <param name="bNotify">Whether to show notifications for this issue</param>
+		/// <param name="notify">Whether to show notifications for this issue</param>
 		/// <returns>The issue response</returns>
-		async Task<GetUgsIssueResponse> CreateIssueResponseAsync(IIssueDetails details, bool bNotify)
+		async Task<GetUgsIssueResponse> CreateIssueResponseAsync(IIssueDetails details, bool notify)
 		{
 			Uri? buildUrl = GetIssueBuildUrl(details);
 
 			IUser? owner = details.Issue.OwnerId.HasValue ? await _userCollection.GetCachedUserAsync(details.Issue.OwnerId.Value) : null;
 			IUser? nominatedBy = details.Issue.NominatedById.HasValue ? await _userCollection.GetCachedUserAsync(details.Issue.NominatedById.Value) : null;
 
-			return new GetUgsIssueResponse(details, owner, nominatedBy, bNotify, buildUrl);
+			return new GetUgsIssueResponse(details, owner, nominatedBy, notify, buildUrl);
 		}
 
 		/// <summary>
@@ -373,7 +375,7 @@ namespace Horde.Build.Ugs
 				newResolvedById = request.Resolved.Value ? IIssue.ResolvedByUnknownId : UserId.Empty;
 			}
 
-			if (!await _issueService.UpdateIssueAsync(issueId, ownerId: newOwnerId, nominatedById: newNominatedById, acknowledged: request.Acknowledged, declinedById: newDeclinedById, fixChange: request.FixChange, resolvedById: newResolvedById))
+			if (!await _issueService.UpdateIssueAsync(issueId, ownerId: newOwnerId, nominatedById: newNominatedById, acknowledged: request.Acknowledged, declinedById: newDeclinedById, fixChange: request.FixChange, resolvedById: newResolvedById, initiatedById: User.GetUserId()))
 			{
 				return NotFound();
 			}

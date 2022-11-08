@@ -16,7 +16,7 @@ TAutoConsoleVariable<int32> CVarAnimBlendStackPruningEnable(TEXT("a.AnimNode.Ble
 
 /////////////////////////////////////////////////////
 // FPoseSearchAnimPlayer
-void FPoseSearchAnimPlayer::Initialize(ESearchIndexAssetType InAssetType, UAnimationAsset* AnimationAsset, float AccumulatedTime, bool bLoop, bool bMirrored, UMirrorDataTable* MirrorDataTable, float BlendTime, const UBlendProfile* BlendProfile, EAlphaBlendOption InBlendOption, FVector BlendParameters)
+void FPoseSearchAnimPlayer::Initialize(ESearchIndexAssetType InAssetType, UAnimationAsset* AnimationAsset, float AccumulatedTime, bool bLoop, bool bMirrored, UMirrorDataTable* MirrorDataTable, float BlendTime, const UBlendProfile* BlendProfile, EAlphaBlendOption InBlendOption, FVector BlendParameters, float PlayRate)
 {
 	check(AnimationAsset);
 
@@ -58,7 +58,7 @@ void FPoseSearchAnimPlayer::Initialize(ESearchIndexAssetType InAssetType, UAnima
 		SequencePlayerNode.SetAccumulatedTime(AccumulatedTime);
 		SequencePlayerNode.SetSequence(Sequence);
 		SequencePlayerNode.SetLoopAnimation(bLoop);
-		SequencePlayerNode.SetPlayRate(1.0f);
+		SequencePlayerNode.SetPlayRate(PlayRate);
 	}
 	else if (AssetType == ESearchIndexAssetType::BlendSpace)
 	{
@@ -68,7 +68,7 @@ void FPoseSearchAnimPlayer::Initialize(ESearchIndexAssetType InAssetType, UAnima
 		BlendSpacePlayerNode.SetAccumulatedTime(AccumulatedTime);
 		BlendSpacePlayerNode.SetBlendSpace(BlendSpace);
 		BlendSpacePlayerNode.SetLoop(bLoop);
-		BlendSpacePlayerNode.SetPlayRate(1.0f);
+		BlendSpacePlayerNode.SetPlayRate(PlayRate);
 		BlendSpacePlayerNode.SetPosition(BlendParameters);
 	}
 	else 
@@ -76,6 +76,18 @@ void FPoseSearchAnimPlayer::Initialize(ESearchIndexAssetType InAssetType, UAnima
 		checkNoEntry();
 	}
 	UpdateSourceLinkNode();
+}
+
+void FPoseSearchAnimPlayer::UpdatePlayRate(float PlayRate)
+{
+	if (AssetType == ESearchIndexAssetType::Sequence)
+	{
+		SequencePlayerNode.SetPlayRate(PlayRate);
+	}
+	else if (AssetType == ESearchIndexAssetType::BlendSpace)
+	{
+		BlendSpacePlayerNode.SetPlayRate(PlayRate);
+	}
 }
 
 void FPoseSearchAnimPlayer::StorePoseContext(const FPoseContext& PoseContext)
@@ -362,11 +374,19 @@ float FAnimNode_BlendStack::GetAccumulatedTime() const
 	return AnimPlayers.IsEmpty() ? 0.f : AnimPlayers.First().GetAccumulatedTime();
 }
 
-void FAnimNode_BlendStack::BlendTo(ESearchIndexAssetType AssetType, UAnimationAsset* AnimationAsset, float AccumulatedTime, bool bLoop, bool bMirrored, UMirrorDataTable* MirrorDataTable, int32 MaxActiveBlends, float BlendTime, const UBlendProfile* BlendProfile, EAlphaBlendOption BlendOption, FVector BlendParameters)
+void FAnimNode_BlendStack::BlendTo(ESearchIndexAssetType AssetType, UAnimationAsset* AnimationAsset, float AccumulatedTime, bool bLoop, bool bMirrored, UMirrorDataTable* MirrorDataTable, int32 MaxActiveBlends, float BlendTime, const UBlendProfile* BlendProfile, EAlphaBlendOption BlendOption, FVector BlendParameters, float PlayRate)
 {
 	RequestedMaxActiveBlends = MaxActiveBlends;
 	AnimPlayers.PushFirst(FPoseSearchAnimPlayer());
-	AnimPlayers.First().Initialize(AssetType, AnimationAsset, AccumulatedTime, bLoop, bMirrored, MirrorDataTable, BlendTime, BlendProfile, BlendOption, BlendParameters);
+	AnimPlayers.First().Initialize(AssetType, AnimationAsset, AccumulatedTime, bLoop, bMirrored, MirrorDataTable, BlendTime, BlendProfile, BlendOption, BlendParameters, PlayRate);
+}
+
+void FAnimNode_BlendStack::UpdatePlayRate(float PlayRate)
+{
+	if (!AnimPlayers.IsEmpty())
+	{
+		AnimPlayers.First().UpdatePlayRate(PlayRate);
+	}
 }
 
 void FAnimNode_BlendStack::GatherDebugData(FNodeDebugData& DebugData)

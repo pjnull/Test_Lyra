@@ -20,11 +20,16 @@ namespace UnrealBuildTool.Rules
 			PrivateDependencyModuleNames.AddRange(
 				new string[] {
 					"RenderCore",
-					"RHI"
+					"RHI",
+					"ColorManagement"
 				});
 
 			if (Target.bBuildEditor)
 			{
+				PrivateDependencyModuleNames.AddRange(
+					new string[] {
+						"UnrealEd",
+					});
 				PrivateIncludePathModuleNames.Add("TargetPlatform");
 			}
 		}

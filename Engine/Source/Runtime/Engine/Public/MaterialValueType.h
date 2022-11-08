@@ -57,7 +57,14 @@ enum EMaterialValueType
 	MCT_VoidStatement         = 1 << 22,
 
 	/** Non-static bool, only used in new HLSL translator */
-	MCT_Bool = 1 << 23,
+	MCT_Bool				 = 1 << 23,
+
+	/** Unsigned int types */
+	MCT_UInt1				 = 1 << 24,
+	MCT_UInt2				 = 1 << 25,
+	MCT_UInt3				 = 1 << 26,
+	MCT_UInt4				 = 1 << 27,
+	MCT_UInt				 = MCT_UInt1 | MCT_UInt2 | MCT_UInt3 | MCT_UInt4,
 
 	MCT_Numeric = MCT_Float | MCT_LWCType | MCT_Bool,
 };

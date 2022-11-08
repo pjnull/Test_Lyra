@@ -2,6 +2,7 @@
 
 #include "BlueprintCompilationManager.h"
 
+#include "Async/Async.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "BlueprintCompilerExtension.h"
 #include "BlueprintEditorSettings.h"
@@ -124,7 +125,7 @@ struct FBlueprintCompilationManagerImpl : public FGCObject
 	void CompileSynchronouslyImpl(const FBPCompileRequestInternal& Request);
 	void FlushCompilationQueueImpl(bool bSuppressBroadcastCompiled, TArray<UBlueprint*>* BlueprintsCompiled, TArray<UBlueprint*>* BlueprintsCompiledOrSkeletonCompiled, FUObjectSerializeContext* InLoadContext);
 	void ProcessExtensions(const TArray<FCompilerData>& InCurrentlyCompilingBPs);
-	void FlushReinstancingQueueImpl();
+	void FlushReinstancingQueueImpl(bool bFindAndReplaceCDOReferences = false);
 	bool HasBlueprintsToCompile() const;
 	bool IsGeneratedClassLayoutReady() const;
 	void GetDefaultValue(const UClass* ForClass, const FProperty* Property, FString& OutDefaultValueAsString) const;
@@ -232,13 +233,14 @@ void FBlueprintCompilationManagerImpl::CompileSynchronouslyImpl(const FBPCompile
 
 	Request.UserData.BPToCompile->bQueuedForCompilation = true;
 
-	const bool bIsRegeneratingOnLoad		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::IsRegeneratingOnLoad		) != EBlueprintCompileOptions::None;
-	const bool bRegenerateSkeletonOnly		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::RegenerateSkeletonOnly	) != EBlueprintCompileOptions::None;
-	const bool bSkipGarbageCollection		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipGarbageCollection	) != EBlueprintCompileOptions::None
+	const bool bIsRegeneratingOnLoad		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::IsRegeneratingOnLoad				) != EBlueprintCompileOptions::None;
+	const bool bRegenerateSkeletonOnly		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::RegenerateSkeletonOnly			) != EBlueprintCompileOptions::None;
+	const bool bSkipGarbageCollection		= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipGarbageCollection			) != EBlueprintCompileOptions::None
 		|| bRegenerateSkeletonOnly;
-	const bool bBatchCompile				= (Request.UserData.CompileOptions & EBlueprintCompileOptions::BatchCompile				) != EBlueprintCompileOptions::None;
-	const bool bSkipReinstancing			= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipReinstancing			) != EBlueprintCompileOptions::None;
-	const bool bSkipSaving					= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipSave					) != EBlueprintCompileOptions::None;
+	const bool bBatchCompile				= (Request.UserData.CompileOptions & EBlueprintCompileOptions::BatchCompile						) != EBlueprintCompileOptions::None;
+	const bool bSkipReinstancing			= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipReinstancing					) != EBlueprintCompileOptions::None;
+	const bool bSkipSaving					= (Request.UserData.CompileOptions & EBlueprintCompileOptions::SkipSave							) != EBlueprintCompileOptions::None;
+	const bool bFindAndReplaceCDOReferences	= (Request.UserData.CompileOptions & EBlueprintCompileOptions::IncludeCDOInReferenceReplacement	) != EBlueprintCompileOptions::None;
 
 	ensure(!bIsRegeneratingOnLoad); // unexpected code path, compile on load handled with different function call
 	ensure(!bSkipReinstancing); // This is an internal option, should not go through CompileSynchronouslyImpl
@@ -267,7 +269,7 @@ void FBlueprintCompilationManagerImpl::CompileSynchronouslyImpl(const FBPCompile
 	TArray<UBlueprint*> CompiledBlueprints;
 	TArray<UBlueprint*> SkeletonCompiledBlueprints;
 	FlushCompilationQueueImpl(bSuppressBroadcastCompiled, &CompiledBlueprints, &SkeletonCompiledBlueprints, nullptr);
-	FlushReinstancingQueueImpl();
+	FlushReinstancingQueueImpl(bFindAndReplaceCDOReferences);
 	
 	if( Request.UserData.ClientResultsLog && Request.UserData.ClientResultsLog->bLogDetailedResults)
 	{
@@ -1630,10 +1632,28 @@ void FBlueprintCompilationManagerImpl::FlushCompilationQueueImpl(bool bSuppressB
 
 			if(CompilerData.ShouldRegisterCompilerResults())
 			{
-				// This helper structure registers the results log messages with the UI control that displays them:
-				FScopedBlueprintMessageLog MessageLog(BP);
-				MessageLog.Log->ClearMessages();
-				MessageLog.Log->AddMessages(CompilerData.ActiveResultsLog->Messages, false);
+				if (IsInGameThread())
+				{
+					// This helper structure registers the results log messages with the UI control that displays them:
+					FScopedBlueprintMessageLog MessageLog(BP);
+					MessageLog.Log->ClearMessages();
+					MessageLog.Log->AddMessages(CompilerData.ActiveResultsLog->Messages, false);
+				}
+				else
+				{
+					Async(EAsyncExecution::TaskGraphMainThread,
+						[Messages = CompilerData.ActiveResultsLog->Messages, WeakBP = TWeakObjectPtr<UBlueprint>(BP)]()
+						{
+							if (WeakBP.IsValid())
+							{
+								FScopedBlueprintMessageLog MessageLog(WeakBP.Get());
+								MessageLog.Log->ClearMessages();
+								MessageLog.Log->AddMessages(Messages, false);
+							}
+						}
+					);
+				}
+				
 			}
 
 			if(CompilerData.ShouldSetTemporaryBlueprintFlags())
@@ -1769,7 +1789,7 @@ void FBlueprintCompilationManagerImpl::ProcessExtensions(const TArray<FCompilerD
 	}
 }
 
-void FBlueprintCompilationManagerImpl::FlushReinstancingQueueImpl()
+void FBlueprintCompilationManagerImpl::FlushReinstancingQueueImpl(bool bFindAndReplaceCDOReferences)
 {
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_FUNC()
 
@@ -1790,11 +1810,14 @@ void FBlueprintCompilationManagerImpl::FlushReinstancingQueueImpl()
 		
 		TGuardValue<bool> ReinstancingGuard(GIsReinstancing, true);
 		
-		FBatchReplaceInstancesOfClassParameters Options;
+		FReplaceInstancesOfClassParameters Options;
 		Options.bArchetypesAreUpToDate = true;
+		Options.bReplaceReferencesToOldCDOs = bFindAndReplaceCDOReferences;
 		FBlueprintCompileReinstancer::BatchReplaceInstancesOfClass(ClassesToReinstance, Options);
 
-		if (IsAsyncLoading())
+		// Special case when we run on ALT, we want to cleanup all classes flagged for reinstanciation right away.
+		const bool bIsInActualAsyncLoadingThread = IsInAsyncLoadingThread() && !IsInGameThread();
+		if (IsAsyncLoading() && IsAsyncLoadingMultithreaded() && !bIsInActualAsyncLoadingThread)
 		{
 			// While async loading we only remove classes that have no instances being
 			// async loaded. Those instances will need to be reinstanced once they finish
@@ -1999,7 +2022,7 @@ void FBlueprintCompilationManagerImpl::ReparentHierarchies(const TMap<UClass*, U
 		OldClassToNewClassDerivedTypes.Add(ReinstancingJob.OldToNew);
 	}
 	TGuardValue<bool> ReinstancingGuard(GIsReinstancing, true);
-	FBatchReplaceInstancesOfClassParameters BatchOptions;
+	FReplaceInstancesOfClassParameters BatchOptions;
 	BatchOptions.bArchetypesAreUpToDate = true;
 	BatchOptions.bReplaceReferencesToOldClasses = bReplaceReferencesToOldClasses;
 
@@ -2023,7 +2046,7 @@ void FBlueprintCompilationManagerImpl::ReparentHierarchies(const TMap<UClass*, U
 	BatchOptions.ObjectsThatShouldUseOldStuff = &OldObjects;
 	BatchOptions.InstancesThatShouldUseOldClass = &OldObjects;
 
-	FBlueprintCompileReinstancer::BatchReplaceInstancesOfClass( OldClassToNewClassDerivedTypes, BatchOptions);
+	FBlueprintCompileReinstancer::BatchReplaceInstancesOfClass(OldClassToNewClassDerivedTypes, BatchOptions );
 }
 
 
@@ -2183,18 +2206,24 @@ void FBlueprintCompilationManagerImpl::ReinstanceBatch(TArray<FReinstancingJob>&
 	}
 
 	// run UpdateBytecodeReferences:
-	for (const FReinstancingJob& ReinstancingJob : Reinstancers)
 	{
-		if (ReinstancingJob.OldToNew.Key)
+		TSet<UBlueprint*> DependentBPs;
+		TMap<FFieldVariant, FFieldVariant> FieldMappings;
+		for (const FReinstancingJob& ReinstancingJob : Reinstancers)
 		{
-			InOutOldToNewClassMap.Add(ReinstancingJob.OldToNew.Key, ReinstancingJob.OldToNew.Value);
+			if (ReinstancingJob.OldToNew.Key)
+			{
+				InOutOldToNewClassMap.Add(ReinstancingJob.OldToNew.Key, ReinstancingJob.OldToNew.Value);
+			}
+
+			if (ReinstancingJob.Reinstancer.IsValid())
+			{
+				UBlueprint* CompiledBlueprint = UBlueprint::GetBlueprintFromClass(ReinstancingJob.OldToNew.Value);
+				ReinstancingJob.Reinstancer->UpdateBytecodeReferences(DependentBPs, FieldMappings);
+			}
 		}
-			
-		if(ReinstancingJob.Reinstancer.IsValid())
-		{
-			UBlueprint* CompiledBlueprint = UBlueprint::GetBlueprintFromClass(ReinstancingJob.OldToNew.Value);
-			ReinstancingJob.Reinstancer->UpdateBytecodeReferences();
-		}
+
+		FBlueprintCompileReinstancer::FinishUpdateBytecodeReferences(DependentBPs, FieldMappings);
 	}
 	
 	// Now we can update templates and archetypes - note that we don't look for direct references to archetypes - doing

@@ -39,7 +39,7 @@
 // The thin lighting model is used when the thickness becomes strictly lower than 0.1 millimeter
 #define STRATA_LAYER_ISTHIN_THICKNESS_THRESHOLD_CM 0.01f
 
-#define STRATA_BASE_PASS_MRT_OUTPUT_COUNT	2
+#define STRATA_BASE_PASS_MRT_OUTPUT_COUNT	3
 
 #define STRATA_SSS_DATA_UINT_COUNT		2
 
@@ -56,8 +56,11 @@
 #define STRATA_TILE_TYPE_SINGLE						1
 #define STRATA_TILE_TYPE_COMPLEX					2
 #define STRATA_TILE_TYPE_ROUGH_REFRACT				3
-#define STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT	4
-#define STRATA_TILE_TYPE_COUNT						5
+#define STRATA_TILE_TYPE_ROUGH_REFRACT_SSS_WITHOUT	4
+#define STRATA_TILE_TYPE_DECAL_SIMPLE				5
+#define STRATA_TILE_TYPE_DECAL_SINGLE				6
+#define STRATA_TILE_TYPE_DECAL_COMPLEX				7
+#define STRATA_TILE_TYPE_COUNT						8
 
 // sizeof(FRHIDrawIndirectParameters) = 4 uints = 16 bytes
 #define GetStrataTileTypeDrawIndirectArgOffset_Byte(x)  (x * 16)

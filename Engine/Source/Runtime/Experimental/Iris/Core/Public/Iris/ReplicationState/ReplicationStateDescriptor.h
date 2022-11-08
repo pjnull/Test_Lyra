@@ -4,7 +4,6 @@
 
 #include "CoreTypes.h"
 #include "Misc/EnumClassFlags.h"
-#include "Net/Core/Trace/NetDebugName.h"
 #include "Templates/TypeHash.h"
 #include <atomic>
 
@@ -13,6 +12,7 @@ class FProperty;
 class FString;
 namespace UE::Net
 {
+	struct FNetDebugName;
 	struct FNetSerializer;
 	typedef uint64 FRepTag;
 	struct FReplicationStateDescriptor;
@@ -257,7 +257,7 @@ struct FReplicationStateDescriptor
 	// Function to destruct external state representation
 	DestructReplicationStateFunc DestructReplicationState;
 
-	// Function used to construct FastArrays
+	// Function used to construct custom replication fragments
 	CreateAndRegisterReplicationFragmentFunc CreateAndRegisterReplicationFragmentFunction;
 
 	EReplicationStateTraits Traits;

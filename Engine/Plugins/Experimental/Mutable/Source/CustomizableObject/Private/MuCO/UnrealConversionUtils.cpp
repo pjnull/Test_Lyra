@@ -110,14 +110,15 @@ namespace UnrealConversionUtils
 			const void* InMutableData)
 		{
 			// \todo Ugly cast.
-			const_cast<FSkinWeightDataVertexBuffer*>(OutVertexWeightBuffer.GetDataVertexBuffer())->SetMaxBoneInfluences(NumBoneInfluences);
-			const_cast<FSkinWeightDataVertexBuffer*>(OutVertexWeightBuffer.GetDataVertexBuffer())->Init(NumBones, NumVertices);
+			FSkinWeightDataVertexBuffer* VertexBuffer = const_cast<FSkinWeightDataVertexBuffer*>(OutVertexWeightBuffer.GetDataVertexBuffer());
+			VertexBuffer->SetMaxBoneInfluences(NumBoneInfluences);
+			VertexBuffer->Init(NumBones, NumVertices);
 
 			if (NumVertices)
 			{
 				OutVertexWeightBuffer.SetNeedsCPUAccess(bNeedCPUAccess);
 
-				FSkinWeightInfo* Data = OutVertexWeightBuffer.GetDataVertexBuffer()->GetWeightData();
+				uint8* Data = VertexBuffer->GetWeightData();
 				FMemory::Memcpy(Data, InMutableData, OutVertexWeightBuffer.GetVertexDataSize());
 			}
 		}
@@ -239,16 +240,18 @@ namespace UnrealConversionUtils
 		USkeletalMesh* SkeletalMesh,
 		const mu::MeshPtrConst MutableMesh,
 		const int32 MeshLODIndex)
-	{
-		MUTABLE_CPUPROFILER_SCOPE(UpdateSkeletalMesh_SurfaceLoop_MemCpy);
 
+	{
 		FSkeletalMeshLODRenderData& LODModel = Helper_GetLODData(SkeletalMesh)[MeshLODIndex];
+
 		const mu::FMeshBufferSet& MutableMeshVertexBuffers = MutableMesh->GetVertexBuffers();
 		const int32 NumVertices = MutableMeshVertexBuffers.GetElementCount();
 
-		uint32 BuildFlags = SkeletalMesh->GetVertexBufferFlags();
-		const bool bUseFullPrecisionUVs = (BuildFlags & ESkeletalMeshVertexFlags::UseFullPrecisionUVs) != 0;
-		const bool bHasVertexColors = (BuildFlags & ESkeletalMeshVertexFlags::HasVertexColors) != 0;
+		MUTABLE_CPUPROFILER_SCOPE(UpdateSkeletalMesh_SurfaceLoop_MemCpy);
+
+		const ESkeletalMeshVertexFlags BuildFlags = SkeletalMesh->GetVertexBufferFlags();
+		const bool bUseFullPrecisionUVs = EnumHasAllFlags(BuildFlags, ESkeletalMeshVertexFlags::UseFullPrecisionUVs);
+		const bool bHasVertexColors = EnumHasAllFlags(BuildFlags, ESkeletalMeshVertexFlags::HasVertexColors);
 		const int NumTexCoords = MutableMeshVertexBuffers.GetBufferChannelCount(MUTABLE_VERTEXBUFFER_TEXCOORDS);
 
 		const bool bNeedsCPUAccess = Helper_GetLODInfoArray(SkeletalMesh)[MeshLODIndex].bAllowCPUAccess;

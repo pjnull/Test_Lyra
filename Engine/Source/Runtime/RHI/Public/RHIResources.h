@@ -49,16 +49,6 @@ enum class EClearBinding;
 class RHI_API FRHIResource
 {
 public:
-	UE_DEPRECATED(5.0, "FRHIResource(bool) is deprecated, please use FRHIResource(ERHIResourceType)")
-	FRHIResource(bool InbDoNotDeferDelete=false)
-		: ResourceType(RRT_None)
-		, bCommitted(true)
-#if RHI_ENABLE_RESOURCE_INFO
-		, bBeingTracked(false)
-#endif
-	{
-	}
-
 	FRHIResource(ERHIResourceType InResourceType)
 		: ResourceType(InResourceType)
 		, bCommitted(true)
@@ -664,6 +654,8 @@ class FRHIRayTracingShader : public FRHIShader
 {
 public:
 	explicit FRHIRayTracingShader(EShaderFrequency InFrequency) : FRHIShader(RRT_RayTracingShader, InFrequency) {}
+
+	int32 RayTracingPayloadType = 0; // This corresponds to the ERayTracingPayloadType enum associated with the shader
 };
 
 class FRHIRayGenShader : public FRHIRayTracingShader
@@ -1190,10 +1182,6 @@ private:
 	EBufferUsageFlags Usage{};
 };
 
-UE_DEPRECATED(5.0, "FRHIIndexBuffer is deprecated, please use FRHIBuffer.")      typedef class FRHIBuffer FRHIIndexBuffer;
-UE_DEPRECATED(5.0, "FRHIVertexBuffer is deprecated, please use FRHIBuffer.")     typedef class FRHIBuffer FRHIVertexBuffer;
-UE_DEPRECATED(5.0, "FRHIStructuredBuffer is deprecated, please use FRHIBuffer.") typedef class FRHIBuffer FRHIStructuredBuffer;
-
 //
 // Textures
 //
@@ -1491,6 +1479,9 @@ struct RHI_API FRHITextureDesc
 	/** Texture format used when creating the UAV. PF_Unknown means to use the default one (same as Format). */
 	EPixelFormat UAVFormat = PF_Unknown;
 
+	/** Resource memory percentage which should be allocated onto fast VRAM (hint-only). (encoding into 8bits, 0..255 -> 0%..100%) */
+	uint8 FastVRAMPercentage = 0xFF;
+
 	/* A mask representing which GPUs to create the resource on, in a multi-GPU system. */
 	FRHIGPUMask GPUMask = FRHIGPUMask::All();
 
@@ -1665,7 +1656,8 @@ struct FRHITextureCreateDesc : public FRHITextureDesc
 	FRHITextureCreateDesc& SetDebugName(const TCHAR* InDebugName)              { DebugName = InDebugName;                  return *this; }
 	FRHITextureCreateDesc& SetGPUMask(FRHIGPUMask InGPUMask)                   { GPUMask = InGPUMask;                      return *this; }
 	FRHITextureCreateDesc& SetBulkData(FResourceBulkDataInterface* InBulkData) { BulkData = InBulkData;                    return *this; }
-	FRHITextureCreateDesc& DetermineInititialState() { if (InitialState == ERHIAccess::Unknown) InitialState = RHIGetDefaultResourceState(Flags, BulkData != nullptr); return *this; }
+	FRHITextureCreateDesc& DetermineInititialState()                           { if (InitialState == ERHIAccess::Unknown) InitialState = RHIGetDefaultResourceState(Flags, BulkData != nullptr); return *this; }
+	FRHITextureCreateDesc& SetFastVRAMPercentage(float In)                     { FastVRAMPercentage = uint8(FMath::Clamp(In, 0.f, 1.0f) * 0xFF); return *this; }
 
 	/* The RHI access state that the resource will be created in. */
 	ERHIAccess InitialState = ERHIAccess::Unknown;
@@ -1848,18 +1840,6 @@ public:
 		return LastRenderTime.GetLastRenderTime();
 	}
 
-	/** Returns the last render time container, or NULL if none were specified at creation. */
-	UE_DEPRECATED(5.0, "GetLastRenderTimeContainer is deprecated and will be removed in the future")
-	FLastRenderTimeContainer* GetLastRenderTimeContainer()
-	{
-		return nullptr;
-	}
-
-	UE_DEPRECATED(5.0, "SetDefaultLastRenderTimeContainer is deprecated and will be removed in the future")
-	FORCEINLINE_DEBUGGABLE void SetDefaultLastRenderTimeContainer()
-	{
-	}
-
 	void SetName(const FName& InName)
 	{
 		Name = InName;
@@ -1946,14 +1926,15 @@ public:
 		ReferencedTexture = DefaultTexture;
 	}
 
-	UE_DEPRECATED(5.0, "The InLastRenderTime parameter will be removed in the future")
-	explicit FRHITextureReference(FLastRenderTimeContainer* InLastRenderTime)
-		: FRHITextureReference()
-	{}
-
 	virtual class FRHITextureReference* GetTextureReference() override
 	{
 		return this;
+	}
+
+	virtual FRHIDescriptorHandle GetDefaultBindlessHandle() const override 
+	{ 
+		check(ReferencedTexture);
+		return ReferencedTexture->GetDefaultBindlessHandle();
 	}
 
 	virtual void* GetNativeResource() const override 
@@ -2304,9 +2285,6 @@ typedef TRefCountPtr<FRHIBoundShaderState> FBoundShaderStateRHIRef;
 typedef TRefCountPtr<const FRHIUniformBufferLayout> FUniformBufferLayoutRHIRef;
 typedef TRefCountPtr<FRHIUniformBuffer> FUniformBufferRHIRef;
 typedef TRefCountPtr<FRHIBuffer> FBufferRHIRef;
-UE_DEPRECATED(5.0, "FIndexBufferRHIRef is deprecated, please use FBufferRHIRef.")      typedef FBufferRHIRef FIndexBufferRHIRef;
-UE_DEPRECATED(5.0, "FVertexBufferRHIRef is deprecated, please use FBufferRHIRef.")     typedef FBufferRHIRef FVertexBufferRHIRef;
-UE_DEPRECATED(5.0, "FStructuredBufferRHIRef is deprecated, please use FBufferRHIRef.") typedef FBufferRHIRef FStructuredBufferRHIRef;
 typedef TRefCountPtr<FRHITexture> FTextureRHIRef;
 /*UE_DEPRECATED(5.1, "FTexture2DRHIRef is deprecated, please use FTextureRHIRef.")      */ typedef FTextureRHIRef FTexture2DRHIRef;
 /*UE_DEPRECATED(5.1, "FTexture2DArrayRHIRef is deprecated, please use FTextureRHIRef.") */ typedef FTextureRHIRef FTexture2DArrayRHIRef;

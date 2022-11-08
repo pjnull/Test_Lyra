@@ -48,7 +48,7 @@ class ENGINE_API UAnimationSettings : public UDeveloperSettings
 
 	/** If true and the existing compression error is greater than Alternative Compression Threshold, then Alternative Compression Threshold will be effectively raised to the existing error level */
 	UE_DEPRECATED(5.1, "This is being removed because it is unused")
-	UPROPERTY(config, EditAnywhere, Category = Compression)
+	UPROPERTY(config /*, EditAnywhere, Category = Compression*/, meta = (DeprecatedProperty, DeprecationMessage = "No longer used."))
 	bool bRaiseMaxErrorToExisting;
 
 	/** If true, recompression will log performance information */
@@ -101,8 +101,14 @@ class ENGINE_API UAnimationSettings : public UDeveloperSettings
 	UPROPERTY(config, EditAnywhere, Category = Mirroring)
 	TArray<FMirrorFindReplaceExpression> MirrorFindReplaceExpressions;
 
+	/** Project specific default frame-rate used when (re)initializing any animation based data */
+	UPROPERTY(config, EditAnywhere, Category = AnimationData)
+	FFrameRate DefaultFrameRate;
 public:
 	static UAnimationSettings * Get() { return CastChecked<UAnimationSettings>(UAnimationSettings::StaticClass()->GetDefaultObject()); }
+
+	/** Returns the project specific default frame-rate */
+	const FFrameRate& GetDefaultFrameRate() const;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;

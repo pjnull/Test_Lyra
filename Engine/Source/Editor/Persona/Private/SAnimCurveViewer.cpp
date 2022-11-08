@@ -22,6 +22,8 @@
 #include "Framework/Commands/GenericCommands.h"
 #include "CurveViewerCommands.h"
 #include "Animation/EditorAnimCurveBoneLinks.h"
+#include "HAL/PlatformApplicationMisc.h"
+#include "ScopedTransaction.h"
 
 #define LOCTEXT_NAMESPACE "SAnimCurveViewer"
 
@@ -577,7 +579,7 @@ void SAnimCurveViewer::Construct(const FArguments& InArgs, const TSharedRef<clas
 		.AutoHeight()		// This is required to make the scrollbar work, as content overflows Slate containers by default
 		[
 			SNew(SBox)
-			.WidthOverride(150)
+			.WidthOverride(150.f)
 			.Content()
 			[
 				AnimTypeBoxContainer.ToSharedRef()
@@ -688,6 +690,16 @@ void SAnimCurveViewer::BindCommands()
 		FCanExecuteAction::CreateSP(this, &SAnimCurveViewer::CanDelete));
 
 	CommandList.MapAction(
+		FGenericCommands::Get().Copy,
+		FExecuteAction::CreateSP(this, &SAnimCurveViewer::OnCopyClicked),
+		FCanExecuteAction::CreateSP(this, &SAnimCurveViewer::CanCopy));
+
+	CommandList.MapAction(
+		FGenericCommands::Get().Paste,
+		FExecuteAction::CreateSP(this, &SAnimCurveViewer::OnPasteClicked),
+		FCanExecuteAction::CreateSP(this, &SAnimCurveViewer::CanPaste));
+	
+	CommandList.MapAction(
 		MenuActions.AddCurve,
 		FExecuteAction::CreateSP(this, &SAnimCurveViewer::OnAddClicked),
 		FCanExecuteAction());
@@ -737,6 +749,8 @@ TSharedPtr<SWidget> SAnimCurveViewer::OnGetContextMenuContent() const
 
 	MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename, NAME_None, LOCTEXT("RenameSmartNameLabel", "Rename Curve"), LOCTEXT("RenameSmartNameToolTip", "Rename the selected curve"));
 	MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete, NAME_None, LOCTEXT("DeleteSmartNameLabel", "Delete Curve"), LOCTEXT("DeleteSmartNameToolTip", "Delete the selected curve"));
+	MenuBuilder.AddMenuEntry(FGenericCommands::Get().Copy);
+	MenuBuilder.AddMenuEntry(FGenericCommands::Get().Paste);
 	MenuBuilder.AddMenuEntry(Actions.AddCurve);
 
 	MenuBuilder.EndSection();
@@ -966,7 +980,7 @@ void SAnimCurveViewer::CreateAnimCurveTypeList(TSharedRef<SHorizontalBox> Horizo
 	// Add toggle button for 'all curves'
 	HorizontalBox->AddSlot()
 	.AutoWidth()
-	.Padding(3, 1)
+	.Padding(3.f, 1.f)
 	[
 		SNew(SCheckBox)
 		.Style(FAppStyle::Get(), "ToggleButtonCheckbox")
@@ -974,7 +988,7 @@ void SAnimCurveViewer::CreateAnimCurveTypeList(TSharedRef<SHorizontalBox> Horizo
 		.Type(ESlateCheckBoxType::ToggleButton)
 		.IsChecked(this, &SAnimCurveViewer::IsShowingAllCurves)
 		.OnCheckStateChanged(this, &SAnimCurveViewer::OnToggleShowingAllCurves)
-		.Padding(4)
+		.Padding(4.f)
 		.Content()
 		[
 			SNew(STextBlock)
@@ -992,7 +1006,7 @@ void SAnimCurveViewer::CreateAnimCurveTypeList(TSharedRef<SHorizontalBox> Horizo
 	{
 		HorizontalBox->AddSlot()
 		.AutoWidth()
-		.Padding(3, 1)
+		.Padding(3.f, 1.f)
 		[
 			SNew(SAnimCurveTypeList)
 			.IsEnabled(this, &SAnimCurveViewer::IsCurveFilterEnabled)
@@ -1117,6 +1131,70 @@ bool SAnimCurveViewer::CanDelete()
 	return AnimCurveListView->GetNumItemsSelected() > 0;
 }
 
+static const TCHAR* ClipboardHeader = TEXT("AnimCurveViewer");
+
+void SAnimCurveViewer::OnCopyClicked()
+{
+	TArray<TSharedPtr<FDisplayedAnimCurveInfo>> SelectedItems = AnimCurveListView->GetSelectedItems();
+
+	FAnimCurveViewerClipboard Clipboard;
+
+	for (TSharedPtr<FDisplayedAnimCurveInfo> Item : SelectedItems)
+	{
+		FAnimCurveViewerClipboardEntry Entry;
+		Entry.CurveName = Item->SmartName.DisplayName;
+
+		if(const FCurveMetaData* CurveMetaData = EditableSkeletonPtr.Pin()->GetSkeleton().GetCurveMetaData(Item->SmartName.DisplayName))
+		{
+			Entry.MetaData = *CurveMetaData;
+		}
+
+		Clipboard.Entries.Add(Entry);
+	}
+
+	FString ClipboardString = ClipboardHeader;
+	FAnimCurveViewerClipboard::StaticStruct()->ExportText(ClipboardString, &Clipboard, nullptr, nullptr, PPF_None, nullptr);
+	FPlatformApplicationMisc::ClipboardCopy(*ClipboardString);
+}
+
+bool SAnimCurveViewer::CanCopy() const
+{
+	return AnimCurveListView->GetNumItemsSelected() > 0;
+}
+
+void SAnimCurveViewer::OnPasteClicked()
+{
+	if (const FSmartNameMapping* NameMapping = GetAnimCurveMapping())
+	{
+		FScopedTransaction Transaction(LOCTEXT("PasteCurves", "Paste Curves"));
+		
+		FString TextToImport;
+		FPlatformApplicationMisc::ClipboardPaste(TextToImport);
+		TextToImport.RemoveFromStart(ClipboardHeader);
+
+		FAnimCurveViewerClipboard Clipboard;
+		FAnimCurveViewerClipboard::StaticStruct()->ImportText(*TextToImport, &Clipboard, nullptr, PPF_None, GLog, FAnimCurveViewerClipboard::StaticStruct()->GetName());
+
+		for(const FAnimCurveViewerClipboardEntry& Entry : Clipboard.Entries)
+		{
+			FSmartName NewCurveName;
+			EditableSkeletonPtr.Pin()->AddSmartname(ContainerName, Entry.CurveName, NewCurveName);
+			EditableSkeletonPtr.Pin()->SetCurveMetaBoneLinks(NewCurveName, Entry.MetaData.LinkedBones, Entry.MetaData.MaxLOD);
+			EditableSkeletonPtr.Pin()->SetCurveMetaDataMaterial(NewCurveName, Entry.MetaData.Type.bMaterial);
+			EditableSkeletonPtr.Pin()->SetCurveMetaDataMorphTarget(NewCurveName, Entry.MetaData.Type.bMorphtarget);
+		}
+
+		RefreshCurveList(true);
+	}
+}
+
+bool SAnimCurveViewer::CanPaste() const
+{
+	FString TextToImport;
+	FPlatformApplicationMisc::ClipboardPaste(TextToImport);
+	return TextToImport.StartsWith(ClipboardHeader);
+}
+
 void SAnimCurveViewer::OnSelectionChanged(TSharedPtr<FDisplayedAnimCurveInfo> InItem, ESelectInfo::Type SelectInfo)
 {
 	// make sure the currently selected ones are refreshed if it's first time
@@ -1133,7 +1211,7 @@ void SAnimCurveViewer::OnSelectionChanged(TSharedPtr<FDisplayedAnimCurveInfo> In
 			TArray<FBoneReference> BoneLinks;
 			FSmartName CurrentName = RowItem->SmartName;
 			const FCurveMetaData* CurveMetaData = EditableSkeletonPtr.Pin()->GetSkeleton().GetCurveMetaData(CurrentName);
-			uint32 MaxLOD = 0xFF;
+			uint8 MaxLOD = 0xFF;
 			if (CurveMetaData)
 			{
 				BoneLinks = CurveMetaData->LinkedBones;

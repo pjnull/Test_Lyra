@@ -3,11 +3,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
 using EpicGames.Horde.Storage;
-using EpicGames.Horde.Storage.Bundles;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Horde.Agent.Commands.Bundles
@@ -19,36 +18,24 @@ namespace Horde.Agent.Commands.Bundles
 		public RefName RefName { get; set; } = DefaultRefName;
 
 		[CommandLine("-Blob=")]
-		public BlobId? BlobId { get; set; }
+		public BlobLocator? BlobId { get; set; }
 
 		public override async Task<int> ExecuteAsync(ILogger logger)
 		{
-			IBlobStore blobStore = CreateBlobStore(logger);
+			using IStorageClientOwner storeOwner = CreateStorageClient(logger);
+			IStorageClient store = storeOwner.Store;
 
-			IBlob blob;
-			if (BlobId != null)
+			if (BlobId == null)
 			{
-				blob = await blobStore.ReadBlobAsync(BlobId.Value);
-				logger.LogInformation("Summary for blob {BlobId}", BlobId.Value);
-			}
-			else
-			{
-				blob = await blobStore.ReadRefAsync(RefName);
-				logger.LogInformation("Summary for ref {RefId}", RefName);
+				NodeLocator locator = await store.ReadRefTargetAsync(RefName);
+				BlobId = locator.Blob;
 			}
 
-			IReadOnlyList<BlobId> references = blob.References;
-			logger.LogInformation("");
-			logger.LogInformation("BlobRefs: {NumRefs}", references.Count);
-			foreach (BlobId reference in references)
-			{
-				logger.LogInformation("  {BlobId}", reference);
-			}
+			logger.LogInformation("Summary for blob {BlobId}", BlobId.Value);
+			Bundle bundle = await store.ReadBundleAsync(BlobId.Value);
 
-			ReadOnlyMemory<byte> data = blob.Data;
-			MemoryReader reader = new MemoryReader(data);
-			BundleHeader header = new BundleHeader(reader);
-			int packetStart = data.Length - reader.Memory.Length;
+			BundleHeader header = bundle.Header;
+			int packetStart = 0;
 
 			logger.LogInformation("");
 			logger.LogInformation("Imports: {NumImports}", header.Imports.Count);
@@ -56,10 +43,10 @@ namespace Horde.Agent.Commands.Bundles
 			int refIdx = 0;
 			foreach (BundleImport import in header.Imports)
 			{
-				logger.LogInformation("  From blob {BlobId} ({NumExports}/{TotalExports} nodes)", import.BlobId, import.Exports.Count, import.ExportCount);
+				logger.LogInformation("  From blob {BlobId} ({NumExports} nodes)", import.Locator, import.Exports.Count);
 				foreach ((int exportIdx, IoHash exportHash) in import.Exports)
 				{
-					logger.LogInformation("    [{Index}] IMP {BlobId}:{ExportIdx} = {ExportHash}", refIdx, import.BlobId, exportIdx, exportHash);
+					logger.LogInformation("    [{Index}] IMP {BlobId}:{ExportIdx} = {ExportHash}", refIdx, import.Locator, exportIdx, exportHash);
 					refIdx++;
 				}
 			}

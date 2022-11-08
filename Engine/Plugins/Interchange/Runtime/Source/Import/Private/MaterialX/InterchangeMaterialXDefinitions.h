@@ -206,9 +206,26 @@ MATERIALX_NAMESPACE_BEGIN
 		static constexpr const char* TransformNormal = "transformnormal";
 		static constexpr const char* TransformPoint = "transformpoint";
 		static constexpr const char* TransformVector = "transformvector";
-		static constexpr const char* Transpose = "transpose";
+		static constexpr const char* Transpose = "transpose";		
 		// Compositing nodes
+		static constexpr const char* Burn = "burn";
+		static constexpr const char* Difference = "difference";
+		static constexpr const char* Disjointover = "disjointover";
+		static constexpr const char* Dodge = "dodge";
+		static constexpr const char* In = "in";
+		static constexpr const char* Inside = "inside";
+		static constexpr const char* Mask = "mask";
+		static constexpr const char* Matte = "matte";
+		static constexpr const char* Minus = "minus";
 		static constexpr const char* Mix = "mix";
+		static constexpr const char* Out = "out";
+		static constexpr const char* Outside = "outside";
+		static constexpr const char* Over = "over";
+		static constexpr const char* Overlay = "overlay";
+		static constexpr const char* Plus = "plus";
+		static constexpr const char* Premult = "premult";
+		static constexpr const char* Screen = "screen";
+		static constexpr const char* Unpremult = "unpremult";
 		// Conditional nodes
 		static constexpr const char* IfGreater = "ifgreater";
 		static constexpr const char* IfGreaterEq = "ifgreatereq";
@@ -229,12 +246,22 @@ MATERIALX_NAMESPACE_BEGIN
 		static constexpr const char* RampTB = "ramptb";
 		static constexpr const char* SplitLR = "splitlr";
 		static constexpr const char* SplitTB = "splittb";
+		// Procedural3D nodes 
+		static constexpr const char* CellNoise3D = "cellnoise3d";
+		static constexpr const char* Fractal3D = "fractal3d";
+		static constexpr const char* Noise3D = "noise3d";
+		static constexpr const char* WorleyNoise3D = "worleynoise3d";
 		// Organization nodes 
 		static constexpr const char* Dot = "dot";
 		// Texture nodes 
 		static constexpr const char* Image = "image";
 		static constexpr const char* TiledImage = "tiledimage";
-		// Geometric nodes 
+		// Geometric nodes
+		static constexpr const char* Bitangent = "bitangent";
+		static constexpr const char* GeomColor = "geomcolor";
+		static constexpr const char* Normal = "normal";
+		static constexpr const char* Position = "position";
+		static constexpr const char* Tangent = "tangent";
 		static constexpr const char* TexCoord = "texcoord";
 		// Light nodes
 		static constexpr const char* DirectionalLight = "directional_light";
@@ -247,6 +274,8 @@ MATERIALX_NAMESPACE_BEGIN
 		static constexpr const char* RgbToHsv = "rgbtohsv";
 		static constexpr const char* Saturate = "saturate";
 		static constexpr const char* Smoothstep = "smoothstep";
+		// Application
+		static constexpr const char* Time= "time";
 		// PBR
 		static constexpr const char* StandardSurface = "standard_surface";
 	}

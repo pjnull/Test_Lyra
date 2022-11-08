@@ -21,8 +21,9 @@ namespace Chaos {
 FClothConstraints::FClothConstraints()
 	: Evolution(nullptr)
 	, AnimationPositions(nullptr)
-	, OldAnimationPositions(nullptr)
+	, OldAnimationPositions_deprecated(nullptr)
 	, AnimationNormals(nullptr)
+	, AnimationVelocities(nullptr)
 	, ParticleOffset(0)
 	, NumParticles(0)
 	, ConstraintInitOffset(INDEX_NONE)
@@ -50,8 +51,27 @@ void FClothConstraints::Initialize(
 {
 	Evolution = InEvolution;
 	AnimationPositions = &InAnimationPositions;
-	OldAnimationPositions = &InOldAnimationPositions;
+	OldAnimationPositions_deprecated = &InOldAnimationPositions;
 	AnimationNormals = &InAnimationNormals;
+	AnimationVelocities = nullptr;
+	ParticleOffset = InParticleOffset;
+	NumParticles = InNumParticles;
+}
+
+void FClothConstraints::Initialize(
+	Softs::FPBDEvolution* InEvolution,
+	const TArray<Softs::FSolverVec3>& InInterpolatedAnimationPositions,
+	const TArray<Softs::FSolverVec3>& /*InOldAnimationPositions*/, // deprecated
+	const TArray<Softs::FSolverVec3>& InInterpolatedAnimationNormals,
+	const TArray<Softs::FSolverVec3>& InAnimationVelocities,
+	int32 InParticleOffset,
+	int32 InNumParticles)
+{
+	Evolution = InEvolution;
+	AnimationPositions = &InInterpolatedAnimationPositions;
+	OldAnimationPositions_deprecated = nullptr;
+	AnimationNormals = &InInterpolatedAnimationNormals;
+	AnimationVelocities = &InAnimationVelocities;
 	ParticleOffset = InParticleOffset;
 	NumParticles = InNumParticles;
 }
@@ -339,6 +359,22 @@ void FClothConstraints::SetEdgeConstraints(const TArray<TVec3<int32>>& SurfaceEl
 	++NumConstraintRules;
 }
 
+void FClothConstraints::SetXPBDEdgeConstraints(const TArray<TVec3<int32>>& SurfaceElements, const TConstArrayView<FRealSingle>& StiffnessMultipliers, const TConstArrayView<FRealSingle>& DampingRatioMultipliers)
+{
+	check(Evolution);
+	XEdgeConstraints = MakeShared<Softs::FXPBDSpringConstraints>(
+		Evolution->Particles(),
+		ParticleOffset, NumParticles,
+		SurfaceElements,
+		StiffnessMultipliers,
+		DampingRatioMultipliers,
+		/*InStiffness =*/ Softs::FSolverVec2::UnitVector,
+		/*InDampingRatio =*/ Softs::FSolverVec2::ZeroVector,
+		/*bTrimKinematicConstraints =*/ true);
+	++NumConstraintInits;  // Uses init to update the property tables
+	++NumConstraintRules;
+}
+
 void FClothConstraints::SetBendingConstraints(const TArray<TVec2<int32>>& Edges, const TConstArrayView<FRealSingle>& StiffnessMultipliers, bool bUseXPBDConstraints)
 {
 	check(Evolution);
@@ -382,7 +418,7 @@ void FClothConstraints::SetBendingConstraints(TArray<TVec4<int32>>&& BendingElem
 			BucklingStiffnessMultipliers,
 			/*InStiffness =*/ Softs::FSolverVec2::UnitVector,
 			/*InBucklingRatio=*/ (Softs::FSolverReal)0.f,
-			/*InBucklingStiffnessMultiplier =*/ Softs::FSolverVec2::UnitVector,
+			/*InBucklingStiffness =*/ Softs::FSolverVec2::UnitVector,
 			/*bTrimKinematicConstraints =*/ true);
 	}
 	else
@@ -395,10 +431,29 @@ void FClothConstraints::SetBendingConstraints(TArray<TVec4<int32>>&& BendingElem
 			BucklingStiffnessMultipliers,
 			/*InStiffness =*/ Softs::FSolverVec2::UnitVector,
 			/*InBucklingRatio=*/ (Softs::FSolverReal)0.f,
-			/*InBucklingStiffnessMultiplier =*/ Softs::FSolverVec2::UnitVector,
+			/*InBucklingStiffness =*/ Softs::FSolverVec2::UnitVector,
 			/*bTrimKinematicConstraints =*/ true);
 
 	}
+	++NumConstraintInits;  // Uses init to update the property tables
+	++NumConstraintRules;
+}
+
+void FClothConstraints::SetXPBDBendingConstraints(TArray<TVec4<int32>>&& BendingElements, const TConstArrayView<FRealSingle>& StiffnessMultipliers, const TConstArrayView<FRealSingle>& BucklingStiffnessMultipliers, const TConstArrayView<FRealSingle>& DampingRatioMultipliers)
+{
+	check(Evolution);
+	XBendingElementConstraints = MakeShared<Softs::FXPBDBendingConstraints>(
+		Evolution->Particles(),
+		ParticleOffset, NumParticles,
+		MoveTemp(BendingElements),
+		StiffnessMultipliers,
+		BucklingStiffnessMultipliers,
+		DampingRatioMultipliers,
+		/*InStiffness =*/ Softs::FSolverVec2::UnitVector,
+		/*InBucklingRatio=*/ (Softs::FSolverReal)0.f,
+		/*InBucklingStiffness =*/ Softs::FSolverVec2::UnitVector,
+		/*InDampingRatio =*/ Softs::FSolverVec2::ZeroVector,
+		/*bTrimKinematicConstraints =*/ true);
 	++NumConstraintInits;  // Uses init to update the property tables
 	++NumConstraintRules;
 }
@@ -511,13 +566,30 @@ void FClothConstraints::SetBackstopConstraints(const TConstArrayView<FRealSingle
 
 void FClothConstraints::SetAnimDriveConstraints(const TConstArrayView<FRealSingle>& AnimDriveStiffnessMultipliers, const TConstArrayView<FRealSingle>& AnimDriveDampingMultipliers)
 {
-	AnimDriveConstraints = MakeShared<Softs::FPBDAnimDriveConstraint>(
-		ParticleOffset,
-		NumParticles,
-		*AnimationPositions,
-		*OldAnimationPositions,
-		AnimDriveStiffnessMultipliers,
-		AnimDriveDampingMultipliers);
+	if (AnimationVelocities)
+	{
+		AnimDriveConstraints = MakeShared<Softs::FPBDAnimDriveConstraint>(
+			ParticleOffset,
+			NumParticles,
+			*AnimationPositions,
+			TArray<Softs::FSolverVec3>(),
+			*AnimationVelocities,
+			AnimDriveStiffnessMultipliers,
+			AnimDriveDampingMultipliers);
+	}
+	else
+	{
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		// Deprecated behavior until old Initialize can be removed
+		AnimDriveConstraints = MakeShareable( new Softs::FPBDAnimDriveConstraint(
+			ParticleOffset,
+			NumParticles,
+			*AnimationPositions,
+			*OldAnimationPositions_deprecated,
+			AnimDriveStiffnessMultipliers,
+			AnimDriveDampingMultipliers));
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	}
 	++NumConstraintInits;  // Uses init to update the property tables
 	++NumConstraintRules;
 }
@@ -565,7 +637,7 @@ void FClothConstraints::SetSelfCollisionConstraints(const FTriangleMesh& Triangl
 	++NumConstraintInits;
 }
 
-void FClothConstraints::SetEdgeProperties(const Softs::FSolverVec2& EdgeStiffness)
+void FClothConstraints::SetEdgeProperties(const Softs::FSolverVec2& EdgeStiffness, const Softs::FSolverVec2& DampingRatio)
 {
 	if (EdgeConstraints)
 	{
@@ -573,11 +645,11 @@ void FClothConstraints::SetEdgeProperties(const Softs::FSolverVec2& EdgeStiffnes
 	}
 	if (XEdgeConstraints)
 	{
-		XEdgeConstraints->SetProperties(EdgeStiffness);
+		XEdgeConstraints->SetProperties(EdgeStiffness, DampingRatio);
 	}
 }
 
-void FClothConstraints::SetBendingProperties(const Softs::FSolverVec2& BendingStiffness, Softs::FSolverReal BucklingRatio, const Softs::FSolverVec2& BucklingStiffness)
+void FClothConstraints::SetBendingProperties(const Softs::FSolverVec2& BendingStiffness, Softs::FSolverReal BucklingRatio, const Softs::FSolverVec2& BucklingStiffness, const Softs::FSolverVec2& BendingDampingRatio)
 {
 	if (BendingConstraints)
 	{
@@ -593,7 +665,7 @@ void FClothConstraints::SetBendingProperties(const Softs::FSolverVec2& BendingSt
 	}
 	if (XBendingElementConstraints)
 	{
-		XBendingElementConstraints->SetProperties(BendingStiffness, BucklingRatio, BucklingStiffness);
+		XBendingElementConstraints->SetProperties(BendingStiffness, BucklingRatio, BucklingStiffness, BendingDampingRatio);
 	}
 }
 

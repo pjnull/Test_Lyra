@@ -10,8 +10,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRayTracingTestbed, "System.Renderer.RayTracing
 
 #if RHI_RAYTRACING
 
+#include "RayTracing/RayTracingBasicShaders.h"
 #include "RayTracingInstanceBufferUtil.h"
 #include "RayTracingDefinitions.h"
+#include "RayTracingPayloadType.h"
 #include "GlobalShader.h"
 #include "Containers/DynamicRHIResourceArray.h"
 
@@ -63,20 +65,18 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 	FShaderResourceViewRHIRef RayBufferView;
 
 	{
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		TResourceArray<FBasicRayData> RayData;
+		TResourceArray<FBasicRayTracingRay> RayData;
 		RayData.SetNumUninitialized(NumRays);
-		RayData[0] = FBasicRayData{ { 0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f}, 100000.0f }; // expected to hit
-		RayData[1] = FBasicRayData{ { 0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f},      0.5f }; // expected to miss (short ray)
-		RayData[2] = FBasicRayData{ { 0.75f, 0.0f,  1.0f}, 0xFFFFFFFF, {0.0f, 0.0f, -1.0f}, 100000.0f }; // expected to hit  (should hit back face)
-		RayData[3] = FBasicRayData{ {-0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f}, 100000.0f }; // expected to miss (doesn't intersect)
+		RayData[0] = FBasicRayTracingRay{ { 0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f}, 100000.0f }; // expected to hit
+		RayData[1] = FBasicRayTracingRay{ { 0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f},      0.5f }; // expected to miss (short ray)
+		RayData[2] = FBasicRayTracingRay{ { 0.75f, 0.0f,  1.0f}, 0xFFFFFFFF, {0.0f, 0.0f, -1.0f}, 100000.0f }; // expected to hit  (should hit back face)
+		RayData[3] = FBasicRayTracingRay{ {-0.75f, 0.0f, -1.0f}, 0xFFFFFFFF, {0.0f, 0.0f,  1.0f}, 100000.0f }; // expected to miss (doesn't intersect)
 
 		FRHIResourceCreateInfo CreateInfo(TEXT("RayBuffer"));
 		CreateInfo.ResourceArray = &RayData;
 
-		RayBuffer = RHICreateStructuredBuffer(sizeof(FBasicRayData), RayData.GetResourceDataSize(), BUF_Static | BUF_ShaderResource, CreateInfo);
+		RayBuffer = RHICreateStructuredBuffer(sizeof(FBasicRayTracingRay), RayData.GetResourceDataSize(), BUF_Static | BUF_ShaderResource, CreateInfo);
 		RayBufferView = RHICreateShaderResourceView(RayBuffer);
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	FBufferRHIRef OcclusionResultBuffer;
@@ -93,9 +93,7 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 
 	{
 		FRHIResourceCreateInfo CreateInfo(TEXT("IntersectionResultBuffer"));
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		IntersectionResultBuffer = RHICreateVertexBuffer(sizeof(FIntersectionPayload)*NumRays, BUF_Static | BUF_UnorderedAccess, CreateInfo);
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+		IntersectionResultBuffer = RHICreateVertexBuffer(sizeof(FBasicRayTracingIntersectionResult)*NumRays, BUF_Static | BUF_UnorderedAccess, CreateInfo);
 		IntersectionResultBufferView = RHICreateUnorderedAccessView(IntersectionResultBuffer, PF_R32_UINT);
 	}
 
@@ -212,7 +210,8 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 		TransformUploadSRV,
 		RayTracingScene.NumNativeGPUSceneInstances,
 		RayTracingScene.NumNativeCPUInstances,
-		{});
+		{},
+		nullptr);
 
 	RHICmdList.BindAccelerationStructureMemory(RayTracingScene.Scene, SceneBuffer, 0);
 
@@ -221,21 +220,22 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 	// #yuriy_todo: explicit transitions and state validation for BLAS
 	// RHICmdList.Transition(FRHITransitionInfo(Geometry.GetReference(), ERHIAccess::BVHWrite, ERHIAccess::BVHRead));
 
-	FRayTracingSceneBuildParams Params;
-	Params.Scene = RayTracingScene.Scene;
-	Params.ScratchBuffer = ScratchBuffer;
-	Params.ScratchBufferOffset = 0;
-	Params.InstanceBuffer = InstanceBuffer.Buffer;
-	Params.InstanceBufferOffset = 0;
+	FRayTracingSceneBuildParams BuildParams;
+	BuildParams.Scene = RayTracingScene.Scene;
+	BuildParams.ScratchBuffer = ScratchBuffer;
+	BuildParams.ScratchBufferOffset = 0;
+	BuildParams.InstanceBuffer = InstanceBuffer.Buffer;
+	BuildParams.InstanceBufferOffset = 0;
 
-	RHICmdList.BuildAccelerationStructure(Params);
+	RHICmdList.BuildAccelerationStructure(BuildParams);
 
 	RHICmdList.Transition(FRHITransitionInfo(RayTracingScene.Scene.GetReference(), ERHIAccess::BVHWrite, ERHIAccess::BVHRead));
 
-	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	RHICmdList.RayTraceOcclusion(RayTracingScene.Scene, RayBufferView, OcclusionResultBufferView, NumRays);
-	RHICmdList.RayTraceIntersection(RayTracingScene.Scene, RayBufferView, IntersectionResultBufferView, NumRays);
-	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	FShaderResourceViewInitializer RayTracingSceneViewInitializer(SceneBuffer, RayTracingScene.Scene->GetLayerBufferOffset(0), 0);
+	FShaderResourceViewRHIRef RayTracingSceneView = RHICreateShaderResourceView(RayTracingSceneViewInitializer);
+
+	DispatchBasicOcclusionRays(RHICmdList, RayTracingScene.Scene, RayTracingSceneView, RayBufferView, OcclusionResultBufferView, NumRays);
+	DispatchBasicIntersectionRays(RHICmdList, RayTracingScene.Scene, RayTracingSceneView, RayBufferView, IntersectionResultBufferView, NumRays);
 
 	const bool bValidateResults = true;
 	bool bOcclusionTestOK = false;
@@ -266,8 +266,7 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 		// Read back and validate intersection trace results
 
 		{
-			PRAGMA_DISABLE_DEPRECATION_WARNINGS
-			auto MappedResults = (const FIntersectionPayload*)RHILockBuffer(IntersectionResultBuffer, 0, sizeof(FIntersectionPayload)*NumRays, RLM_ReadOnly);
+			auto MappedResults = (const FBasicRayTracingIntersectionResult*)RHILockBuffer(IntersectionResultBuffer, 0, sizeof(FBasicRayTracingIntersectionResult)*NumRays, RLM_ReadOnly);
 
 			check(MappedResults);
 
@@ -285,7 +284,6 @@ bool RunRayTracingTestbed_RenderThread(const FString& Parameters)
 			RHIUnlockBuffer(IntersectionResultBuffer);
 
 			bIntersectionTestOK = (MappedResults[0].HitT >= 0) && (MappedResults[1].HitT < 0) && (MappedResults[2].HitT >= 0) && (MappedResults[3].HitT < 0);
-			PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 	}
 
@@ -306,6 +304,11 @@ public:
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Minimal;
 	}
 
 	FTestRaygenShader() {}
@@ -334,7 +337,7 @@ public:
 	LAYOUT_FIELD(FShaderResourceParameter, Output) // UAV RWStructuredBuffer<uint>
 };
 
-IMPLEMENT_SHADER_TYPE(, FTestRaygenShader, TEXT("/Engine/Private/RayTracing/RayTracingTest.usf"), TEXT("TestMainRGS"), SF_RayGen);
+IMPLEMENT_GLOBAL_SHADER(FTestRaygenShader, "/Engine/Private/RayTracing/RayTracingTest.usf", "TestMainRGS", SF_RayGen);
 
 
 bool FRayTracingTestbed::RunTest(const FString& Parameters)

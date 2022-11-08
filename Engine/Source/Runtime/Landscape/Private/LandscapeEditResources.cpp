@@ -15,7 +15,7 @@ FLandscapeTexture2DResource::FLandscapeTexture2DResource(uint32 InSizeX, uint32 
 	: SizeX(InSizeX)
 	, SizeY(InSizeY)
 	, Format(InFormat)
-	, NumMips(bInNumMips)
+	, NumMips(IntCastChecked<uint8>(bInNumMips))
 	, bCreateUAVs(bInNeedUAVs)
 	, bCreateSRV(bInNeedSRV)
 {
@@ -116,7 +116,7 @@ void FLandscapeTexture2DArrayResource::InitRHI()
 
 	const FRHITextureCreateDesc Desc =
 		FRHITextureCreateDesc::Create2DArray(TEXT("FLandscapeTexture2DArrayResource"), SizeX, SizeY, SizeZ, Format)
-		.SetNumMips(NumMips)
+		.SetNumMips(static_cast<uint8>(NumMips))
 		.SetFlags(Flags);
 
 	TextureRHI = RHICreateTexture(Desc);
@@ -132,7 +132,7 @@ void FLandscapeTexture2DArrayResource::InitRHI()
 
 	if (bCreateSRV)
 	{
-		TextureSRV = RHICreateShaderResourceView(TextureRHI, /*MipLevel = */0, NumMips, Format);
+		TextureSRV = RHICreateShaderResourceView(TextureRHI, /*MipLevel = */0, static_cast<uint8>(NumMips), Format);
 	}
 }
 

@@ -553,7 +553,8 @@ void UBlendSpace::TickAssetPlayer(FAnimTickRecord& Instance, struct FAnimNotifyQ
 					ClampedNormalizedCurrentTime = FMath::Clamp<float>(NormalizedPreviousTime, 0.f, 1.f);
 				}
 
-				const bool bGenerateNotifies = (NormalizedCurrentTime != NormalizedPreviousTime) && NotifyTriggerMode != ENotifyTriggerMode::None;
+				const bool bHasDeltaTime = (NormalizedCurrentTime != NormalizedPreviousTime);
+				const bool bGenerateNotifies = NotifyTriggerMode != ENotifyTriggerMode::None;
 
 				// Get the index of the highest weight, assuming that the first is the highest until we find otherwise
 				const bool bTriggerNotifyHighestWeightedAnim = NotifyTriggerMode == ENotifyTriggerMode::HighestWeightedAnimation && SampleDataList.Num() > 0;
@@ -603,9 +604,12 @@ void UBlendSpace::TickAssetPlayer(FAnimTickRecord& Instance, struct FAnimNotifyQ
 								Sample.Animation->GetAnimNotifies(PrevSampleDataTime, DeltaTimePosition, NotifyContext);
 							}
 
-							if (Context.RootMotionMode == ERootMotionMode::RootMotionFromEverything && Sample.Animation->bEnableRootMotion)
+							if (bHasDeltaTime)
 							{
-								Context.RootMotionMovementParams.AccumulateWithBlend(Sample.Animation->ExtractRootMotion(PrevSampleDataTime, DeltaTimePosition, Instance.bLooping), SampleEntry.GetClampedWeight());
+								if (Context.RootMotionMode == ERootMotionMode::RootMotionFromEverything && Sample.Animation->bEnableRootMotion)
+								{
+									Context.RootMotionMovementParams.AccumulateWithBlend(Sample.Animation->ExtractRootMotion(PrevSampleDataTime, DeltaTimePosition, Instance.bLooping), SampleEntry.GetClampedWeight());
+								}
 							}
 
 							// Capture the final adjusted delta time and previous frame time as an asset player record
@@ -794,7 +798,7 @@ void UBlendSpace::ResetToRefPose(FCompactPose& OutPose) const
 	}
 }
 
-static const FAnimExtractContext DefaultBlendSpaceExtractionContext = { 0.f, true, {}, false };
+static const FAnimExtractContext DefaultBlendSpaceExtractionContext = { 0.0, true, {}, false };
 
 void UBlendSpace::GetAnimationPose(TArray<FBlendSampleData>& BlendSampleDataCache, /*out*/ FCompactPose& OutPose, /*out*/ FBlendedCurve& OutCurve) const
 {
@@ -885,18 +889,13 @@ void UBlendSpace::GetAnimationPose_Internal(TArray<FBlendSampleData>& BlendSampl
 			}
 			else
 			{
-				if (Sample.Animation
-#if WITH_EDITOR
-					// verify if Sample.Animation->GetSkeleton matches
-					&& ensure(GetSkeleton()->IsCompatible(Sample.Animation->GetSkeleton()))
-#endif // WITH_EDITOR
-					)
+				if (Sample.Animation && Sample.Animation->GetSkeleton() != nullptr)
 				{
 					const float Time = FMath::Clamp<float>(BlendSampleDataCache[I].Time, 0.f, Sample.Animation->GetPlayLength());
 
 					FAnimationPoseData ChildAnimationPoseData = { Pose, ChildrenCurves[I], ChildrenAttributes[I] };
 					// first one always fills up the source one
-					Sample.Animation->GetAnimationPose(ChildAnimationPoseData, FAnimExtractContext(Time, ExtractionContext.bExtractRootMotion, BlendSampleDataCache[I].DeltaTimeRecord, ExtractionContext.bLooping));
+					Sample.Animation->GetAnimationPose(ChildAnimationPoseData, FAnimExtractContext(static_cast<double>(Time), ExtractionContext.bExtractRootMotion, BlendSampleDataCache[I].DeltaTimeRecord, ExtractionContext.bLooping));
 				}
 				else
 				{
@@ -1467,7 +1466,10 @@ bool UBlendSpace::IsAnimationCompatibleWithSkeleton(const UAnimSequence* Animati
 {
 	// Check if the animation sequences skeleton is compatible with the blendspace one
 	const USkeleton* MySkeleton = GetSkeleton();
-	const bool bIsAnimationCompatible = AnimationSequence && MySkeleton && AnimationSequence->GetSkeleton() && MySkeleton->IsCompatible(AnimationSequence->GetSkeleton());
+	bool bIsAnimationCompatible = AnimationSequence && MySkeleton && AnimationSequence->GetSkeleton();
+#if WITH_EDITORONLY_DATA
+	bIsAnimationCompatible = bIsAnimationCompatible && MySkeleton->IsCompatibleForEditor(AnimationSequence->GetSkeleton());
+#endif
 	return bIsAnimationCompatible;
 }
 
@@ -1622,7 +1624,7 @@ FVector UBlendSpace::GetNormalizedBlendInput(const FVector& BlendInput) const
 
 const FEditorElement* UBlendSpace::GetGridSampleInternal(int32 Index) const
 {
-	return GridSamples.IsValidIndex(Index) ? &GridSamples[Index] : NULL;
+	return GridSamples.IsValidIndex(Index) ? &GridSamples[Index] : nullptr;
 }
 
 // When using CriticallyDampedSmoothing, how to go from the interpolation speed to the smooth

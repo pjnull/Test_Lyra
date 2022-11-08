@@ -90,7 +90,8 @@ void UPolyEditInsertEdgeActivity::Setup(UInteractiveTool* ParentToolIn)
 
 	ActivityContext = ParentTool->GetToolManager()->GetContextObjectStore()->FindContext<UPolyEditActivityContext>();
 
-	TopologySelector = ActivityContext->SelectionMechanic->GetTopologySelector();
+	// TODO: When the deprecated function GetTopologySelector is removed from UPolygonSelectionMechanic, we can remove the UMeshTopologySelectionMechanic:: prefix here
+	TopologySelector = ActivityContext->SelectionMechanic->UMeshTopologySelectionMechanic::GetTopologySelector();
 
 	ActivityContext->OnUndoRedo.AddWeakLambda(this, [this](bool bGroupTopologyModified)
 	{
@@ -258,6 +259,19 @@ void UPolyEditInsertEdgeActivity::Tick(float DeltaTime)
 				ChangeTracker.EndChange(), EmptySelection);
 
 			ToolState = EState::GettingStart;
+			
+			if (Settings->bContinuousInsertion)
+			{
+				// If continuous insertion is enabled, try to find information associated with new start point.
+				// If found, remain in GettingEnd mode.
+				FVector3d PreviewPoint;
+				if (GetHoveredItem(LastEndPointWorldRay, StartPoint, StartTopologyID, bStartIsCorner, PreviewPoint))
+				{
+					PreviewPoints.Reset();
+					PreviewPoints.Add(PreviewPoint);
+					ToolState = EState::GettingEnd;
+				}
+			}
 		}
 		else
 		{
@@ -598,6 +612,9 @@ void UPolyEditInsertEdgeActivity::OnClicked(const FInputDeviceRay& ClickPos)
 				ClearPreview(false);
 			}
 		}
+
+		LastEndPointWorldRay = ClickPos.WorldRay;
+			
 		break;
 	}
 	}

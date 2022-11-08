@@ -875,7 +875,7 @@ protected:
 	TaskTrace::FId GetTraceId() const
 	{
 #if UE_TASK_TRACE_ENABLED
-		return TraceId;
+		return TraceId.load(std::memory_order_relaxed);
 #else
 		return TaskTrace::InvalidId;
 #endif
@@ -975,7 +975,7 @@ private:
 #endif
 
 #if UE_TASK_TRACE_ENABLED
-	TaskTrace::FId TraceId;
+	std::atomic<TaskTrace::FId> TraceId { TaskTrace::InvalidId };
 #endif
 };
 
@@ -1084,7 +1084,7 @@ public:
 	TaskTrace::FId GetTraceId() const
 	{
 #if UE_TASK_TRACE_ENABLED
-		return TraceId;
+		return TraceId.load(std::memory_order_relaxed);
 #else
 		return TaskTrace::InvalidId;
 #endif
@@ -1169,7 +1169,7 @@ private:
 #endif
 
 #if UE_TASK_TRACE_ENABLED
-	TaskTrace::FId TraceId = TaskTrace::GenerateTaskId();
+	std::atomic<TaskTrace::FId> TraceId { TaskTrace::GenerateTaskId() };
 #endif
 };
 

@@ -135,10 +135,43 @@ void UMassProcessor::SetShouldAutoRegisterWithGlobalList(const bool bAutoRegiste
 	}
 }
 
+void UMassProcessor::GetArchetypesMatchingOwnedQueries(const FMassEntityManager& EntityManager, TArray<FMassArchetypeHandle>& OutArchetype)
+{
+	for (FMassEntityQuery* QueryPtr : OwnedQueries)
+	{
+		CA_ASSUME(QueryPtr);
+		QueryPtr->CacheArchetypes(EntityManager);
+
+		for (const FMassArchetypeHandle& ArchetypeHandle : QueryPtr->GetArchetypes())
+		{
+			OutArchetype.AddUnique(ArchetypeHandle);
+		}
+	}
+}
+
+bool UMassProcessor::DoesAnyArchetypeMatchOwnedQueries(const FMassEntityManager& EntityManager)
+{
+	for (FMassEntityQuery* QueryPtr : OwnedQueries)
+	{
+		CA_ASSUME(QueryPtr);
+		QueryPtr->CacheArchetypes(EntityManager);
+
+		if (QueryPtr->GetArchetypes().Num() > 0)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UMassProcessor::PostInitProperties()
 {
 	Super::PostInitProperties();
-	if (HasAnyFlags(RF_ClassDefaultObject) == false) 
+
+	// We want even the CDO processors to be fully set up so that we can reason about processors based on CDOs, without 
+	// needing to instantiate processors based on a given class.
+	// Note that we skip abstract processors because we're not going to instantiate them at runtime anyway.
+	if (GetClass()->HasAnyClassFlags(CLASS_Abstract) == false)
 	{
 		ConfigureQueries();
 
@@ -148,9 +181,10 @@ void UMassProcessor::PostInitProperties()
 			CA_ASSUME(QueryPtr);
 			bNeedsGameThread = (bNeedsGameThread || QueryPtr->DoesRequireGameThreadExecution());
 		}
-		// @todo warning temporarily disabled until details cleared
-		/*UE_CLOG(bRequiresGameThreadExecution != bNeedsGameThread, LogMass, Warning, TEXT("%s is marked bRequiresGameThreadExecution = %s, while the registered quries' requirement indicate the opposite")
-			, *GetProcessorName(), bRequiresGameThreadExecution ? TEXT("TRUE") : TEXT("FALSE"));*/
+		
+		UE_CLOG(bRequiresGameThreadExecution != bNeedsGameThread, LogMass, Verbose
+			, TEXT("%s is marked bRequiresGameThreadExecution = %s, while the registered quries' requirement indicate the opposite")
+			, *GetProcessorName(), bRequiresGameThreadExecution ? TEXT("TRUE") : TEXT("FALSE"));
 
 		// better safe than sorry - if queries indicate the game thread execution is required then we marked the whole processor as such
 		bRequiresGameThreadExecution = bRequiresGameThreadExecution || bNeedsGameThread;
@@ -258,9 +292,9 @@ void UMassCompositeProcessor::ConfigureQueries()
 FGraphEventRef UMassCompositeProcessor::DispatchProcessorTasks(const TSharedPtr<FMassEntityManager>& EntityManager, FMassExecutionContext& ExecutionContext, const FGraphEventArray& InPrerequisites)
 {
 	FGraphEventArray Events;
-	Events.Reserve(ProcessingFlatGraph.Num());
+	Events.Reserve(FlatProcessingGraph.Num());
 		
-	for (FDependencyNode& ProcessingNode : ProcessingFlatGraph)
+	for (FDependencyNode& ProcessingNode : FlatProcessingGraph)
 	{
 		FGraphEventArray Prerequisites;
 		for (const int32 DependencyIndex : ProcessingNode.Dependencies)
@@ -279,13 +313,13 @@ FGraphEventRef UMassCompositeProcessor::DispatchProcessorTasks(const TSharedPtr<
 #if WITH_MASSENTITY_DEBUG
 	if (UE::Mass::Debug::bLogProcessingGraph)
 	{
-		for (int i = 0; i < ProcessingFlatGraph.Num(); ++i)
+		for (int i = 0; i < FlatProcessingGraph.Num(); ++i)
 		{
-			FDependencyNode& ProcessingNode = ProcessingFlatGraph[i];
+			FDependencyNode& ProcessingNode = FlatProcessingGraph[i];
 			FString DependenciesDesc;
 			for (const int32 DependencyIndex : ProcessingNode.Dependencies)
 			{
-				DependenciesDesc += FString::Printf(TEXT("%s, "), *ProcessingFlatGraph[DependencyIndex].Name.ToString());
+				DependenciesDesc += FString::Printf(TEXT("%s, "), *FlatProcessingGraph[DependencyIndex].Name.ToString());
 			}
 
 			check(ProcessingNode.Processor);
@@ -323,84 +357,85 @@ void UMassCompositeProcessor::Initialize(UObject& Owner)
 	}
 }
 
-void UMassCompositeProcessor::CopyAndSort(const FMassProcessingPhaseConfig& PhaseConfig, const FString& DependencyGraphFileName)
-{
-	check(GetOuter());
-	
-	// create processors via a temporary pipeline. This ensures consistency with other places we use FRuntimePipelines
-	FMassRuntimePipeline TmpPipeline;
-	TmpPipeline.CreateFromArray(PhaseConfig.ProcessorCDOs, *GetOuter());
-
-	SetProcessors(TmpPipeline.Processors, DependencyGraphFileName);
-}
-
-void UMassCompositeProcessor::SetProcessors(TArrayView<UMassProcessor*> InProcessorInstances, const FString& DependencyGraphFileName)
+void UMassCompositeProcessor::SetProcessors(TArrayView<UMassProcessor*> InProcessorInstances, const TSharedPtr<FMassEntityManager>& EntityManager)
 {
 	// figure out dependencies
-	FProcessorDependencySolver Solver(InProcessorInstances, GroupName, DependencyGraphFileName);
-	TArray<FProcessorDependencySolver::FOrderInfo> SortedProcessorsAndGroups;
-	Solver.ResolveDependencies(SortedProcessorsAndGroups);
+	FMassProcessorDependencySolver Solver(InProcessorInstances);
+	TArray<FMassProcessorOrderInfo> SortedProcessors;
+	Solver.ResolveDependencies(SortedProcessors, EntityManager);
 
-	Populate(SortedProcessorsAndGroups);
+	Populate(SortedProcessors);
+
+	if (Solver.IsSolvingForSingleThread() == false)
+	{
+		BuildFlatProcessingGraph(SortedProcessors);
+	}
+}
+
+void UMassCompositeProcessor::BuildFlatProcessingGraph(TConstArrayView<FMassProcessorOrderInfo> SortedProcessors)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Mass_BuildFlatProcessingGraph);
+#if !MASS_DO_PARALLEL
+	UE_LOG(LogMass, Warning
+		, TEXT("MassCompositeProcessor::BuildFlatProcessingGraph is not expected to run in a single-threaded Mass setup. The flat graph will not be used at runtime."));
+#endif // MASS_DO_PARALLEL
+
+	FlatProcessingGraph.Reset();
 
 	// this part is creating an ordered, flat list of processors that can be executed in sequence
 	// with subsequent task only depending on the elements prior on the list
 	TMap<FName, int32> NameToDependencyIndex;
-	NameToDependencyIndex.Reserve(SortedProcessorsAndGroups.Num());
+	NameToDependencyIndex.Reserve(SortedProcessors.Num());
 	TArray<int32> SuperGroupDependency;
-	for (FProcessorDependencySolver::FOrderInfo& Element : SortedProcessorsAndGroups)
+	for (const FMassProcessorOrderInfo& Element : SortedProcessors)
 	{
-		NameToDependencyIndex.Add(Element.Name, ProcessingFlatGraph.Num());
+		NameToDependencyIndex.Add(Element.Name, FlatProcessingGraph.Num());
 
 		// we don't expect to get any "group" nodes here. If it happens it indicates a bug in dependency solving
 		checkSlow(Element.Processor);
-		FDependencyNode& Node = ProcessingFlatGraph.Add_GetRef({ Element.Name, Element.Processor });
+		FDependencyNode& Node = FlatProcessingGraph.Add_GetRef({ Element.Name, Element.Processor });
 		Node.Dependencies.Reserve(Element.Dependencies.Num());
 		for (FName DependencyName : Element.Dependencies)
 		{
 			checkSlow(DependencyName.IsNone() == false);
 			Node.Dependencies.Add(NameToDependencyIndex.FindChecked(DependencyName));
 		}
+#if WITH_MASSENTITY_DEBUG
+		Node.SequenceIndex = Element.SequenceIndex;
+#endif // WITH_MASSENTITY_DEBUG
 	}
 
 #if WITH_MASSENTITY_DEBUG
 	FScopedCategoryAndVerbosityOverride LogOverride(TEXT("LogMass"), ELogVerbosity::Log);
 	UE_LOG(LogMass, Log, TEXT("%s flat processing graph:"), *GroupName.ToString());
 
-	TArray<int32> Offset;
-	Offset.Reserve(ProcessingFlatGraph.Num());
-
-	for (int i = 0; i < ProcessingFlatGraph.Num(); ++i)
+	int32 Index = 0;
+	for (const FDependencyNode& ProcessingNode : FlatProcessingGraph)
 	{
-		FDependencyNode& ProcessingNode = ProcessingFlatGraph[i];
 		FString DependenciesDesc;
-		int32 MyOffset = 0;
 		for (const int32 DependencyIndex : ProcessingNode.Dependencies)
 		{
 			DependenciesDesc += FString::Printf(TEXT("%d, "), DependencyIndex);
-			MyOffset = FMath::Max(MyOffset, Offset[DependencyIndex]);
 		}
-		MyOffset += 2;
-		Offset.Add(MyOffset);
-
 		if (ProcessingNode.Processor)
 		{
-			UE_LOG(LogMass, Log, TEXT("[%2d]%*s%s%s%s"), i, MyOffset, TEXT(""), *ProcessingNode.Processor->GetProcessorName()
+			UE_LOG(LogMass, Log, TEXT("[%2d]%*s%s%s%s"), Index, ProcessingNode.SequenceIndex * 2, TEXT(""), *ProcessingNode.Processor->GetProcessorName()
 				, DependenciesDesc.Len() > 0 ? TEXT(" depends on ") : TEXT(""), *DependenciesDesc);
 		}
+		++Index;
 	}
 #endif // WITH_MASSENTITY_DEBUG
 }
 
-void UMassCompositeProcessor::Populate(TConstArrayView<FProcessorDependencySolver::FOrderInfo> OrderedProcessors)
+void UMassCompositeProcessor::Populate(TConstArrayView<FMassProcessorOrderInfo> OrderedProcessors)
 {
 	ChildPipeline.Processors.Reset();
 
 	const FMassProcessingPhaseConfig& PhaseConfig = GET_MASS_CONFIG_VALUE(GetProcessingPhaseConfig(ProcessingPhase));
 
-	for (const FProcessorDependencySolver::FOrderInfo& ProcessorInfo : OrderedProcessors)
+	for (const FMassProcessorOrderInfo& ProcessorInfo : OrderedProcessors)
 	{
-		if (ensureMsgf(ProcessorInfo.NodeType == EDependencyNodeType::Processor, TEXT("Encountered unexpected EDependencyNodeType while populating %s"), *GetGroupName().ToString()))
+		if (ensureMsgf(ProcessorInfo.NodeType == FMassProcessorOrderInfo::EDependencyNodeType::Processor, TEXT("Encountered unexpected FMassProcessorOrderInfo::EDependencyNodeType while populating %s"), *GetGroupName().ToString()))
 		{
 			checkSlow(ProcessorInfo.Processor);
 			

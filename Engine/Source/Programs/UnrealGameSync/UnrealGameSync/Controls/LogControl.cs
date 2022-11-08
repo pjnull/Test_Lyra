@@ -913,6 +913,8 @@ namespace UnrealGameSync
 
 	public class LogControlTextWriter : ILogger
 	{
+		const LogLevel MinLogLevel = LogLevel.Information;
+
 		class NullDisposable : IDisposable
 		{
 			public void Dispose() { }
@@ -925,8 +927,13 @@ namespace UnrealGameSync
 			_logControl = inLogControl;
 		}
 
-		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
 		{
+			if (logLevel < MinLogLevel)
+			{
+				return;
+			}
+
 			string message = formatter(state, exception);
 			_logControl.AppendLine(message);
 

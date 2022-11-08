@@ -57,11 +57,11 @@ namespace Horde.Build.Jobs.Templates
 				Name = null!;
 			}
 
-			public TemplateDocument(string name, Priority? priority, bool bAllowPreflights, bool updateIssues, bool promoteIssuesByDefault, string? initialAgentType, string? submitNewChange, string? submitDescription, List<string>? arguments, List<Parameter>? parameters)
+			public TemplateDocument(string name, Priority? priority, bool allowPreflights, bool updateIssues, bool promoteIssuesByDefault, string? initialAgentType, string? submitNewChange, string? submitDescription, List<string>? arguments, List<Parameter>? parameters)
 			{
 				Name = name;
 				Priority = priority;
-				AllowPreflights = bAllowPreflights;
+				AllowPreflights = allowPreflights;
 				UpdateIssues = updateIssues;
 				PromoteIssuesByDefault = promoteIssuesByDefault;
 				InitialAgentType = initialAgentType;
@@ -91,12 +91,6 @@ namespace Horde.Build.Jobs.Templates
 		/// <param name="mongoService">The database service singleton</param>
 		public TemplateCollection(MongoService mongoService)
 		{
-			// Ensure discriminator cannot be registered twice (throws exception). Can otherwise happen during unit tests.
-			if (BsonSerializer.LookupDiscriminatorConvention(typeof(JobsTabColumn)) == null)
-			{
-				BsonSerializer.RegisterDiscriminatorConvention(typeof(JobsTabColumn), new DefaultDiscriminatorConvention(typeof(JobsTabColumn), typeof(JobsTabLabelColumn)));	
-			}
-			
 			_templates = mongoService.GetCollection<TemplateDocument>("Templates");
 
 			MemoryCacheOptions options = new MemoryCacheOptions();
@@ -110,9 +104,9 @@ namespace Horde.Build.Jobs.Templates
 		}
 
 		/// <inheritdoc/>
-		public async Task<ITemplate> AddAsync(string name, Priority? priority, bool bAllowPreflights, bool bUpdateIssues, bool bPromoteIssuesByDefault, string? initialAgentType, string? submitNewChange, string? submitDescription, List<string>? arguments, List<Parameter>? parameters)
+		public async Task<ITemplate> AddAsync(string name, Priority? priority, bool allowPreflights, bool updateIssues, bool promoteIssuesByDefault, string? initialAgentType, string? submitNewChange, string? submitDescription, List<string>? arguments, List<Parameter>? parameters)
 		{
-			TemplateDocument template = new TemplateDocument(name, priority, bAllowPreflights, bUpdateIssues, bPromoteIssuesByDefault, initialAgentType, submitNewChange, submitDescription, arguments, parameters);
+			TemplateDocument template = new TemplateDocument(name, priority, allowPreflights, updateIssues, promoteIssuesByDefault, initialAgentType, submitNewChange, submitDescription, arguments, parameters);
 			if (await GetAsync(template.Id) == null)
 			{
 				await _templates.ReplaceOneAsync(x => x.Id == template.Id, template, new ReplaceOptions { IsUpsert = true });

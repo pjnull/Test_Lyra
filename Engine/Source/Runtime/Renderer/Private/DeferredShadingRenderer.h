@@ -765,7 +765,8 @@ private:
 		const FTranslucencyLightingVolumeTextures& TranslucencyLightingVolumeTextures,
 		FTranslucencyPassResourcesMap* OutTranslucencyResourceMap,
 		ETranslucencyView ViewsToRender,
-		FInstanceCullingManager& InstanceCullingManager);
+		FInstanceCullingManager& InstanceCullingManager,
+		bool bStandardTranslucentCanRenderSeparate);
 
 	/** Renders the scene's translucency given a specific pass. */
 	void RenderTranslucencyInner(
@@ -777,7 +778,8 @@ private:
 		ETranslucencyView ViewsToRender,
 		FRDGTextureRef SceneColorCopyTexture,
 		ETranslucencyPass::Type TranslucencyPass,
-		FInstanceCullingManager& InstanceCullingManager);
+		FInstanceCullingManager& InstanceCullingManager,
+		bool bStandardTranslucentCanRenderSeparate);
 
 	/** Renders the scene's light shafts */
 	FRDGTextureRef RenderLightShaftOcclusion(
@@ -790,7 +792,10 @@ private:
 		FTranslucencyPassResourcesMap& OutTranslucencyResourceMap);
 
 	bool ShouldRenderDistortion() const;
-	void RenderDistortion(FRDGBuilder& GraphBuilder, FRDGTextureRef SceneColorTexture, FRDGTextureRef SceneDepthTexture);
+	void RenderDistortion(FRDGBuilder& GraphBuilder, 
+		FRDGTextureRef SceneColorTexture, 
+		FRDGTextureRef SceneDepthTexture,
+		FTranslucencyPassResourcesMap& TranslucencyResourceMap);
 
 	void CollectLightForTranslucencyLightingVolumeInjection(
 		FRDGBuilder& GraphBuilder,
@@ -1154,7 +1159,11 @@ private:
 	/** Lighting evaluation shader registration */
 	static FRHIRayTracingShader* GetRayTracingDefaultMissShader(const FViewInfo& View);
 	static FRHIRayTracingShader* GetRayTracingLightingMissShader(const FViewInfo& View);
+	static FRHIRayTracingShader* GetRayTracingDefaultOpaqueShader(const FViewInfo& View);
+	static FRHIRayTracingShader* GetRayTracingDefaultHiddenShader(const FViewInfo& View);
 	static FRHIRayTracingShader* GetPathTracingDefaultMissShader(const FViewInfo& View);
+	static FRHIRayTracingShader* GetPathTracingDefaultOpaqueHitShader(const FViewInfo& View);
+	static FRHIRayTracingShader* GetPathTracingDefaultHiddenHitShader(const FViewInfo& View);
 
 	const FRHITransition* RayTracingDynamicGeometryUpdateEndTransition = nullptr; // Signaled when all AS for this frame are built
 #endif // RHI_RAYTRACING

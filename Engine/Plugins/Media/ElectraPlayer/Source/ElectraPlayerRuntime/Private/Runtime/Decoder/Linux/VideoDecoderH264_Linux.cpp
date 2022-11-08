@@ -737,7 +737,10 @@ void FVideoDecoderH264LinuxLibavcodec::PrepareAU(TSharedPtr<FDecoderInput, ESPMo
 			if (StartTime >= AU->AccessUnit->LatestPTS)
 			{
 				StartTime.SetToInvalid();
-				AU->bIsDiscardable = true;
+				if (AU->AccessUnit->DTS.IsValid() && AU->AccessUnit->DTS >= AU->AccessUnit->LatestPTS)
+				{
+					AU->bIsDiscardable = true;
+				}
 			}
 			else if (EndTime >= AU->AccessUnit->LatestPTS)
 			{
@@ -1348,7 +1351,7 @@ void FVideoDecoderH264LinuxLibavcodec::ProcessOutput(bool bFlush)
 			bool bRender = NextImage.SourceInfo->AdjustedPTS.IsValid();
 			TSharedPtr<FElectraPlayerVideoDecoderOutputLinux, ESPMode::ThreadSafe> DecoderOutput = RenderOutputBuffer->GetBufferProperties().GetValue("texture").GetSharedPointer<FElectraPlayerVideoDecoderOutputLinux>();
 			FIntPoint BufferDim(NextImage.ImageInfo.Planes[0].Width, NextImage.ImageInfo.Planes[0].Height);
-			if (DecoderOutput->InitializeForBuffer(BufferDim, EPixelFormat::PF_NV12, OutputBufferSampleProperties))
+			if (DecoderOutput->InitializeForBuffer(BufferDim, EPixelFormat::PF_NV12, 8, OutputBufferSampleProperties))
 			{
 				TArray<uint8>& ImgBuf = DecoderOutput->GetMutableBuffer();
 				ConvertDecodedImageToNV12(ImgBuf, DecoderOutput->GetBufferDimensions(), NextImage);

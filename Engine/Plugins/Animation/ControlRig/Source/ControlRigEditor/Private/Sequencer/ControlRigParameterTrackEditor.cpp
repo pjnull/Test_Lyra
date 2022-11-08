@@ -723,7 +723,7 @@ public:
 				}
 				else if(Skeleton)
 				{
-					if (Skeleton->IsCompatibleSkeletonByAssetString(PreviewSkeleton))
+					if (Skeleton->IsCompatibleForEditor(PreviewSkeleton))
 					{
 						return true;
 					}
@@ -736,7 +736,7 @@ public:
 			}
 			else if (Skeleton)
 			{
-				if (Skeleton->IsCompatibleSkeletonByAssetString(PreviewSkeleton))
+				if (Skeleton->IsCompatibleForEditor(PreviewSkeleton))
 				{
 					return true;
 				}
@@ -748,7 +748,7 @@ public:
 			}
 			else if (Skeleton)
 			{
-				if (Skeleton->IsCompatibleSkeletonByAssetString(SourceHierarchyImport))
+				if (Skeleton->IsCompatibleForEditor(SourceHierarchyImport))
 				{
 					return true;
 				}
@@ -760,7 +760,7 @@ public:
 			}
 			else if (Skeleton)
 			{
-				if (Skeleton->IsCompatibleSkeletonByAssetString(SourceCurveImport))
+				if (Skeleton->IsCompatibleForEditor(SourceCurveImport))
 				{
 					return true;
 				}
@@ -2861,8 +2861,15 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 	
 	URigHierarchy* Hierarchy = Subject->GetHierarchy();
 	static bool bIsSelectingIndirectControl = false;
+	static TArray<FRigControlElement*> SelectedElements = {};
 
-	if(ControlElement->Settings.AnimationType == ERigControlAnimationType::ProxyControl)
+	// Avoid cyclic selection
+	if (SelectedElements.Contains(ControlElement))
+	{
+		return;
+	}
+
+	if(ControlElement->CanDriveControls())
 	{
 		const TArray<FRigElementKey>& DrivenControls = ControlElement->Settings.DrivenControls;
 		for(const FRigElementKey& DrivenKey : DrivenControls)
@@ -2870,10 +2877,18 @@ void FControlRigParameterTrackEditor::HandleControlSelected(UControlRig* Subject
 			if(FRigControlElement* DrivenControl = Hierarchy->Find<FRigControlElement>(DrivenKey))
 			{
 				TGuardValue<bool> SubControlGuard(bIsSelectingIndirectControl, true);
+
+				TArray<FRigControlElement*> NewSelection = SelectedElements;
+				NewSelection.Add(ControlElement);
+				TGuardValue<TArray<FRigControlElement*>> SelectedElementsGuard(SelectedElements, NewSelection);
+				
 				HandleControlSelected(Subject, DrivenControl, bSelected);
 			}
 		}
-		return;
+		if(ControlElement->Settings.AnimationType == ERigControlAnimationType::ProxyControl)
+		{
+			return;
+		}
 	}
 	
 	//if parent selected we select child here if it's a bool,integer or single float
@@ -4721,7 +4736,7 @@ void FControlRigParameterSection::AddAnimationSubMenuForFK(FMenuBuilder& MenuBui
 		AssetPickerConfig.OnShouldFilterAsset = FOnShouldFilterAsset::CreateRaw(this, &FControlRigParameterSection::ShouldFilterAssetForFK);
 		AssetPickerConfig.Filter.bRecursiveClasses = true;
 		AssetPickerConfig.Filter.ClassPaths.Add(UAnimSequenceBase::StaticClass()->GetClassPathName());
-		AssetPickerConfig.Filter.TagsAndValues.Add(TEXT("Skeleton"), FAssetData(Skeleton).GetExportTextName());
+		AssetPickerConfig.OnShouldFilterAsset = FOnShouldFilterAsset::CreateUObject(Skeleton, &USkeleton::ShouldFilterAsset, TEXT("Skeleton"));
 		AssetPickerConfig.SaveSettingsName = TEXT("SequencerAssetPicker");
 		AssetPickerConfig.AdditionalReferencingAssets.Add(FAssetData(Sequence));
 	}

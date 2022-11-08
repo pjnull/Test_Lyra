@@ -191,6 +191,8 @@ static const IShaderFormat* FindShaderFormat(FName Name)
 /** Processes a compilation job. */
 static void ProcessCompilationJob(const FShaderCompilerInput& Input,FShaderCompilerOutput& Output,const FString& WorkingDirectory)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(ProcessCompilationJob);
+
 	const IShaderFormat* Compiler = FindShaderFormat(Input.ShaderFormat);
 	if (!Compiler)
 	{
@@ -259,6 +261,8 @@ static void UpdateFileSize(FArchive& OutputFile, int64 FileSizePosition)
 static int64 WriteOutputFileHeader(FArchive& OutputFile, int32 ErrorCode, int32 CallstackLength, const TCHAR* Callstack,
 	int32 ExceptionInfoLength, const TCHAR* ExceptionInfo)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(WriteOutputFileHeader);
+
 	int64 FileSizePosition = 0;
 	int32 OutputVersion = ShaderCompileWorkerOutputVersion;
 	OutputFile << OutputVersion;
@@ -303,8 +307,8 @@ public:
 	,	WorkingDirectory(InWorkingDirectory)
 	,	InputFilename(InInputFilename)
 	,	OutputFilename(InOutputFilename)
-	,	InputFilePath(FString(InWorkingDirectory) + InInputFilename)
-	,	OutputFilePath(FString(InWorkingDirectory) + InOutputFilename)
+	,	InputFilePath(FString(InWorkingDirectory) / InInputFilename)
+	,	OutputFilePath(FString(InWorkingDirectory) / InOutputFilename)
 	,	FormatVersionMap(InFormatVersionMap)
 	{
 		TArray<FString> Tokens, Switches;
@@ -326,6 +330,7 @@ public:
 	void Loop()
 	{
 		UE_LOG(LogShaders, Log, TEXT("Entering job loop"));
+		TRACE_CPUPROFILER_EVENT_SCOPE(Loop);
 
 		while(true)
 		{
@@ -334,6 +339,8 @@ public:
 
 			// Read & Process Input
 			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(ReadInput);
+
 				FArchive* InputFilePtr = OpenInputFile();
 				if(!InputFilePtr)
 				{
@@ -383,6 +390,14 @@ public:
 				UE_LOG(LogShaders, Log, TEXT("TimeToLive set to 0, or used HLSLcc compiler, exiting after single job"));
 				break;
 			}
+
+#if ENABLE_LOW_LEVEL_MEM_TRACKER
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(UpdateStatsPerFrame);
+
+				FLowLevelMemTracker::Get().UpdateStatsPerFrame();
+			}
+#endif
 		}
 
 		UE_LOG(LogShaders, Log, TEXT("Exiting job loop"));
@@ -448,6 +463,8 @@ private:
 
 	void ProcessInputFromArchive(FArchive* InputFilePtr, TArray<FJobResult>& OutSingleJobResults, TArray<FPipelineJobResult>& OutPipelineJobResults)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(ProcessInputFromArchive);
+
 		int32 InputVersion;
 		*InputFilePtr << InputVersion;
 		if (ShaderCompileWorkerInputVersion != InputVersion)
@@ -697,13 +714,8 @@ private:
 
 			int32 NumBatches = 0;
 			InputFile << NumBatches;
-			// Flush cache, to make sure we load the latest version of the input file.
-			// (Otherwise quick changes to a shader file can result in the wrong output.)
-			FString ShaderPlatformNameString;
-			InputFile << ShaderPlatformNameString;
-			FName ShaderPlatformName = FName(*ShaderPlatformNameString);
 
-			FlushShaderFileCache(&ShaderPlatformName);
+			FlushShaderFileCache();
 			
 			for (int32 BatchIndex = 0; BatchIndex < NumBatches; BatchIndex++)
 			{
@@ -835,6 +847,8 @@ private:
 
 	FArchive* CreateOutputArchive()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(CreateOutputArchive);
+
 		FArchive* OutputFilePtr = nullptr;
 		const double StartTime = FPlatformTime::Seconds();
 		bool bResult = false;
@@ -886,6 +900,8 @@ private:
 
 	void WriteToOutputArchive(FArchive* OutputFilePtr, TArray<FJobResult>& SingleJobResults, TArray<FPipelineJobResult>& PipelineJobResults)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(WriteToOutputArchive);
+
 		FArchive& OutputFile = *OutputFilePtr;
 		int64 FileSizePosition = WriteOutputFileHeader(OutputFile, (int32)ESCWErrorCode::Success, 0, nullptr, 0, nullptr);
 
@@ -1001,6 +1017,8 @@ private:
 	
 	static bool AnyJobUsedHLSLccCompiler(TArray<FJobResult>& SingleJobResults, TArray<FPipelineJobResult>& PipelineJobResults)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(AnyJobUsedHLSLccCompiler);
+
 		for (int32 ResultIndex = 0; ResultIndex < SingleJobResults.Num(); ResultIndex++)
 		{
 			FJobResult& JobResult = SingleJobResults[ResultIndex];
@@ -1028,6 +1046,8 @@ private:
 
 static void DirectCompile(const TArray<const class IShaderFormat*>& ShaderFormats)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(DirectCompile);
+
 	// Find all the info required for compiling a single shader
 	TArray<FString> Tokens, Switches;
 	FCommandLine::Parse(FCommandLine::Get(), Tokens, Switches);
@@ -1184,7 +1204,7 @@ static void DirectCompile(const TArray<const class IShaderFormat*>& ShaderFormat
  */
 static int32 GuardedMain(int32 argc, TCHAR* argv[], bool bDirectMode)
 {
-	FString ExtraCmdLine = TEXT("-NOPACKAGECACHE -ReduceThreadUsage -cpuprofilertrace -nocrashreports -nothreading");
+	FString ExtraCmdLine = TEXT("-NOPACKAGECACHE -ReduceThreadUsage -cpuprofilertrace -nocrashreports");
 
 	// When executing tasks remotely through XGE, enumerating files requires tcp/ip round-trips with
 	// the initiator, which can slow down engine initialization quite drastically.
@@ -1251,6 +1271,8 @@ static int32 GuardedMain(int32 argc, TCHAR* argv[], bool bDirectMode)
 	GLogConsole->Show( true );
 #endif
 
+	TRACE_CPUPROFILER_EVENT_SCOPE(Main);
+
 	auto AtomicSave = 
 		[](const FString& Filename, TFunctionRef<void (const FString& TmpFile)> SaveFunction)
 		{
@@ -1278,6 +1300,8 @@ static int32 GuardedMain(int32 argc, TCHAR* argv[], bool bDirectMode)
 	TMap<FString, uint32> FormatVersionMap;
 	for (int32 Index = 0; Index < ShaderFormats.Num(); Index++)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(ShaderFormat);
+
 		TArray<FName> OutFormats;
 		ShaderFormats[Index]->GetSupportedFormats(OutFormats);
 		check(OutFormats.Num());
@@ -1301,6 +1325,8 @@ static int32 GuardedMain(int32 argc, TCHAR* argv[], bool bDirectMode)
 		//@todo - would be nice to change application name or description to have the ThreadId in it for debugging purposes
 		SetConsoleTitle(argv[3]);
 #endif
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(FWorkLoop);
 
 		FWorkLoop WorkLoop(argv[2], argv[1], argv[4], argv[5], FormatVersionMap);
 		WorkLoop.Loop();

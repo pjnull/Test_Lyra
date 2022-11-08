@@ -58,22 +58,6 @@ namespace UE::PoseSearch
 //////////////////////////////////////////////////////////////////////////
 // Constants and utilities
 
-// @todo: set UE_POSE_SEARCH_FORCE_SINGLE_THREAD to 0
-// Temporarily disable parallel indexing due to a bug
-// A single BoneContainer is being used while indexing assets, but some
-// const BoneContainer methods change mutable lookup tables.
-#define UE_POSE_SEARCH_FORCE_SINGLE_THREAD 1
-
-#ifndef UE_POSE_SEARCH_FORCE_SINGLE_THREAD
-#define UE_POSE_SEARCH_FORCE_SINGLE_THREAD 0
-#endif
-
-#if UE_POSE_SEARCH_FORCE_SINGLE_THREAD
-	constexpr EParallelForFlags ParallelForFlags = EParallelForFlags::ForceSingleThread;
-#else
-	constexpr EParallelForFlags ParallelForFlags = EParallelForFlags::None;
-#endif // UE_POSE_SEARCH_FORCE_SINGLE_THREAD
-
 static inline float ArraySum(TConstArrayView<float> View, int32 StartIndex, int32 Offset)
 {
 	float Sum = 0.f;
@@ -185,50 +169,45 @@ FORCEINLINE auto LowerBound(IteratorType First, IteratorType Last, const ValueTy
 	return LowerBound(First, Last, Value, FIdentityFunctor(), TLess<>());
 }
 
-static TArrayView<size_t> PopulateNonSelectableIdx(TArrayView<size_t> NonSelectableIdxBuffer, FSearchContext& SearchContext, const UPoseSearchDatabase* Database, TArrayView<const float> QueryValues)
+typedef TArray<size_t, TInlineAllocator<128>> FNonSelectableIdx;
+static void PopulateNonSelectableIdx(FNonSelectableIdx& NonSelectableIdx, FSearchContext& SearchContext, const UPoseSearchDatabase* Database, TConstArrayView<float> QueryValues)
 {
 	check(Database);
+	const FPoseSearchIndex* SearchIndex = Database->GetSearchIndex();
+	check(SearchIndex);
 
-	int32 NonSelectableIdxUsedSize = 0;
-	if (SearchContext.IsCurrentResultFromDatabase(Database) && SearchContext.CurrentResult.IsValid() && SearchContext.PoseJumpThresholdTime > 0.f)
+	const FPoseSearchIndexAsset* CurrentIndexAsset = SearchContext.CurrentResult.GetSearchIndexAsset();
+	if (CurrentIndexAsset && SearchContext.IsCurrentResultFromDatabase(Database) && SearchContext.PoseJumpThresholdTime > 0.f)
 	{
-		const FPoseSearchIndexAsset* CurrentIndexAsset = SearchContext.CurrentResult.SearchIndexAsset;
 		const int32 PoseJumpIndexThreshold = FMath::FloorToInt(SearchContext.PoseJumpThresholdTime / Database->Schema->GetSamplingInterval());
-		const bool IsLooping = Database->IsSourceAssetLooping(CurrentIndexAsset);
+		const bool IsLooping = Database->IsSourceAssetLooping(*CurrentIndexAsset);
 
 		for (int32 i = -PoseJumpIndexThreshold; i <= -1; ++i)
 		{
-			const int32 PoseIdx = SearchContext.CurrentResult.PoseIdx + i;
-			const float DeltaTime = i * Database->Schema->GetSamplingInterval();
-
-			// @todo: should we use the quantized time associated to InOutMotionMatchingState.DbPoseIdx instead of InOutMotionMatchingState.AssetPlayerTime?
-			float PoseAssetPlayerTime = SearchContext.CurrentResult.AssetTime + DeltaTime;
+			int32 PoseIdx = SearchContext.CurrentResult.PoseIdx + i;
+			bool bIsPoseInRange = false;
 			if (IsLooping)
 			{
-				while (PoseAssetPlayerTime < CurrentIndexAsset->SamplingInterval.Min)
+				bIsPoseInRange = true;
+
+				while (PoseIdx < CurrentIndexAsset->FirstPoseIdx)
 				{
-					PoseAssetPlayerTime += CurrentIndexAsset->SamplingInterval.Size();
+					PoseIdx += CurrentIndexAsset->NumPoses;
 				}
 			}
-
-			if (CurrentIndexAsset->SamplingInterval.Contains(PoseAssetPlayerTime))
+			else if (CurrentIndexAsset->IsPoseInRange(PoseIdx))
 			{
-				if (NonSelectableIdxUsedSize < NonSelectableIdxBuffer.Num())
-				{
-					NonSelectableIdxBuffer[NonSelectableIdxUsedSize++] = PoseIdx;
+				bIsPoseInRange = true;
+			}
+
+			if (bIsPoseInRange)
+			{
+				NonSelectableIdx.Add(PoseIdx);
 
 #if UE_POSE_SEARCH_TRACE_ENABLED
-					const FPoseSearchCost PoseCost = Database->ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
-					SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_PoseJumpThresholdTime);
+				const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+				SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_PoseJumpThresholdTime);
 #endif
-				}
-				else
-				{
-					UE_LOG(LogPoseSearch, Warning, TEXT("PopulateNonSelectableIdx couldn't add all the NonSelectableIdx"));
-					TArrayView<size_t> NonSelectableIdx(NonSelectableIdxBuffer.GetData(), NonSelectableIdxUsedSize);
-					NonSelectableIdx.Sort();
-					return NonSelectableIdx;
-				}
 			}
 			else
 			{
@@ -238,37 +217,30 @@ static TArrayView<size_t> PopulateNonSelectableIdx(TArrayView<size_t> NonSelecta
 
 		for (int32 i = 0; i <= PoseJumpIndexThreshold; ++i)
 		{
-			const int32 PoseIdx = SearchContext.CurrentResult.PoseIdx + i;
-			const float DeltaTime = i * Database->Schema->GetSamplingInterval();
-
-			// @todo: should we use the quantized time associated to InOutMotionMatchingState.DbPoseIdx instead of InOutMotionMatchingState.AssetPlayerTime?
-			float PoseAssetPlayerTime = SearchContext.CurrentResult.AssetTime + DeltaTime;
+			int32 PoseIdx = SearchContext.CurrentResult.PoseIdx + i;
+			bool bIsPoseInRange = false;
 			if (IsLooping)
 			{
-				while (PoseAssetPlayerTime > CurrentIndexAsset->SamplingInterval.Max)
+				bIsPoseInRange = true;
+
+				while (PoseIdx >= CurrentIndexAsset->FirstPoseIdx + CurrentIndexAsset->NumPoses)
 				{
-					PoseAssetPlayerTime -= CurrentIndexAsset->SamplingInterval.Size();
+					PoseIdx -= CurrentIndexAsset->NumPoses;
 				}
 			}
-
-			if (CurrentIndexAsset->SamplingInterval.Contains(PoseAssetPlayerTime))
+			else if (CurrentIndexAsset->IsPoseInRange(PoseIdx))
 			{
-				if (NonSelectableIdxUsedSize < NonSelectableIdxBuffer.Num())
-				{
-					NonSelectableIdxBuffer[NonSelectableIdxUsedSize++] = PoseIdx;
+				bIsPoseInRange = true;
+			}
+
+			if (bIsPoseInRange)
+			{
+				NonSelectableIdx.Add(PoseIdx);
 
 #if UE_POSE_SEARCH_TRACE_ENABLED
-					const FPoseSearchCost PoseCost = Database->ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
-					SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_PoseJumpThresholdTime);
+				const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+				SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_PoseJumpThresholdTime);
 #endif
-				}
-				else
-				{
-					UE_LOG(LogPoseSearch, Warning, TEXT("PopulateNonSelectableIdx couldn't add all the NonSelectableIdx"));
-					TArrayView<size_t> NonSelectableIdx(NonSelectableIdxBuffer.GetData(), NonSelectableIdxUsedSize);
-					NonSelectableIdx.Sort();
-					return NonSelectableIdx;
-				}
 			}
 			else
 			{
@@ -285,38 +257,117 @@ static TArrayView<size_t> PopulateNonSelectableIdx(TArrayView<size_t> NonSelecta
 			const FHistoricalPoseIndex& HistoricalPoseIndex = It.Key();
 			if (HistoricalPoseIndex.DatabaseKey == DatabaseKey)
 			{
-				if (NonSelectableIdxUsedSize < NonSelectableIdxBuffer.Num())
-				{
-					NonSelectableIdxBuffer[NonSelectableIdxUsedSize++] = HistoricalPoseIndex.PoseIndex;
+				NonSelectableIdx.Add(HistoricalPoseIndex.PoseIndex);
 
 #if UE_POSE_SEARCH_TRACE_ENABLED
-					check(HistoricalPoseIndex.PoseIndex >= 0);
-					const FPoseSearchIndex* SearchIndex = Database->GetSearchIndex();
-					check(SearchIndex);
+				check(HistoricalPoseIndex.PoseIndex >= 0);
 					
-					// if we're editing the database and removing assets it's possible that the PoseIndicesHistory contains invalid pose indexes
-					if (HistoricalPoseIndex.PoseIndex < SearchIndex->NumPoses)
-					{
-						const FPoseSearchCost PoseCost = Database->ComparePoses(SearchContext, HistoricalPoseIndex.PoseIndex, EPoseComparisonFlags::None, QueryValues);
-						SearchContext.BestCandidates.Add(PoseCost, HistoricalPoseIndex.PoseIndex, Database, EPoseCandidateFlags::DiscardedBy_PoseReselectHistory);
-					}
-#endif
-				}
-				else
+				// if we're editing the database and removing assets it's possible that the PoseIndicesHistory contains invalid pose indexes
+				if (HistoricalPoseIndex.PoseIndex < SearchIndex->NumPoses)
 				{
-					UE_LOG(LogPoseSearch, Warning, TEXT("PopulateNonSelectableIdx couldn't add all the NonSelectableIdx"));
-					TArrayView<size_t> NonSelectableIdx(NonSelectableIdxBuffer.GetData(), NonSelectableIdxUsedSize);
-					NonSelectableIdx.Sort();
-					return NonSelectableIdx;
+					const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(HistoricalPoseIndex.PoseIndex, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+					SearchContext.BestCandidates.Add(PoseCost, HistoricalPoseIndex.PoseIndex, Database, EPoseCandidateFlags::DiscardedBy_PoseReselectHistory);
 				}
+#endif
 			}
 		}
 	}
 
-	TArrayView<size_t> NonSelectableIdx(NonSelectableIdxBuffer.GetData(), NonSelectableIdxUsedSize);
 	NonSelectableIdx.Sort();
-	return NonSelectableIdx;
 }
+
+struct FPoseFilters
+{
+	FPoseFilters(const UPoseSearchSchema* Schema, TConstArrayView<size_t> NonSelectableIdx, EPoseSearchPoseFlags OverallFlags)
+	{
+		NonSelectableIdxPoseFilter.NonSelectableIdx = NonSelectableIdx;
+
+		if (EnumHasAnyFlags(OverallFlags, EPoseSearchPoseFlags::BlockTransition))
+		{
+			AllPoseFilters.Add(&BlockTransitionPoseFilter);
+		}
+
+		if (NonSelectableIdxPoseFilter.IsPoseFilterActive())
+		{
+			AllPoseFilters.Add(&NonSelectableIdxPoseFilter);
+		}
+
+		for (const IPoseFilter* ChannelPoseFilter : Schema->Channels)
+		{
+			if (ChannelPoseFilter->IsPoseFilterActive())
+			{
+				AllPoseFilters.Add(ChannelPoseFilter);
+			}
+		}
+	}
+
+	bool AreFiltersValid(const FPoseSearchIndex* SearchIndex, TConstArrayView<float> QueryValues, int32 PoseIdx, const FPoseSearchPoseMetadata& Metadata
+#if UE_POSE_SEARCH_TRACE_ENABLED
+		, UE::PoseSearch::FSearchContext& SearchContext, const UPoseSearchDatabase* Database
+#endif
+	) const
+	{
+		TConstArrayView<float> PoseValues = SearchIndex->GetPoseValues(PoseIdx);
+		for (const IPoseFilter* PoseFilter : AllPoseFilters)
+		{
+			if (!PoseFilter->IsPoseValid(PoseValues, QueryValues, PoseIdx, Metadata))
+			{
+#if UE_POSE_SEARCH_TRACE_ENABLED
+				if (PoseFilter == &NonSelectableIdxPoseFilter)
+				{
+					// candidate already added to SearchContext.BestCandidates by PopulateNonSelectableIdx
+				}
+				else if (PoseFilter == &BlockTransitionPoseFilter)
+				{
+					const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+					SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_BlockTransition);
+				}
+				else
+				{
+					const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+					SearchContext.BestCandidates.Add(PoseCost, PoseIdx, Database, EPoseCandidateFlags::DiscardedBy_PoseFilter);
+				}
+#endif
+				return false;
+			}
+		}
+		return true;
+	};
+
+private:
+	struct FNonSelectableIdxPoseFilter : public IPoseFilter
+	{
+		virtual bool IsPoseFilterActive() const override
+		{
+			return !NonSelectableIdx.IsEmpty();
+		}
+
+		virtual bool IsPoseValid(TConstArrayView<float> PoseValues, TConstArrayView<float> QueryValues, int32 PoseIdx, const FPoseSearchPoseMetadata& Metadata) const override
+		{
+			return Algo::BinarySearch(NonSelectableIdx, PoseIdx) == INDEX_NONE;
+		}
+
+		TConstArrayView<size_t> NonSelectableIdx;
+	};
+
+	struct FBlockTransitionPoseFilter : public IPoseFilter
+	{
+		virtual bool IsPoseFilterActive() const override
+		{
+			return true;
+		}
+
+		virtual bool IsPoseValid(TConstArrayView<float> PoseValues, TConstArrayView<float> QueryValues, int32 PoseIdx, const FPoseSearchPoseMetadata& Metadata) const override
+		{
+			return !EnumHasAnyFlags(Metadata.Flags, EPoseSearchPoseFlags::BlockTransition);
+		}
+	};
+
+	FNonSelectableIdxPoseFilter NonSelectableIdxPoseFilter;
+	FBlockTransitionPoseFilter BlockTransitionPoseFilter;
+
+	TArray<const IPoseFilter*, TInlineAllocator<64>> AllPoseFilters;
+};
 
 } // namespace UE::PoseSearch
 
@@ -342,7 +393,7 @@ void UPoseSearchFeatureChannel::ComputeMeanDeviations(const Eigen::MatrixXd& Cen
 	using namespace UE::PoseSearch;
 
 	int32 DataOffset = ChannelDataOffset;
-	FFeatureVectorHelper::ComputeMeanDeviations(MinimumMeanDeviation, CenteredPoseMatrix, MeanDeviations, DataOffset, ChannelCardinality);
+	FFeatureVectorHelper::ComputeMeanDeviations(GetMinimumMeanDeviation(), CenteredPoseMatrix, MeanDeviations, DataOffset, ChannelCardinality);
 
 	check(DataOffset == ChannelDataOffset + ChannelCardinality);
 }
@@ -490,48 +541,44 @@ bool UPoseSearchSchema::BuildQuery(UE::PoseSearch::FSearchContext& SearchContext
 //////////////////////////////////////////////////////////////////////////
 // FPoseSearchIndexAsset
 // 
-const FPoseSearchIndexAsset* FPoseSearchIndex::FindAssetForPose(int32 PoseIdx) const
+const FPoseSearchIndexAsset& FPoseSearchIndex::GetAssetForPose(int32 PoseIdx) const
 {
-	auto Predicate = [PoseIdx](const FPoseSearchIndexAsset& Asset)
-	{
-		return Asset.IsPoseInRange(PoseIdx);
-	};
-	return Assets.FindByPredicate(Predicate);
+	const int32 AssetIndex = PoseMetadata[PoseIdx].AssetIndex;
+	return Assets[AssetIndex];
 }
 
-float FPoseSearchIndex::GetAssetTime(int32 PoseIdx, const FPoseSearchIndexAsset* Asset) const
+const FPoseSearchIndexAsset* FPoseSearchIndex::GetAssetForPoseSafe(int32 PoseIdx) const
 {
-	if (!Asset)
+	if (PoseMetadata.IsValidIndex(PoseIdx))
 	{
-		Asset = FindAssetForPose(PoseIdx);
-		if (!Asset)
+		const int32 AssetIndex = PoseMetadata[PoseIdx].AssetIndex;
+		if (Assets.IsValidIndex(AssetIndex))
 		{
-			UE_LOG(LogPoseSearch, Error, TEXT("Couldn't find asset for pose %i in database"), PoseIdx);
-			return -1.0f;
+			return &Assets[AssetIndex];
 		}
 	}
+	return nullptr;
+}
 
-	if (!Asset->IsPoseInRange(PoseIdx))
+float FPoseSearchIndex::GetAssetTime(int32 PoseIdx) const
+{
+	const FPoseSearchIndexAsset& Asset = GetAssetForPose(PoseIdx);
+
+	if (Asset.Type == ESearchIndexAssetType::Sequence)
 	{
-		UE_LOG(LogPoseSearch, Error, TEXT("Pose %i out of range in database"), PoseIdx);
-		return -1.0f;
-	}
+		const FFloatInterval SamplingRange = Asset.SamplingInterval;
 
-	if (Asset->Type == ESearchIndexAssetType::Sequence)
-	{
-		const FFloatInterval SamplingRange = Asset->SamplingInterval;
-
-		float AssetTime = FMath::Min(SamplingRange.Min + Schema->GetSamplingInterval() * (PoseIdx - Asset->FirstPoseIdx), SamplingRange.Max);
+		float AssetTime = FMath::Min(SamplingRange.Min + Schema->GetSamplingInterval() * (PoseIdx - Asset.FirstPoseIdx), SamplingRange.Max);
 		return AssetTime;
 	}
 	
-	if (Asset->Type == ESearchIndexAssetType::BlendSpace)
+	if (Asset.Type == ESearchIndexAssetType::BlendSpace)
 	{
-		const FFloatInterval SamplingRange = Asset->SamplingInterval;
+		const FFloatInterval SamplingRange = Asset.SamplingInterval;
 
 		// For BlendSpaces the AssetTime is in the range [0, 1] while the Sampling Range
 		// is in real time (seconds)
-		float AssetTime = FMath::Min(SamplingRange.Min + Schema->GetSamplingInterval() * (PoseIdx - Asset->FirstPoseIdx), SamplingRange.Max) / (Asset->NumPoses * Schema->GetSamplingInterval());
+		float AssetTime = FMath::Min(SamplingRange.Min + Schema->GetSamplingInterval() * (PoseIdx - Asset.FirstPoseIdx), SamplingRange.Max) / (Asset.NumPoses * Schema->GetSamplingInterval());
 		return AssetTime;
 	}
 	
@@ -564,6 +611,16 @@ TConstArrayView<float> FPoseSearchIndex::GetPoseValues(int32 PoseIdx) const
 	return MakeArrayView(&Values[ValueOffset], Schema->SchemaCardinality);
 }
 
+TConstArrayView<float> FPoseSearchIndex::GetPoseValuesSafe(int32 PoseIdx) const
+{
+	if (PoseIdx >= 0 && PoseIdx < NumPoses && Schema && Schema->SchemaCardinality >= 0)
+	{
+		const int32 ValueOffset = PoseIdx * Schema->SchemaCardinality;
+		return MakeArrayView(&Values[ValueOffset], Schema->SchemaCardinality);
+	}
+	return TConstArrayView<float>();
+}
+
 void FPoseSearchIndex::Reset()
 {
 	NumPoses = 0;
@@ -572,35 +629,35 @@ void FPoseSearchIndex::Reset()
 	Schema = nullptr;
 }
 
-float FPoseSearchIndex::ComputeMirrorMismatchAddend(int32 PoseIdx, UE::PoseSearch::FSearchContext& SearchContext) const
+FPoseSearchCost FPoseSearchIndex::ComparePoses(int32 PoseIdx, EPoseSearchBooleanRequest QueryMirrorRequest, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags, TConstArrayView<float> QueryValues) const
 {
-	if (SearchContext.QueryMirrorRequest != EPoseSearchBooleanRequest::Indifferent)
+	// base dissimilarity cost representing how the assiciated PoseIdx differ, in a weighted way, from the query pose (QueryValues)
+	const float DissimilarityCost = UE::PoseSearch::CompareFeatureVectors(GetPoseValues(PoseIdx), QueryValues, WeightsSqrt);
+	
+	// cost addend associated to a mismatch in mirror state between query and analyzed PoseIdx
+	float MirrorMismatchAddend = 0.f;
+	if (QueryMirrorRequest != EPoseSearchBooleanRequest::Indifferent)
 	{
-		const FPoseSearchIndexAsset* IndexAsset = FindAssetForPose(PoseIdx);
+		const FPoseSearchIndexAsset& IndexAsset = GetAssetForPose(PoseIdx);
 		const bool bMirroringMismatch =
-			(IndexAsset->bMirrored && SearchContext.QueryMirrorRequest == EPoseSearchBooleanRequest::FalseValue) ||
-			(!IndexAsset->bMirrored && SearchContext.QueryMirrorRequest == EPoseSearchBooleanRequest::TrueValue);
+			(IndexAsset.bMirrored && QueryMirrorRequest == EPoseSearchBooleanRequest::FalseValue) ||
+			(!IndexAsset.bMirrored && QueryMirrorRequest == EPoseSearchBooleanRequest::TrueValue);
 		if (bMirroringMismatch)
 		{
 			check(Schema);
-			return Schema->MirrorMismatchCostBias;
+			MirrorMismatchAddend = Schema->MirrorMismatchCostBias;
 		}
 	}
-	return 0.f;
-}
 
-float FPoseSearchIndex::ComputeNotifyAddend(int32 PoseIdx) const
-{
-	return PoseMetadata[PoseIdx].CostAddend;
-}
+	const FPoseSearchPoseMetadata& PoseIdxMetadata = PoseMetadata[PoseIdx];
+	
+	// cost addend associated to Schema->BaseCostBias or overriden by UAnimNotifyState_PoseSearchModifyCost
+	const float NotifyAddend = PoseIdxMetadata.CostAddend;
 
-float FPoseSearchIndex::ComputeContinuingPoseCostAddend(int32 PoseIdx, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags) const
-{
-	if (EnumHasAnyFlags(PoseComparisonFlags, UE::PoseSearch::EPoseComparisonFlags::ContinuingPose))
-	{
-		return PoseMetadata[PoseIdx].ContinuingPoseCostAddend;
-	}
-	return 0.f;
+	// cost addend associated to Schema->ContinuingPoseCostBias or overriden by UAnimNotifyState_PoseSearchOverrideContinuingPoseCostBias
+	const float ContinuingPoseCostAddend = EnumHasAnyFlags(PoseComparisonFlags, UE::PoseSearch::EPoseComparisonFlags::ContinuingPose) ? PoseIdxMetadata.ContinuingPoseCostAddend : 0.f;
+	
+	return FPoseSearchCost(DissimilarityCost, NotifyAddend, MirrorMismatchAddend, ContinuingPoseCostAddend);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -649,15 +706,13 @@ UE::PoseSearch::FSearchResult UPoseSearchSequenceMetaData::Search(UE::PoseSearch
 	}
 
 	Schema->BuildQuery(SearchContext, Result.ComposedQuery);
-	TArrayView<const float> QueryValues = Result.ComposedQuery.GetValues();
+	TConstArrayView<float> QueryValues = Result.ComposedQuery.GetValues();
 
 	if (!ensure(QueryValues.Num() == SearchIndex.Schema->SchemaCardinality))
 	{
 		return Result;
 	}
 
-	FPoseSearchCost BestPoseCost;
-	int32 BestPoseIdx = INDEX_NONE;
 	for (const FPoseSearchIndexAsset& Asset : SearchIndex.Assets)
 	{
 		const int32 EndIndex = Asset.FirstPoseIdx + Asset.NumPoses;
@@ -670,44 +725,28 @@ UE::PoseSearch::FSearchResult UPoseSearchSequenceMetaData::Search(UE::PoseSearch
 				continue;
 			}
 
-			const FPoseSearchCost PoseCost = ComparePoses(PoseIdx, EPoseComparisonFlags::ContinuingPose, QueryValues);
-			if (PoseCost < BestPoseCost)
+			const FPoseSearchCost PoseCost = SearchIndex.ComparePoses(PoseIdx, EPoseSearchBooleanRequest::Indifferent, EPoseComparisonFlags::ContinuingPose, QueryValues);
+			if (PoseCost < Result.PoseCost)
 			{
-				BestPoseCost = PoseCost;
-				BestPoseIdx = PoseIdx;
+				Result.PoseCost = PoseCost;
+				Result.PoseIdx = PoseIdx;
 			}
 		}
 	}
 
-	Result.PoseCost = BestPoseCost;
-	Result.PoseIdx = BestPoseIdx;
-	Result.SearchIndexAsset = SearchIndex.FindAssetForPose(BestPoseIdx);
-	Result.AssetTime = SearchIndex.GetAssetTime(BestPoseIdx, Result.SearchIndexAsset);
-	Result.Database = nullptr;
+	if (Result.PoseIdx != INDEX_NONE)
+	{
+		Result.AssetTime = SearchIndex.GetAssetTime(Result.PoseIdx);
+	}
 
+#if ENABLE_DRAW_DEBUG
 	DrawFeatureVector(SearchContext.DebugDrawParams, Result.PoseIdx);
 	
 	EnumAddFlags(SearchContext.DebugDrawParams.Flags, EDebugDrawFlags::DrawQuery);
 	DrawFeatureVector(SearchContext.DebugDrawParams, QueryValues);
+#endif // ENABLE_DRAW_DEBUG
 
 	return Result;
-}
-
-FPoseSearchCost UPoseSearchSequenceMetaData::ComparePoses(
-	int32 PoseIdx,
-	UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags,
-	TConstArrayView<float> QueryValues) const
-{
-	using namespace UE::PoseSearch;
-
-	const float DissimilarityCost = CompareFeatureVectors(SearchIndex.GetPoseValues(PoseIdx), QueryValues);
-
-	// @todo: shouldn't we include MirrorMismatchAddend as well?
-	const float MirrorMismatchAddend = 0.f; // SearchIndex.ComputeMirrorMismatchAddend(PoseIdx, SearchContext);
-	const float NotifyAddend = SearchIndex.ComputeNotifyAddend(PoseIdx);
-	const float ContinuingPoseCostAddend = SearchIndex.ComputeContinuingPoseCostAddend(PoseIdx, PoseComparisonFlags);
-
-	return FPoseSearchCost(DissimilarityCost, NotifyAddend, MirrorMismatchAddend, ContinuingPoseCostAddend);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -739,42 +778,38 @@ const FPoseSearchIndex* UPoseSearchDatabase::GetSearchIndex() const
 	return PrivateDerivedData ? &PrivateDerivedData->SearchIndex : nullptr;
 }
 
-const FPoseSearchIndex* UPoseSearchDatabase::GetSearchIndexSafe() const
+const FPoseSearchIndex* UPoseSearchDatabase::GetSearchIndexSafe(bool bVerboseLogging) const
 {
 	const FPoseSearchIndex* SearchIndex = GetSearchIndex();
 
 	if (!SearchIndex || !SearchIndex->IsValid() || SearchIndex->IsEmpty())
 	{
-		if (!Schema)
+		if (bVerboseLogging)
 		{
-			UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: no Schema!"), *GetName());
+			if (!Schema)
+			{
+				UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: no Schema!"), *GetName());
+			}
+			else if (!Schema->IsValid())
+			{
+				UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: Schema %s is invalid"), *GetName(), *Schema->GetName());
+			}
+			else
+			{
+				UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: is there any unsaved modified asset?"), *GetName());
+			}
 		}
-		else if (!Schema->IsValid())
-		{
-			UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: Schema %s is invalid"), *GetName(), *Schema->GetName());
-		}
-		else
-		{
-			UE_LOG(LogAnimation, Warning, TEXT("UPoseSearchDatabase %s failed to index. Reason: is there any unsaved modified asset?"), *GetName());
-		}
-
 		SearchIndex = nullptr;
 	}
 
 	return SearchIndex;
 }
 
-float UPoseSearchDatabase::GetAssetTime(int32 PoseIdx, const FPoseSearchIndexAsset* Asset) const
-{
-	const float AssetTime = GetSearchIndex()->GetAssetTime(PoseIdx, Asset);
-	return AssetTime;
-}
-
-int32 UPoseSearchDatabase::GetPoseIndexFromTime(float Time, const FPoseSearchIndexAsset* SearchIndexAsset) const
+int32 UPoseSearchDatabase::GetPoseIndexFromTime(float Time, const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
 	const bool bIsLooping = IsSourceAssetLooping(SearchIndexAsset);
-	const FFloatInterval& Range = SearchIndexAsset->SamplingInterval;
-	const bool bHasPoseIndex = SearchIndexAsset->FirstPoseIdx != INDEX_NONE && SearchIndexAsset->NumPoses > 0 && (bIsLooping || Range.Contains(Time));
+	const FFloatInterval& Range = SearchIndexAsset.SamplingInterval;
+	const bool bHasPoseIndex = SearchIndexAsset.FirstPoseIdx != INDEX_NONE && SearchIndexAsset.NumPoses > 0 && (bIsLooping || Range.Contains(Time));
 	if (bHasPoseIndex)
 	{
 		int32 PoseOffset = FMath::RoundToInt(Schema->SampleRate * (Time - Range.Min));
@@ -783,33 +818,33 @@ int32 UPoseSearchDatabase::GetPoseIndexFromTime(float Time, const FPoseSearchInd
 		{
 			if (bIsLooping)
 			{
-				PoseOffset = (PoseOffset % SearchIndexAsset->NumPoses) + SearchIndexAsset->NumPoses;
+				PoseOffset = (PoseOffset % SearchIndexAsset.NumPoses) + SearchIndexAsset.NumPoses;
 			}
 			else
 			{
 				PoseOffset = 0;
 			}
 		}
-		else if (PoseOffset >= SearchIndexAsset->NumPoses)
+		else if (PoseOffset >= SearchIndexAsset.NumPoses)
 		{
 			if (bIsLooping)
 			{
-				PoseOffset = PoseOffset % SearchIndexAsset->NumPoses;
+				PoseOffset = PoseOffset % SearchIndexAsset.NumPoses;
 			}
 			else
 			{
-				PoseOffset = SearchIndexAsset->NumPoses - 1;
+				PoseOffset = SearchIndexAsset.NumPoses - 1;
 			}
 		}
 
-		int32 PoseIdx = SearchIndexAsset->FirstPoseIdx + PoseOffset;
+		int32 PoseIdx = SearchIndexAsset.FirstPoseIdx + PoseOffset;
 		return PoseIdx;
 	}
 
 	return INDEX_NONE;
 }
 
-bool UPoseSearchDatabase::GetPoseIndicesAndLerpValueFromTime(float Time, const FPoseSearchIndexAsset* SearchIndexAsset, int32& PrevPoseIdx, int32& PoseIdx, int32& NextPoseIdx, float& LerpValue) const
+bool UPoseSearchDatabase::GetPoseIndicesAndLerpValueFromTime(float Time, const FPoseSearchIndexAsset& SearchIndexAsset, int32& PrevPoseIdx, int32& PoseIdx, int32& NextPoseIdx, float& LerpValue) const
 {
 	PoseIdx = GetPoseIndexFromTime(Time, SearchIndexAsset);
 	if (PoseIdx == INDEX_NONE)
@@ -820,7 +855,7 @@ bool UPoseSearchDatabase::GetPoseIndicesAndLerpValueFromTime(float Time, const F
 		return false;
 	}
 
-	const FFloatInterval& Range = SearchIndexAsset->SamplingInterval;
+	const FFloatInterval& Range = SearchIndexAsset.SamplingInterval;
 	const float FloatPoseOffset = Schema->SampleRate * (Time - Range.Min);
 	const int32 PoseOffset = FMath::RoundToInt(FloatPoseOffset);
 	LerpValue = FloatPoseOffset - float(PoseOffset);
@@ -845,60 +880,60 @@ bool UPoseSearchDatabase::GetPoseIndicesAndLerpValueFromTime(float Time, const F
 	return true;
 }
 
-const FPoseSearchDatabaseAnimationAssetBase& UPoseSearchDatabase::GetAnimationSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const
+const FPoseSearchDatabaseAnimationAssetBase& UPoseSearchDatabase::GetAnimationSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::Sequence)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::Sequence)
 	{
-		return Sequences[SearchIndexAsset->SourceAssetIdx];
+		return Sequences[SearchIndexAsset.SourceAssetIdx];
 	}
 
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace)
 	{
-		return BlendSpaces[SearchIndexAsset->SourceAssetIdx];
+		return BlendSpaces[SearchIndexAsset.SourceAssetIdx];
 	}
 
 	checkNoEntry();
-	return Sequences[SearchIndexAsset->SourceAssetIdx];
+	return Sequences[SearchIndexAsset.SourceAssetIdx];
 }
 
-const FPoseSearchDatabaseSequence& UPoseSearchDatabase::GetSequenceSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const
+const FPoseSearchDatabaseSequence& UPoseSearchDatabase::GetSequenceSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
-	check(SearchIndexAsset->Type == ESearchIndexAssetType::Sequence);
-	return Sequences[SearchIndexAsset->SourceAssetIdx];
+	check(SearchIndexAsset.Type == ESearchIndexAssetType::Sequence);
+	return Sequences[SearchIndexAsset.SourceAssetIdx];
 }
 
-const FPoseSearchDatabaseBlendSpace& UPoseSearchDatabase::GetBlendSpaceSourceAsset(const FPoseSearchIndexAsset* SearchIndexAsset) const
+const FPoseSearchDatabaseBlendSpace& UPoseSearchDatabase::GetBlendSpaceSourceAsset(const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
-	check(SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace);
-	return BlendSpaces[SearchIndexAsset->SourceAssetIdx];
+	check(SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace);
+	return BlendSpaces[SearchIndexAsset.SourceAssetIdx];
 }
 
-const bool UPoseSearchDatabase::IsSourceAssetLooping(const FPoseSearchIndexAsset* SearchIndexAsset) const
+const bool UPoseSearchDatabase::IsSourceAssetLooping(const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::Sequence)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::Sequence)
 	{
-		return GetSequenceSourceAsset(SearchIndexAsset).Sequence->bLoop;
+		return Sequences[SearchIndexAsset.SourceAssetIdx].Sequence->bLoop;
 	}
 
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace)
 	{
-		return GetBlendSpaceSourceAsset(SearchIndexAsset).BlendSpace->bLoop;
+		return BlendSpaces[SearchIndexAsset.SourceAssetIdx].BlendSpace->bLoop;
 	}
 	
 	checkNoEntry();
 	return false;
 }
 
-const FString UPoseSearchDatabase::GetSourceAssetName(const FPoseSearchIndexAsset* SearchIndexAsset) const
+const FString UPoseSearchDatabase::GetSourceAssetName(const FPoseSearchIndexAsset& SearchIndexAsset) const
 {
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::Sequence)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::Sequence)
 	{
-		return GetSequenceSourceAsset(SearchIndexAsset).Sequence->GetName();
+		return Sequences[SearchIndexAsset.SourceAssetIdx].Sequence->GetName();
 	}
 	
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace)
+	if (SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace)
 	{
-		return GetBlendSpaceSourceAsset(SearchIndexAsset).BlendSpace->GetName();
+		return BlendSpaces[SearchIndexAsset.SourceAssetIdx].BlendSpace->GetName();
 	}
 	
 	checkNoEntry();
@@ -917,7 +952,7 @@ static void AddRawSequenceToWriter(UAnimSequence* Sequence, UE::PoseSearch::FDer
 	if (Sequence)
 	{
 		FName SequenceName = Sequence->GetFName();
-		FGuid SequenceGuid = Sequence->GetRawDataGuid();
+		FGuid SequenceGuid = Sequence->GetDataModel()->GenerateGuid();
 		KeyBuilder << SequenceName;
 		KeyBuilder << SequenceGuid;
 		KeyBuilder << Sequence->bLoop;
@@ -1035,7 +1070,7 @@ bool UPoseSearchDatabase::IsValidForIndexing() const
 			}
 
 			const USkeleton* SeqSkeleton = DbSequence.Sequence->GetSkeleton();
-			if (!SeqSkeleton || !SeqSkeleton->IsCompatible(Schema->Skeleton))
+			if (!SeqSkeleton)
 			{
 				bValid = false;
 				break;
@@ -1051,7 +1086,7 @@ bool UPoseSearchDatabase::IsValidForIndexing() const
 			}
 
 			const USkeleton* SeqSkeleton = DbBlendSpace.BlendSpace->GetSkeleton();
-			if (!SeqSkeleton || !SeqSkeleton->IsCompatible(Schema->Skeleton))
+			if (!SeqSkeleton)
 			{
 				bValid = false;
 				break;
@@ -1173,46 +1208,47 @@ UAnimationAsset* FPoseSearchDatabaseBlendSpace::GetAnimationAsset() const
 
 bool FPoseSearchDatabaseBlendSpace::IsLooping() const
 {
+	check(BlendSpace);
+
 	return BlendSpace->bLoop;
 }
 
-void FPoseSearchDatabaseBlendSpace::GetBlendSpaceParameterSampleRanges(
-	int32& HorizontalBlendNum,
-	int32& VerticalBlendNum,
-	float& HorizontalBlendMin,
-	float& HorizontalBlendMax,
-	float& VerticalBlendMin,
-	float& VerticalBlendMax) const
+void FPoseSearchDatabaseBlendSpace::GetBlendSpaceParameterSampleRanges(int32& HorizontalBlendNum, int32& VerticalBlendNum) const
 {
+	check(BlendSpace);
+
 	HorizontalBlendNum = bUseGridForSampling ? BlendSpace->GetBlendParameter(0).GridNum + 1 : FMath::Max(NumberOfHorizontalSamples, 1);
-	VerticalBlendNum = bUseGridForSampling ? BlendSpace->GetBlendParameter(1).GridNum + 1 : FMath::Max(NumberOfVerticalSamples, 1);
+	VerticalBlendNum = BlendSpace->IsA<UBlendSpace1D>() ? 1 : bUseGridForSampling ? BlendSpace->GetBlendParameter(1).GridNum + 1 : FMath::Max(NumberOfVerticalSamples, 1);
 
 	check(HorizontalBlendNum >= 1 && VerticalBlendNum >= 1);
-
-	HorizontalBlendMin = BlendSpace->GetBlendParameter(0).Min;
-	HorizontalBlendMax = BlendSpace->GetBlendParameter(0).Max;
-
-	VerticalBlendMin = BlendSpace->GetBlendParameter(1).Min;
-	VerticalBlendMax = BlendSpace->GetBlendParameter(1).Max;
-
-	if (BlendSpace->IsA<UBlendSpace1D>())
-	{
-		VerticalBlendNum = 1;
-		VerticalBlendMin = 0.0;
-		VerticalBlendMax = 0.0;
-	}
 }
 
-static FVector BlendParameterForSampleRanges(
-	int32 HorizontalBlendIndex,
-	int32 VerticalBlendIndex,
-	int32 HorizontalBlendNum,
-	int32 VerticalBlendNum,
-	float HorizontalBlendMin,
-	float HorizontalBlendMax,
-	float VerticalBlendMin,
-	float VerticalBlendMax)
+FVector FPoseSearchDatabaseBlendSpace::BlendParameterForSampleRanges(int32 HorizontalBlendIndex, int32 VerticalBlendIndex) const
 {
+	check(BlendSpace);
+
+	const bool bWrapInputOnHorizontalAxis = BlendSpace->GetBlendParameter(0).bWrapInput;
+	const bool bWrapInputOnVerticalAxis = BlendSpace->GetBlendParameter(1).bWrapInput;
+
+	int32 HorizontalBlendNum, VerticalBlendNum;
+	GetBlendSpaceParameterSampleRanges(HorizontalBlendNum, VerticalBlendNum);
+
+	if (bWrapInputOnHorizontalAxis)
+	{
+		++HorizontalBlendNum;
+	}
+
+	if (bWrapInputOnVerticalAxis)
+	{
+		++VerticalBlendNum;
+	}
+
+	const float HorizontalBlendMin = BlendSpace->GetBlendParameter(0).Min;
+	const float HorizontalBlendMax = BlendSpace->GetBlendParameter(0).Max;
+
+	const float VerticalBlendMin = BlendSpace->GetBlendParameter(1).Min;
+	const float VerticalBlendMax = BlendSpace->GetBlendParameter(1).Max;
+
 	return FVector(
 		HorizontalBlendNum > 1 ? 
 			HorizontalBlendMin + (HorizontalBlendMax - HorizontalBlendMin) * 
@@ -1295,29 +1331,15 @@ bool UPoseSearchDatabase::TryInitSearchIndexAssets(FPoseSearchIndex& OutSearchIn
 			BlendSpace.MirrorOption == EPoseSearchMirrorOption::UnmirroredAndMirrored;
 
 		int32 HorizontalBlendNum, VerticalBlendNum;
-		float HorizontalBlendMin, HorizontalBlendMax, VerticalBlendMin, VerticalBlendMax;
+		BlendSpace.GetBlendSpaceParameterSampleRanges(HorizontalBlendNum, VerticalBlendNum);
 
-		BlendSpace.GetBlendSpaceParameterSampleRanges(
-			HorizontalBlendNum,
-			VerticalBlendNum,
-			HorizontalBlendMin,
-			HorizontalBlendMax,
-			VerticalBlendMin,
-			VerticalBlendMax);
-
+		const bool bWrapInputOnHorizontalAxis = BlendSpace.BlendSpace->GetBlendParameter(0).bWrapInput;
+		const bool bWrapInputOnVerticalAxis = BlendSpace.BlendSpace->GetBlendParameter(1).bWrapInput;
 		for (int32 HorizontalIndex = 0; HorizontalIndex < HorizontalBlendNum; HorizontalIndex++)
 		{
 			for (int32 VerticalIndex = 0; VerticalIndex < VerticalBlendNum; VerticalIndex++)
 			{
-				FVector BlendParameters = BlendParameterForSampleRanges(
-					HorizontalIndex,
-					VerticalIndex,
-					HorizontalBlendNum,
-					VerticalBlendNum,
-					HorizontalBlendMin,
-					HorizontalBlendMax,
-					VerticalBlendMin,
-					VerticalBlendMax);
+				const FVector BlendParameters = BlendSpace.BlendParameterForSampleRanges(HorizontalIndex, VerticalIndex);
 						
 				int32 TriangulationIndex = 0;
 				BlendSpace.BlendSpace->GetSamplesFromBlendInput(BlendParameters, BlendSamples, TriangulationIndex, true);
@@ -1606,19 +1628,6 @@ bool UPoseSearchDatabase::IsCachedCookedPlatformDataLoaded(const ITargetPlatform
 
 #endif // WITH_EDITOR
 
-FPoseSearchCost UPoseSearchDatabase::ComparePoses(UE::PoseSearch::FSearchContext& SearchContext, int32 PoseIdx, UE::PoseSearch::EPoseComparisonFlags PoseComparisonFlags, TConstArrayView<float> QueryValues) const
-{
-	const FPoseSearchIndex* SearchIndex = GetSearchIndex();
-	check(SearchIndex);
-
-	const float DissimilarityCost = UE::PoseSearch::CompareFeatureVectors(SearchIndex->GetPoseValues(PoseIdx), QueryValues, SearchIndex->WeightsSqrt);
-	const float MirrorMismatchAddend = SearchIndex->ComputeMirrorMismatchAddend(PoseIdx, SearchContext);
-	const float NotifyAddend = SearchIndex->ComputeNotifyAddend(PoseIdx);
-	const float ContinuingPoseCostAddend = SearchIndex->ComputeContinuingPoseCostAddend(PoseIdx, PoseComparisonFlags);
-
-	return FPoseSearchCost(DissimilarityCost, NotifyAddend, MirrorMismatchAddend, ContinuingPoseCostAddend);
-}
-
 UE::PoseSearch::FSearchResult UPoseSearchDatabase::Search(UE::PoseSearch::FSearchContext& SearchContext) const
 {
 	using namespace UE::PoseSearch;
@@ -1679,7 +1688,6 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 	const uint32 ClampedNumberOfPrincipalComponents = GetNumberOfPrincipalComponents();
 	const uint32 ClampedKDTreeQueryNumNeighbors = FMath::Clamp<uint32>(KDTreeQueryNumNeighbors, 1, SearchIndex->NumPoses);
 
-
 	//stack allocated temporaries
 	TArrayView<size_t> ResultIndexes((size_t*)FMemory_Alloca((ClampedKDTreeQueryNumNeighbors + 1) * sizeof(size_t)), ClampedKDTreeQueryNumNeighbors + 1);
 	TArrayView<float> ResultDistanceSqr((float*)FMemory_Alloca((ClampedKDTreeQueryNumNeighbors + 1) * sizeof(float)), ClampedKDTreeQueryNumNeighbors + 1);
@@ -1687,10 +1695,6 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 	RowMajorVectorMap CenteredQueryValues((float*)FMemory_Alloca(NumDimensions * sizeof(float)), 1, NumDimensions);
 	RowMajorVectorMap ProjectedQueryValues((float*)FMemory_Alloca(ClampedNumberOfPrincipalComponents * sizeof(float)), 1, ClampedNumberOfPrincipalComponents);
 	
-	constexpr int NonSelectableIdxDataSize = 128;
-	size_t* NonSelectableIdxData((size_t*)FMemory_Alloca(NonSelectableIdxDataSize * sizeof(size_t)));
-	TArrayView<size_t> NonSelectableIdxBuffer(NonSelectableIdxData, NonSelectableIdxDataSize);
-
 	// KDTree in PCA space search
 	if (PoseSearchMode == EPoseSearchMode::PCAKDTree_Validate)
 	{
@@ -1700,7 +1704,7 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 		for (int32 PoseIdx = 0; PoseIdx < SearchIndex->NumPoses; ++PoseIdx)
 		{
 			FKDTree::KNNResultSet ResultSet(ClampedKDTreeQueryNumNeighbors, ResultIndexes, ResultDistanceSqr);
-			TArrayView<const float> PoseValues = SearchIndex->GetPoseValues(PoseIdx);
+			TConstArrayView<float> PoseValues = SearchIndex->GetPoseValues(PoseIdx);
 
 			const RowMajorVectorMapConst Mean(SearchIndex->Mean.GetData(), 1, NumDimensions);
 			const ColMajorMatrixMapConst PCAProjectionMatrix(SearchIndex->PCAProjectionMatrix.GetData(), NumDimensions, ClampedNumberOfPrincipalComponents);
@@ -1727,15 +1731,15 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 
 	SearchContext.GetOrBuildQuery(this, Result.ComposedQuery);
 
-	TArrayView<const float> QueryValues = Result.ComposedQuery.GetValues();
+	TConstArrayView<float> QueryValues = Result.ComposedQuery.GetValues();
 
 	const bool IsCurrentResultFromThisDatabase = SearchContext.IsCurrentResultFromDatabase(this);
 
 	// evaluating the continuing pose only if it hasn't already being evaluated and the related animation can advance
-	if (IsCurrentResultFromThisDatabase && SearchContext.bCanAdvance && !Result.ContinuingPoseCost.IsValid())
+	if (!SearchContext.bForceInterrupt && IsCurrentResultFromThisDatabase && SearchContext.bCanAdvance && !Result.ContinuingPoseCost.IsValid())
 	{
 		Result.PoseIdx = SearchContext.CurrentResult.PoseIdx;
-		Result.PoseCost = ComparePoses(SearchContext, Result.PoseIdx, EPoseComparisonFlags::ContinuingPose, QueryValues);
+		Result.PoseCost = SearchIndex->ComparePoses(Result.PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::ContinuingPose, QueryValues);
 		Result.ContinuingPoseCost = Result.PoseCost;
 
 		if (GetSkipSearchIfPossible())
@@ -1748,8 +1752,8 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 	// there's no point in performing the search if CurrentBestTotalCost is already better than that
 	if (SearchContext.GetCurrentBestTotalCost() > SearchIndex->MinCostAddend)
 	{
-		TConstArrayView<size_t> NonSelectableIdx = PopulateNonSelectableIdx(NonSelectableIdxBuffer, SearchContext, this, QueryValues);
-		const RowMajorVectorMapConst MapWeightsSqrt(SearchIndex->WeightsSqrt.GetData(), 1, NumDimensions);
+		FNonSelectableIdx NonSelectableIdx;
+		PopulateNonSelectableIdx(NonSelectableIdx, SearchContext, this, QueryValues);
 		FKDTree::KNNResultSet ResultSet(ClampedKDTreeQueryNumNeighbors, ResultIndexes, ResultDistanceSqr, NonSelectableIdx);
 
 		check(QueryValues.Num() == NumDimensions);
@@ -1759,37 +1763,35 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 
 		// transforming query values into PCA space to query the KDTree
 		const RowMajorVectorMapConst QueryValuesMap(QueryValues.GetData(), 1, NumDimensions);
+		const RowMajorVectorMapConst MapWeightsSqrt(SearchIndex->WeightsSqrt.GetData(), 1, NumDimensions);
 		WeightedQueryValues = QueryValuesMap.array() * MapWeightsSqrt.array();
 		CenteredQueryValues.noalias() = WeightedQueryValues - Mean;
 		ProjectedQueryValues.noalias() = CenteredQueryValues * PCAProjectionMatrix;
 
 		SearchIndex->KDTree.FindNeighbors(ResultSet, ProjectedQueryValues.data());
 
+		// NonSelectableIdx are already filtered out inside the kdtree search
+		const FPoseFilters PoseFilters(SearchIndex->Schema, TConstArrayView<size_t>(), SearchIndex->OverallFlags);
 		for (size_t ResultIndex = 0; ResultIndex < ResultSet.Num(); ++ResultIndex)
 		{
 			const int32 PoseIdx = ResultIndexes[ResultIndex];
-
-			const FPoseSearchPoseMetadata& Metadata = SearchIndex->PoseMetadata[PoseIdx];
-
-			if (EnumHasAnyFlags(Metadata.Flags, EPoseSearchPoseFlags::BlockTransition))
-			{
+			if (PoseFilters.AreFiltersValid(SearchIndex, QueryValues, PoseIdx, SearchIndex->PoseMetadata[PoseIdx]
 #if UE_POSE_SEARCH_TRACE_ENABLED
-				const FPoseSearchCost PoseCost = ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
-				SearchContext.BestCandidates.Add(PoseCost, PoseIdx, this, EPoseCandidateFlags::DiscardedBy_BlockTransition);
+				, SearchContext, this
 #endif
-				continue;
-			}
-
-			const FPoseSearchCost PoseCost = ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
-			if (PoseCost < Result.PoseCost)
+			))
 			{
-				Result.PoseCost = PoseCost;
-				Result.PoseIdx = PoseIdx;
-			}
+				const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
+				if (PoseCost < Result.PoseCost)
+				{
+					Result.PoseCost = PoseCost;
+					Result.PoseIdx = PoseIdx;
+				}
 
 #if UE_POSE_SEARCH_TRACE_ENABLED
-			SearchContext.BestCandidates.Add(PoseCost, PoseIdx, this, EPoseCandidateFlags::Valid_Pose);
+				SearchContext.BestCandidates.Add(PoseCost, PoseIdx, this, EPoseCandidateFlags::Valid_Pose);
 #endif
+			}
 		}
 
 		if (GetSkipSearchIfPossible() && Result.PoseCost.IsValid())
@@ -1797,12 +1799,19 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchPCAKDTree(UE::PoseSearc
 			SearchContext.UpdateCurrentBestCost(Result.PoseCost);
 		}
 	}
+	else
+	{
+#if UE_POSE_SEARCH_TRACE_ENABLED
+		// calling just for reporting non selectable poses
+		FNonSelectableIdx NonSelectableIdx;
+		PopulateNonSelectableIdx(NonSelectableIdx, SearchContext, this, QueryValues);
+#endif
+	}
 
 	// finalizing Result properties
 	if (Result.PoseIdx != INDEX_NONE)
 	{
-		Result.SearchIndexAsset = SearchIndex->FindAssetForPose(Result.PoseIdx);
-		Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx, Result.SearchIndexAsset);
+		Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx);
 		Result.Database = this;
 #if WITH_EDITOR
 		Result.SearchIndexHash = GetSearchIndexHash();
@@ -1825,16 +1834,16 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchBruteForce(UE::PoseSear
 	check(SearchIndex);
 
 	SearchContext.GetOrBuildQuery(this, Result.ComposedQuery);
-	TArrayView<const float> QueryValues = Result.ComposedQuery.GetValues();
+	TConstArrayView<float> QueryValues = Result.ComposedQuery.GetValues();
 
 	const bool IsCurrentResultFromThisDatabase = SearchContext.IsCurrentResultFromDatabase(this);
-	if (IsCurrentResultFromThisDatabase)
+	if (!SearchContext.bForceInterrupt && IsCurrentResultFromThisDatabase)
 	{
 		// evaluating the continuing pose only if it hasn't already being evaluated and the related animation can advance
 		if (SearchContext.bCanAdvance && !Result.ContinuingPoseCost.IsValid())
 		{
 			Result.PoseIdx = SearchContext.CurrentResult.PoseIdx;
-			Result.PoseCost = ComparePoses(SearchContext, Result.PoseIdx, EPoseComparisonFlags::ContinuingPose, QueryValues);
+			Result.PoseCost = SearchIndex->ComparePoses(Result.PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::ContinuingPose, QueryValues);
 			Result.ContinuingPoseCost = Result.PoseCost;
 
 			if (GetSkipSearchIfPossible())
@@ -1844,39 +1853,24 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchBruteForce(UE::PoseSear
 		}
 	}
 
-	constexpr int NonSelectableIdxDataSize = 128;
-	size_t* NonSelectableIdxData((size_t*)FMemory_Alloca(NonSelectableIdxDataSize * sizeof(size_t)));
-	TArrayView<size_t> NonSelectableIdxBuffer(NonSelectableIdxData, NonSelectableIdxDataSize);
-	TConstArrayView<size_t> NonSelectableIdx = PopulateNonSelectableIdx(NonSelectableIdxBuffer, SearchContext, this, QueryValues);
-	check(Algo::IsSorted(NonSelectableIdx));
-
 	// since any PoseCost calculated here is at least SearchIndex->MinCostAddend,
 	// there's no point in performing the search if CurrentBestTotalCost is already better than that
 	if (SearchContext.GetCurrentBestTotalCost() > SearchIndex->MinCostAddend)
 	{
-		for (const FPoseSearchIndexAsset& Asset : SearchIndex->Assets)
+		FNonSelectableIdx NonSelectableIdx;
+		PopulateNonSelectableIdx(NonSelectableIdx, SearchContext, this, QueryValues);
+		check(Algo::IsSorted(NonSelectableIdx));
+
+		const FPoseFilters PoseFilters(SearchIndex->Schema, NonSelectableIdx, SearchIndex->OverallFlags);
+		for (int32 PoseIdx = 0; PoseIdx < SearchIndex->NumPoses; ++PoseIdx)
 		{
-			const bool CheckForNonSelectableIdx = IsCurrentResultFromThisDatabase && (&Asset == SearchContext.CurrentResult.SearchIndexAsset);
-			const int32 EndIndex = Asset.FirstPoseIdx + Asset.NumPoses;
-			for (int32 PoseIdx = Asset.FirstPoseIdx; PoseIdx < EndIndex; ++PoseIdx)
-			{
-				const FPoseSearchPoseMetadata& Metadata = SearchIndex->PoseMetadata[PoseIdx];
-
-				if (EnumHasAnyFlags(Metadata.Flags, EPoseSearchPoseFlags::BlockTransition))
-				{
+			if (PoseFilters.AreFiltersValid(SearchIndex, QueryValues, PoseIdx, SearchIndex->PoseMetadata[PoseIdx]
 #if UE_POSE_SEARCH_TRACE_ENABLED
-					const FPoseSearchCost PoseCost = ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
-					SearchContext.BestCandidates.Add(PoseCost, PoseIdx, this, EPoseCandidateFlags::DiscardedBy_BlockTransition);
+				, SearchContext, this
 #endif
-					continue;
-				}
-
-				if (CheckForNonSelectableIdx && Algo::BinarySearch(NonSelectableIdx, PoseIdx) != INDEX_NONE)
-				{
-					continue;
-				}
-
-				const FPoseSearchCost PoseCost = ComparePoses(SearchContext, PoseIdx, EPoseComparisonFlags::None, QueryValues);
+			))
+			{
+				const FPoseSearchCost PoseCost = SearchIndex->ComparePoses(PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::None, QueryValues);
 				if (PoseCost < Result.PoseCost)
 				{
 					Result.PoseCost = PoseCost;
@@ -1897,12 +1891,19 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabase::SearchBruteForce(UE::PoseSear
 			SearchContext.UpdateCurrentBestCost(Result.PoseCost);
 		}
 	}
+	else
+	{
+#if UE_POSE_SEARCH_TRACE_ENABLED
+		// calling just for reporting non selectable poses
+		FNonSelectableIdx NonSelectableIdx;
+		PopulateNonSelectableIdx(NonSelectableIdx, SearchContext, this, QueryValues);
+#endif
+	}
 
 	// finalizing Result properties
 	if (Result.PoseIdx != INDEX_NONE)
 	{
-		Result.SearchIndexAsset = SearchIndex->FindAssetForPose(Result.PoseIdx);
-		Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx, Result.SearchIndexAsset);
+		Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx);
 		Result.Database = this;
 #if WITH_EDITOR
 		Result.SearchIndexHash = GetSearchIndexHash();
@@ -1945,18 +1946,14 @@ UE::PoseSearch::FSearchResult UPoseSearchDatabaseSet::Search(UE::PoseSearch::FSe
 		{
 			SearchContext.GetOrBuildQuery(Database, Result.ComposedQuery);
 
-			TArrayView<const float> QueryValues = Result.ComposedQuery.GetValues();
-
-			const FPoseSearchIndexAsset* PoseSearchIndexAsset = SearchIndex->FindAssetForPose(SearchContext.CurrentResult.PoseIdx);
-			check(PoseSearchIndexAsset);
+			TConstArrayView<float> QueryValues = Result.ComposedQuery.GetValues();
 
 			Result.PoseIdx = SearchContext.CurrentResult.PoseIdx;
-			Result.PoseCost = Database->ComparePoses(SearchContext, Result.PoseIdx, EPoseComparisonFlags::ContinuingPose, QueryValues);
+			Result.PoseCost = SearchIndex->ComparePoses(Result.PoseIdx, SearchContext.QueryMirrorRequest, EPoseComparisonFlags::ContinuingPose, QueryValues);
 			Result.ContinuingPoseCost = Result.PoseCost;
 			ContinuingCost = Result.PoseCost;
 
-			Result.SearchIndexAsset = SearchIndex->FindAssetForPose(Result.PoseIdx);
-			Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx, Result.SearchIndexAsset);
+			Result.AssetTime = SearchIndex->GetAssetTime(Result.PoseIdx);
 			Result.Database = Database;
 #if WITH_EDITOR
 			Result.SearchIndexHash = Database->GetSearchIndexHash();
@@ -2030,40 +2027,14 @@ void FPoseSearchFeatureVectorBuilder::Init(const UPoseSearchSchema* InSchema)
 {
 	check(InSchema && InSchema->IsValid());
 	Schema = InSchema;
-	ResetFeatures();
+	Values.Reset();
+	Values.SetNumZeroed(Schema->SchemaCardinality);
 }
 
 void FPoseSearchFeatureVectorBuilder::Reset()
 {
 	Schema = nullptr;
-	Values.Reset(0);
-}
-
-void FPoseSearchFeatureVectorBuilder::ResetFeatures()
-{
-	Values.Reset(0);
-	Values.SetNumZeroed(Schema->SchemaCardinality);
-}
-
-void FPoseSearchFeatureVectorBuilder::CopyFromSearchIndex(const FPoseSearchIndex& SearchIndex, int32 PoseIdx)
-{
-	check(Schema == SearchIndex.Schema);
-	Values = SearchIndex.GetPoseValues(PoseIdx);
-}
-
-bool FPoseSearchFeatureVectorBuilder::IsInitialized() const
-{
-	return (Schema != nullptr) && (Values.Num() == Schema->SchemaCardinality);
-}
-
-bool FPoseSearchFeatureVectorBuilder::IsInitializedForSchema(const UPoseSearchSchema* InSchema) const
-{
-	return (Schema == InSchema) && IsInitialized();
-}
-
-bool FPoseSearchFeatureVectorBuilder::IsCompatible(const FPoseSearchFeatureVectorBuilder& OtherBuilder) const
-{
-	return IsInitialized() && (Schema == OtherBuilder.Schema);
+	Values.Reset();
 }
 
 namespace UE::PoseSearch
@@ -2096,7 +2067,7 @@ void FPoseIndicesHistory::Update(const FSearchResult& SearchResult, float DeltaT
 	}
 }
 
-FTransform FSearchContext::TryGetTransformAndCacheResults(float SampleTime, const UPoseSearchSchema* Schema, int8 SchemaBoneIdx, bool& Error)
+FTransform FSearchContext::TryGetTransformAndCacheResults(float SampleTime, const UPoseSearchSchema* Schema, int8 SchemaBoneIdx, bool& bError)
 {
 	check(History && Schema);
 
@@ -2111,7 +2082,7 @@ FTransform FSearchContext::TryGetTransformAndCacheResults(float SampleTime, cons
 
 	if (Entry)
 	{
-		Error = false;
+		bError = false;
 		return Entry->Transform;
 	}
 
@@ -2133,11 +2104,11 @@ FTransform FSearchContext::TryGetTransformAndCacheResults(float SampleTime, cons
 				NewEntry.Transform = SampledComponentPose[NewEntryBoneIndexType];
 			}
 
-			Error = false;
+			bError = false;
 			return SampledComponentPose[BoneIndexType];
 		}
 
-		Error = true;
+		bError = true;
 		return FTransform::Identity;
 	}
 	
@@ -2149,11 +2120,11 @@ FTransform FSearchContext::TryGetTransformAndCacheResults(float SampleTime, cons
 		NewEntry.BoneIndexType = BoneIndexType;
 		NewEntry.Transform = SampledRootTransform;
 
-		Error = false;
+		bError = false;
 		return SampledRootTransform;
 	}
 	
-	Error = true;
+	bError = true;
 	return FTransform::Identity;
 }
 
@@ -2209,7 +2180,7 @@ bool FSearchContext::GetOrBuildQuery(const UPoseSearchDatabase* Database, FPoseS
 
 bool FSearchContext::IsCurrentResultFromDatabase(const UPoseSearchDatabase* Database) const
 {
-	return !bForceInterrupt && CurrentResult.IsValid() && CurrentResult.Database == Database;
+	return CurrentResult.IsValid() && CurrentResult.Database == Database;
 }
 
 TConstArrayView<float> FSearchContext::GetCurrentResultPrevPoseVector() const
@@ -2438,7 +2409,7 @@ void FFeatureVectorHelper::EncodeQuat(TArrayView<float> Values, int32& DataOffse
 	DataOffset += EncodeQuatCardinality;
 }
 
-void FFeatureVectorHelper::EncodeQuat(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue)
+void FFeatureVectorHelper::EncodeQuat(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue)
 {
 	FQuat Quat = DecodeQuatInternal(CurValues, DataOffset);
 
@@ -2454,19 +2425,19 @@ void FFeatureVectorHelper::EncodeQuat(TArrayView<float> Values, int32& DataOffse
 			Quat = FQuat::Slerp(Quat, DecodeQuatInternal(NextValues, DataOffset), LerpValue);
 		}
 	}
+	
 	// @todo: do we need to add options for cubic interpolation?
-
 	EncodeQuat(Values, DataOffset, Quat);
 }
 
-FQuat FFeatureVectorHelper::DecodeQuat(TArrayView<const float> Values, int32& DataOffset)
+FQuat FFeatureVectorHelper::DecodeQuat(TConstArrayView<float> Values, int32& DataOffset)
 {
 	const FQuat Quat = DecodeQuatInternal(Values, DataOffset);
 	DataOffset += EncodeQuatCardinality;
 	return Quat;
 }
 
-FQuat FFeatureVectorHelper::DecodeQuatInternal(TArrayView<const float> Values, int32 DataOffset)
+FQuat FFeatureVectorHelper::DecodeQuatInternal(TConstArrayView<float> Values, int32 DataOffset)
 {
 	const FVector X(Values[DataOffset + 0], Values[DataOffset + 1], Values[DataOffset + 2]);
 	const FVector Y(Values[DataOffset + 3], Values[DataOffset + 4], Values[DataOffset + 5]);
@@ -2488,7 +2459,7 @@ void FFeatureVectorHelper::EncodeVector(TArrayView<float> Values, int32& DataOff
 	DataOffset += EncodeVectorCardinality;
 }
 
-void FFeatureVectorHelper::EncodeVector(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue, bool bNormalize)
+void FFeatureVectorHelper::EncodeVector(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue, bool bNormalize)
 {
 	FVector Vector = DecodeVectorInternal(CurValues, DataOffset);
 
@@ -2504,8 +2475,8 @@ void FFeatureVectorHelper::EncodeVector(TArrayView<float> Values, int32& DataOff
 			Vector = FMath::Lerp(Vector, DecodeVectorInternal(NextValues, DataOffset), LerpValue);
 		}
 	}
+	
 	// @todo: do we need to add options for cubic interpolation?
-
 	if (bNormalize)
 	{
 		Vector = Vector.GetSafeNormal(UE_SMALL_NUMBER, FVector::XAxisVector);
@@ -2514,14 +2485,14 @@ void FFeatureVectorHelper::EncodeVector(TArrayView<float> Values, int32& DataOff
 	EncodeVector(Values, DataOffset, Vector);
 }
 
-FVector FFeatureVectorHelper::DecodeVector(TArrayView<const float> Values, int32& DataOffset)
+FVector FFeatureVectorHelper::DecodeVector(TConstArrayView<float> Values, int32& DataOffset)
 {
 	const FVector Vector = DecodeVectorInternal(Values, DataOffset);
 	DataOffset += EncodeVectorCardinality;
 	return Vector;
 }
 
-FVector FFeatureVectorHelper::DecodeVectorInternal(TArrayView<const float> Values, int32 DataOffset)
+FVector FFeatureVectorHelper::DecodeVectorInternal(TConstArrayView<float> Values, int32 DataOffset)
 {
 	return FVector(Values[DataOffset + 0], Values[DataOffset + 1], Values[DataOffset + 2]);
 }
@@ -2533,7 +2504,7 @@ void FFeatureVectorHelper::EncodeVector2D(TArrayView<float> Values, int32& DataO
 	DataOffset += EncodeVector2DCardinality;
 }
 
-void FFeatureVectorHelper::EncodeVector2D(TArrayView<float> Values, int32& DataOffset, TArrayView<const float> PrevValues, TArrayView<const float> CurValues, TArrayView<const float> NextValues, float LerpValue)
+void FFeatureVectorHelper::EncodeVector2D(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue)
 {
 	FVector2D Vector2D = DecodeVector2DInternal(CurValues, DataOffset);
 
@@ -2549,21 +2520,60 @@ void FFeatureVectorHelper::EncodeVector2D(TArrayView<float> Values, int32& DataO
 			Vector2D = FMath::Lerp(Vector2D, DecodeVector2DInternal(NextValues, DataOffset), LerpValue);
 		}
 	}
+	
 	// @todo: do we need to add options for cubic interpolation?
-
 	EncodeVector2D(Values, DataOffset, Vector2D);
 }
 
-FVector2D FFeatureVectorHelper::DecodeVector2D(TArrayView<const float> Values, int32& DataOffset)
+FVector2D FFeatureVectorHelper::DecodeVector2D(TConstArrayView<float> Values, int32& DataOffset)
 {
 	const FVector2D Vector2D = DecodeVector2DInternal(Values, DataOffset);
 	DataOffset += EncodeVector2DCardinality;
 	return Vector2D;
 }
 
-FVector2D FFeatureVectorHelper::DecodeVector2DInternal(TArrayView<const float> Values, int32 DataOffset)
+FVector2D FFeatureVectorHelper::DecodeVector2DInternal(TConstArrayView<float> Values, int32 DataOffset)
 {
 	return FVector2D(Values[DataOffset + 0], Values[DataOffset + 1]);
+}
+
+void FFeatureVectorHelper::EncodeFloat(TArrayView<float> Values, int32& DataOffset, const float Value)
+{
+	Values[DataOffset + 0] = Value;
+	DataOffset += EncodeFloatCardinality;
+}
+
+void FFeatureVectorHelper::EncodeFloat(TArrayView<float> Values, int32& DataOffset, TConstArrayView<float> PrevValues, TConstArrayView<float> CurValues, TConstArrayView<float> NextValues, float LerpValue)
+{
+	float Value = DecodeFloatInternal(CurValues, DataOffset);
+
+	// linear interpolation
+	if (!FMath::IsNearlyZero(LerpValue))
+	{
+		if (LerpValue < 0.f)
+		{
+			Value = FMath::Lerp(Value, DecodeFloatInternal(PrevValues, DataOffset), -LerpValue);
+		}
+		else
+		{
+			Value = FMath::Lerp(Value, DecodeFloatInternal(NextValues, DataOffset), LerpValue);
+		}
+	}
+
+	// @todo: do we need to add options for cubic interpolation?
+	EncodeFloat(Values, DataOffset, Value);
+}
+
+float FFeatureVectorHelper::DecodeFloat(TConstArrayView<float> Values, int32& DataOffset)
+{
+	const float Value = DecodeFloatInternal(Values, DataOffset);
+	DataOffset += EncodeFloatCardinality;
+	return Value;
+}
+
+float FFeatureVectorHelper::DecodeFloatInternal(TConstArrayView<float> Values, int32 DataOffset)
+{
+	return Values[DataOffset];
 }
 
 void FFeatureVectorHelper::ComputeMeanDeviations(float MinMeanDeviation, const Eigen::MatrixXd& CenteredPoseMatrix, Eigen::VectorXd& MeanDeviations, int32& DataOffset, int32 Cardinality)
@@ -2593,6 +2603,7 @@ void FFeatureVectorHelper::SetMeanDeviations(float Deviation, Eigen::VectorXd& M
 // FDebugDrawParams
 bool FDebugDrawParams::CanDraw() const
 {
+#if ENABLE_DRAW_DEBUG
 	if (!World)
 	{
 		return false;
@@ -2605,10 +2616,14 @@ bool FDebugDrawParams::CanDraw() const
 	}
 
 	return SearchIndex->IsValid() && !SearchIndex->IsEmpty() && SearchIndex->Schema->SchemaCardinality > 0;
+#else // ENABLE_DRAW_DEBUG
+	return false;
+#endif // ENABLE_DRAW_DEBUG
 }
 
 FColor FDebugDrawParams::GetColor(int32 ColorPreset) const
 {
+#if ENABLE_DRAW_DEBUG
 	FLinearColor Color = FLinearColor::Red;
 
 	const UPoseSearchSchema* Schema = GetSchema();
@@ -2640,6 +2655,9 @@ FColor FDebugDrawParams::GetColor(int32 ColorPreset) const
 	}
 
 	return Color.ToFColor(true);
+#else // ENABLE_DRAW_DEBUG
+	return FColor::Black;
+#endif // ENABLE_DRAW_DEBUG
 }
 
 const FPoseSearchIndex* FDebugDrawParams::GetSearchIndex() const
@@ -2681,47 +2699,47 @@ void FSearchResult::Update(float NewAssetTime)
 	if (!IsValid())
 	{
 		Reset();
-		return;
-	}
-
-	if (SearchIndexAsset->Type == ESearchIndexAssetType::Sequence)
-	{
-		const FPoseSearchDatabaseSequence& DbSequence = Database->GetSequenceSourceAsset(SearchIndexAsset);
-
-		if (Database->GetPoseIndicesAndLerpValueFromTime(NewAssetTime, SearchIndexAsset, PrevPoseIdx, PoseIdx, NextPoseIdx, LerpValue))
-		{
-			AssetTime = NewAssetTime;
-		}
-		else
-		{
-			Reset();
-		}
-	}
-	else if (SearchIndexAsset->Type == ESearchIndexAssetType::BlendSpace)
-	{
-		const FPoseSearchDatabaseBlendSpace& DbBlendSpace = Database->GetBlendSpaceSourceAsset(SearchIndexAsset);
-
-		TArray<FBlendSampleData> BlendSamples;
-		int32 TriangulationIndex = 0;
-		DbBlendSpace.BlendSpace->GetSamplesFromBlendInput(SearchIndexAsset->BlendParameters, BlendSamples, TriangulationIndex, true);
-
-		const float PlayLength = DbBlendSpace.BlendSpace->GetAnimationLengthFromSampleData(BlendSamples);
-
-		// Asset player time for blendspaces is normalized [0, 1] so we need to convert 
-		// to a real time before we advance it
-		const float RealTime = NewAssetTime * PlayLength;
-		if (Database->GetPoseIndicesAndLerpValueFromTime(RealTime, SearchIndexAsset, PrevPoseIdx, PoseIdx, NextPoseIdx, LerpValue))
-		{
-			AssetTime = NewAssetTime;
-		}
-		else
-		{
-			Reset();
-		}
 	}
 	else
 	{
-		checkNoEntry();
+		const FPoseSearchIndexAsset& SearchIndexAsset = Database->GetSearchIndex()->GetAssetForPose(PoseIdx);
+		if (SearchIndexAsset.Type == ESearchIndexAssetType::Sequence)
+		{
+			if (Database->GetPoseIndicesAndLerpValueFromTime(NewAssetTime, SearchIndexAsset, PrevPoseIdx, PoseIdx, NextPoseIdx, LerpValue))
+			{
+				AssetTime = NewAssetTime;
+			}
+			else
+			{
+				Reset();
+			}
+		}
+		else if (SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace)
+		{
+			const FPoseSearchDatabaseBlendSpace& DbBlendSpace = Database->GetBlendSpaceSourceAsset(SearchIndexAsset);
+
+			TArray<FBlendSampleData> BlendSamples;
+			int32 TriangulationIndex = 0;
+			DbBlendSpace.BlendSpace->GetSamplesFromBlendInput(SearchIndexAsset.BlendParameters, BlendSamples, TriangulationIndex, true);
+
+			const float PlayLength = DbBlendSpace.BlendSpace->GetAnimationLengthFromSampleData(BlendSamples);
+
+			// Asset player time for blendspaces is normalized [0, 1] so we need to convert 
+			// to a real time before we advance it
+			const float RealTime = NewAssetTime * PlayLength;
+			if (Database->GetPoseIndicesAndLerpValueFromTime(RealTime, SearchIndexAsset, PrevPoseIdx, PoseIdx, NextPoseIdx, LerpValue))
+			{
+				AssetTime = NewAssetTime;
+			}
+			else
+			{
+				Reset();
+			}
+		}
+		else
+		{
+			checkNoEntry();
+		}
 	}
 }
 
@@ -2743,7 +2761,6 @@ bool FSearchResult::IsValid() const
 void FSearchResult::Reset()
 {
 	PoseIdx = INDEX_NONE;
-	SearchIndexAsset = nullptr;
 	Database = nullptr;
 	ComposedQuery.Reset();
 	AssetTime = 0.0f;
@@ -2753,32 +2770,37 @@ void FSearchResult::Reset()
 #endif // WITH_EDITOR
 }
 
+const FPoseSearchIndexAsset* FSearchResult::GetSearchIndexAsset(bool bMandatory) const
+{
+	if (bMandatory)
+	{
+		check(IsValid());
+	}
+	else if (!IsValid())
+	{
+		return nullptr;
+	}
+
+	return &Database->GetSearchIndex()->GetAssetForPose(PoseIdx);
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // FAssetSamplerContext
 
-static void FillCompactPoseAndComponentRefRotations(FAssetSamplingContext& Context)
+void FAssetSamplingContext::Init(const UMirrorDataTable* InMirrorDataTable, const FBoneContainer& BoneContainer)
 {
-	if (Context.MirrorDataTable)
+	MirrorDataTable = InMirrorDataTable;
+
+	if (InMirrorDataTable)
 	{
-		const UMirrorDataTable* MirrorDataTablePtr = Context.MirrorDataTable.Get();
-		MirrorDataTablePtr->FillCompactPoseAndComponentRefRotations(
-			Context.BoneContainer,
-			Context.CompactPoseMirrorBones,
-			Context.ComponentSpaceRefRotations);
+		InMirrorDataTable->FillCompactPoseAndComponentRefRotations(BoneContainer, CompactPoseMirrorBones, ComponentSpaceRefRotations);
 	}
 	else
 	{
-		Context.CompactPoseMirrorBones.Reset();
-		Context.ComponentSpaceRefRotations.Reset();
+		CompactPoseMirrorBones.Reset();
+		ComponentSpaceRefRotations.Reset();
 	}
-}
-
-void FAssetSamplingContext::Init(const UPoseSearchSchema* Schema)
-{
-	MirrorDataTable = Schema->MirrorDataTable;
-	BoneContainer.InitializeTo(Schema->BoneIndicesWithParents, FCurveEvaluationOption(false), *Schema->Skeleton);
-	FillCompactPoseAndComponentRefRotations(*this);
 }
 
 FTransform FAssetSamplingContext::MirrorTransform(const FTransform& InTransform) const
@@ -2820,7 +2842,7 @@ void ICostBreakDownData::AddEntireBreakDownSection(const FText& Label, const UPo
 // Uses distance delta between NextRootDistanceIndex and NextRootDistanceIndex - 1 and extrapolates it to ExtrapolationTime
 static float ExtrapolateAccumulatedRootDistance(
 	int32 SamplingRate,
-	TArrayView<const float> AccumulatedRootDistance,
+	TConstArrayView<float> AccumulatedRootDistance,
 	int32 NextRootDistanceIndex, 
 	float ExtrapolationTime,
 	const FPoseSearchExtrapolationParameters& ExtrapolationParameters)
@@ -2840,7 +2862,7 @@ static float ExtrapolateAccumulatedRootDistance(
 
 static float ExtractAccumulatedRootDistance(
 	int32 SamplingRate,
-	TArrayView<const float> AccumulatedRootDistance,
+	TConstArrayView<float> AccumulatedRootDistance,
 	float PlayLength,
 	float Time,
 	const FPoseSearchExtrapolationParameters& ExtrapolationParameters)
@@ -2950,46 +2972,9 @@ static FTransform ExtrapolateRootMotion(
 
 //////////////////////////////////////////////////////////////////////////
 // FSequenceSampler
-
-struct FSequenceSampler : public IAssetSampler
-{
-public:
-	struct FInput
-	{
-		const UAnimSequence* Sequence = nullptr;
-		bool bLoopable = false;
-		int32 RootDistanceSamplingRate = 60;
-		FPoseSearchExtrapolationParameters ExtrapolationParameters;
-	} Input;
-
-	void Init(const FInput& Input);
-	void Process();
-
-	float GetPlayLength() const override { return Input.Sequence->GetPlayLength(); };
-	bool IsLoopable() const override { return Input.bLoopable; };
-
-	float GetTimeFromRootDistance(float Distance) const override;
-
-	float GetTotalRootDistance() const override { return TotalRootDistance; };
-	FTransform GetTotalRootTransform() const override { return TotalRootTransform; }
-
-	virtual void ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const override;
-	virtual float ExtractRootDistance(float Time) const override;
-	virtual FTransform ExtractRootTransform(float Time) const override;
-	virtual void ExtractPoseSearchNotifyStates(float Time, TArray<class UAnimNotifyState_PoseSearchBase*>& NotifyStates) const override;
-	virtual const UAnimationAsset* GetAsset() const override { return Input.Sequence; }
-
-private:
-	float TotalRootDistance = 0.0f;
-	FTransform TotalRootTransform = FTransform::Identity;
-	TArray<float> AccumulatedRootDistance;
-
-	void ProcessRootDistance();
-};
-
 void FSequenceSampler::Init(const FInput& InInput)
 {
-	check(InInput.Sequence);
+	check(InInput.Sequence.Get());
 
 	Input = InInput;
 }
@@ -3025,6 +3010,11 @@ float FSequenceSampler::GetTimeFromRootDistance(float Distance) const
 	return ClipTime;
 }
 
+bool FSequenceSampler::IsLoopable() const
+{
+	return Input.Sequence->bLoop;
+}
+
 void FSequenceSampler::ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const
 {
 	Input.Sequence->GetAnimationPose(OutAnimPoseData, ExtractionCtx);
@@ -3032,7 +3022,7 @@ void FSequenceSampler::ExtractPose(const FAnimExtractContext& ExtractionCtx, FAn
 
 FTransform FSequenceSampler::ExtractRootTransform(float Time) const
 {
-	if (Input.bLoopable)
+	if (IsLoopable())
 	{
 		FTransform LoopableRootTransform = Input.Sequence->ExtractRootMotion(0.0f, Time, true);
 		return LoopableRootTransform;
@@ -3163,62 +3153,16 @@ void FSequenceSampler::ProcessRootDistance()
 	TotalRootDistance = AccumulatedRootDistance.Last();
 }
 
+const UAnimationAsset* FSequenceSampler::GetAsset() const
+{
+	return Input.Sequence.Get();
+}
+
 //////////////////////////////////////////////////////////////////////////
 // FBlendSpaceSampler
-
-struct FBlendSpaceSampler : public IAssetSampler
-{
-public:
-	struct FInput
-	{
-		const FAssetSamplingContext* SamplingContext = nullptr;
-		const UBlendSpace* BlendSpace = nullptr;
-		bool bLoopable = false;
-		int32 RootDistanceSamplingRate = 60;
-		int32 RootTransformSamplingRate = 60;
-		FPoseSearchExtrapolationParameters ExtrapolationParameters;
-		FVector BlendParameters;
-	} Input;
-
-	void Init(const FInput& Input);
-
-	void Process();
-
-	float GetPlayLength() const override { return PlayLength; };
-	bool IsLoopable() const override { return Input.bLoopable; };
-
-	float GetTimeFromRootDistance(float Distance) const override;
-
-	float GetTotalRootDistance() const override { return TotalRootDistance; };
-	FTransform GetTotalRootTransform() const override { return TotalRootTransform; }
-
-	virtual void ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const override;
-	virtual float ExtractRootDistance(float Time) const override;
-	virtual FTransform ExtractRootTransform(float Time) const override;
-	virtual void ExtractPoseSearchNotifyStates(float Time, TArray<class UAnimNotifyState_PoseSearchBase*>& NotifyStates) const override;
-
-	virtual const UAnimationAsset* GetAsset() const override { return Input.BlendSpace; }
-
-private:
-	float PlayLength = 0.0f;
-	float TotalRootDistance = 0.0f;
-	FTransform TotalRootTransform = FTransform::Identity;
-	TArray<float> AccumulatedRootDistance;
-	TArray<FTransform> AccumulatedRootTransform;
-	
-	void ProcessPlayLength();
-	void ProcessRootDistance();
-	void ProcessRootTransform();
-
-	// Extracts the pre-computed blend space root transform. ProcessRootTransform must be run first.
-	FTransform ExtractBlendSpaceRootTrackTransform(float Time) const;
-	FTransform ExtractBlendSpaceRootMotion(float StartTime, float DeltaTime, bool bAllowLooping) const;
-	FTransform ExtractBlendSpaceRootMotionFromRange(float StartTrackPosition, float EndTrackPosition) const;
-};
-
 void FBlendSpaceSampler::Init(const FInput& InInput)
 {
-	check(InInput.BlendSpace);
+	check(InInput.BlendSpace.Get());
 
 	Input = InInput;
 }
@@ -3258,6 +3202,11 @@ float FBlendSpaceSampler::GetTimeFromRootDistance(float Distance) const
 	return ClipTime;
 }
 
+bool FBlendSpaceSampler::IsLoopable() const
+{
+	return Input.BlendSpace->bLoop;
+}
+
 void FBlendSpaceSampler::ExtractPose(const FAnimExtractContext& ExtractionCtx, FAnimationPoseData& OutAnimPoseData) const
 {
 	TArray<FBlendSampleData> BlendSamples;
@@ -3281,7 +3230,7 @@ void FBlendSpaceSampler::ExtractPose(const FAnimExtractContext& ExtractionCtx, F
 
 FTransform FBlendSpaceSampler::ExtractRootTransform(float Time) const
 {
-	if (Input.bLoopable)
+	if (IsLoopable())
 	{
 		FTransform LoopableRootTransform = ExtractBlendSpaceRootMotion(0.0f, Time, true);
 		return LoopableRootTransform;
@@ -3490,8 +3439,6 @@ void FBlendSpaceSampler::ProcessPlayLength()
 	Input.BlendSpace->GetSamplesFromBlendInput(Input.BlendParameters, BlendSamples, TriangulationIndex, true);
 
 	PlayLength = Input.BlendSpace->GetAnimationLengthFromSampleData(BlendSamples);
-
-	checkf(PlayLength > 0.0f, TEXT("Blendspace has zero play length"));
 }
 
 void FBlendSpaceSampler::ProcessRootTransform()
@@ -3516,7 +3463,7 @@ void FBlendSpaceSampler::ProcessRootTransform()
 
 		FDeltaTimeRecord DeltaTimeRecord;
 		DeltaTimeRecord.Set(PreviousTime, CurrentTime - PreviousTime);
-		FAnimExtractContext ExtractionCtx(CurrentTime, true, DeltaTimeRecord, Input.bLoopable);
+		FAnimExtractContext ExtractionCtx(static_cast<double>(CurrentTime), true, DeltaTimeRecord, IsLoopable());
 
 		for (int32 BlendSampleIdex = 0; BlendSampleIdex < BlendSamples.Num(); BlendSampleIdex++)
 		{
@@ -3535,8 +3482,8 @@ void FBlendSpaceSampler::ProcessRootTransform()
 		Anim::FStackAttributeContainer StackAttributeContainer;
 		FAnimationPoseData AnimPoseData(Pose, BlendedCurve, StackAttributeContainer);
 
-		Pose.SetBoneContainer(&Input.SamplingContext->BoneContainer);
-		BlendedCurve.InitFrom(Input.SamplingContext->BoneContainer);
+		Pose.SetBoneContainer(&Input.BoneContainer);
+		BlendedCurve.InitFrom(Input.BoneContainer);
 
 		Input.BlendSpace->GetAnimationPose(BlendSamples, ExtractionCtx, AnimPoseData);
 
@@ -3595,6 +3542,11 @@ void FBlendSpaceSampler::ProcessRootDistance()
 	// FAssetIndexer::GetSampleTimeFromDistance() and FAssetIndexer::GetSampleInfo()
 	TotalRootTransform = LastRootTransform.GetRelativeTransform(InitialRootTransform);
 	TotalRootDistance = AccumulatedRootDistance.Last();
+}
+
+const UAnimationAsset* FBlendSpaceSampler::GetAsset() const
+{
+	return Input.BlendSpace.Get();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -3667,13 +3619,14 @@ public:
 		int32 FirstIndexedSample = 0;
 		int32 LastIndexedSample = 0;
 		int32 NumIndexedPoses = 0;
+
 		TArray<float> FeatureVectorTable;
 		TArray<FPoseSearchPoseMetadata> PoseMetadata;
 		TBitArray<> AllFeaturesNotAdded;
 	} Output;
 
 	void Reset();
-	void Init(const FAssetIndexingContext& IndexingContext);
+	void Init(const FAssetIndexingContext& IndexingContext, const FBoneContainer& InBoneContainer);
 	bool Process();
 
 public: // IAssetIndexer
@@ -3686,12 +3639,8 @@ public: // IAssetIndexer
 	FTransform GetTransformAndCacheResults(float SampleTime, float OriginTime, int8 SchemaBoneIdx, bool& Clamped) override;
 
 private:
-	FAssetIndexingContext IndexingContext;
-	TArray<FPoseSearchFeatureVectorBuilder> FeatureVectorBuilders;
-	FPoseSearchPoseMetadata Metadata;
+	FPoseSearchPoseMetadata GetMetadata(int32 SampleIdx) const;
 	
-	void AddMetadata(int32 SampleIdx);
-
 	struct CachedEntry
 	{
 		float SampleTime;
@@ -3707,6 +3656,8 @@ private:
 		FAnimationPoseData AnimPoseData = { Pose, UnusedCurve, UnusedAtrribute };
 	};
 
+	FBoneContainer BoneContainer;
+	FAssetIndexingContext IndexingContext;
 	TArray<CachedEntry> CachedEntries;
 };
 
@@ -3721,30 +3672,23 @@ void FAssetIndexer::Reset()
 	Output.AllFeaturesNotAdded.Reset();
 }
 
-void FAssetIndexer::Init(const FAssetIndexingContext& InIndexingContext)
+void FAssetIndexer::Init(const FAssetIndexingContext& InIndexingContext, const FBoneContainer& InBoneContainer)
 {
 	check(InIndexingContext.Schema);
 	check(InIndexingContext.Schema->IsValid());
 	check(InIndexingContext.MainSampler);
 
+	BoneContainer = InBoneContainer;
 	IndexingContext = InIndexingContext;
 
 	Reset();
 
 	Output.FirstIndexedSample = FMath::FloorToInt(IndexingContext.RequestedSamplingRange.Min * IndexingContext.Schema->SampleRate);
-	Output.LastIndexedSample = 
-		FMath::Max(0, FMath::CeilToInt(IndexingContext.RequestedSamplingRange.Max * IndexingContext.Schema->SampleRate));
+	Output.LastIndexedSample = FMath::Max(0, FMath::CeilToInt(IndexingContext.RequestedSamplingRange.Max * IndexingContext.Schema->SampleRate));
 	Output.NumIndexedPoses = Output.LastIndexedSample - Output.FirstIndexedSample + 1;
 	
 	Output.FeatureVectorTable.SetNumZeroed(IndexingContext.Schema->SchemaCardinality * Output.NumIndexedPoses);
-
 	Output.PoseMetadata.SetNum(Output.NumIndexedPoses);
-
-	FeatureVectorBuilders.SetNum(Output.NumIndexedPoses);
-	for (FPoseSearchFeatureVectorBuilder& Builder : FeatureVectorBuilders)
-	{
-		Builder.Init(IndexingContext.Schema);
-	}
 }
 
 bool FAssetIndexer::Process()
@@ -3757,40 +3701,23 @@ bool FAssetIndexer::Process()
 
 	IndexingContext.BeginSampleIdx = Output.FirstIndexedSample;
 	IndexingContext.EndSampleIdx = Output.LastIndexedSample + 1;
-	const int32 NumSamplesInRange = IndexingContext.EndSampleIdx - IndexingContext.BeginSampleIdx;
 
-	FAssetIndexingOutput AssetIndexingOutput{FeatureVectorBuilders};
-
-	// Index each channel
-	for (int32 ChannelIdx = 0; ChannelIdx != IndexingContext.Schema->Channels.Num(); ++ChannelIdx)
-	{
-		const TObjectPtr<UPoseSearchFeatureChannel>& Channel = IndexingContext.Schema->Channels[ChannelIdx];
-		Channel->IndexAsset(*this, AssetIndexingOutput);
-	}
-
-	// @todo: this step can be avoided now since Schema.SchemaCardinality is known and the data can be preallocated before Channel->IndexAsset
-	
-	// Merge spans of feature vectors into contiguous buffer
 	if (IndexingContext.Schema->SchemaCardinality > 0)
 	{
-		for (int32 VectorIdx = 0; VectorIdx != NumSamplesInRange; ++VectorIdx)
+		// Index each channel
+		FAssetIndexingOutput AssetIndexingOutput(IndexingContext.Schema->SchemaCardinality, Output.FeatureVectorTable);
+		for (int32 ChannelIdx = 0; ChannelIdx != IndexingContext.Schema->Channels.Num(); ++ChannelIdx) 
 		{
-			const int32 SampleIdx = VectorIdx + IndexingContext.BeginSampleIdx;
-			const int32 PoseIdx = SampleIdx - Output.FirstIndexedSample;
-			const int32 FirstValueIdx = PoseIdx * IndexingContext.Schema->SchemaCardinality;
-			TArrayView<float> WriteValues = MakeArrayView(&Output.FeatureVectorTable[FirstValueIdx], IndexingContext.Schema->SchemaCardinality);
-			TArrayView<const float> ReadValues = FeatureVectorBuilders[VectorIdx].GetValues();
-			check(WriteValues.Num() == ReadValues.Num());
-			FMemory::Memcpy(WriteValues.GetData(), ReadValues.GetData(), WriteValues.Num() * WriteValues.GetTypeSize());
+			IndexingContext.Schema->Channels[ChannelIdx]->IndexAsset(*this, AssetIndexingOutput);
 		}
 	}
 
 	// Generate pose metadata
 	for (int32 SampleIdx = IndexingContext.BeginSampleIdx; SampleIdx != IndexingContext.EndSampleIdx; ++SampleIdx)
 	{
-		AddMetadata(SampleIdx);
 		const int32 PoseIdx = SampleIdx - Output.FirstIndexedSample;
-		Output.PoseMetadata[PoseIdx] = Metadata;
+		FPoseSearchPoseMetadata& OutputPoseMetadata = Output.PoseMetadata[PoseIdx];
+		OutputPoseMetadata = GetMetadata(SampleIdx);
 	}
 
 	return true;
@@ -3994,7 +3921,7 @@ FAssetIndexer::FSampleInfo FAssetIndexer::GetSampleInfo(float SampleTime) const
 		if (SampleTime < 0.0f)
 		{
 			RootMotionPerCycle = RootMotionPerCycle.Inverse();
-			RootDistancePerCycle *= -1;
+			RootDistancePerCycle *= -1.f;
 		}
 
 		// Find the remaining motion deltas after wrapping
@@ -4039,12 +3966,12 @@ FTransform FAssetIndexer::MirrorTransform(const FTransform& Transform) const
 	return IndexingContext.bMirrored ? IndexingContext.SamplingContext->MirrorTransform(Transform) : Transform;
 }
 
-void FAssetIndexer::AddMetadata(int32 SampleIdx)
+FPoseSearchPoseMetadata FAssetIndexer::GetMetadata(int32 SampleIdx) const
 {
 	const float SequenceLength = IndexingContext.MainSampler->GetPlayLength();
 	const float SampleTime = FMath::Min(SampleIdx * IndexingContext.Schema->GetSamplingInterval(), SequenceLength);
 
-	Metadata = FPoseSearchPoseMetadata();
+	FPoseSearchPoseMetadata Metadata;
 	Metadata.CostAddend = IndexingContext.Schema->BaseCostBias;
 	Metadata.ContinuingPoseCostAddend = IndexingContext.Schema->ContinuingPoseCostBias;
 	
@@ -4069,6 +3996,7 @@ void FAssetIndexer::AddMetadata(int32 SampleIdx)
 			Metadata.ContinuingPoseCostAddend = ContinuingPoseCostBias->CostAddend;
 		}
 	}
+	return Metadata;
 }
 
 FTransform FAssetIndexer::GetTransformAndCacheResults(float SampleTime, float OriginTime, int8 SchemaBoneIdx, bool& Clamped)
@@ -4088,19 +4016,19 @@ FTransform FAssetIndexer::GetTransformAndCacheResults(float SampleTime, float Or
 		Entry->SampleTime = SampleTime;
 		Entry->OriginTime = OriginTime;
 
-		if (!SamplingContext->BoneContainer.IsValid())
+		if (!BoneContainer.IsValid())
 		{
 			UE_LOG(LogPoseSearch,
 				Warning, 
 				TEXT("Invalid BoneContainer encountered in FAssetIndexer::GetTransformAndCacheResults. Asset: %s. Schema: %s. BoneContainerAsset: %s. NumBoneIndices: %d"),
 				*GetNameSafe(IndexingContext.MainSampler->GetAsset()),
 				*GetNameSafe(IndexingContext.Schema),
-				*GetNameSafe(SamplingContext->BoneContainer.GetAsset()),
-				SamplingContext->BoneContainer.GetCompactPoseNumBones());
+				*GetNameSafe(BoneContainer.GetAsset()),
+				BoneContainer.GetCompactPoseNumBones());
 		}
 
-		Entry->Pose.SetBoneContainer(&SamplingContext->BoneContainer);
-		Entry->UnusedCurve.InitFrom(SamplingContext->BoneContainer);
+		Entry->Pose.SetBoneContainer(&BoneContainer);
+		Entry->UnusedCurve.InitFrom(BoneContainer);
 
 		IAssetIndexer::FSampleInfo Origin = GetSampleInfo(OriginTime);
 		IAssetIndexer::FSampleInfo Sample = GetSampleInfoRelative(SampleTime, Origin);
@@ -4110,7 +4038,7 @@ FTransform FAssetIndexer::GetTransformAndCacheResults(float SampleTime, float Or
 
 		FDeltaTimeRecord DeltaTimeRecord;
 		DeltaTimeRecord.Set(PreviousTime, CurrentTime - PreviousTime);
-		FAnimExtractContext ExtractionCtx(CurrentTime, true, DeltaTimeRecord, Sample.Clip->IsLoopable());
+		FAnimExtractContext ExtractionCtx(static_cast<double>(CurrentTime), true, DeltaTimeRecord, Sample.Clip->IsLoopable());
 
 		Sample.Clip->ExtractPose(ExtractionCtx, Entry->AnimPoseData);
 
@@ -4131,7 +4059,7 @@ FTransform FAssetIndexer::GetTransformAndCacheResults(float SampleTime, float Or
 	}
 
 	const FBoneReference& BoneReference = IndexingContext.Schema->BoneReferences[SchemaBoneIdx];
-	FCompactPoseBoneIndex CompactBoneIndex = SamplingContext->BoneContainer.MakeCompactPoseIndex(FMeshPoseBoneIndex(BoneReference.BoneIndex));
+	FCompactPoseBoneIndex CompactBoneIndex = BoneContainer.MakeCompactPoseIndex(FMeshPoseBoneIndex(BoneReference.BoneIndex));
 
 	const FTransform BoneTransform = Entry->ComponentSpacePose.GetComponentSpaceTransform(CompactBoneIndex) * MirrorTransform(Entry->RootTransform);
 	Clamped = Entry->Clamped;
@@ -4142,8 +4070,9 @@ FTransform FAssetIndexer::GetTransformAndCacheResults(float SampleTime, float Or
 //////////////////////////////////////////////////////////////////////////
 // PoseSearch API
 
-void DrawFeatureVector(const FDebugDrawParams& DrawParams, TArrayView<const float> PoseVector)
+void DrawFeatureVector(const FDebugDrawParams& DrawParams, TConstArrayView<float> PoseVector)
 {
+#if ENABLE_DRAW_DEBUG
 	if (DrawParams.CanDraw())
 	{
 		const UPoseSearchSchema* Schema = DrawParams.GetSchema();
@@ -4160,19 +4089,23 @@ void DrawFeatureVector(const FDebugDrawParams& DrawParams, TArrayView<const floa
 			}
 		}
 	}
+#endif // ENABLE_DRAW_DEBUG
 }
 
 void DrawFeatureVector(const FDebugDrawParams& DrawParams, int32 PoseIdx)
 {
+#if ENABLE_DRAW_DEBUG
 	// if we're editing the schema while in PIE with Rewind Debugger active, PoseIdx could be out of bound / stale
 	if (DrawParams.CanDraw() && PoseIdx >= 0 && PoseIdx < DrawParams.GetSearchIndex()->NumPoses)
 	{
 		DrawFeatureVector(DrawParams, DrawParams.GetSearchIndex()->GetPoseValues(PoseIdx));
 	}
+#endif // ENABLE_DRAW_DEBUG
 }
 
 void DrawSearchIndex(const FDebugDrawParams& DrawParams)
 {
+#if ENABLE_DRAW_DEBUG
 	if (DrawParams.CanDraw())
 	{
 		const FPoseSearchIndex* SearchIndex = DrawParams.GetSearchIndex();
@@ -4182,6 +4115,7 @@ void DrawSearchIndex(const FDebugDrawParams& DrawParams)
 			DrawFeatureVector(DrawParams, PoseIdx);
 		}
 	}
+#endif // ENABLE_DRAW_DEBUG
 }
 
 static Eigen::VectorXd ComputeChannelsDeviations(const FPoseSearchIndex* SearchIndex)
@@ -4492,19 +4426,20 @@ bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* Sequ
 	}
 
 	USkeleton* SeqSkeleton = Sequence->GetSkeleton();
-	if (!SeqSkeleton || !SeqSkeleton->IsCompatible(SequenceMetaData->Schema->Skeleton))
+	if (!SeqSkeleton)
 	{
 		return false;
 	}
 
+	FBoneContainer BoneContainer;
+	BoneContainer.InitializeTo(SequenceMetaData->Schema->BoneIndicesWithParents, FCurveEvaluationOption(false), *SequenceMetaData->Schema->Skeleton);
 	FAssetSamplingContext SamplingContext;
-	SamplingContext.Init(SequenceMetaData->Schema);
+	SamplingContext.Init(SequenceMetaData->Schema->MirrorDataTable, BoneContainer);
 
 	FSequenceSampler Sampler;
 	FSequenceSampler::FInput SamplerInput;
 	SamplerInput.ExtrapolationParameters = SequenceMetaData->ExtrapolationParameters;
 	SamplerInput.Sequence = Sequence;
-	SamplerInput.bLoopable = false;
 	Sampler.Init(SamplerInput);
 	Sampler.Process();
 
@@ -4514,7 +4449,8 @@ bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* Sequ
 	IndexerContext.MainSampler = &Sampler;
 	IndexerContext.Schema = SequenceMetaData->Schema;
 	IndexerContext.RequestedSamplingRange = GetEffectiveSamplingRange(Sequence, SequenceMetaData->SamplingRange);
-	Indexer.Init(IndexerContext);
+
+	Indexer.Init(IndexerContext, BoneContainer);
 	if (!Indexer.Process())
 	{
 		return false;
@@ -4532,6 +4468,12 @@ bool BuildIndex(const UAnimSequence* Sequence, UPoseSearchSequenceMetaData* Sequ
 	SequenceMetaData->SearchIndex.Schema = SequenceMetaData->Schema;
 	SequenceMetaData->SearchIndex.Assets.Add(SearchIndexAsset);
 	SequenceMetaData->SearchIndex.PoseMetadata = Indexer.Output.PoseMetadata;
+
+	SequenceMetaData->SearchIndex.OverallFlags = EPoseSearchPoseFlags::None;
+	for (const FPoseSearchPoseMetadata& PoseMetadata : Indexer.Output.PoseMetadata)
+	{
+		SequenceMetaData->SearchIndex.OverallFlags = PoseMetadata.Flags;
+	}
 
 	// todo: do we need to PreprocessSearchIndex?
 	// PreprocessSearchIndex(&SequenceMetaData->SearchIndex, Database);
@@ -4551,19 +4493,18 @@ struct FDatabaseIndexingContext
 
 	TArray<FAssetIndexer> Indexers;
 
-	void PrepareSamplers();
-	void PrepareIndexers();
+	void PrepareSamplers(const FBoneContainer& BoneContainer);
+	void PrepareIndexers(const FBoneContainer& BoneContainer);
 	bool IndexAssets();
 	void JoinIndex();
 	float CalculateMinCostAddend() const;
 };
 
-void FDatabaseIndexingContext::PrepareSamplers()
+void FDatabaseIndexingContext::PrepareSamplers(const FBoneContainer& BoneContainer)
 {
-	SamplingContext.Init(Database->Schema);
+	SamplingContext.Init(Database->Schema->MirrorDataTable, BoneContainer);
 
 	// Prepare samplers for all sequences
-
 	auto AddSequenceSampler = [&](const UAnimSequence* Sequence, bool bLoopable)
 	{
 		if (!SequenceSamplerMap.Contains(Sequence))
@@ -4574,7 +4515,6 @@ void FDatabaseIndexingContext::PrepareSamplers()
 			FSequenceSampler::FInput Input;
 			Input.ExtrapolationParameters = Database->ExtrapolationParameters;
 			Input.Sequence = Sequence;
-			Input.bLoopable = bLoopable;
 			SequenceSamplers[SequenceSamplerIdx].Init(Input);
 		}
 	};
@@ -4596,43 +4536,20 @@ void FDatabaseIndexingContext::PrepareSamplers()
 			AddSequenceSampler(DbSequence.FollowUpSequence, DbSequence.FollowUpSequence->bLoop);
 		}
 	}
-
-	ParallelFor(
-		SequenceSamplers.Num(),
-		[this](int32 SamplerIdx) { SequenceSamplers[SamplerIdx].Process(); },
-		ParallelForFlags
-	);
-
+		
 	// Prepare samplers for all blend spaces
-
 	for (const FPoseSearchDatabaseBlendSpace& DbBlendSpace : Database->BlendSpaces)
 	{
 		if (DbBlendSpace.BlendSpace)
 		{
 			int32 HorizontalBlendNum, VerticalBlendNum;
-			float HorizontalBlendMin, HorizontalBlendMax, VerticalBlendMin, VerticalBlendMax;
-
-			DbBlendSpace.GetBlendSpaceParameterSampleRanges(
-				HorizontalBlendNum,
-				VerticalBlendNum,
-				HorizontalBlendMin,
-				HorizontalBlendMax,
-				VerticalBlendMin,
-				VerticalBlendMax);
+			DbBlendSpace.GetBlendSpaceParameterSampleRanges(HorizontalBlendNum, VerticalBlendNum);
 
 			for (int32 HorizontalIndex = 0; HorizontalIndex < HorizontalBlendNum; HorizontalIndex++)
 			{
 				for (int32 VerticalIndex = 0; VerticalIndex < VerticalBlendNum; VerticalIndex++)
 				{
-					FVector BlendParameters = BlendParameterForSampleRanges(
-						HorizontalIndex,
-						VerticalIndex,
-						HorizontalBlendNum,
-						VerticalBlendNum,
-						HorizontalBlendMin,
-						HorizontalBlendMax,
-						VerticalBlendMin,
-						VerticalBlendMax);
+					const FVector BlendParameters = DbBlendSpace.BlendParameterForSampleRanges(HorizontalIndex, VerticalIndex);
 
 					if (!BlendSpaceSamplerMap.Contains({ DbBlendSpace.BlendSpace, BlendParameters }))
 					{
@@ -4640,10 +4557,9 @@ void FDatabaseIndexingContext::PrepareSamplers()
 						BlendSpaceSamplerMap.Add({ DbBlendSpace.BlendSpace, BlendParameters }, BlendSpaceSamplerIdx);
 
 						FBlendSpaceSampler::FInput Input;
-						Input.SamplingContext = &SamplingContext;
+						Input.BoneContainer = BoneContainer;
 						Input.ExtrapolationParameters = Database->ExtrapolationParameters;
 						Input.BlendSpace = DbBlendSpace.BlendSpace;
-						Input.bLoopable = DbBlendSpace.BlendSpace->bLoop;
 						Input.BlendParameters = BlendParameters;
 
 						BlendSpaceSamplers[BlendSpaceSamplerIdx].Init(Input);
@@ -4653,14 +4569,22 @@ void FDatabaseIndexingContext::PrepareSamplers()
 		}
 	}
 
-	ParallelFor(
-		BlendSpaceSamplers.Num(),
-		[this](int32 SamplerIdx) { BlendSpaceSamplers[SamplerIdx].Process(); },
-		ParallelForFlags
-	);
+	TArray<IAssetSampler*, TInlineAllocator<512>> AssetSampler;
+	AssetSampler.SetNumUninitialized(SequenceSamplers.Num() + BlendSpaceSamplers.Num());
+	
+	for (int i = 0; i < SequenceSamplers.Num(); ++i)
+	{
+		AssetSampler[i] = &SequenceSamplers[i];
+	}
+	for (int i = 0; i < BlendSpaceSamplers.Num(); ++i)
+	{
+		AssetSampler[i + SequenceSamplers.Num()] = &BlendSpaceSamplers[i];
+	}
+
+	ParallelFor(AssetSampler.Num(), [AssetSampler](int32 SamplerIdx) { AssetSampler[SamplerIdx]->Process(); }, ParallelForFlags);
 }
 
-void FDatabaseIndexingContext::PrepareIndexers()
+void FDatabaseIndexingContext::PrepareIndexers(const FBoneContainer& BoneContainer)
 {
 	Indexers.Reserve(Database->GetSearchIndex()->Assets.Num());
 
@@ -4675,6 +4599,7 @@ void FDatabaseIndexingContext::PrepareIndexers()
 	};
 
 	Indexers.Reserve(Database->GetSearchIndex()->Assets.Num());
+
 	for (int32 AssetIdx = 0; AssetIdx != SearchIndex->Assets.Num(); ++AssetIdx)
 	{
 		const FPoseSearchIndexAsset& SearchIndexAsset = SearchIndex->Assets[AssetIdx];
@@ -4687,7 +4612,7 @@ void FDatabaseIndexingContext::PrepareIndexers()
 
 		if (SearchIndexAsset.Type == ESearchIndexAssetType::Sequence)
 		{
-			const FPoseSearchDatabaseSequence& DbSequence = Database->GetSequenceSourceAsset(&SearchIndexAsset);
+			const FPoseSearchDatabaseSequence& DbSequence = Database->GetSequenceSourceAsset(SearchIndexAsset);
 			const float SequenceLength = DbSequence.Sequence->GetPlayLength();
 			IndexerContext.MainSampler = GetSequenceSampler(DbSequence.Sequence);
 			IndexerContext.LeadInSampler = SearchIndexAsset.SamplingInterval.Min == 0.0f ? GetSequenceSampler(DbSequence.LeadInSequence) : nullptr;
@@ -4695,7 +4620,7 @@ void FDatabaseIndexingContext::PrepareIndexers()
 		}
 		else if (SearchIndexAsset.Type == ESearchIndexAssetType::BlendSpace)
 		{
-			const FPoseSearchDatabaseBlendSpace& DbBlendSpace = Database->GetBlendSpaceSourceAsset(&SearchIndexAsset);
+			const FPoseSearchDatabaseBlendSpace& DbBlendSpace = Database->GetBlendSpaceSourceAsset(SearchIndexAsset);
 			IndexerContext.MainSampler = GetBlendSpaceSampler(DbBlendSpace.BlendSpace, SearchIndexAsset.BlendParameters);
 		}
 		else
@@ -4704,18 +4629,14 @@ void FDatabaseIndexingContext::PrepareIndexers()
 		}
 
 		FAssetIndexer& Indexer = Indexers.AddDefaulted_GetRef();
-		Indexer.Init(IndexerContext);
+		Indexer.Init(IndexerContext, BoneContainer);
 	}
 }
 
 bool FDatabaseIndexingContext::IndexAssets()
 {
 	// Index asset data
-	ParallelFor(
-		Indexers.Num(),
-		[this](int32 AssetIdx) { Indexers[AssetIdx].Process(); },
-		ParallelForFlags
-	);
+	ParallelFor(Indexers.Num(), [this](int32 AssetIdx) { Indexers[AssetIdx].Process(); }, ParallelForFlags);
 	return true;
 }
 
@@ -4750,6 +4671,7 @@ void FDatabaseIndexingContext::JoinIndex()
 	SearchIndex->Values.Reset();
 	SearchIndex->PoseMetadata.Reset();
 	SearchIndex->PCAValues.Reset();
+	SearchIndex->OverallFlags = EPoseSearchPoseFlags::None;
 
 	for (int32 AssetIdx = 0; AssetIdx != SearchIndex->Assets.Num(); ++AssetIdx)
 	{
@@ -4759,8 +4681,17 @@ void FDatabaseIndexingContext::JoinIndex()
 		SearchIndexAsset.NumPoses = Output.NumIndexedPoses;
 		SearchIndexAsset.FirstPoseIdx = TotalPoses;
 
+		const int32 PoseMetadataStartIdx = SearchIndex->PoseMetadata.Num();
+		const int32 PoseMetadataEndIdx = PoseMetadataStartIdx + Output.PoseMetadata.Num();
+
 		SearchIndex->Values.Append(Output.FeatureVectorTable.GetData(), Output.FeatureVectorTable.Num());
 		SearchIndex->PoseMetadata.Append(Output.PoseMetadata);
+		
+		for (int32 i = PoseMetadataStartIdx; i < PoseMetadataEndIdx; ++i)
+		{
+			SearchIndex->PoseMetadata[i].AssetIndex = AssetIdx;
+			SearchIndex->OverallFlags |= SearchIndex->PoseMetadata[i].Flags;
+		}
 
 		TotalPoses += Output.NumIndexedPoses;
 		TotalFloats += Output.FeatureVectorTable.Num();
@@ -4798,8 +4729,11 @@ bool BuildIndex(const UPoseSearchDatabase* Database, FPoseSearchIndex& OutSearch
 	DbIndexingContext.Database = Database;
 	DbIndexingContext.SearchIndex = &OutSearchIndex;
 
-	DbIndexingContext.PrepareSamplers();
-	DbIndexingContext.PrepareIndexers();
+	FBoneContainer BoneContainer;
+	BoneContainer.InitializeTo(Database->Schema->BoneIndicesWithParents, FCurveEvaluationOption(false), *Database->Schema->Skeleton);
+
+	DbIndexingContext.PrepareSamplers(BoneContainer);
+	DbIndexingContext.PrepareIndexers(BoneContainer);
 	bSuccess &= DbIndexingContext.IndexAssets();
 	DbIndexingContext.JoinIndex();
 

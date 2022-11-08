@@ -289,9 +289,11 @@ struct FAnimNotifyEvent : public FAnimLinkableElement
 {
 	GENERATED_USTRUCT_BODY()
 
+#if WITH_EDITORONLY_DATA
 	/** The user requested time for this notify */
 	UPROPERTY()
 	float DisplayTime_DEPRECATED;
+#endif
 
 	/** An offset from the DisplayTime to the actual time we will trigger the notify, as we cannot always trigger it exactly at the time the user wants */
 	UPROPERTY()
@@ -371,12 +373,14 @@ private:
 public:
 	FAnimNotifyEvent()
 		: FAnimLinkableElement()
+#if WITH_EDITORONLY_DATA
 		, DisplayTime_DEPRECATED(0)
+#endif
 		, TriggerTimeOffset(0)
 		, EndTriggerTimeOffset(0)
 		, TriggerWeightThreshold(ZERO_ANIMWEIGHT_THRESH)
-		, Notify(NULL)
-		, NotifyStateClass(NULL)
+		, Notify(nullptr)
+		, NotifyStateClass(nullptr)
 		, Duration(0)
 		, bConvertedFromBranchingPoint(false)
 		, MontageTickType(EMontageNotifyTickType::Queued)
@@ -879,6 +883,33 @@ struct ENGINE_API FRawAnimSequenceTrack
 		}
 
 		return Ar;
+	}
+
+	bool ContainsNaN() const
+	{
+		bool bContainsNaN = false;
+
+		auto CheckForNan = [&bContainsNaN](const auto& Keys) -> bool
+		{
+			if (!bContainsNaN)
+			{
+				for (const auto& Key : Keys)
+				{
+					if (Key.ContainsNaN())
+						return true;
+				}
+
+				return false;
+			}
+		
+			return true;
+		};
+
+		bContainsNaN = CheckForNan(PosKeys);
+		bContainsNaN = CheckForNan(RotKeys);
+		bContainsNaN = CheckForNan(ScaleKeys);
+
+		return bContainsNaN;
 	}
 
 	bool Serialize(FArchive& Ar)

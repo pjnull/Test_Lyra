@@ -226,7 +226,7 @@ EOS_EResult FEOSSDKManager::Initialize()
 		{
 			bInitialized = true;
 
-			FCoreDelegates::OnConfigSectionsChanged.AddRaw(this, &FEOSSDKManager::OnConfigSectionsChanged);
+			FCoreDelegates::TSOnConfigSectionsChanged().AddRaw(this, &FEOSSDKManager::OnConfigSectionsChanged);
 			LoadConfig();
 
 #if !NO_LOGGING
@@ -244,6 +244,8 @@ EOS_EResult FEOSSDKManager::Initialize()
 				UE_LOG(LogEOSSDK, Warning, TEXT("EOS_Logging_SetLogLevel failed Verbosity=%s error=[%s]"), ToString(LogEOSSDK.GetVerbosity()), *LexToString(EosResult));
 			}
 #endif // !NO_LOGGING
+
+			FCoreDelegates::OnNetworkConnectionStatusChanged.AddRaw(this, &FEOSSDKManager::OnNetworkConnectionStatusChanged);
 		}
 		else
 		{
@@ -409,7 +411,15 @@ IEOSPlatformHandlePtr FEOSSDKManager::CreatePlatform(const FString& PlatformConf
 	if (PlatformConfig->bDisableOverlay) PlatformOptions.Flags |= EOS_PF_DISABLE_OVERLAY;
 	if (PlatformConfig->bDisableSocialOverlay) PlatformOptions.Flags |= EOS_PF_DISABLE_SOCIAL_OVERLAY;
 
-	PlatformOptions.CacheDirectory = Utf8CacheDirectory.Length() ? Utf8DeploymentId.Get() : nullptr;
+	if (FPlatformMisc::IsCacheStorageAvailable())
+	{
+		PlatformOptions.CacheDirectory = Utf8CacheDirectory.Length() ? Utf8DeploymentId.Get() : nullptr;
+	}
+	else
+	{
+		PlatformOptions.CacheDirectory = nullptr;
+	}
+
 	PlatformOptions.TickBudgetInMilliseconds = PlatformConfig->TickBudgetInMilliseconds;
 
 	static_assert(EOS_PLATFORM_RTCOPTIONS_API_LATEST == 1, "EOS_Platform_RTCOptions updated");
@@ -452,7 +462,7 @@ IEOSPlatformHandlePtr FEOSSDKManager::CreatePlatform(EOS_Platform_Options& Platf
 			SetupTicker();
 
 			EOS_Platform_SetApplicationStatus(PlatformHandle, CachedApplicationStatus);
-			EOS_Platform_SetNetworkStatus(PlatformHandle, CachedNetworkStatus);
+			EOS_Platform_SetNetworkStatus(PlatformHandle, ConvertNetworkStatus(FPlatformMisc::GetNetworkConnectionStatus()));
 
 			// Tick the platform once to work around EOSSDK error logging that occurs if you create then immediately destroy a platform.
 			SharedPlatform->Tick();
@@ -530,6 +540,33 @@ bool FEOSSDKManager::Tick(float)
 	return true;
 }
 
+EOS_ENetworkStatus FEOSSDKManager::ConvertNetworkStatus(ENetworkConnectionStatus Status)
+{
+	switch (Status)
+	{
+	case ENetworkConnectionStatus::Unknown:			return EOS_ENetworkStatus::EOS_NS_Online;
+	case ENetworkConnectionStatus::Disabled:		return EOS_ENetworkStatus::EOS_NS_Disabled;
+	case ENetworkConnectionStatus::Local:			return EOS_ENetworkStatus::EOS_NS_Offline;
+	case ENetworkConnectionStatus::Connected:		return EOS_ENetworkStatus::EOS_NS_Online;
+	}
+
+	checkNoEntry();
+	return EOS_ENetworkStatus::EOS_NS_Disabled;
+}
+
+void FEOSSDKManager::OnNetworkConnectionStatusChanged(ENetworkConnectionStatus LastConnectionState, ENetworkConnectionStatus ConnectionState)
+{
+	const EOS_ENetworkStatus OldNetworkStatus = ConvertNetworkStatus(LastConnectionState);
+	const EOS_ENetworkStatus NewNetworkStatus = ConvertNetworkStatus(ConnectionState);
+
+	UE_LOG(LogEOSSDK, Log, TEXT("OnNetworkConnectionStatusChanged [%s] -> [%s]"), LexToString(OldNetworkStatus), LexToString(NewNetworkStatus));
+
+	for (EOS_HPlatform PlatformHandle : ActivePlatforms)
+	{
+		EOS_Platform_SetNetworkStatus(PlatformHandle, NewNetworkStatus);
+	}
+}
+
 void FEOSSDKManager::OnApplicationStatusChanged(EOS_EApplicationStatus ApplicationStatus)
 {
 	UE_LOG(LogEOSSDK, Log, TEXT("OnApplicationStatusChanged [%s] -> [%s]"), LexToString(CachedApplicationStatus), LexToString(ApplicationStatus));
@@ -537,16 +574,6 @@ void FEOSSDKManager::OnApplicationStatusChanged(EOS_EApplicationStatus Applicati
 	for (EOS_HPlatform PlatformHandle : ActivePlatforms)
 	{
 		EOS_Platform_SetApplicationStatus(PlatformHandle, ApplicationStatus);
-	}
-}
-
-void FEOSSDKManager::OnNetworkStatusChanged(EOS_ENetworkStatus NetworkStatus)
-{
-	UE_LOG(LogEOSSDK, Log, TEXT("OnNetworkStatusChanged [%s] -> [%s]"), LexToString(CachedNetworkStatus), LexToString(NetworkStatus));
-	CachedNetworkStatus = NetworkStatus;
-	for (EOS_HPlatform PlatformHandle : ActivePlatforms)
-	{
-		EOS_Platform_SetNetworkStatus(PlatformHandle, NetworkStatus);
 	}
 }
 
@@ -653,7 +680,7 @@ void FEOSSDKManager::Shutdown()
 			ReleaseReleasedPlatforms();
 		}
 
-		FCoreDelegates::OnConfigSectionsChanged.RemoveAll(this);
+		FCoreDelegates::TSOnConfigSectionsChanged().RemoveAll(this);
 
 #if !NO_LOGGING
 		FCoreDelegates::OnLogVerbosityChanged.RemoveAll(this);
@@ -665,6 +692,8 @@ void FEOSSDKManager::Shutdown()
 		CallbackObjects.Empty();
 
 		bInitialized = false;
+
+		FCoreDelegates::OnNetworkConnectionStatusChanged.RemoveAll(this);
 	}
 }
 

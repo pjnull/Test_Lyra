@@ -1202,7 +1202,8 @@ protected:
 			checkf(WriteDescriptors[DescriptorIndex].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE || WriteDescriptors[DescriptorIndex].descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 				TEXT("DescriptorType mismatch at index %d: called WriteTextureView<%d> and was expecting %d."),
 				DescriptorIndex, (uint32)DescriptorType, (uint32)WriteDescriptors[DescriptorIndex].descriptorType);
-			ensureMsgf(Layout == VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR ||
+			ensureMsgf(Layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL ||
+				  Layout == VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR ||
 				  Layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL ||
 				  Layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL ||
 				  Layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL || 
@@ -1376,7 +1377,7 @@ private:
 	public:
 		FCachedPool(FVulkanDevice* InDevice, uint32 InMaxDescriptorSets, const float PoolSizesRatio[VK_DESCRIPTOR_TYPE_RANGE_SIZE]);
 
-		uint32 GetMaxDescriptorSets() const
+		inline uint32 GetMaxDescriptorSets() const
 		{
 			return Pool.GetMaxDescriptorSets();
 		}
@@ -1413,3 +1414,40 @@ private:
 	float PoolAllocRatio;
 };
 
+// Manager for resource descriptors used in bindless rendering.
+class FVulkanBindlessDescriptorManager : public VulkanRHI::FDeviceChild
+{
+public:
+	using BindlessLayoutArray = TArray<VkDescriptorSetLayout, TInlineAllocator<VulkanBindless::MaxNumSets>>;
+
+	FVulkanBindlessDescriptorManager(FVulkanDevice* InDevice);
+	~FVulkanBindlessDescriptorManager();
+
+	void Init();
+
+	BindlessLayoutArray GeneratePipelineLayout(const TArray<VkDescriptorSetLayout>& LayoutArray) const;
+
+	void BindDescriptorSets(VkCommandBuffer CommandBuffer, VkPipelineBindPoint BindPoint);
+
+	FRHIDescriptorHandle RegisterSampler(VkSampler VulkanSampler);
+
+private:
+	const bool bBindlessResourcesAllowed;
+	const bool bBindlessSamplersAllowed;
+
+	uint32 MaxResourceDescriptors = 0;
+	uint32 MaxSamplerDescriptors = 0;
+
+	std::atomic<uint32> BindlessSamplerCount = 0;
+
+	VkDescriptorSetLayout EmptyDescriptorSetLayout = VK_NULL_HANDLE;
+
+	VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
+
+	VkDescriptorSetLayout SamplerDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout ResourceDescriptorSetLayout = VK_NULL_HANDLE;
+
+	VkDescriptorSet  DescriptorSets[VulkanBindless::NumBindlessSets] = { VK_NULL_HANDLE };
+
+	VkPipelineLayout BindlessPipelineLayout = VK_NULL_HANDLE;
+};

@@ -280,6 +280,21 @@ struct CORE_API FUE5MainStreamObjectVersion
 		// Replace FNames for class/actor paths with FSoftObjectPath
 		WorldPartitionActorDescActorAndClassPaths,
 
+		// Reintroducing AnimationDataModelInterface_BackedOut changes
+		ReintroduceAnimationDataModelInterface,
+
+		// Support 16-bit skin weights on SkeletalMesh
+		IncreasedSkinWeightPrecision,
+
+		// bIsUsedWithVolumetricCloud flag auto conversion
+		MaterialHasIsUsedWithVolumetricCloudFlag,
+
+		// bIsUsedWithVolumetricCloud flag auto conversion
+		UpdateHairDescriptionBulkData,
+
+		// Added TransformScaleMethod pin to SpawnActorFromClass node
+		SpawnActorFromClassTransformScaleMethod,
+
 		// -----<new versions can be added above this line>-------------------------------------------------
 		VersionPlusOne,
 		LatestVersion = VersionPlusOne - 1

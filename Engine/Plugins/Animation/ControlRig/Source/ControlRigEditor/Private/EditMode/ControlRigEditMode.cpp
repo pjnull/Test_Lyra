@@ -3450,6 +3450,7 @@ void FControlRigEditMode::OnHierarchyModified(ERigHierarchyNotification InNotif,
 		case ERigHierarchyNotification::ElementAdded:
 		case ERigHierarchyNotification::ElementRemoved:
 		case ERigHierarchyNotification::ElementRenamed:
+		case ERigHierarchyNotification::ElementReordered:
 		case ERigHierarchyNotification::HierarchyReset:
 		{
 			UControlRig* ControlRig = InHierarchy->GetTypedOuter<UControlRig>();
@@ -3566,7 +3567,7 @@ void FControlRigEditMode::OnHierarchyModified(ERigHierarchyNotification InNotif,
 							{
 								ControlProxy->SelectProxy(ControlRig,Key.Name, bSelected);
 
-								if(ControlElement->Settings.AnimationType == ERigControlAnimationType::ProxyControl)
+								if(ControlElement->CanDriveControls())
 								{
 									const UControlRigEditModeSettings* Settings = GetDefault<UControlRigEditModeSettings>();
 
@@ -3682,8 +3683,10 @@ void FControlRigEditMode::OnHierarchyModified_AnyThread(ERigHierarchyNotificatio
 		{
 			return;
 		}
-		const FRigBaseElement* Element = WeakHierarchy.Get()->Find(Key);
-		OnHierarchyModified(InNotif, WeakHierarchy.Get(), Element);
+		if (const FRigBaseElement* Element = WeakHierarchy.Get()->Find(Key))
+		{
+			OnHierarchyModified(InNotif, WeakHierarchy.Get(), Element);
+		}
 		
 	}, TStatId(), NULL, ENamedThreads::GameThread);
 }
@@ -4506,7 +4509,7 @@ void FControlRigEditMode::NotifyDrivenControls(UControlRig* InControlRig, const 
 	// if we are changing a proxy control - we also need to notify the change for the driven controls
 	if (FRigControlElement* ControlElement = InControlRig->GetHierarchy()->Find<FRigControlElement>(InKey))
 	{
-		if(ControlElement->Settings.AnimationType == ERigControlAnimationType::ProxyControl)
+		if(ControlElement->CanDriveControls())
 		{
 			FRigControlModifiedContext Context;
 			Context.EventName = FRigUnit_BeginExecution::EventName;

@@ -470,9 +470,6 @@ private:
 	/** When true, the specified cubemap face index value is used, otherwise the value of -1 is used.*/
 	bool bUseSpecifiedFace;
 
-	/** During re-import, cache this setting so it can be restored if necessary */
-	bool SavedCompressionSetting;
-
 	/** The texture's zoom factor. */
 	double Zoom;
 
@@ -535,7 +532,7 @@ private:
 	void OnEstimateCompressionChanged(ECheckBoxState NewState);
 	ECheckBoxState EstimateCompressionChecked() const;
 
-	TSharedPtr<STextBlock> OodleEncoderUsed;
+	TSharedPtr<STextBlock> OodleCompressorUsed;
 	TSharedPtr<STextBlock> OodleLevelUsed;
 	TSharedPtr<STextBlock> OodleCompressionBlockUsed;
 	TSharedPtr<STextBlock> OodleEstimateRaw;

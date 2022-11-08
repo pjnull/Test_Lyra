@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using EpicGames.Horde.Common;
 using EpicGames.Horde.Compute;
 using Horde.Build.Agents.Fleet;
@@ -11,6 +13,92 @@ namespace Horde.Build.Agents.Pools
 {
 	using PoolId = StringId<IPool>;
 
+	/// <summary>
+	/// Metadata for configuring and picking a pool sizing strategy
+	/// </summary>
+	public class PoolSizeStrategyInfo
+	{
+		/// <summary>
+		/// Strategy implementation to use
+		/// </summary>
+		public PoolSizeStrategy Type { get; set; }
+		
+		/// <summary>
+		/// Condition if this strategy should be enabled (right now, using date/time as a distinguishing factor)
+		/// </summary>
+		public Condition? Condition { get; set; }
+
+		/// <summary>
+		/// Configuration for the strategy, serialized as JSON
+		/// </summary>
+		public string Config { get; set; } = "";
+
+		/// <summary>
+		/// Empty constructor for JSON serialization
+		/// </summary>
+		public PoolSizeStrategyInfo()
+		{
+		}
+		
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		public PoolSizeStrategyInfo(PoolSizeStrategy type, Condition? condition, string? config)
+		{
+			config = String.IsNullOrWhiteSpace(config) ? "{}" : config;
+
+			// Try deserializing to ensure the config is valid JSON
+			// Config can be null due to JSON serializer calling the constructor
+			JsonSerializer.Deserialize<dynamic>(config);
+			
+			Type = type;
+			Condition = condition;
+			Config = config;
+		}
+	}
+	
+	/// <summary>
+	/// Metadata for configuring and picking a fleet manager
+	/// </summary>
+	public class FleetManagerInfo
+	{
+		/// <summary>
+		/// Fleet manager type implementation to use
+		/// </summary>
+		public FleetManagerType Type { get; set; }
+		
+		/// <summary>
+		/// Condition if this strategy should be enabled (right now, using date/time as a distinguishing factor)
+		/// </summary>
+		public Condition? Condition { get; set; }
+
+		/// <summary>
+		/// Configuration for the strategy, serialized as JSON
+		/// </summary>
+		public string Config { get; set; } = "{}";
+
+		/// <summary>
+		/// Empty constructor for BSON/JSON serialization
+		/// </summary>
+		public FleetManagerInfo()
+		{
+		}
+		
+		/// <summary>
+		/// Constructor
+		/// </summary>
+		[JsonConstructor]
+		public FleetManagerInfo(FleetManagerType type, Condition? condition, string? config)
+		{
+			config = String.IsNullOrWhiteSpace(config) ? "{}" : config;
+			JsonSerializer.Deserialize<dynamic>(config);
+			
+			Type = type;
+			Condition = condition;
+			Config = config;
+		}
+	}
+	
 	/// <summary>
 	/// A pool of machines
 	/// </summary>
@@ -90,6 +178,17 @@ namespace Horde.Build.Agents.Pools
 		/// Pool sizing strategy to be used for this pool
 		/// </summary>
 		public PoolSizeStrategy SizeStrategy { get; }
+
+		/// <summary>
+		/// List of pool sizing strategies for this pool. The first strategy with a matching condition will be picked.
+		/// </summary>
+		public IReadOnlyList<PoolSizeStrategyInfo> SizeStrategies { get; }
+
+		/// <summary>
+		/// List of fleet managers for this pool. The first strategy with a matching condition will be picked.
+		/// If empty or no conditions match, a default fleet manager will be used.
+		/// </summary>
+		public IReadOnlyList<FleetManagerInfo> FleetManagers { get; }
 		
 		/// <summary>
 		/// Settings for lease utilization pool sizing strategy (if used)

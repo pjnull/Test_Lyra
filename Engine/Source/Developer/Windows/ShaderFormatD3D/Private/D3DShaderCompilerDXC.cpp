@@ -552,7 +552,9 @@ static bool RewriteUsingSC(FString& PreprocessedShaderSource, const FShaderCompi
 
 			if (bDumpDebugInfo)
 			{
-				DumpDebugUSF(Input, CStrSourceData.c_str(), 0, GRewrittenBaseFilename);
+				UE::ShaderCompilerCommon::FDebugShaderDataOptions DebugDataOptions;
+				DebugDataOptions.OverrideBaseFilename = GRewrittenBaseFilename;
+				UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShaderSource, DebugDataOptions);
 			}
 		}
 	}
@@ -611,8 +613,8 @@ bool CompileAndProcessD3DShaderDXC(FString& PreprocessedShaderSource,
 		bEnable16BitTypes = true;
 	}
 
-	// Write out the preprocessed file and a batch file to compile it if requested (DumpDebugInfoPath is valid)
-	bool bDumpDebugInfo = DumpDebugShaderUSF(PreprocessedShaderSource, Input);
+	UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShaderSource);
+	bool bDumpDebugInfo = Input.DumpDebugInfoEnabled(); 
 
 	FString Filename = Input.GetSourceFilename();
 
@@ -665,12 +667,6 @@ bool CompileAndProcessD3DShaderDXC(FString& PreprocessedShaderSource,
 	{
 		FString BatchFileContents = D3DCreateDXCCompileBatchFile(Args, Filename);
 		FFileHelper::SaveStringToFile(BatchFileContents, *(Input.DumpDebugInfoPath / TEXT("CompileDXC.bat")));
-
-		if (Input.bGenerateDirectCompileFile)
-		{
-			FFileHelper::SaveStringToFile(CreateShaderCompilerWorkerDirectCommandLine(Input), *(Input.DumpDebugInfoPath / TEXT("DirectCompile.txt")));
-			FFileHelper::SaveStringToFile(Input.DebugDescription, *(Input.DumpDebugInfoPath / TEXT("permutation_info.txt")));
-		}
 	}
 
 	TRefCountPtr<IDxcBlob> ShaderBlob;
@@ -773,6 +769,19 @@ bool CompileAndProcessD3DShaderDXC(FString& PreprocessedShaderSource,
 
 						NumFoundEntryPoints++;
 					}
+				}
+			}
+
+			// @todo - working around DXC issue https://github.com/microsoft/DirectXShaderCompiler/issues/4715
+			if (LibraryDesc.FunctionCount > 0)
+			{
+				if (Input.Environment.CompilerFlags.Contains(CFLAG_BindlessResources))
+				{
+					ShaderRequiresFlags |= D3D_SHADER_REQUIRES_RESOURCE_DESCRIPTOR_HEAP_INDEXING;
+				}
+				if (Input.Environment.CompilerFlags.Contains(CFLAG_BindlessSamplers))
+				{
+					ShaderRequiresFlags |= D3D_SHADER_REQUIRES_SAMPLER_DESCRIPTOR_HEAP_INDEXING;
 				}
 			}
 
@@ -882,6 +891,14 @@ bool CompileAndProcessD3DShaderDXC(FString& PreprocessedShaderSource,
 		// Save results if compilation and reflection succeeded
 		if (Output.bSucceeded)
 		{
+			int32 RayTracingPayloadType = 0;
+			if (bIsRayTracingShader)
+			{
+				if (const FString* RTPayloadTypePtr = Input.Environment.GetDefinitions().Find(TEXT("RT_PAYLOAD_TYPE")))
+				{
+					RayTracingPayloadType = FCString::Atoi(**RTPayloadTypePtr);
+				}
+			}
 			auto PostSRTWriterCallback = [&](FMemoryWriter& Ar)
 			{
 				if (bIsRayTracingShader)
@@ -889,6 +906,7 @@ bool CompileAndProcessD3DShaderDXC(FString& PreprocessedShaderSource,
 					Ar << RayEntryPoint;
 					Ar << RayAnyHitEntryPoint;
 					Ar << RayIntersectionEntryPoint;
+					Ar << RayTracingPayloadType;
 				}
 			};
 

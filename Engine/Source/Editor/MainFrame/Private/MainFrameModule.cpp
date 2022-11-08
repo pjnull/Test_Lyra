@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MainFrameModule.h"
+#include "Features/IModularFeatures.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
 #include "SlateOptMacros.h"
@@ -33,6 +34,7 @@
 #include "Toolkits/FConsoleCommandExecutor.h"
 #include "Misc/MessageDialog.h"
 #include "ProfilingDebugging/StallDetector.h"
+#include "Interfaces/IEditorMainFrameProvider.h"
 
 DEFINE_LOG_CATEGORY(LogMainFrame);
 #define LOCTEXT_NAMESPACE "FMainFrameModule"
@@ -68,6 +70,52 @@ const FText StaticGetApplicationTitle( const bool bIncludeGameName )
 	return ApplicationTitle;
 }
 
+/* FProjectDialogProvider
+ *****************************************************************************/
+
+void FProjectDialogProvider::Register()
+{
+	IModularFeatures::Get().RegisterModularFeature(IEditorMainFrameProvider::GetModularFeatureName(), this);
+}
+
+void FProjectDialogProvider::UnRegister()
+{
+	IModularFeatures::Get().UnregisterModularFeature(IEditorMainFrameProvider::GetModularFeatureName(), this);
+}
+
+bool FProjectDialogProvider::IsRequestingMainFrameControl() const
+{
+	return !FApp::HasProjectName();
+}
+
+FMainFrameWindowOverrides FProjectDialogProvider::GetDesiredWindowConfiguration() const
+{
+	FMainFrameWindowOverrides ProjectDialogWindowConfig;
+
+	// Force tabs restored from layout that have no window (the LevelEditor tab) to use a docking area with
+	// embedded title area content.  We need to override the behavior here because we're creating the actual
+	// window ourselves instead of letting the tab management system create it for us.
+	ProjectDialogWindowConfig.bEmbedTitleAreaContent = false;
+
+	// Do not maximize the window initially. Keep a small dialog feel.
+	ProjectDialogWindowConfig.bInitiallyMaximized = false;
+
+	ProjectDialogWindowConfig.WindowSize = FMainFrameModule::GetProjectBrowserWindowSize();
+
+	ProjectDialogWindowConfig.bIsUserSizable = true;
+	ProjectDialogWindowConfig.bSupportsMaximize = true;
+	ProjectDialogWindowConfig.bSupportsMinimize = true;
+	ProjectDialogWindowConfig.CenterRules = EAutoCenter::PreferredWorkArea;
+	// When opening the project dialog, show "Project Browser" in the window title
+	ProjectDialogWindowConfig.WindowTitle = LOCTEXT("ProjectBrowserDialogTitle", "Unreal Project Browser");
+
+	return ProjectDialogWindowConfig;
+}
+
+TSharedRef<SWidget> FProjectDialogProvider::CreateMainFrameContentWidget() const
+{
+	return FGameProjectGenerationModule::Get().CreateGameProjectDialog(/*bAllowProjectOpening=*/true, /*bAllowProjectCreate=*/true);
+}
 
 /* IMainFrameModule implementation
  *****************************************************************************/
@@ -102,32 +150,40 @@ void FMainFrameModule::CreateDefaultMainFrameAuxiliary(const bool bStartImmersiv
 	{
 		FRootWindowLocation DefaultWindowLocation;
 
-		bool bEmbedTitleAreaContent = true;
-		bool bIsUserSizable = true;
-		bool bSupportsMaximize = true;
-		bool bSupportsMinimize = true;
-		EAutoCenter CenterRules = EAutoCenter::None;
-		FText WindowTitle;
-		if ( ShouldShowProjectDialogAtStartup() )
+		FMainFrameWindowOverrides WindowConfig;
+		bool bShowStartupDialogInPlaceOfMainEditor = false;
+		TSharedPtr<SWidget> MainFrameContent;
+
+		FGameProjectGenerationModule::Get();
+
+		TArray<IEditorMainFrameProvider*> MainFrameProviders = IModularFeatures::Get().GetModularFeatureImplementations<IEditorMainFrameProvider>(IEditorMainFrameProvider::GetModularFeatureName());		
+		for (IEditorMainFrameProvider* Provider: MainFrameProviders)
 		{
-			// Force tabs restored from layout that have no window (the LevelEditor tab) to use a docking area with
-			// embedded title area content.  We need to override the behavior here because we're creating the actual
-			// window ourselves instead of letting the tab management system create it for us.
-			bEmbedTitleAreaContent = false;
+			if (Provider && Provider->IsRequestingMainFrameControl())
+			{
+				WindowConfig = Provider->GetDesiredWindowConfiguration();
+				MainFrameContent = Provider->CreateMainFrameContentWidget();
+				bShowStartupDialogInPlaceOfMainEditor = true;
 
-			// Do not maximize the window initially. Keep a small dialog feel.
-			DefaultWindowLocation.InitiallyMaximized = false;
-
-			DefaultWindowLocation.WindowSize = GetProjectBrowserWindowSize();
-
-			bIsUserSizable = true;
-			bSupportsMaximize = true;
-			bSupportsMinimize = true;
-			CenterRules = EAutoCenter::PreferredWorkArea;;
-			// When opening the project dialog, show "Project Browser" in the window title
-			WindowTitle = LOCTEXT("ProjectBrowserDialogTitle", "Unreal Project Browser");
+				// We can only have one main frame provider, which means we just use  the first active one
+				break;
+			}
 		}
-		else
+
+		if (WindowConfig.ScreenPosition.IsSet())
+		{
+			DefaultWindowLocation.ScreenPosition = WindowConfig.ScreenPosition.GetValue();
+		}
+		if (WindowConfig.WindowSize.IsSet())
+		{
+			DefaultWindowLocation.WindowSize = WindowConfig.WindowSize.GetValue();
+		}
+		if (WindowConfig.bInitiallyMaximized.IsSet())
+		{
+			DefaultWindowLocation.InitiallyMaximized = WindowConfig.bInitiallyMaximized.GetValue();
+		}
+
+		if (!bShowStartupDialogInPlaceOfMainEditor)
 		{
 			if( bStartImmersive )
 			{
@@ -136,19 +192,19 @@ void FMainFrameModule::CreateDefaultMainFrameAuxiliary(const bool bStartImmersiv
 			}
 
 			const bool bIncludeGameName = true;
-			WindowTitle = GetApplicationTitle( bIncludeGameName );
+			WindowConfig.WindowTitle = GetApplicationTitle( bIncludeGameName );
 		}
 
 		TSharedRef<SWindow> RootWindow = SNew(SWindow)
-			.AutoCenter(CenterRules)
-			.Title( WindowTitle )
+			.AutoCenter(WindowConfig.CenterRules)
+			.Title( WindowConfig.WindowTitle )
 			.IsInitiallyMaximized( DefaultWindowLocation.InitiallyMaximized )
 			.ScreenPosition( DefaultWindowLocation.ScreenPosition )
 			.ClientSize( DefaultWindowLocation.WindowSize )
-			.CreateTitleBar( !bEmbedTitleAreaContent )
-			.SizingRule( bIsUserSizable ? ESizingRule::UserSized : ESizingRule::FixedSize )
-			.SupportsMaximize( bSupportsMaximize )
-			.SupportsMinimize( bSupportsMinimize );
+			.CreateTitleBar( !WindowConfig.bEmbedTitleAreaContent )
+			.SizingRule( WindowConfig.bIsUserSizable ? ESizingRule::UserSized : ESizingRule::FixedSize )
+			.SupportsMaximize( WindowConfig.bSupportsMaximize )
+			.SupportsMinimize( WindowConfig.bSupportsMinimize );
 
 		const bool bShowRootWindowImmediately = false;
 		FSlateApplication::Get().AddWindow( RootWindow, bShowRootWindowImmediately );
@@ -158,19 +214,14 @@ void FMainFrameModule::CreateDefaultMainFrameAuxiliary(const bool bStartImmersiv
 
 		FSlateNotificationManager::Get().SetRootWindow(RootWindow);
 
-		TSharedPtr<SWidget> MainFrameContent;
 		bool bLevelEditorIsMainTab = false;
-		if ( ShouldShowProjectDialogAtStartup() )
-		{
-			MainFrameContent = FGameProjectGenerationModule::Get().CreateGameProjectDialog(/*bAllowProjectOpening=*/true, /*bAllowProjectCreate=*/true);
-		}
-		else
+		if (!bShowStartupDialogInPlaceOfMainEditor)
 		{
 			// Get desktop metrics
 			FDisplayMetrics DisplayMetrics;
 			FSlateApplication::Get().GetDisplayMetrics( DisplayMetrics );
 
-			const float DPIScale = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(DisplayMetrics.PrimaryDisplayWorkAreaRect.Left, DisplayMetrics.PrimaryDisplayWorkAreaRect.Top);
+			const float DPIScale = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint((float)DisplayMetrics.PrimaryDisplayWorkAreaRect.Left, (float)DisplayMetrics.PrimaryDisplayWorkAreaRect.Top);
 
 			// Setup a position and size for the main frame window that's centered in the desktop work area
 			const float CenterScale = 0.65f;
@@ -263,7 +314,7 @@ void FMainFrameModule::CreateDefaultMainFrameAuxiliary(const bool bStartImmersiv
 			FToolMenuContext EmptyContext;
 			MakeMainMenu(FGlobalTabmanager::Get(), "MainFrame.NomadMainMenu", EmptyContext);
 		
-			MainFrameContent = FGlobalTabmanager::Get()->RestoreFrom(LoadedLayout, RootWindow, bEmbedTitleAreaContent, OutputCanBeNullptr);
+			MainFrameContent = FGlobalTabmanager::Get()->RestoreFrom(LoadedLayout, RootWindow, WindowConfig.bEmbedTitleAreaContent, OutputCanBeNullptr);
 			// MainFrameContent will only be nullptr if its main area contains invalid tabs (probably some layout bug). If so, reset layout to avoid potential crashes
 			if (!MainFrameContent.IsValid())
 			{
@@ -320,7 +371,7 @@ void FMainFrameModule::CreateDefaultMainFrameAuxiliary(const bool bStartImmersiv
 		MRUFavoritesList = new FMainMRUFavoritesList;
 		MRUFavoritesList->ReadFromINI();
 
-		MainFrameCreationFinishedEvent.Broadcast(RootWindow, ShouldShowProjectDialogAtStartup());
+		MainFrameCreationFinishedEvent.Broadcast(RootWindow, bShowStartupDialogInPlaceOfMainEditor);
 	}
 }
 
@@ -535,6 +586,8 @@ void FMainFrameModule::StartupModule( )
 
 	MRUFavoritesList = NULL;
 
+	ProjectDialogProvider.Register();
+
 	ensureMsgf(!IsRunningGame(), TEXT("The MainFrame module should only be loaded when running the editor.  Code that extends the editor, adds menu items, etc... should not run when running in -game mode or in a non-WITH_EDITOR build"));
 	MainFrameHandler = MakeShareable(new FMainFrameHandler);
 
@@ -598,6 +651,8 @@ void FMainFrameModule::ShutdownModule( )
 		SourceCodeAccessModule.OnOpenFileFailed().RemoveAll( this );
 	}
 #endif
+
+	ProjectDialogProvider.UnRegister();
 }
 
 
@@ -616,16 +671,6 @@ void FMainFrameModule::HandleResizeMainFrameCommand(const TArray<FString>& Args)
 	}
 	
 }
-
-
-/* FMainFrameModule implementation
- *****************************************************************************/
-
-bool FMainFrameModule::ShouldShowProjectDialogAtStartup( ) const
-{
-	return !FApp::HasProjectName();
-}
-
 
 /* FMainFrameModule event handlers
  *****************************************************************************/

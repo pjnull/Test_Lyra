@@ -1,12 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ViewModels/NiagaraSimCacheViewModel.h"
+#include "NiagaraComponent.h"
 #include "NiagaraSimCache.h"
 #include "NiagaraEditorCommon.h"
 #include "NiagaraDebuggerCommon.h"
-#include "Misc/ScopeExit.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "UObject/Package.h"
+#include "UObject/Package.h"
 
 #define LOCTEXT_NAMESPACE "NiagaraSimCacheViewModel"
 
@@ -30,6 +32,7 @@ void FNiagaraSimCacheViewModel::Initialize(TWeakObjectPtr<UNiagaraSimCache> SimC
 
 	WeakSimCache = SimCache;
 	UpdateCachedFrame();
+	SetupPreviewComponentAndInstance();
 	OnViewDataChangedDelegate.Broadcast(true);
 }
 
@@ -47,9 +50,33 @@ void FNiagaraSimCacheViewModel::UpdateSimCache(const FNiagaraSystemSimCacheCaptu
 	}
 	else
 	{
-		UE_LOG(LogNiagaraEditor, Warning, TEXT("Debug Spreadsheet recieved empty sim cache data."));
+		UE_LOG(LogNiagaraEditor, Warning, TEXT("Debug Spreadsheet received empty sim cache data."));
 	}
 	Initialize(SimCache);
+}
+
+void FNiagaraSimCacheViewModel::SetupPreviewComponentAndInstance()
+{
+	UNiagaraSimCache* SimCache = WeakSimCache.Get();
+	UNiagaraSystem* System = SimCache ? SimCache->GetSystem(true) : nullptr;
+
+	if(SimCache && System)
+	{
+		PreviewComponent = NewObject<UNiagaraComponent>(GetTransientPackage(), NAME_None, RF_Transient);
+		PreviewComponent->CastShadow = 1;
+		PreviewComponent->bCastDynamicShadow = 1;
+		PreviewComponent->SetAllowScalability(false);
+		PreviewComponent->SetAsset(System);
+		PreviewComponent->SetForceSolo(true);
+		PreviewComponent->SetAgeUpdateMode(ENiagaraAgeUpdateMode::DesiredAge);
+		PreviewComponent->SetCanRenderWhileSeeking(false);
+		PreviewComponent->Activate(true);
+		PreviewComponent->SetSimCache(SimCache);
+		PreviewComponent->SetRelativeLocation(FVector::ZeroVector);
+		PreviewComponent->SetDesiredAge(SimCache->GetStartSeconds());
+	}
+
+	
 }
 
 FText FNiagaraSimCacheViewModel::GetComponentText(const FName ComponentName, const int32 InstanceIndex) const
@@ -101,6 +128,16 @@ void FNiagaraSimCacheViewModel::SetFrameIndex(const int32 InFrameIndex)
 {
 	FrameIndex = InFrameIndex;
 	UpdateCachedFrame();
+	const UNiagaraSimCache* SimCache = WeakSimCache.Get();
+	if(PreviewComponent && SimCache)
+	{
+		const float Duration = SimCache->GetDurationSeconds();
+		const int NumFrames = SimCache->GetNumFrames();
+
+		const float NormalizedFrame = NumFrames == 0 ? 0.0f : float(InFrameIndex) / float(NumFrames - 1);
+		
+		PreviewComponent->SetDesiredAge(SimCache->GetStartSeconds() + (Duration * NormalizedFrame));
+	}
 	OnViewDataChangedDelegate.Broadcast(false);
 }
 

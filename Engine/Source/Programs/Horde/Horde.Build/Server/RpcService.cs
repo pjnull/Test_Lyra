@@ -13,6 +13,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using EpicGames.BuildGraph.Expressions;
+using EpicGames.BuildGraph;
+using System.Xml.Linq;
 using EpicGames.Core;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -216,13 +219,13 @@ namespace Horde.Build.Server
 
 				// Get the set of workspaces that are currently required
 				HashSet<AgentWorkspace> conformWorkspaces = await _poolService.GetWorkspacesAsync(agent, DateTime.UtcNow);
-				bool bPendingConform = !conformWorkspaces.SetEquals(newWorkspaces) || (agent.RequestFullConform && !request.RemoveUntrackedFiles);
+				bool pendingConform = !conformWorkspaces.SetEquals(newWorkspaces) || (agent.RequestFullConform && !request.RemoveUntrackedFiles);
 
 				// Update the workspaces
-				if (await _agentService.TryUpdateWorkspacesAsync(agent, newWorkspaces, bPendingConform))
+				if (await _agentService.TryUpdateWorkspacesAsync(agent, newWorkspaces, pendingConform))
 				{
 					UpdateAgentWorkspacesResponse response = new UpdateAgentWorkspacesResponse();
-					if (bPendingConform)
+					if (pendingConform)
 					{
 						response.Retry = await _conformTaskSource.GetWorkspacesAsync(agent, response.PendingWorkspaces);
 						response.RemoveUntrackedFiles = request.RemoveUntrackedFiles || agent.RequestFullConform;
@@ -252,12 +255,22 @@ namespace Horde.Build.Server
 			properties = new List<string>();
 			resources = new Dictionary<string, int>();
 
-			if (capabilities == null) return;
+			if (capabilities == null)
+			{
+				return;
+			}
 			properties.AddRange(capabilities.Properties);
 
-			if (capabilities.Devices.Count <= 0) return;
+			if (capabilities.Devices.Count <= 0)
+			{
+				return;
+			}
+
 			RpcDeviceCapabilities device = capabilities.Devices[0];
-			if (device.Properties == null) return;
+			if (device.Properties == null)
+			{
+				return;
+			}
 
 			properties.AddRange(device.Properties);
 			CopyPropertyToResource(KnownPropertyNames.LogicalCores, properties, resources);
@@ -289,7 +302,7 @@ namespace Horde.Build.Server
 					throw new StructuredRpcException(StatusCode.PermissionDenied, "User is not authenticated to create new agents");
 				}
 
-				agent = await _agentService.CreateAgentAsync(request.Name, true, null, null);
+				agent = await _agentService.CreateAgentAsync(request.Name, true, null);
 			}
 
 			// Make sure we're allowed to create sessions on this agent
@@ -313,7 +326,7 @@ namespace Horde.Build.Server
 			response.AgentId = agent.Id.ToString();
 			response.SessionId = agent.SessionId.ToString();
 			response.ExpiryTime = Timestamp.FromDateTime(agent.SessionExpiresAt!.Value);
-			response.Token = _agentService.IssueSessionToken(agent.Id, agent.SessionId!.Value);
+			response.Token = await _agentService.IssueSessionTokenAsync(agent.Id, agent.SessionId!.Value);
 			return response;
 		}
 
@@ -585,10 +598,7 @@ namespace Horde.Build.Server
 			}
 
 			// Create a log file if necessary
-			if (log.Value == null)
-			{
-				log.Value = await _logFileService.CreateLogFileAsync(job.Id, batch.SessionId, LogType.Json);
-			}
+			log.Value ??= await _logFileService.CreateLogFileAsync(job.Id, batch.SessionId, LogType.Json);
 
 			// Get the node for this step
 			IGraph graph = await _jobService.GetGraphAsync(job);
@@ -617,6 +627,28 @@ namespace Horde.Build.Server
 				response.Name = node.Name;
 				response.Credentials.Add(credentials);
 
+				foreach(NodeOutputRef input in node.Inputs)
+				{
+					INode inputNode = graph.GetNode(input.NodeRef);
+					response.Inputs.Add($"{inputNode.Name}/{inputNode.OutputNames[input.OutputIdx]}");
+				}
+
+				response.OutputNames.Add(node.OutputNames);
+
+				foreach (INodeGroup otherGroup in graph.Groups)
+				{
+					if (otherGroup != graph.Groups[batch.GroupIdx])
+					{
+						foreach (NodeOutputRef outputRef in otherGroup.Nodes.SelectMany(x => x.Inputs))
+						{
+							if (outputRef.NodeRef.GroupIdx == batch.GroupIdx && outputRef.NodeRef.NodeIdx == step.NodeIdx && !response.PublishOutputs.Contains(outputRef.OutputIdx))
+							{
+								response.PublishOutputs.Add(outputRef.OutputIdx);
+							}
+						}
+					}
+				}
+
 				string templateName = "<unknown>";
 				if (job.TemplateHash != null)
 				{
@@ -627,6 +659,11 @@ namespace Horde.Build.Server
 				response.EnvVars.Add("UE_HORDE_TEMPLATEID", job.TemplateId.ToString());
 				response.EnvVars.Add("UE_HORDE_TEMPLATENAME", templateName);
 				response.EnvVars.Add("UE_HORDE_STEPNAME", node.Name);
+
+				if (job.Environment != null)
+				{
+					response.EnvVars.Add(job.Environment);
+				}
 
 				IJobStepRef? lastStep = await _jobStepRefCollection.GetPrevStepForNodeAsync(job.StreamId, job.TemplateId, node.Name, job.Change);
 				if (lastStep != null)
@@ -806,7 +843,7 @@ namespace Horde.Build.Server
 				List<NewNode> newNodes = new List<NewNode>();
 				foreach (CreateNodeRequest node in group.Nodes)
 				{
-					NewNode newNode = new NewNode(node.Name, node.InputDependencies.ToList(), node.OrderDependencies.ToList(), node.Priority, node.AllowRetry, node.RunEarly, node.Warnings, new Dictionary<string, string>(node.Credentials), new Dictionary<string, string>(node.Properties), new NodeAnnotations(node.Annotations));
+					NewNode newNode = new NewNode(node.Name, node.Inputs.ToList(), node.Outputs.ToList(), node.InputDependencies.ToList(), node.OrderDependencies.ToList(), node.Priority, node.AllowRetry, node.RunEarly, node.Warnings, new Dictionary<string, string>(node.Credentials), new Dictionary<string, string>(node.Properties), new NodeAnnotations(node.Annotations));
 					newNodes.Add(newNode);
 				}
 				newGroups.Add(new NewGroup(group.AgentType, newNodes));
@@ -880,7 +917,7 @@ namespace Horde.Build.Server
 				newEvent.LineCount = createEvent.LineCount;
 				newEvents.Add(newEvent);
 			}
-			await _logFileService.CreateEventsAsync(newEvents);
+			await _logFileService.CreateEventsAsync(newEvents, context.CancellationToken);
 			return new Empty();
 		}
 
@@ -892,7 +929,7 @@ namespace Horde.Build.Server
 		/// <returns>Information about the new agent</returns>
 		public override async Task<Empty> WriteOutput(WriteOutputRequest request, ServerCallContext context)
 		{
-			ILogFile? logFile = await _logFileService.GetCachedLogFileAsync(new LogId(request.LogId));
+			ILogFile? logFile = await _logFileService.GetCachedLogFileAsync(new LogId(request.LogId), context.CancellationToken);
 			if (logFile == null)
 			{
 				throw new StructuredRpcException(StatusCode.NotFound, "Resource not found");
@@ -902,7 +939,7 @@ namespace Horde.Build.Server
 				throw new StructuredRpcException(StatusCode.PermissionDenied, "Access denied");
 			}
 
-			await _logFileService.WriteLogDataAsync(logFile, request.Offset, request.LineIndex, request.Data.ToArray(), request.Flush);
+			await _logFileService.WriteLogDataAsync(logFile, request.Offset, request.LineIndex, request.Data.ToArray(), request.Flush, cancellationToken: context.CancellationToken);
 			return new Empty();
 		}
 
@@ -919,7 +956,11 @@ namespace Horde.Build.Server
 				throw new StructuredRpcException(StatusCode.PermissionDenied, "Access to software is forbidden");
 			}
 
-			string version = await _agentSoftwareService.SetArchiveAsync(new AgentSoftwareChannelName(request.Channel), null, request.Data.ToArray());
+			string version = await _agentSoftwareService.UploadArchiveAsync(request.Data.ToArray());
+			foreach (string channel in request.Channel.Split('+', ';'))
+			{
+				await _agentSoftwareService.UpdateChannelAsync(new AgentSoftwareChannelName(channel), null, version);
+			}
 
 			UploadSoftwareResponse response = new UploadSoftwareResponse();
 			response.Version = version;

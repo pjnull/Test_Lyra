@@ -196,10 +196,7 @@ void FTextureSourceData::Init(UTexture& InTexture, TextureMipGenSettings InMipGe
 
 		LayerData->ImageFormat = FImageCoreUtils::ConvertToRawImageFormat( InTexture.Source.GetFormat(LayerIndex) );
 
-		FTextureFormatSettings FormatSettings;
-		InTexture.GetLayerFormatSettings(LayerIndex, FormatSettings);
-
-		LayerData->GammaSpace = FormatSettings.SRGB ? (InTexture.bUseLegacyGamma ? EGammaSpace::Pow22 : EGammaSpace::sRGB) : EGammaSpace::Linear;
+		LayerData->SourceGammaSpace = InTexture.Source.GetGammaSpace(LayerIndex);
 	}
 
 	Blocks.Reserve(NumBlocks);
@@ -292,7 +289,7 @@ void FTextureSourceData::GetSourceMips(FTextureSource& Source, IImageWrapperModu
 						FImage* SourceMip = new(BlockData.MipsPerLayer[LayerIndex]) FImage(
 							MipSizeX, MipSizeY, MipSizeZ,
 							LayerData.ImageFormat,
-							LayerData.GammaSpace
+							LayerData.SourceGammaSpace
 						);
 
 						if (!ScopedMipData.GetMipData(SourceMip->RawData, BlockIndex, LayerIndex, MipIndex))
@@ -553,10 +550,6 @@ static void DDC1_StoreClassicTextureInDerivedData(
 
 		check(CompressedImage.RawData.GetTypeSize() == 1);
 		int64 CompressedDataSize = CompressedImage.RawData.Num();
-
-		// check CompressedDataSize against int32_max , except if VT
-		// bForVirtualTextureStreamingBuild is false in this branch
-		check(CompressedDataSize < MAX_int32);
 
 		// CompressedImage sizes were padded up to multiple of 4 for d3d, no longer
 		UE_LOG(LogTextureUpload, Verbose, TEXT("Compressed Mip %d PF=%d : %dx%dx%d : %d ; up4 %dx%d=%d"),
@@ -1072,10 +1065,10 @@ static int64 GetBuildRequiredMemoryEstimate(UTexture* InTexture,
 
 		MemoryEstimate += OutputSizeBytes;
 
-		// check BlockSize to see if it's uncompressed or a BCN format :
-		if ( PFI.BlockSizeX > 1 )
+		// check to see if it's uncompressed or a BCN format :
+		if ( IsDXTCBlockCompressedTextureFormat(PixelFormat) )
 		{
-			// block-compressed format
+			// block-compressed format ; assume it's using Oodle Texture
 			
 			if ( bRDO )
 			{
@@ -1151,6 +1144,10 @@ static int64 GetBuildRequiredMemoryEstimate(UTexture* InTexture,
 
 				MemoryEstimate += FMath::Max(RDOPhase1MemUse,RDOPhase2MemUse);
 			}
+		}
+		else
+		{
+			// note: memory ues of non-Oodle encoders is not estimated
 		}
 		
 		MemoryEstimate += 64 * 1024; // overhead room

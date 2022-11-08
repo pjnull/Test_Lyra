@@ -124,6 +124,8 @@ static FAutoConsoleVariableRef CVarUseGenericStreamingPath(
 
 static int32 MobileReduceLoadedMips(int32 NumTotalMips)
 {
+	// apply cvar options to reduce the number of mips created at runtime
+	// note they are still cooked  &shipped
 	int32 NumReduceMips = FMath::Max(0, CVarMobileReduceLoadedMips.GetValueOnAnyThread());
 	int32 MaxLoadedMips = FMath::Clamp(CVarMobileMaxLoadedMips.GetValueOnAnyThread(), 1, GMaxTextureMipCount);
 
@@ -333,6 +335,7 @@ int32 UTexture2D::GetSizeX() const
 #if WITH_EDITOR
 		if (IsDefaultTexture())
 		{
+			// any calculation that actually uses this is garbage
 			return GetDefaultTexture2D(this)->GetSizeX();
 		}
 #endif
@@ -348,6 +351,7 @@ int32 UTexture2D::GetSizeY() const
 #if WITH_EDITOR
 		if (IsDefaultTexture())
 		{
+			// any calculation that actually uses this is garbage
 			return GetDefaultTexture2D(this)->GetSizeY();
 		}
 #endif
@@ -798,6 +802,12 @@ int32 UTexture2D::CalcTextureMemorySize( int32 MipCount ) const
 
 int32 UTexture2D::GetNumMipsAllowed(bool bIgnoreMinResidency) const
 {
+	// this function is trying to get the number of mips that will be in the texture after cooking
+	//	(eg. after "drop mip" lod bias is applied)
+	// but it doesn't exactly replicate the behavior of Serialize
+	// it's also similar to Texture::GetResourcePostInitState but not the same
+	// yay
+
 	const int32 NumMips = GetNumMips();
 
 	// Compute the number of mips that will be available after cooking, as some mips get cooked out.
@@ -919,30 +929,6 @@ bool UTexture2D::HasAlphaChannel() const
 	}
 	return false;
 }
-
-#if WITH_EDITOR
-bool UTexture2D::GetStreamableRenderResourceState(FTexturePlatformData* InPlatformData, FStreamableRenderResourceState& OutState) const
-{
-	TGuardValue<FTexturePlatformData*> Guard(const_cast<UTexture2D*>(this)->PrivatePlatformData, InPlatformData);
-	if (GetPlatformData())
-	{
-		if (IsCurrentlyVirtualTextured())
-		{
-			return false;
-		}
-
-		const EPixelFormat PixelFormat = GetPixelFormat();
-		const int32 NumMips = FMath::Min3<int32>(GetPlatformData()->Mips.Num(), GMaxTextureMipCount, FStreamableRenderResourceState::MAX_LOD_COUNT);
-		if (NumMips && GPixelFormats[PixelFormat].Supported &&
-			(NumMips > 1 || FMath::Max(GetSizeX(), GetSizeY()) <= (int32)GetMax2DTextureDimension()))
-		{
-			OutState = GetResourcePostInitState(GetPlatformData(), true, 0, NumMips, /*bSkipCanBeLoaded*/ true);
-			return true;
-		}
-	}
-	return false;
-}
-#endif
 
 FTextureResource* UTexture2D::CreateResource()
 {
@@ -1286,6 +1272,8 @@ FVirtualTexture2DResource::FVirtualTexture2DResource(const UTexture2D* InOwner, 
 	FirstMipToUse = FMath::Min((int32)MaxMip, InFirstMipToUse);
 
 	bSRGB = InOwner->SRGB;
+	const EPixelFormat PixelFormat = VTData->LayerTypes[0];
+	bGreyScaleFormat = (PixelFormat == PF_G8) || (PixelFormat == PF_BC4);
 
 	// Initialize this resource FeatureLevel, so it gets re-created on FeatureLevel changes
 	SetFeatureLevel(GMaxRHIFeatureLevel);

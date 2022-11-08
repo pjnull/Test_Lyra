@@ -20,10 +20,6 @@
 	#define WITH_PLATFORM_INSTALL_BUNDLE_SOURCE 0
 #endif
 
-#if WITH_PLATFORM_INSTALL_BUNDLE_SOURCE
-	#include "PlatformInstallBundleSource.h"
-#endif
-
 #include "AnalyticsEventAttribute.h"
 #include "IAnalyticsProviderET.h"
 
@@ -52,7 +48,7 @@ namespace InstallBundleManagerUtil
 			
 #if WITH_PLATFORM_INSTALL_BUNDLE_SOURCE
 		case EInstallBundleSourceType::Platform:
-			return MakeShared<FPlatformInstallBundleSource>();
+			return MakePlatformBundleSource();
 #endif
 		}
 

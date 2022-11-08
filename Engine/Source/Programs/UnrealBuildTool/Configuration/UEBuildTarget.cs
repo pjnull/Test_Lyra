@@ -3635,7 +3635,8 @@ namespace UnrealBuildTool
 				// Disable any plugin which does not support the target platform. The editor should update such references in the .uproject file on load.
 				if (!Rules.bIncludePluginsForTargetPlatforms && !Info.Descriptor.SupportsTargetPlatform(Platform))
 				{
-					throw new BuildException("{0} is referenced via {1} with a mismatched 'SupportedTargetPlatforms' field. This will cause problems in packaged builds, because the .uplugin file will not be staged. Launch the editor to update references from your project file, or update references from other plugins manually.", Info.File.GetFileName(), ReferenceChain);
+					LogValue PluginLogValue = LogValue.SourceFile(Info.File, Info.File.GetFileName());
+					throw new BuildLogEventException("{Plugin} is referenced via {ReferenceChain} with a mismatched 'SupportedTargetPlatforms' field. This will cause problems in packaged builds, because the .uplugin file will not be staged. Launch the editor to update references from your project file, or update references from other plugins manually.", PluginLogValue, ReferenceChain);
 				}
 
 				// Disable any plugin that requires the build platform
@@ -3873,7 +3874,7 @@ namespace UnrealBuildTool
 		/// <summary>
 		/// Sets up the global compile and link environment for the target.
 		/// </summary>
-		private void SetupGlobalEnvironment(UEToolChain ToolChain, CppCompileEnvironment GlobalCompileEnvironment, LinkEnvironment GlobalLinkEnvironment)
+		public void SetupGlobalEnvironment(UEToolChain ToolChain, CppCompileEnvironment GlobalCompileEnvironment, LinkEnvironment GlobalLinkEnvironment)
 		{
 			UEBuildPlatform BuildPlatform = UEBuildPlatform.GetBuildPlatform(Platform);
 
@@ -3932,6 +3933,8 @@ namespace UnrealBuildTool
 			GlobalLinkEnvironment.bUsePDBFiles = Rules.bUsePDBFiles;
 			GlobalLinkEnvironment.PackagePath = Rules.PackagePath;
 			GlobalLinkEnvironment.CrashDiagnosticDirectory = Rules.CrashDiagnosticDirectory;
+			GlobalLinkEnvironment.ThinLTOCacheDirectory = Rules.ThinLTOCacheDirectory;
+			GlobalLinkEnvironment.ThinLTOCachePruningArguments = Rules.ThinLTOCachePruningArguments;
 			GlobalLinkEnvironment.BundleDirectory = BuildPlatform.GetBundleDirectory(Rules, Binaries[0].OutputFilePaths);
 			GlobalLinkEnvironment.BundleVersion = Rules.BundleVersion;
 			GlobalLinkEnvironment.bAllowLTCG = Rules.bAllowLTCG;
@@ -4304,7 +4307,7 @@ namespace UnrealBuildTool
 			BuildPlatform.SetUpConfigurationEnvironment(Rules, GlobalCompileEnvironment, GlobalLinkEnvironment);
 		}
 
-		static CppConfiguration GetCppConfiguration(UnrealTargetConfiguration Configuration)
+		public static CppConfiguration GetCppConfiguration(UnrealTargetConfiguration Configuration)
 		{
 			switch (Configuration)
 			{

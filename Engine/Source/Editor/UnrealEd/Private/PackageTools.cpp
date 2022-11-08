@@ -807,6 +807,8 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 	{
 		bool bResult = false;
 
+		TGuardValue<bool> IsEditorLoadingPackageGuard(GIsEditorLoadingPackage, true);
+
 		FTextBuilder ErrorMessageBuilder;
 
 		using namespace UE::PackageTools::Private;
@@ -1075,9 +1077,9 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 							);
 
 							TSet<UObject*> InstancesToLeaveAlone(OldInstances);
-							FReplaceInstancesOfClassParameters ReplaceInstancesParameters(OldBlueprint->GeneratedClass, CastChecked<UBlueprint>(NewObject)->GeneratedClass);
+							FReplaceInstancesOfClassParameters ReplaceInstancesParameters;
 							ReplaceInstancesParameters.InstancesThatShouldUseOldClass = &InstancesToLeaveAlone;
-							FBlueprintCompileReinstancer::ReplaceInstancesOfClassEx(ReplaceInstancesParameters);
+							FBlueprintCompileReinstancer::ReplaceInstancesOfClass(OldBlueprint->GeneratedClass, CastChecked<UBlueprint>(NewObject)->GeneratedClass, ReplaceInstancesParameters);
 						}
 						else
 						{
@@ -1167,7 +1169,7 @@ UPackageTools::UPackageTools(const FObjectInitializer& ObjectInitializer)
 			// Recompile any BPs that had their references updated
 			if (BlueprintsToRecompileThisBatch.Num() > 0)
 			{
-				FScopedSlowTask CompilingBlueprintsSlowTask(BlueprintsToRecompileThisBatch.Num(), NSLOCTEXT("UnrealEd", "CompilingBlueprints", "Compiling Blueprints"));
+				FScopedSlowTask CompilingBlueprintsSlowTask(static_cast<float>(BlueprintsToRecompileThisBatch.Num()), NSLOCTEXT("UnrealEd", "CompilingBlueprints", "Compiling Blueprints"));
 
 				// Gather up all loaded BP assets.
 				TArray<UObject*> BPs;

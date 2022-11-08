@@ -315,6 +315,25 @@ static bool RenameVariableReferencesInGraph(UBlueprint* InBlueprint, UClass* InV
 	return bFoundReference;
 }
 
+/**
+ * Gathers all variable nodes from all graph's subgraph nodes
+ *
+ * @param Graph			        The Graph to search
+ * @param OutVariableNodes		variable node array to write to
+ */
+static void GetAllChildGraphVariables(UEdGraph* Graph, TArray<UK2Node_Variable*>& OutVariableNodes)
+{
+	for (UEdGraph* SubGraph : Graph->SubGraphs)
+	{
+		check(SubGraph != nullptr);
+		SubGraph->GetNodesOfClass<UK2Node_Variable>(OutVariableNodes);
+		if (!SubGraph->SubGraphs.IsEmpty())
+		{
+			GetAllChildGraphVariables(SubGraph, OutVariableNodes);
+		}
+	}
+}
+
 FBlueprintEditorUtils::FOnRenameVariableReferences FBlueprintEditorUtils::OnRenameVariableReferencesEvent;
 
 void FBlueprintEditorUtils::RenameVariableReferences(UBlueprint* Blueprint, UClass* VariableClass, const FName& OldVarName, const FName& NewVarName)
@@ -1829,6 +1848,31 @@ void FBlueprintEditorUtils::PostDuplicateBlueprint(UBlueprint* Blueprint, bool b
 			UObject* OldCDO = OldBPGC->GetDefaultObject();
 			check(OldCDO != nullptr);
 
+			// Make sure that OldBPGC isn't garbage collected within this scope
+			struct FAddToRootHelper
+			{
+				FAddToRootHelper(UBlueprintGeneratedClass* InBPGC)
+				{
+					BPGC = InBPGC;
+					bWasRoot = BPGC->IsRooted();
+					if(!bWasRoot)
+					{
+						BPGC->AddToRoot();
+					}
+				}
+
+				~FAddToRootHelper()
+				{
+					if (!bWasRoot)
+					{
+						BPGC->RemoveFromRoot();
+					}
+				}
+
+				UBlueprintGeneratedClass* BPGC;
+				bool bWasRoot;
+			} KeepBPGCAlive(OldBPGC);
+
 			if (FBlueprintDuplicationScopeFlags::HasAnyFlag(FBlueprintDuplicationScopeFlags::ValidatePinsUsingSourceClass))
 			{
 				Blueprint->OriginalClass = OldBPGC;
@@ -2848,18 +2892,20 @@ void FBlueprintEditorUtils::RenameGraph(UEdGraph* Graph, const FString& NewNameS
 		// Find all variable nodes in this graph.
 		TArray<UK2Node_Variable*> VariableNodes;
 		Graph->GetNodesOfClass<UK2Node_Variable>(VariableNodes);
-		for (const UEdGraph* SubGraph : Graph->SubGraphs)
-		{
-			check(SubGraph != nullptr);
-			SubGraph->GetNodesOfClass<UK2Node_Variable>(VariableNodes);
-		}
+		GetAllChildGraphVariables(Graph, VariableNodes);
 
+		// if it's index is >= 0 we know it was found in the array of functiongraphs
+		bool bGraphIsFunction = (Blueprint->FunctionGraphs.IndexOfByKey(Graph) > -1);
 		// For any nodes that reference a local variable, update the variable's scope to be the graph's new name (which will mirror the UFunction).
 		for (UK2Node_Variable* const VariableNode : VariableNodes)
 		{
 			if (VariableNode->VariableReference.IsLocalScope())
 			{
-				VariableNode->VariableReference.SetLocalMember(VariableNode->VariableReference.GetMemberName(), NewNameStr, VariableNode->VariableReference.GetMemberGuid());
+				// if the rename is the function set the local variable scope to the new name otherwise we leave it with the same scope (Ex: subgraphs in a function)
+				if (bGraphIsFunction)
+				{
+					VariableNode->VariableReference.SetLocalMember(VariableNode->VariableReference.GetMemberName(), NewNameStr, VariableNode->VariableReference.GetMemberGuid());
+				}
 			}
 		}
 
@@ -6347,7 +6393,7 @@ void FBlueprintEditorUtils::MarkBlueprintChildrenAsModified(UBlueprint* InBluepr
 	TArray<FAssetData> Children;
 	if (GetChildrenOfBlueprint(InBlueprint, Children) > 0)
 	{
-		int32 Unloaded = Algo::CountIf(Children,
+		SIZE_T Unloaded = Algo::CountIf(Children,
 			[](const FAssetData& Asset)
 			{
 				return !Asset.IsAssetLoaded();
@@ -6358,7 +6404,7 @@ void FBlueprintEditorUtils::MarkBlueprintChildrenAsModified(UBlueprint* InBluepr
 		EAppReturnType::Type DialogResponse = EAppReturnType::Yes;
 		if (Unloaded > 0)
 		{
-			FText Message = FText::Format(LOCTEXT("LoadChildrenPopupMessage", "Load {0} unloaded child blueprints to fix up phantom references?"), FText::FromString(FString::FromInt(Unloaded)));
+			FText Message = FText::Format(LOCTEXT("LoadChildrenPopupMessage", "Load {0} unloaded child blueprints to fix up phantom references?"), FText::FromString(LexToString(Unloaded)));
 			FText Title = LOCTEXT("LoadChildrenPopupTitle", "Load Unloaded Children?");
 			DialogResponse = FMessageDialog::Open(EAppMsgType::YesNo, Message, &Title);
 		}
@@ -8767,8 +8813,8 @@ void FBlueprintEditorUtils::OpenReparentBlueprintMenu( const TArray< UBlueprint*
 
 	TSharedRef<SBox> ClassPickerBox = 
 		SNew(SBox)
-		.WidthOverride(280)
-		.HeightOverride(400)
+		.WidthOverride(280.0f)
+		.HeightOverride(400.0f)
 		[
 			SNew(SBorder)
 			.BorderImage(FAppStyle::GetBrush("Menu.Background"))
@@ -9096,12 +9142,12 @@ bool FBlueprintEditorUtils::IsObjectADebugCandidate( AActor* InActorObject, UBlu
 	return bPassesFlags && bCanDebugThisObject;
 }
 
-bool FBlueprintEditorUtils::PropertyValueFromString(const FProperty* Property, const FString& StrValue, uint8* Container, UObject* OwningObject)
+bool FBlueprintEditorUtils::PropertyValueFromString(const FProperty* Property, const FString& StrValue, uint8* Container, UObject* OwningObject, int32 PortFlags)
 {
-	return PropertyValueFromString_Direct(Property, StrValue, Property->ContainerPtrToValuePtr<uint8>(Container), OwningObject);
+	return PropertyValueFromString_Direct(Property, StrValue, Property->ContainerPtrToValuePtr<uint8>(Container), OwningObject, PortFlags);
 }
 
-bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Property, const FString& StrValue, uint8* DirectValue, UObject* OwningObject)
+bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Property, const FString& StrValue, uint8* DirectValue, UObject* OwningObject, int32 PortFlags)
 {
 	bool bParseSucceeded = true;
 	if (!Property->IsA(FStructProperty::StaticClass()))
@@ -9132,7 +9178,7 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 		}
 		else if (const FByteProperty* ByteProperty = CastField<const FByteProperty>(Property))
 		{
-			int32 IntValue = 0;
+			int64 IntValue = 0;
 			if (const UEnum* Enum = ByteProperty->Enum)
 			{
 				if (StrValue.Len() < NAME_SIZE)
@@ -9153,10 +9199,11 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 			}
 			else
 			{
-				bParseSucceeded = FDefaultValueHelper::ParseInt(StrValue, IntValue);
+				bParseSucceeded = FDefaultValueHelper::ParseInt64(StrValue, IntValue);
 			}
+
 			bParseSucceeded = bParseSucceeded && (IntValue <= 255) && (IntValue >= 0);
-			ByteProperty->SetPropertyValue(DirectValue, IntValue);
+			ByteProperty->SetPropertyValue(DirectValue, static_cast<uint8>(IntValue));
 		}
 		else if (const FEnumProperty* EnumProperty = CastField<const FEnumProperty>(Property))
 		{
@@ -9206,7 +9253,7 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 		else if (Property->IsA(FTextProperty::StaticClass()))
 		{
 			FStringOutputDevice ImportError;
-			const TCHAR* EndOfParsedBuff = Property->ImportText_Direct(*StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText, &ImportError);
+			const TCHAR* EndOfParsedBuff = Property->ImportText_Direct(*StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText | PortFlags, &ImportError);
 			bParseSucceeded = EndOfParsedBuff && ImportError.IsEmpty();
 		}
 		else
@@ -9217,7 +9264,7 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 				: *StrValue;
 
 			FStringOutputDevice ImportError;
-			const TCHAR* EndOfParsedBuff = Property->ImportText_Direct(*StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText, &ImportError);
+			const TCHAR* EndOfParsedBuff = Property->ImportText_Direct(*StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText | PortFlags, &ImportError);
 			bParseSucceeded = EndOfParsedBuff && ImportError.IsEmpty();
 		}
 	}
@@ -9264,7 +9311,7 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 			ensure(1 == StructProperty->ArrayDim);
 
 			FStringOutputDevice ImportError;
-			const TCHAR* EndOfParsedBuff = StructProperty->ImportText_Direct(StrValue.IsEmpty() ? TEXT("()") : *StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText, &ImportError);
+			const TCHAR* EndOfParsedBuff = StructProperty->ImportText_Direct(StrValue.IsEmpty() ? TEXT("()") : *StrValue, DirectValue, OwningObject, PPF_SerializedAsImportText | PortFlags, &ImportError);
 			bParseSucceeded &= EndOfParsedBuff && ImportError.IsEmpty();
 		}
 	}
@@ -9272,12 +9319,12 @@ bool FBlueprintEditorUtils::PropertyValueFromString_Direct(const FProperty* Prop
 	return bParseSucceeded;
 }
 
-bool FBlueprintEditorUtils::PropertyValueToString(const FProperty* Property, const uint8* Container, FString& OutForm, UObject* OwningObject)
+bool FBlueprintEditorUtils::PropertyValueToString(const FProperty* Property, const uint8* Container, FString& OutForm, UObject* OwningObject, int32 PortFlags)
 {
-	return PropertyValueToString_Direct(Property, Property->ContainerPtrToValuePtr<const uint8>(Container), OutForm, OwningObject);
+	return PropertyValueToString_Direct(Property, Property->ContainerPtrToValuePtr<const uint8>(Container), OutForm, OwningObject, PortFlags);
 }
 
-bool FBlueprintEditorUtils::PropertyValueToString_Direct(const FProperty* Property, const uint8* DirectValue, FString& OutForm, UObject* OwningObject)
+bool FBlueprintEditorUtils::PropertyValueToString_Direct(const FProperty* Property, const uint8* DirectValue, FString& OutForm, UObject* OwningObject, int32 PortFlags)
 {
 	check(Property && DirectValue);
 	OutForm.Reset();
@@ -9321,7 +9368,7 @@ bool FBlueprintEditorUtils::PropertyValueToString_Direct(const FProperty* Proper
 	if (OutForm.IsEmpty())
 	{
 		const uint8* DefaultValue = DirectValue;	
-		bSucceeded = Property->ExportText_Direct(OutForm, DirectValue, DefaultValue, OwningObject, PPF_SerializedAsImportText);
+		bSucceeded = Property->ExportText_Direct(OutForm, DirectValue, DefaultValue, OwningObject, PPF_SerializedAsImportText | PortFlags);
 	}
 	return bSucceeded;
 }

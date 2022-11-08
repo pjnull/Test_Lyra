@@ -41,6 +41,7 @@ namespace EMeshPass
 		Velocity,
 		TranslucentVelocity,
 		TranslucencyStandard,
+		TranslucencyStandardModulate,
 		TranslucencyAfterDOF,
 		TranslucencyAfterDOFModulate,
 		TranslucencyAfterMotionBlur,
@@ -66,7 +67,7 @@ namespace EMeshPass
 #endif
 
 		Num,
-		NumBits = 5,
+		NumBits = 6,
 	};
 }
 static_assert(EMeshPass::Num <= (1 << EMeshPass::NumBits), "EMeshPass::Num will not fit in EMeshPass::NumBits");
@@ -88,6 +89,7 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	case EMeshPass::Velocity: return TEXT("Velocity");
 	case EMeshPass::TranslucentVelocity: return TEXT("TranslucentVelocity");
 	case EMeshPass::TranslucencyStandard: return TEXT("TranslucencyStandard");
+	case EMeshPass::TranslucencyStandardModulate: return TEXT("TranslucencyStandardModulate");
 	case EMeshPass::TranslucencyAfterDOF: return TEXT("TranslucencyAfterDOF");
 	case EMeshPass::TranslucencyAfterDOFModulate: return TEXT("TranslucencyAfterDOFModulate");
 	case EMeshPass::TranslucencyAfterMotionBlur: return TEXT("TranslucencyAfterMotionBlur");
@@ -113,9 +115,9 @@ inline const TCHAR* GetMeshPassName(EMeshPass::Type MeshPass)
 	}
 
 #if WITH_EDITOR
-	static_assert(EMeshPass::Num == 28 + 4, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 29 + 4, "Need to update switch(MeshPass) after changing EMeshPass"); // GUID to prevent incorrect auto-resolves, please change when changing the expression: {A6E82589-44B3-4DAD-AC57-8AF6BD50DF43}
 #else
-	static_assert(EMeshPass::Num == 28, "Need to update switch(MeshPass) after changing EMeshPass");
+	static_assert(EMeshPass::Num == 29, "Need to update switch(MeshPass) after changing EMeshPass"); // GUID to prevent incorrect auto-resolves, please change when changing the expression: {A6E82589-44B3-4DAD-AC57-8AF6BD50DF43}
 #endif
 
 	checkf(0, TEXT("Missing case for EMeshPass %u"), (uint32)MeshPass);
@@ -133,18 +135,18 @@ public:
 
 	void Set(EMeshPass::Type Pass) 
 	{ 
-		Data |= (1 << Pass); 
+		Data |= (uint64(1) << Pass); 
 	}
 
 	bool Get(EMeshPass::Type Pass) const 
 	{ 
-		return !!(Data & (1 << Pass)); 
+		return !!(Data & (uint64(1) << Pass)); 
 	}
 
 	EMeshPass::Type SkipEmpty(EMeshPass::Type Pass) const 
 	{
-		uint32 Mask = 0xFFffFFff << Pass;
-		return EMeshPass::Type(FMath::Min<uint32>(EMeshPass::Num, FMath::CountTrailingZeros(Data & Mask)));
+		uint64 Mask = 0xFFffFFffFFffFFffULL << Pass;
+		return EMeshPass::Type(FMath::Min<uint64>(EMeshPass::Num, FMath::CountTrailingZeros64(Data & Mask)));
 	}
 
 	int GetNum() 
@@ -167,7 +169,7 @@ public:
 		return Data == 0; 
 	}
 
-	uint32 Data;
+	uint64 Data;
 };
 
 struct FMinimalBoundShaderStateInput

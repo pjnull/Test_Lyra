@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using EpicGames.Core;
 using Horde.Build.Agents;
+using Horde.Build.Agents.Pools;
 using Horde.Build.Configuration;
 using Horde.Build.Jobs;
 using Horde.Build.Jobs.Artifacts;
@@ -20,9 +21,10 @@ using HordeCommon;
 namespace Horde.Build.Tests
 {
 	using JobId = ObjectId<IJob>;
+	using PoolId = StringId<IPool>;
     using ProjectId = StringId<IProject>;
     using StreamId = StringId<IStream>;
-    using TemplateRefId = StringId<TemplateRef>;
+    using TemplateId = StringId<ITemplateRef>;
 
 	public class Fixture
 	{
@@ -31,8 +33,8 @@ namespace Horde.Build.Tests
 		public ITemplate Template { get; private set; } = null!;
 		public IGraph Graph { get; private set; } = null!;
 		public IStream? Stream { get; private set; }
-		public TemplateRefId TemplateRefId1 { get; private set; }
-		public TemplateRefId TemplateRefId2 { get; private set; }
+		public TemplateId TemplateRefId1 { get; private set; }
+		public TemplateId TemplateRefId2 { get; private set; }
 		public IArtifact Job1Artifact { get; private set; } = null!;
 		public string Job1ArtifactData { get; private set; } = null!;
 		public IAgent Agent1 { get; private set; } = null!;
@@ -62,19 +64,19 @@ namespace Horde.Build.Tests
 			Template = await templateCollection.AddAsync("Test template");
 			Graph = await graphCollection.AddAsync(Template);
 
-			TemplateRefId1 = new TemplateRefId("template1");
-			TemplateRefId2 = new TemplateRefId("template2");
+			TemplateRefId1 = new TemplateId("template1");
+			TemplateRefId2 = new TemplateId("template2");
 
 			List<TemplateRefConfig> templates = new List<TemplateRefConfig>();
 			templates.Add(new TemplateRefConfig { Id = TemplateRefId1, Name = "Test Template" });
 			templates.Add(new TemplateRefConfig { Id = TemplateRefId2, Name = "Test Template" });
 
-			List<CreateStreamTabRequest> tabs = new List<CreateStreamTabRequest>();
-			tabs.Add(new CreateJobsTabRequest { Title = "foo", Templates = new List<TemplateRefId> { TemplateRefId1, TemplateRefId2 } });
+			List<TabConfig> tabs = new List<TabConfig>();
+			tabs.Add(new JobsTabConfig { Title = "foo", Templates = new List<TemplateId> { TemplateRefId1, TemplateRefId2 } });
 
-			Dictionary<string, CreateAgentTypeRequest> agentTypes = new()
+			Dictionary<string, AgentConfig> agentTypes = new()
 			{
-				{ "Win64", new() { Pool = PoolName} }
+				{ "Win64", new() { Pool = new PoolId(PoolName) } }
 			};
 
 			StreamConfig config = new StreamConfig { Name = "//UE5/Main", Tabs = tabs, Templates = templates, AgentTypes = agentTypes };
@@ -97,46 +99,20 @@ namespace Horde.Build.Tests
 				name: "hello1",
 				change: 1000001,
 				codeChange: 1000002,
-				preflightChange: 1001,
-				clonedPreflightChange: null,
-				preflightDescription: null,
-				startedByUserId: null,
-				priority: Priority.Normal,
-				null,
-				null,
-				null,
-				null,
-				false,
-				false,
-				null,
-				null,
-				arguments: new List<string>()
+				new CreateJobOptions { PreflightChange = 1001 }
 			);
 			Job1 = (await jobService.GetJobAsync(Job1.Id))!;
 
 			Job2 = await jobService.CreateJobAsync(
 				jobId: new JobId("5f69ea1b68423e921b035106"),
 				stream: Stream!,
-				templateRefId: new TemplateRefId("template-id-1"),
+				templateRefId: new TemplateId("template-id-1"),
 				templateHash: ContentHash.MD5("made-up-template-hash"),
 				graph: fg,
 				name: "hello2",
 				change: 2000001,
 				codeChange: 2000002,
-				preflightChange: null,
-				clonedPreflightChange: null,
-				preflightDescription: null,
-				startedByUserId: null,
-				priority: Priority.Normal,
-				null,
-				null,
-				null,
-				null,
-				false,
-				false,
-				null,
-				null,
-				arguments: new List<string>()
+				new CreateJobOptions()
 			);
 			Job2 = (await jobService.GetJobAsync(Job2.Id))!;
 
@@ -146,7 +122,7 @@ namespace Horde.Build.Tests
 				"text/plain", job1ArtifactStream);
 
 			Agent1Name = "testAgent1";
-			Agent1 = await agentService.CreateAgentAsync(Agent1Name, true, null, null);
+			Agent1 = await agentService.CreateAgentAsync(Agent1Name, true, null);
 		}
 
 		private class FixtureGraph : IGraph

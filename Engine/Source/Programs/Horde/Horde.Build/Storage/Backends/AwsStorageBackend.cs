@@ -2,9 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Globalization;
 using System.IO;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
@@ -12,6 +13,7 @@ using Amazon.Extensions.NETCore.Setup;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Google.Protobuf.WellKnownTypes;
 using Horde.Build.Utilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -101,7 +103,7 @@ namespace Horde.Build.Storage.Backends
 	/// <summary>
 	/// FileStorage implementation using an s3 bucket
 	/// </summary>
-	public sealed class AwsStorageBackend : IStorageBackend, IDisposable
+	public sealed class AwsStorageBackend : IStorageBackendWithRedirects, IDisposable
 	{
 		/// <summary>
 		/// S3 Client
@@ -117,6 +119,11 @@ namespace Horde.Build.Storage.Backends
 		/// Semaphore for connecting to AWS
 		/// </summary>
 		private readonly SemaphoreSlim _semaphore;
+
+		/// <summary>
+		/// Prefix for objects in the bucket
+		/// </summary>
+		private readonly string _pathPrefix;
 
 		/// <summary>
 		/// Logger interface
@@ -137,6 +144,12 @@ namespace Horde.Build.Storage.Backends
 			_options = options;
 			_semaphore = new SemaphoreSlim(16);
 			_logger = logger;
+
+			_pathPrefix = (_options.AwsBucketPath ?? String.Empty).TrimEnd('/');
+			if (_pathPrefix.Length > 0)
+			{
+				_pathPrefix += '/';
+			}
 
 			logger.LogInformation("Created AWS storage backend for bucket {BucketName} using credentials {Credentials} {CredentialsStr}", options.AwsBucketName, awsOptions.Credentials.GetType(), awsOptions.Credentials.ToString());
 		}
@@ -239,25 +252,21 @@ namespace Horde.Build.Storage.Backends
 			}
 		}
 
-		string GetFullPath(string path)
-		{
-			if (_options.AwsBucketPath == null)
-			{
-				return path;
-			}
+		string GetFullPath(string path) => _pathPrefix + path;
 
-			StringBuilder result = new StringBuilder();
-			result.Append(_options.AwsBucketPath);
-			if (result.Length > 0 && result[^1] != '/')
-			{
-				result.Append('/');
-			}
-			result.Append(path);
-			return result.ToString();
+		/// <inheritdoc/>
+		public Task<Stream?> TryReadAsync(string path, CancellationToken cancellationToken)
+		{
+			return TryReadAsync(path, null, cancellationToken);
 		}
 
 		/// <inheritdoc/>
-		public async Task<Stream?> ReadAsync(string path, CancellationToken cancellationToken)
+		public Task<Stream?> TryReadAsync(string path, int offset, int length, CancellationToken cancellationToken)
+		{
+			return TryReadAsync(path, new ByteRange(offset, offset + length), cancellationToken);
+		}
+
+		async Task<Stream?> TryReadAsync(string path, ByteRange? byteRange, CancellationToken cancellationToken)
 		{
 			using IScope scope = GlobalTracer.Instance.BuildSpan("AwsStorageBackend.ReadAsync").StartActive();
 			scope.Span.SetTag("Path", path);
@@ -273,6 +282,7 @@ namespace Horde.Build.Storage.Backends
 				GetObjectRequest newGetRequest = new GetObjectRequest();
 				newGetRequest.BucketName = _options.AwsBucketName;
 				newGetRequest.Key = fullPath;
+				newGetRequest.ByteRange = byteRange;
 
 				response = await _client.GetObjectAsync(newGetRequest, cancellationToken);
 
@@ -285,6 +295,40 @@ namespace Horde.Build.Storage.Backends
 				semaLock?.Dispose();
 				response?.Dispose();
 
+				return null;
+			}
+		}
+
+		/// <inheritdoc/>
+		public ValueTask<Uri?> GetReadRedirectAsync(string path, CancellationToken cancellationToken = default) => new ValueTask<Uri?>(GetPresignedUrl(path, HttpVerb.GET));
+
+		/// <inheritdoc/>
+		public ValueTask<Uri?> GetWriteRedirectAsync(string path, CancellationToken cancellationToken = default) => new ValueTask<Uri?>(GetPresignedUrl(path, HttpVerb.PUT));
+
+		/// <summary>
+		/// Helper method to generate a presigned URL for a request
+		/// </summary>
+		Uri? GetPresignedUrl(string path, HttpVerb verb)
+		{
+			using IScope scope = GlobalTracer.Instance.BuildSpan("AwsStorageBackend.TryGetHttpRedirectUrl").StartActive();
+			scope.Span.SetTag("Path", path);
+
+			string fullPath = GetFullPath(path);
+
+			try
+			{
+				GetPreSignedUrlRequest newGetRequest = new GetPreSignedUrlRequest();
+				newGetRequest.BucketName = _options.AwsBucketName;
+				newGetRequest.Key = fullPath;
+				newGetRequest.Verb = verb;
+				newGetRequest.Expires = DateTime.UtcNow.AddHours(3.0);
+
+				string url = _client.GetPreSignedURL(newGetRequest);
+				return new Uri(url);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "Unable to get presigned url for {Path} from S3", fullPath);
 				return null;
 			}
 		}
@@ -460,6 +504,43 @@ namespace Horde.Build.Storage.Backends
 			catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
 			{
 				return false;
+			}
+		}
+
+		/// <inheritdoc/>
+		public async IAsyncEnumerable<string> EnumerateAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+		{
+			ListObjectsV2Request request = new ListObjectsV2Request();
+			request.BucketName = _options.AwsBucketName;
+			if(_pathPrefix.Length > 0)
+			{
+				request.Prefix = _pathPrefix;
+			}
+
+			for (; ; )
+			{
+				ListObjectsV2Response response = await _client.ListObjectsV2Async(request, cancellationToken);
+				foreach (S3Object obj in response.S3Objects)
+				{
+					string path = obj.Key;
+					if (path.StartsWith(_pathPrefix, StringComparison.Ordinal))
+					{
+						yield return path.Substring(_pathPrefix.Length);
+					}
+					else
+					{
+						_logger.LogError("Unexpected object enumerated from {AwsBucketName} - expected object \"{Path}\" to start with \"{AwsBucketPath}\"", _options.AwsBucketName, path, _pathPrefix);
+					}
+				}
+
+				if (response.IsTruncated)
+				{
+					request.ContinuationToken = response.NextContinuationToken;
+				}
+				else
+				{
+					break;
+				}
 			}
 		}
 	}

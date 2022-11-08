@@ -69,6 +69,26 @@ struct CONTROLRIG_API FRigUnit_MathIntBinaryAggregateOp : public FRigUnit_MathIn
 };
 
 /**
+ * A integer constant
+ */
+USTRUCT(meta=(DisplayName="Integer", Keywords="Make,Construct,Constant"))
+struct CONTROLRIG_API FRigUnit_MathIntMake : public FRigUnit_MathIntBase
+{
+	GENERATED_BODY()
+
+	FRigUnit_MathIntMake()
+	{
+		Value = 0;
+	}
+	
+	RIGVM_METHOD()
+	virtual void Execute(const FRigUnitContext& Context) override;
+
+	UPROPERTY(meta=(Input, Output))
+	int32 Value;
+};
+
+/**
  * Returns the sum of the two values
  */
 USTRUCT(meta=(DisplayName="Add", TemplateName="Add", Keywords="Sum,+"))
@@ -233,6 +253,30 @@ struct CONTROLRIG_API FRigUnit_MathIntToFloat : public FRigUnit_MathIntBase
 
 	UPROPERTY(meta=(Output))
 	float Result;
+};
+
+/**
+ * Returns the int cast to a float
+ */
+USTRUCT(meta=(DisplayName="To Double", TemplateName="Cast"))
+struct CONTROLRIG_API FRigUnit_MathIntToDouble : public FRigUnit_MathIntBase
+{
+	GENERATED_BODY()
+
+	FRigUnit_MathIntToDouble()
+	{
+		Value = 0;
+		Result = 0.0;
+	}
+
+	RIGVM_METHOD()
+	virtual void Execute(const FRigUnitContext& Context) override;
+
+	UPROPERTY(meta=(Input))
+	int32 Value;
+
+	UPROPERTY(meta=(Output))
+	double Result;
 };
 
 /**

@@ -21,7 +21,10 @@ public:
 	UMoviePipelineSetting_BlueprintBase()
 	{
 		CategoryText = NSLOCTEXT("MovieRenderPipelineBP", "DefaultCategoryName_Text", "Custom Settings");
-		bIsValidOnMaster = true;
+		bIsValidOnPrimary = true;
+#if WITH_EDITORONLY_DATA
+		bIsValidOnMaster_DEPRECATED = true;
+#endif
 		bIsValidOnShots = true;
 		bCanBeDisabled = true;
 	}
@@ -69,19 +72,28 @@ public:
 		
 	virtual bool CanBeDisabled() const override { return bCanBeDisabled; }
 #endif
-	virtual bool IsValidOnMaster() const override { return bIsValidOnMaster; }
+	virtual bool IsValidOnPrimary() const override { return bIsValidOnPrimary; }
 	virtual bool IsValidOnShots() const override { return bIsValidOnShots; }
+
+	virtual void PostLoad() override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Movie Pipeline")
 	FText CategoryText;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Movie Pipeline")
-	bool bIsValidOnMaster;
+	bool bIsValidOnPrimary;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Movie Pipeline")
 	bool bIsValidOnShots;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Movie Pipeline")
 	bool bCanBeDisabled;
+
+private:
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	bool bIsValidOnMaster_DEPRECATED;
+#endif
 };

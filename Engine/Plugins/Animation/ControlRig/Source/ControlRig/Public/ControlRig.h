@@ -138,6 +138,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Control Rig")
 	float GetAbsoluteTime() const { return AbsoluteTime; }
 
+	/** Gets the current delta time */
+	UFUNCTION(BlueprintPure, Category = "Control Rig")
+	float GetDeltaTime() const { return DeltaTime; }
+
 	/** Set the current delta time */
 	UFUNCTION(BlueprintCallable, Category="Control Rig")
 	void SetDeltaTime(float InDeltaTime);
@@ -520,8 +524,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<URigHierarchy> DynamicHierarchy;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	TSoftObjectPtr<UControlRigShapeLibrary> GizmoLibrary_DEPRECATED;
+#endif
 
 	UPROPERTY()
 	TArray<TSoftObjectPtr<UControlRigShapeLibrary>> ShapeLibraries;
@@ -534,12 +540,14 @@ protected:
 	bool bEnableControlRigLogging;
 #endif
 
+#if WITH_EDITORONLY_DATA
 	// you either go Input or Output, currently if you put it in both place, Output will override
 	UPROPERTY()
 	TMap<FName, FCachedPropertyPath> InputProperties_DEPRECATED;
 
 	UPROPERTY()
 	TMap<FName, FCachedPropertyPath> OutputProperties_DEPRECATED;
+#endif
 
 	FRigNameCache NameCache;
 

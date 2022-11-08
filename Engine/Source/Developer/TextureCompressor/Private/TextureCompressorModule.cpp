@@ -307,7 +307,7 @@ private:
 	}
 
 	// InOutTable += InTable
-	static void AddFilterTable1D( float *InOutTable, float *InTable, uint32 TableSize )
+	static void AddFilterTable1D( float *InOutTable, const float *InTable, uint32 TableSize )
 	{
 		for(uint32 x = 0; x < TableSize; ++x)
 		{
@@ -1149,8 +1149,18 @@ static void GenerateMipBorder(
 // how should be treat lookups outside of the image
 static EMipGenAddressMode ComputeAddressMode(const FImage & Image,const FTextureBuildSettings& Settings)
 {
-	// note: all textures Wrap by default even if their address mode is set to Clamp !?
-	EMipGenAddressMode AddressMode = MGTAM_Wrap;
+	if ( Settings.bPreserveBorder )
+	{
+		return Settings.bBorderColorBlack ? MGTAM_BorderBlack : MGTAM_Clamp;
+	}
+	
+	// conditional on bUseNewMipFilter so old textures are not changed
+	//	really this should be done all the time
+	if ( Settings.bCubemap && Settings.bUseNewMipFilter )
+	{
+		// Cubemaps should Clamp on their faces, never wrap :
+		return MGTAM_Clamp;
+	}
 
 	// Wrap uses AND so requires pow2 sizes ; change to Clamp if nonpow2
 	bool bIsPow2 = FMath::IsPowerOfTwo(Image.SizeX) && FMath::IsPowerOfTwo(Image.SizeY);
@@ -1164,12 +1174,39 @@ static EMipGenAddressMode ComputeAddressMode(const FImage & Image,const FTexture
 
 	if ( ! bIsPow2 )
 	{
-		AddressMode = MGTAM_Clamp;
+		return MGTAM_Clamp;
 	}
 
-	if(Settings.bPreserveBorder)
+	// note: all textures Wrap by default even if their address mode is set to Clamp !?
+	EMipGenAddressMode AddressMode = MGTAM_Wrap;
+
+	if ( Settings.bUseNewMipFilter )
 	{
-		AddressMode = Settings.bBorderColorBlack ? MGTAM_BorderBlack : MGTAM_Clamp;
+		// in new filters, we do use address mode to change mipgen
+		//	(isolated to new filters solely to avoid changing old content)
+
+		// texture address mode is Wrap,Clamp,Mirror, with Wrap by default
+		// treat Clamp & Mirror the same
+		bool bAddressXWrap = (Settings.TextureAddressModeX == TA_Wrap);
+		bool bAddressYWrap = (Settings.TextureAddressModeY == TA_Wrap);
+
+		if ( !bAddressXWrap && !bAddressYWrap )
+		{
+			AddressMode = MGTAM_Clamp;
+		}
+		else if ( bAddressXWrap && bAddressYWrap )
+		{
+			AddressMode = MGTAM_Wrap;
+		}
+		else
+		{
+			// use Wrap for now to match legacy behavior
+			// ideally we'd wrap one dimension and clamp the other, but that is not yet supported
+			// @todo Oodle: separate wrap/clamp for X&Y ; remove the heavy templating on AddressMode
+			AddressMode = MGTAM_Wrap;
+
+			UE_LOG(LogTextureCompressor, Verbose, TEXT("Not ideal: Heterogeneous XY Wrap/Clamp will generate mips with Wrap on both dimensions") );
+		}
 	}
 
 	return AddressMode;
@@ -1235,6 +1272,39 @@ static void GenerateTopMip(const FImage& SrcImage, FImage& DestImage, const FTex
 	}
 }
 
+static FLinearColor Bilerp(
+	const FLinearColor & Sample00,
+	const FLinearColor & Sample10,
+	const FLinearColor & Sample01,
+	const FLinearColor & Sample11,
+	float FracX,float FracY)
+{
+	//FMath::Lerp is :
+	// return (T)(A + Alpha * (B-A));
+	// must match that exactly
+
+	VectorRegister4Float V00 = VectorLoad(&Sample00.Component(0));
+	VectorRegister4Float V10 = VectorLoad(&Sample10.Component(0));
+	VectorRegister4Float V01 = VectorLoad(&Sample01.Component(0));
+	VectorRegister4Float V11 = VectorLoad(&Sample11.Component(0));
+
+	VectorRegister4Float S0 = VectorAdd(V00, VectorMultiply(VectorSetFloat1(FracX), VectorSubtract(V10,V00)));
+	VectorRegister4Float S1 = VectorAdd(V01, VectorMultiply(VectorSetFloat1(FracX), VectorSubtract(V11,V01)));
+	VectorRegister4Float SS = VectorAdd(S0 , VectorMultiply(VectorSetFloat1(FracY), VectorSubtract(S1 ,S0 )));
+	FLinearColor Out;
+	VectorStore(SS,&Out.Component(0));
+	
+	/*
+	// FLinearColor has math operators but they are scalar, not vector
+	FLinearColor Sample0 = FMath::Lerp(Sample00, Sample10, FracX);
+	FLinearColor Sample1 = FMath::Lerp(Sample01, Sample11, FracX);
+	FLinearColor Ret = FMath::Lerp(Sample0, Sample1, FracY);
+	check( Out == Ret );
+	*/
+
+	return Out;
+}
+
 // pixel centers are at XY = integers
 //  range of X is [-0.5,-0.5] to [Width-0.5,Height-0.5]
 static FLinearColor LookupSourceMipBilinear(const FImageView2D& SourceImageData, float X, float Y)
@@ -1248,14 +1318,12 @@ static FLinearColor LookupSourceMipBilinear(const FImageView2D& SourceImageData,
 	int32 IntX1 = FMath::Min(IntX0+1, SourceImageData.SizeX-1);
 	int32 IntY1 = FMath::Min(IntY0+1, SourceImageData.SizeY-1);
 	
-	FLinearColor Sample00 = SourceImageData.Access(IntX0,IntY0);
-	FLinearColor Sample10 = SourceImageData.Access(IntX1,IntY0);
-	FLinearColor Sample01 = SourceImageData.Access(IntX0,IntY1);
-	FLinearColor Sample11 = SourceImageData.Access(IntX1,IntY1);
-	FLinearColor Sample0 = FMath::Lerp(Sample00, Sample10, FractX);
-	FLinearColor Sample1 = FMath::Lerp(Sample01, Sample11, FractX);
-		
-	return FMath::Lerp(Sample0, Sample1, FractY);
+	const FLinearColor & Sample00 = SourceImageData.Access(IntX0,IntY0);
+	const FLinearColor & Sample10 = SourceImageData.Access(IntX1,IntY0);
+	const FLinearColor & Sample01 = SourceImageData.Access(IntX0,IntY1);
+	const FLinearColor & Sample11 = SourceImageData.Access(IntX1,IntY1);
+
+	return Bilerp(Sample00,Sample10,Sample01,Sample11,FractX,FractY);
 }
 
 // UV range is [0,1] , first pixel center is at 0.5/W
@@ -1748,22 +1816,11 @@ struct FImageViewLongLat
 	{
 		SizeX = Image.SizeX;
 		SizeY = Image.SizeY;
-		ImageColors = (&Image.AsRGBA32F()[0]) + SliceIndex * SizeY * SizeX;
-	}
-
-	/** Wraps X around W. */
-	static void WrapTo(int32& X, int32 W)
-	{
-		X = X % W;
-
-		if(X < 0)
-		{
-			X += W;
-		}
+		ImageColors = (&Image.AsRGBA32F()[0]) + SliceIndex * (int64) SizeY * SizeX;
 	}
 
 	/** Const access to a texel. */
-	FLinearColor Access(int32 X, int32 Y) const
+	const FLinearColor & Access(int32 X, int32 Y) const
 	{
 		return ImageColors[X + Y * SizeX];
 	}
@@ -1771,8 +1828,13 @@ struct FImageViewLongLat
 	/** Makes a filtered lookup. */
 	FLinearColor LookupFiltered(float X, float Y) const
 	{
-		int32 X0 = (int32)floorf(X);
-		int32 Y0 = (int32)floorf(Y);
+		// X is in (0,SizeX) (exclusive)
+		// Y is in (0,SizeY)
+		checkSlow( X > 0.f && X < SizeX );
+		checkSlow( Y > 0.f && Y < SizeY );
+
+		int32 X0 = (int32)X;
+		int32 Y0 = (int32)Y;
 
 		float FracX = X - X0;
 		float FracY = Y - Y0;
@@ -1780,28 +1842,52 @@ struct FImageViewLongLat
 		int32 X1 = X0 + 1;
 		int32 Y1 = Y0 + 1;
 
-		WrapTo(X0, SizeX);
-		WrapTo(X1, SizeX);
-		Y0 = FMath::Clamp(Y0, 0, (int32)(SizeY - 1));
-		Y1 = FMath::Clamp(Y1, 0, (int32)(SizeY - 1));
+		// wrap X :
+		checkSlow( X0 >= 0 && X0 < SizeX );
+		if ( X1 >= SizeX )
+		{
+			X1 = 0;
+		}
 
-		FLinearColor CornerRGB00 = Access(X0, Y0);
-		FLinearColor CornerRGB10 = Access(X1, Y0);
-		FLinearColor CornerRGB01 = Access(X0, Y1);
-		FLinearColor CornerRGB11 = Access(X1, Y1);
+		// clamp Y :
+		// clamp should only ever change SizeY to SizeY -1 ?
+		checkSlow( Y0 >= 0 && Y0 < SizeY );
+		if ( Y1 >= SizeY )
+		{
+			Y1 = SizeY-1;
+		}
 
-		FLinearColor CornerRGB0 = FMath::Lerp(CornerRGB00, CornerRGB10, FracX);
-		FLinearColor CornerRGB1 = FMath::Lerp(CornerRGB01, CornerRGB11, FracX);
+		const FLinearColor & CornerRGB00 = Access(X0, Y0);
+		const FLinearColor & CornerRGB10 = Access(X1, Y0);
+		const FLinearColor & CornerRGB01 = Access(X0, Y1);
+		const FLinearColor & CornerRGB11 = Access(X1, Y1);
 
-		return FMath::Lerp(CornerRGB0, CornerRGB1, FracY);
+		return Bilerp(CornerRGB00,CornerRGB10,CornerRGB01,CornerRGB11,FracX,FracY);
 	}
 
 	/** Makes a filtered lookup using a direction. */
-	FLinearColor LookupLongLat(FVector NormalizedDirection) const
-	{
-		// see http://gl.ict.usc.edu/Data/HighResProbes
-		// latitude-longitude panoramic format = equirectangular mapping
+	// see http://gl.ict.usc.edu/Data/HighResProbes
+	// latitude-longitude panoramic format = equirectangular mapping
 
+	// using floats saves ~6% of the total time
+	//	but would change output
+	// cycles_float = 135 cycles_double = 143
+	FLinearColor LookupLongLatFloat(const FVector & NormalizedDirection) const
+	{
+		// atan2 returns in [-PI,PI]
+		// acos returns in [0,PI]
+
+		const float invPI = 1.f/PI;
+		float X = (1.f + atan2f(NormalizedDirection.X, - NormalizedDirection.Z) * invPI) * 0.5f * SizeX;
+		float Y = acosf(NormalizedDirection.Y)*invPI * SizeY;
+
+		return LookupFiltered(X, Y);
+	}
+	
+	FLinearColor LookupLongLatDouble(const FVector & NormalizedDirection) const
+	{
+		// this does the math in doubles then stores to floats :
+		//	that was probably a mistake, but leave it to avoid patches
 		float X = (1 + atan2(NormalizedDirection.X, - NormalizedDirection.Z) / PI) / 2 * SizeX;
 		float Y = acos(NormalizedDirection.Y) / PI * SizeY;
 
@@ -1810,23 +1896,22 @@ struct FImageViewLongLat
 };
 
 // transform world space vector to a space relative to the face
-static FVector TransformSideToWorldSpace(uint32 CubemapFace, FVector InDirection)
+static inline FVector TransformSideToWorldSpace(uint32 CubemapFace, const FVector & InDirection)
 {
 	float x = InDirection.X, y = InDirection.Y, z = InDirection.Z;
 
-	FVector Ret = FVector(0, 0, 0);
+	FVector Ret;
 
 	// see http://msdn.microsoft.com/en-us/library/bb204881(v=vs.85).aspx
 	switch(CubemapFace)
 	{
+		default: checkSlow(0);
 		case 0: Ret = FVector(+z, -y, -x); break;
 		case 1: Ret = FVector(-z, -y, +x); break;
 		case 2: Ret = FVector(+x, +z, +y); break;
 		case 3: Ret = FVector(+x, -z, -y); break;
 		case 4: Ret = FVector(+x, -y, +z); break;
 		case 5: Ret = FVector(-x, -y, -z); break;
-		default:
-			checkSlow(0);
 	}
 
 	// this makes it with the Unreal way (z and y are flipped)
@@ -1834,30 +1919,29 @@ static FVector TransformSideToWorldSpace(uint32 CubemapFace, FVector InDirection
 }
 
 // transform vector relative to the face to world space
-static FVector TransformWorldToSideSpace(uint32 CubemapFace, FVector InDirection)
+static inline FVector TransformWorldToSideSpace(uint32 CubemapFace, const FVector & InDirection)
 {
 	// undo Unreal way (z and y are flipped)
 	float x = InDirection.X, y = InDirection.Z, z = InDirection.Y;
 
-	FVector Ret = FVector(0, 0, 0); 
+	FVector Ret;
 
 	// see http://msdn.microsoft.com/en-us/library/bb204881(v=vs.85).aspx
 	switch(CubemapFace)
 	{
+		default: checkSlow(0);
 		case 0: Ret = FVector(-z, -y, +x); break;
 		case 1: Ret = FVector(+z, -y, -x); break;
 		case 2: Ret = FVector(+x, +z, +y); break;
 		case 3: Ret = FVector(+x, -z, -y); break;
 		case 4: Ret = FVector(+x, -y, +z); break;
 		case 5: Ret = FVector(-x, -y, -z); break;
-		default:
-			checkSlow(0);
 	}
 
 	return Ret;
 }
 
-static FVector ComputeSSCubeDirectionAtTexelCenter(uint32 x, uint32 y, float InvSideExtent)
+static inline FVector ComputeSSCubeDirectionAtTexelCenter(uint32 x, uint32 y, float InvSideExtent)
 {
 	// center of the texels
 	FVector DirectionSS((x + 0.5f) * InvSideExtent * 2 - 1, (y + 0.5f) * InvSideExtent * 2 - 1, 1);
@@ -1865,7 +1949,7 @@ static FVector ComputeSSCubeDirectionAtTexelCenter(uint32 x, uint32 y, float Inv
 	return DirectionSS;
 }
 
-static FVector ComputeWSCubeDirectionAtTexelCenter(uint32 CubemapFace, uint32 x, uint32 y, float InvSideExtent)
+static inline FVector ComputeWSCubeDirectionAtTexelCenter(uint32 CubemapFace, uint32 x, uint32 y, float InvSideExtent)
 {
 	FVector DirectionSS = ComputeSSCubeDirectionAtTexelCenter(x, y, InvSideExtent);
 	FVector DirectionWS = TransformSideToWorldSpace(CubemapFace, DirectionSS);
@@ -1879,7 +1963,7 @@ static uint32 ComputeLongLatCubemapExtents(int32 SrcImageSizeX, const uint32 Max
 
 void ITextureCompressorModule::GenerateBaseCubeMipFromLongitudeLatitude2D(FImage* OutMip, const FImage& SrcImage, const uint32 MaxCubemapTextureResolution, uint8 SourceEncodingOverride)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(Texture.GenerateBaseCubeMipFromLongitudeLatitude2D);
+	TRACE_CPUPROFILER_EVENT_SCOPE(Texture.CubeMipFromLongLat);
 
 	FImage LongLatImage;
 	SrcImage.Linearize(SourceEncodingOverride, LongLatImage);
@@ -1892,7 +1976,9 @@ void ITextureCompressorModule::GenerateBaseCubeMipFromLongitudeLatitude2D(FImage
 	for (int32 Slice = 0; Slice < SrcImage.NumSlices; ++Slice)
 	{
 		FImageViewLongLat LongLatView(LongLatImage, Slice);
-		for (uint32 Face = 0; Face < 6; ++Face)
+
+		// Parallel on the 6 faces :
+		ParallelFor( TEXT("Texture.CubeMipFromLongLat.PF"),6,1, [&](int32 Face)
 		{
 			FImageView2D MipView(*OutMip, Slice * 6 + Face);
 			for (uint32 y = 0; y < Extent; ++y)
@@ -1900,10 +1986,10 @@ void ITextureCompressorModule::GenerateBaseCubeMipFromLongitudeLatitude2D(FImage
 				for (uint32 x = 0; x < Extent; ++x)
 				{
 					FVector DirectionWS = ComputeWSCubeDirectionAtTexelCenter(Face, x, y, InvExtent);
-					MipView.Access(x, y) = LongLatView.LookupLongLat(DirectionWS);
+					MipView.Access(x, y) = LongLatView.LookupLongLatDouble(DirectionWS);
 				}
 			}
-		}
+		});
 	}
 }
 
@@ -2465,7 +2551,6 @@ static inline void AdjustColorsNew(FLinearColor* Colors, int64 Count, const FTex
 	
 	// BuildSettings.ChromaKeyColor is an FColor
 	FLinearColor ChromaKeyColor(InBuildSettings.ChromaKeyColor);
-
 	bool bChromaKeyTexture = InBuildSettings.bChromaKeyTexture;
 	float ChromaKeyThreshold = InBuildSettings.ChromaKeyThreshold + SMALL_NUMBER;
 
@@ -2473,6 +2558,12 @@ static inline void AdjustColorsNew(FLinearColor* Colors, int64 Count, const FTex
 
 	for (int64 i=0; i<Count; i++)
 	{
+		if (bChromaKeyTexture && (Colors[i].Equals(ChromaKeyColor, ChromaKeyThreshold)))
+		{
+			Colors[i] = FLinearColor::Transparent;
+			continue;
+		}
+
 		FLinearColor OriginalColor = Colors[i];
 			
 		if (!bHDRSource)
@@ -2483,11 +2574,25 @@ static inline void AdjustColorsNew(FLinearColor* Colors, int64 Count, const FTex
 			OriginalColor.G = FMath::Clamp(OriginalColor.G, 0.0f, 1.f);
 			OriginalColor.B = FMath::Clamp(OriginalColor.B, 0.0f, 1.f);
 		}
-
-		if (bChromaKeyTexture && (OriginalColor.Equals(ChromaKeyColor, ChromaKeyThreshold)))
+		else
 		{
-			Colors[i] = FLinearColor::Transparent;
-			continue;
+			/*
+			if ( OriginalColor.R < 0 || OriginalColor.G < 0 || OriginalColor.B < 0 )
+			{
+				// need to log texture name for this to be of any use :
+				UE_CALL_ONCE( [&](){
+					UE_LOG(LogTextureCompressor, Warning,
+						TEXT("Negative pixel values (%f, %f, %f) are not expected"),
+						OriginalColor.R, OriginalColor.G, OriginalColor.B);
+				} );
+			}
+			*/
+			
+			// yes HDR source, but we don't support negatives in Adjust
+			// clamp to >= 0 :
+			OriginalColor.R = FMath::Max(OriginalColor.R, 0.0f);
+			OriginalColor.G = FMath::Max(OriginalColor.G, 0.0f);
+			OriginalColor.B = FMath::Max(OriginalColor.B, 0.0f);
 		}
 
 		// Convert to HSV
@@ -3035,8 +3140,11 @@ static bool CompressMipChain(
 	OutMips.Empty(MipCount);
 	OutMips.AddDefaulted(MipCount);
 
+	FIntVector3 Mip0Dimensions = TextureDescription.GetMipDimensions(0);
+	int32 Mip0NumSlicesNoDepth = TextureDescription.GetNumSlices_NoDepth();
+
 	auto ProcessMips =
-		[&TextureFormat, &MipChain, &OutMips, FirstMipTailIndex, MipTailCount, ExtData = ExtendedData.ExtData, &Settings, &DebugTexturePathName, bImageHasAlphaChannel](int32 MipBegin, int32 MipEnd)
+		[&TextureFormat, &MipChain, &OutMips, &Mip0Dimensions, Mip0NumSlicesNoDepth, FirstMipTailIndex, MipTailCount, ExtData = ExtendedData.ExtData, &Settings, &DebugTexturePathName, bImageHasAlphaChannel](int32 MipBegin, int32 MipEnd)
 	{
 		bool bSuccess = true;
 
@@ -3056,6 +3164,8 @@ static bool CompressMipChain(
 				&MipChain[MipIndex],
 				MipsToCompress,
 				Settings,
+				Mip0Dimensions,
+				Mip0NumSlicesNoDepth,
 				DebugTexturePathName,
 				bImageHasAlphaChannel,
 				ExtData,
@@ -3129,6 +3239,8 @@ static bool CompressMipChain(
 // only useful for normal maps, fixed bad input (denormalized normals) and improved quality (quantization artifacts)
 static void NormalizeMip(FImage& InOutMip)
 {
+	const FVector NormalIfZero(0.f,0.f,1.f);
+
 	const uint32 NumPixels = InOutMip.SizeX * InOutMip.SizeY * InOutMip.NumSlices;
 	TArrayView64<FLinearColor> ImageColors = InOutMip.AsRGBA32F();
 	for(uint32 CurPixelIndex = 0; CurPixelIndex < NumPixels; ++CurPixelIndex)
@@ -3137,7 +3249,8 @@ static void NormalizeMip(FImage& InOutMip)
 
 		FVector Normal = FVector(Color.R * 2.0f - 1.0f, Color.G * 2.0f - 1.0f, Color.B * 2.0f - 1.0f);
 
-		Normal = Normal.GetSafeNormal();
+		// GetSafeNormal returns Vec(0,0,0) by default for tiny input, instead return flat/up
+		Normal = Normal.GetSafeNormal(UE_SMALL_NUMBER,NormalIfZero);
 
 		Color = FLinearColor(Normal.X * 0.5f + 0.5f, Normal.Y * 0.5f + 0.5f, Normal.Z * 0.5f + 0.5f, Color.A);
 	}
@@ -3410,6 +3523,7 @@ public:
 			// important to make accurate computation with normal length
 			//  note this normalizes the top mip *before* the gaussian blur
 			DefaultSettings.bRenormalizeTopMip = true;
+			DefaultSettings.bNormalizeNormals = false; // do not normalize after mip gen, we want shortening
 
 			// use new mip filter setting from build settings
 			DefaultSettings.bUseNewMipFilter = BuildSettings.bUseNewMipFilter;
@@ -3436,27 +3550,6 @@ public:
 		//	BuildSettings could have programatically introduced alpha that was not in the source
 		// note the order of operations in bForceAlphaChannel and bForceNoAlphaChannel ( ForceNo takes precedence )
 		const bool bImageHasAlphaChannel = !BuildSettings.bForceNoAlphaChannel  && (BuildSettings.bForceAlphaChannel || FImageCore::DetectAlphaChannel(IntermediateMipChain[0]));
-	
-		// Set the correct biased texture size so that the compressor understands the original source image size
-		// This is requires for platforms that may need to tile based on the original source texture size
-		BuildSettings.TopMipSize.X = IntermediateMipChain[0].SizeX;
-		BuildSettings.TopMipSize.Y = IntermediateMipChain[0].SizeY;
-		BuildSettings.VolumeSizeZ = BuildSettings.bVolume ? IntermediateMipChain[0].NumSlices : 1;
-		if (BuildSettings.bTextureArray)
-		{
-			if (BuildSettings.bCubemap)
-			{
-				BuildSettings.ArraySlices = IntermediateMipChain[0].NumSlices / 6;
-			}
-			else
-			{
-				BuildSettings.ArraySlices = IntermediateMipChain[0].NumSlices;
-			}
-		}
-		else
-		{
-			BuildSettings.ArraySlices = 1;
-		}
 
 		if (bOutImageHasAlpha)
 		{
@@ -3743,7 +3836,7 @@ private:
 		const bool bLinearize = bNeedLinearize || (GenerateCount > 0) || BuildSettings.bRenormalizeTopMip || (BuildSettings.Downscale > 1.f)
 			|| BuildSettings.bHasColorSpaceDefinition || BuildSettings.bComputeBokehAlpha || BuildSettings.bFlipGreenChannel
 			|| BuildSettings.bReplicateRed || BuildSettings.bReplicateAlpha || BuildSettings.bApplyYCoCgBlockScale
-			|| BuildSettings.SourceEncodingOverride != 0 || bNeedAdjustImageColors;
+			|| BuildSettings.SourceEncodingOverride != 0 || bNeedAdjustImageColors || BuildSettings.bNormalizeNormals;
 
 		for (int32 MipIndex = StartMip; MipIndex < StartMip + CopyCount; ++MipIndex)
 		{
@@ -3788,9 +3881,16 @@ private:
 					}
 					else
 					{
-						// if image is in BGRA8 format leave it, otherwise use original RGBA32F
-						ERawImageFormat::Type DestFormat = Image.Format == ERawImageFormat::BGRA8 ? ERawImageFormat::BGRA8 : ERawImageFormat::RGBA32F;
-						Image.CopyTo(*Mip, DestFormat, Image.GammaSpace);
+						// if image is in BGRA8 format leave it, otherwise convert to RGBA32F
+						//  we only support leaving images in source format if they are BGRA8 and require no processing (eg VT tiles)
+						ERawImageFormat::Type DestFormat = Image.Format;
+						EGammaSpace DestGammaSpace = Image.GammaSpace;
+						if ( Image.Format != ERawImageFormat::BGRA8 )
+						{
+							DestFormat = ERawImageFormat::RGBA32F;
+							DestGammaSpace = EGammaSpace::Linear;
+						}
+						Image.CopyTo(*Mip, DestFormat, DestGammaSpace);
 					}
 				}
 			}
@@ -3873,6 +3973,14 @@ private:
 		}
 
 		// Apply post-mip generation adjustments.
+		if ( BuildSettings.bNormalizeNormals )
+		{
+			for ( FImage& MipImage : OutMipChain )
+			{
+				NormalizeMip(MipImage);
+			}
+		}
+	
 		if (BuildSettings.bReplicateRed)
 		{
 			check( !BuildSettings.bReplicateAlpha ); // cannot both be set 
@@ -3882,6 +3990,7 @@ private:
 		{
 			ReplicateAlphaChannel(OutMipChain);
 		}
+
 		if (BuildSettings.bApplyYCoCgBlockScale)
 		{
 			ApplyYCoCgBlockScale(OutMipChain);

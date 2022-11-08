@@ -308,9 +308,15 @@ inline RHI_API bool RHISupportsConservativeRasterization(const FStaticShaderPlat
 }
 
 /** True if the given shader platform supports bindless resources/views. */
+inline ERHIBindlessSupport RHIGetBindlessSupport(const FStaticShaderPlatform Platform)
+{
+	return FDataDrivenShaderPlatformInfo::GetBindlessSupport(Platform);
+}
+
+UE_DEPRECATED(5.2, "You must use RHIGetBindlessSupport instead.")
 inline bool RHISupportsBindless(EShaderPlatform Platform)
 {
-	return FDataDrivenShaderPlatformInfo::GetSupportsBindless(Platform);
+	return RHIGetBindlessSupport(Platform) == ERHIBindlessSupport::AllShaderTypes;
 }
 
 inline bool RHISupportsVolumeTextureAtomics(EShaderPlatform Platform)
@@ -475,10 +481,6 @@ extern RHI_API bool GSupportsEfficientAsyncCompute;
 
 /** True if the RHI supports getting the result of occlusion queries when on a thread other than the render thread */
 extern RHI_API bool GSupportsParallelOcclusionQueries;
-
-/** true if the RHI supports aliasing of transient resources */
-UE_DEPRECATED(5.0, "GSupportsTransientResourceAliasing has been deprecated. Transient resource aliasing is handled through IRHITransientResourceAllocator.")
-extern RHI_API bool GSupportsTransientResourceAliasing;
 
 /** true if the RHI requires a valid RT bound during UAV scatter operation inside the pixel shader */
 extern RHI_API bool GRHIRequiresRenderTargetForPixelShaderUAVs;
@@ -822,6 +824,9 @@ extern RHI_API FVector2f GRHIDefaultMSAASampleOffsets[1 + 2 + 4 + 8 + 16];
 extern RHI_API bool GRHISupportsAsyncPipelinePrecompile;
 
 /** Whether dynamic (bindless) resources are supported */
+extern RHI_API ERHIBindlessSupport GRHIBindlessSupport;
+
+UE_DEPRECATED(5.2, "You must use GRHIBindlessSupport instead.")
 extern RHI_API bool GRHISupportsBindless;
 
 // Calculate the index of the sample in GRHIDefaultMSAASampleOffsets
@@ -833,60 +838,22 @@ inline FVector2f GetMSAASampleOffsets(int32 NumSamples, int32 SampleIndex)
 	return GRHIDefaultMSAASampleOffsets[CalculateMSAASampleArrayIndex(NumSamples, SampleIndex)];
 }
 
-enum class EPixelFormatCapabilities : uint32
-{
-    None             = 0,
-    Texture1D        = 1ull << 1,
-    Texture2D        = 1ull << 2,
-    Texture3D        = 1ull << 3,
-    TextureCube      = 1ull << 4,
-    RenderTarget     = 1ull << 5,
-    DepthStencil     = 1ull << 6,
-	TextureMipmaps   = 1ull << 7,
-	TextureLoad      = 1ull << 8,
-	TextureSample    = 1ull << 9,
-	TextureGather    = 1ull << 10,
-	TextureAtomics   = 1ull << 11,
-	TextureBlendable = 1ull << 12,
-	TextureStore     = 1ull << 13,
-
-	Buffer           = 1ull << 14,
-    VertexBuffer     = 1ull << 15,
-    IndexBuffer      = 1ull << 16,
-	BufferLoad       = 1ull << 17,
-    BufferStore      = 1ull << 18,
-    BufferAtomics    = 1ull << 19,
-
-	UAV              = 1ull << 20,
-    TypedUAVLoad     = 1ull << 21,
-	TypedUAVStore    = 1ull << 22,
-
-	AnyTexture       = Texture1D | Texture2D | Texture3D | TextureCube,
-
-	AllTextureFlags  = AnyTexture | RenderTarget | DepthStencil | TextureMipmaps | TextureLoad | TextureSample | TextureGather | TextureAtomics | TextureBlendable | TextureStore,
-	AllBufferFlags   = Buffer | VertexBuffer | IndexBuffer | BufferLoad | BufferStore | BufferAtomics,
-	AllUAVFlags      = UAV | TypedUAVLoad | TypedUAVStore,
-
-	AllFlags         = AllTextureFlags | AllBufferFlags | AllUAVFlags
-};
-ENUM_CLASS_FLAGS(EPixelFormatCapabilities);
-
 /** Initialize the 'best guess' pixel format capabilities. Platform formats and support must be filled out before calling this. */
 extern RHI_API void RHIInitDefaultPixelFormatCapabilities();
 
 inline bool RHIPixelFormatHasCapabilities(EPixelFormat InFormat, EPixelFormatCapabilities InCapabilities)
 {
-	return EnumHasAllFlags(GPixelFormats[InFormat].Capabilities, InCapabilities);
+	return UE::PixelFormat::HasCapabilities(InFormat, InCapabilities);
 }
 
 inline bool RHIIsTypedUAVLoadSupported(EPixelFormat InFormat)
 {
-	return RHIPixelFormatHasCapabilities(InFormat, EPixelFormatCapabilities::TypedUAVLoad);
+	return UE::PixelFormat::HasCapabilities(InFormat, EPixelFormatCapabilities::TypedUAVLoad);
 }
 
 inline bool RHIIsTypedUAVStoreSupported(EPixelFormat InFormat)
 {
-	return RHIPixelFormatHasCapabilities(InFormat, EPixelFormatCapabilities::TypedUAVStore);
+	return UE::PixelFormat::HasCapabilities(InFormat, EPixelFormatCapabilities::TypedUAVStore);
 }
 
 /**

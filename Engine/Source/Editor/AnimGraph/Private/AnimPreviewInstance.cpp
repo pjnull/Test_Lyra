@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/DebugSkelMeshComponent.h"
 #include "AnimationRuntime.h"
+#include "Animation/AnimationSettings.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimSequenceHelpers.h"
 
@@ -794,7 +795,12 @@ void UAnimPreviewInstance::MontagePreview_StepBackward()
 
 float UAnimPreviewInstance::MontagePreview_CalculateStepLength()
 {
-	return 1.0f / 30.0f;
+	if (UAnimMontage* Montage = Cast<UAnimMontage>(CurrentAsset))
+	{
+		return static_cast<float>(Montage->GetSamplingFrameRate().AsInterval());
+	}
+
+	return static_cast<float>(UAnimationSettings::Get()->GetDefaultFrameRate().AsInterval());
 }
 
 void UAnimPreviewInstance::MontagePreview_JumpToStart()

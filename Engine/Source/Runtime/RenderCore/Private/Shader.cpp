@@ -31,6 +31,10 @@
 #include "Interfaces/IShaderFormat.h"
 #endif
 
+#if RHI_RAYTRACING
+#include "RayTracingPayloadType.h"
+#endif
+
 DEFINE_LOG_CATEGORY(LogShaders);
 
 IMPLEMENT_TYPE_LAYOUT(FShader);
@@ -212,12 +216,15 @@ FShaderType::FShaderType(
 	int32 InTotalPermutationCount,
 	ConstructSerializedType InConstructSerializedRef,
 	ConstructCompiledType InConstructCompiledRef,
-	ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 	ShouldCompilePermutationType InShouldCompilePermutationRef,
+	GetRayTracingPayloadTypeType InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+	ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 	ValidateCompiledResultType InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 	uint32 InTypeSize,
 	const FShaderParametersMetadata* InRootParametersMetadata
-	):
+):
 	ShaderTypeForDynamicCast(InShaderTypeForDynamicCast),
 	TypeLayout(&InTypeLayout),
 	Name(InName),
@@ -231,15 +238,16 @@ FShaderType::FShaderType(
 	TotalPermutationCount(InTotalPermutationCount),
 	ConstructSerializedRef(InConstructSerializedRef),
 	ConstructCompiledRef(InConstructCompiledRef),
-	ModifyCompilationEnvironmentRef(InModifyCompilationEnvironmentRef),
 	ShouldCompilePermutationRef(InShouldCompilePermutationRef),
+	GetRayTracingPayloadTypeRef(InGetRayTracingPayloadTypeRef),
+#if WITH_EDITOR
+	ModifyCompilationEnvironmentRef(InModifyCompilationEnvironmentRef),
 	ValidateCompiledResultRef(InValidateCompiledResultRef),
+#endif // WITH_EDITOR
 	RootParametersMetadata(InRootParametersMetadata),
 	GlobalListLink(this)
 {
 	FTypeLayoutDesc::Register(InTypeLayout);
-
-	CachedUniformBufferPlatform = SP_NumPlatforms;
 
 	// This will trigger if an IMPLEMENT_SHADER_TYPE was in a module not loaded before InitializeShaderTypes
 	// Shader types need to be implemented in modules that are loaded before that
@@ -373,14 +381,59 @@ bool FShaderType::ShouldCompilePermutation(const FShaderPermutationParameters& P
 	return ShouldCompileShaderFrequency((EShaderFrequency)Frequency, Parameters.Platform) && (*ShouldCompilePermutationRef)(Parameters);
 }
 
+#if WITH_EDITOR
+
 void FShaderType::ModifyCompilationEnvironment(const FShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment) const
 {
 	(*ModifyCompilationEnvironmentRef)(Parameters, OutEnvironment);
+#if RHI_RAYTRACING
+	ERayTracingPayloadType RayTracingPayloadType = GetRayTracingPayloadType(Parameters.PermutationId);
+	switch (Frequency)
+	{
+		case SF_RayGen:
+		{
+			// Raygen shader can use any number of payloads, but must use at least one
+			checkf(RayTracingPayloadType != ERayTracingPayloadType::None, TEXT("Raygen shader %s did not declare which payload type(s) it uses. Make sure you override GetRayTracingPayloadType()"), Name);
+			break;
+		}
+		case SF_RayHitGroup:
+		case SF_RayMiss:
+		case SF_RayCallable:
+		{
+			// these shader types must know which payload type they are using
+			checkf(RayTracingPayloadType != ERayTracingPayloadType::None, TEXT("Raytracing shader %s did not declare which payload type(s) it uses. Make sure you override GetRayTracingPayloadType()"), Name);
+			checkf(FMath::CountBits(static_cast<uint32>(RayTracingPayloadType)) == 1, TEXT("Raytracing shader %s did not declare a unique payload type. Only one payload type is supported for this shader frequency."), Name);
+			break;
+		}
+		default:
+		{
+			// not a raytracing shader, specifying a payload type would suggest some confusion has occured
+			checkf(RayTracingPayloadType == ERayTracingPayloadType::None, TEXT("Non-Raytracing shader %s declared a payload type!"), Name);
+			break;
+		}
+	}
+	if (RayTracingPayloadType != ERayTracingPayloadType::None)
+	{
+		OutEnvironment.SetDefine(TEXT("RT_PAYLOAD_TYPE"), static_cast<int32>(RayTracingPayloadType));
+	}
+#endif
 }
 
 bool FShaderType::ValidateCompiledResult(EShaderPlatform Platform, const FShaderParameterMap& ParameterMap, TArray<FString>& OutError) const
 {
 	return (*ValidateCompiledResultRef)(Platform, ParameterMap, OutError);
+}
+
+#endif // WITH_EDITOR
+
+ERayTracingPayloadType FShaderType::GetRayTracingPayloadType(const int32 PermutationId) const
+{
+#if RHI_RAYTRACING
+	return (*GetRayTracingPayloadTypeRef)(PermutationId);
+	return ERayTracingPayloadType::None;
+#else
+	return static_cast<ERayTracingPayloadType>(0);
+#endif
 }
 
 const FSHAHash& FShaderType::GetSourceHash(EShaderPlatform ShaderPlatform) const
@@ -390,6 +443,7 @@ const FSHAHash& FShaderType::GetSourceHash(EShaderPlatform ShaderPlatform) const
 
 void FShaderType::Initialize(const TMap<FString, TArray<const TCHAR*> >& ShaderFileToUniformBufferVariables)
 {
+#if WITH_EDITOR
 	//#todo-rco: Need to call this only when Initializing from a Pipeline once it's removed from the global linked list
 	if (!FPlatformProperties::RequiresCookedData())
 	{
@@ -402,7 +456,7 @@ void FShaderType::Initialize(const TMap<FString, TArray<const TCHAR*> >& ShaderF
 #if UE_BUILD_DEBUG
 			UniqueShaderTypes.Add(Type);
 #endif
-			GenerateReferencedUniformBuffers(Type->SourceFilename, Type->Name, ShaderFileToUniformBufferVariables, Type->ReferencedUniformBufferStructsCache);
+			GenerateReferencedUniformBufferNames(Type->SourceFilename, Type->Name, ShaderFileToUniformBufferVariables, Type->ReferencedUniformBufferNames);
 		}
 	
 #if UE_BUILD_DEBUG
@@ -414,6 +468,7 @@ void FShaderType::Initialize(const TMap<FString, TArray<const TCHAR*> >& ShaderF
 		}
 #endif
 	}
+#endif // WITH_EDITOR
 
 	bInitializedSerializationHistory = true;
 }
@@ -1803,9 +1858,10 @@ void ShaderMapAppendKeyString(EShaderPlatform Platform, FString& KeyString)
 		}
 	}
 
-	if (IsWaterDistanceFieldShadowEnabled(Platform))
+	const bool bNeedsSeparateMainDirLightTexture = IsWaterDistanceFieldShadowEnabled(Platform) || IsWaterVirtualShadowMapFilteringEnabled(Platform);
+	if (bNeedsSeparateMainDirLightTexture)
 	{
-		KeyString += TEXT("_SLWDFS");
+		KeyString += TEXT("_SLWSMDLT");
 	}
 
 	{
@@ -1817,16 +1873,38 @@ void ShaderMapAppendKeyString(EShaderPlatform Platform, FString& KeyString)
 	}
 
 	{
+		static const auto CVar = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.RectLightAtlas.Translucent"));
+		if (CVar && CVar->GetValueOnAnyThread() > 0)
+		{
+			KeyString += TEXT("_RECTTRANS");
+		}
+	}
+
+	{
 		const bool bStrataEnabled = RenderCore_IsStrataEnabled();
 		if (bStrataEnabled)
 		{
 			KeyString += TEXT("_STRATA");
 		}
 
-		static const auto CVarBudget = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.Strata.BytesPerPixel"));
-		if (bStrataEnabled && CVarBudget)
+		if (bStrataEnabled)
 		{
-			KeyString += FString::Printf(TEXT("_BUDGET%u"), CVarBudget->GetValueOnAnyThread());
+			// We enforce at least 20 bytes per pixel because this is the minimal Strata GBuffer footprint of the simplest material.
+			const uint32 MinStrataBytePerPixel = 20u;
+			const uint32 MaxStrataBytePerPixel = 256u;
+			static FShaderPlatformCachedIniValue<int32> CVarBudget(TEXT("r.Strata.BytesPerPixel"));
+			const uint32 BytesPerPixel = FMath::Clamp(uint32(CVarBudget.Get(Platform)), MinStrataBytePerPixel, MaxStrataBytePerPixel);
+			KeyString += FString::Printf(TEXT("_BUDGET%u"), BytesPerPixel);
+		}
+
+		if (bStrataEnabled)
+		{
+			static FShaderPlatformCachedIniValue<int32> CVarDBufferPass(TEXT("r.Strata.DBufferPass"));
+			const int32 StrataDBufferPass = CVarDBufferPass.Get(Platform);
+			if (StrataDBufferPass>0)
+			{
+				KeyString += FString::Printf(TEXT("_DBUFFERPASS"));
+			}
 		}
 
 		static const auto CVarBackCompatibility = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.StrataBackCompatibility"));
@@ -1957,21 +2035,19 @@ void ShaderMapAppendKeyString(EShaderPlatform Platform, FString& KeyString)
 		KeyString += TEXT("_MS_T1");
 	}
 
-	if (RHISupportsBindless(Platform))
+	if (RHIGetBindlessSupport(Platform) != ERHIBindlessSupport::Unsupported)
 	{
-		KeyString += TEXT("_BNDLS");
-
 		const ERHIBindlessConfiguration ResourcesConfig = RHIGetBindlessResourcesConfiguration(Platform);
 		const ERHIBindlessConfiguration SamplersConfig = RHIGetBindlessSamplersConfiguration(Platform);
 
 		if (ResourcesConfig != ERHIBindlessConfiguration::Disabled)
 		{
-			KeyString += ResourcesConfig == ERHIBindlessConfiguration::RayTracingShaders ? TEXT("_RTRES") : TEXT("ALLRES");
+			KeyString += ResourcesConfig == ERHIBindlessConfiguration::RayTracingShaders ? TEXT("_BNDLSRTRES") : TEXT("_BNDLSRES");
 		}
 
 		if (SamplersConfig != ERHIBindlessConfiguration::Disabled)
 		{
-			KeyString += SamplersConfig == ERHIBindlessConfiguration::RayTracingShaders ? TEXT("_RTSAM") : TEXT("ALLSAM");
+			KeyString += SamplersConfig == ERHIBindlessConfiguration::RayTracingShaders ? TEXT("_BNDLSRTSAM") : TEXT("_BNDLSSAM");
 		}
 	}
 

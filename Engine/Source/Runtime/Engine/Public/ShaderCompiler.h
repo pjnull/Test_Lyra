@@ -192,7 +192,7 @@ struct FShaderCompileJobKey
 	{}
 
 	uint32 MakeHash(uint32 Id) const { return HashCombine(HashCombine(HashCombine(GetTypeHash(Id), GetTypeHash(VFType)), GetTypeHash(ShaderType)), GetTypeHash(PermutationId)); }
-
+	ENGINE_API FString ToString() const;
 	const FShaderType* ShaderType;
 	const FVertexFactoryType* VFType;
 	int32 PermutationId;
@@ -499,6 +499,7 @@ private:
 	class IConsoleObject* PrintStatsCmd;
 };
 
+#if WITH_EDITOR
 class FGlobalShaderTypeCompiler
 {
 public:
@@ -515,6 +516,7 @@ public:
 	/** Either returns an equivalent existing shader of this type, or constructs a new instance. */
 	static FShader* FinishCompileShader(const FGlobalShaderType* ShaderType, const FShaderCompileJob& CompileJob, const FShaderPipelineType* ShaderPipelineType);
 };
+#endif // WITH_EDITOR
 
 class FShaderCompileThreadRunnableBase : public FRunnable
 {
@@ -1158,8 +1160,7 @@ extern ENGINE_API FShaderCompilingManager* GShaderCompilingManager;
 /** The global shader compiling stats */
 extern ENGINE_API FShaderCompilerStats* GShaderCompilerStats;
 
-/** The shader precompilers for each platform.  These are only set during the console shader compilation while cooking or in the PrecompileShaders commandlet. */
-extern class FConsoleShaderPrecompiler* GConsoleShaderPrecompilers[SP_NumPlatforms];
+#if WITH_EDITOR
 
 /** Enqueues a shader compile job with GShaderCompilingManager. */
 extern ENGINE_API void GlobalBeginCompileShader(
@@ -1193,6 +1194,8 @@ extern ENGINE_API void GlobalBeginCompileShader(
 	const TCHAR* DebugExtension = nullptr
 );
 
+#endif // WITH_EDITOR
+
 extern void GetOutdatedShaderTypes(TArray<const FShaderType*>& OutdatedShaderTypes, TArray<const FShaderPipelineType*>& OutdatedShaderPipelineTypes, TArray<const FVertexFactoryType*>& OutdatedFactoryTypes);
 
 /** Implementation of the 'recompileshaders' console command.  Recompiles shaders at runtime based on various criteria. */
@@ -1201,9 +1204,11 @@ extern bool RecompileShaders(const TCHAR* Cmd, FOutputDevice& Ar);
 /** Returns whether all global shader types containing the substring are complete and ready for rendering. if type name is null, check everything */
 extern ENGINE_API bool IsGlobalShaderMapComplete(const TCHAR* TypeNameSubstring = nullptr);
 
+#if WITH_EDITORONLY_DATA
 /** Returns the delegate triggered when global shaders compilation jobs start. */
 DECLARE_MULTICAST_DELEGATE(FOnGlobalShadersCompilation);
 extern ENGINE_API FOnGlobalShadersCompilation& GetOnGlobalShaderCompilation();
+#endif // WITH_EDITORONLY_DATA
 
 /**
 * Makes sure all global shaders are loaded and/or compiled for the passed in platform.
@@ -1242,11 +1247,13 @@ extern ENGINE_API void BeginRecompileGlobalShaders(const TArray<const FShaderTyp
 /** Finishes recompiling global shaders.  Must be called after BeginRecompileGlobalShaders. */
 extern ENGINE_API void FinishRecompileGlobalShaders();
 
+#if WITH_EDITOR
 /** Called by the shader compiler to process completed global shader jobs. */
 extern ENGINE_API void ProcessCompiledGlobalShaders(const TArray<FShaderCommonCompileJobPtr>& CompilationResults);
 
 /** Serializes a global shader map to an archive (used with recompiling shaders for a remote console) */
 extern ENGINE_API void SaveGlobalShadersForRemoteRecompile(FArchive& Ar, EShaderPlatform ShaderPlatform);
+#endif // WITH_EDITOR
 
 /** Serializes a global shader map to an archive (used with recompiling shaders for a remote console) */
 extern ENGINE_API void LoadGlobalShadersForRemoteRecompile(FArchive& Ar, EShaderPlatform ShaderPlatform);

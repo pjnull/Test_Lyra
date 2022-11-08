@@ -28,6 +28,11 @@ namespace EpicGames.Perforce
 		public string? Password { get; }
 
 		/// <summary>
+		/// Name of the current host
+		/// </summary>
+		public string? HostName { get; }
+
+		/// <summary>
 		/// Name of the client to use
 		/// </summary>
 		public string? ClientName { get; }
@@ -53,10 +58,25 @@ namespace EpicGames.Perforce
 	/// </summary>
 	public class PerforceSettings : IPerforceSettings
 	{
+		static readonly AssemblyName? s_entryAssemblyName = Assembly.GetEntryAssembly()!.GetName();
+
+		string? _appName;
+		string? _appVersion;
+
 		/// <summary>
 		/// The default settings
 		/// </summary>
 		public static IPerforceSettings Default { get; } = new PerforceSettings(PerforceEnvironment.Default);
+
+		/// <summary>
+		/// Default app name to use for new settings objects
+		/// </summary>
+		public static string? DefaultAppName { get; set; } = s_entryAssemblyName?.Name;
+
+		/// <summary>
+		/// Default version string to use for new settings objects
+		/// </summary>
+		public static string? DefaultAppVersion { get; set; } = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? s_entryAssemblyName?.Version?.ToString();
 
 		/// <inheritdoc/>
 		public string ServerAndPort { get; set; }
@@ -68,13 +88,24 @@ namespace EpicGames.Perforce
 		public string? Password { get; set; }
 
 		/// <inheritdoc/>
+		public string? HostName { get; set; }
+
+		/// <inheritdoc/>
 		public string? ClientName { get; set; }
 
 		/// <inheritdoc/>
-		public string? AppName { get; set; }
+		public string? AppName
+		{
+			get => _appName ?? DefaultAppName;
+			set => _appName = value;
+		}
 
 		/// <inheritdoc/>
-		public string? AppVersion { get; set; }
+		public string? AppVersion
+		{
+			get => _appVersion ?? DefaultAppVersion;
+			set => _appVersion = value;
+		}
 
 		/// <inheritdoc/>
 		public bool PreferNativeClient { get; set; }
@@ -87,6 +118,7 @@ namespace EpicGames.Perforce
 			ServerAndPort = environment.GetValue("P4PORT") ?? "perforce:1666";
 			UserName = environment.GetValue("P4USER") ?? System.Environment.UserName;
 			Password = environment.GetValue("P4PASSWD");
+			HostName = environment.GetValue("P4HOST");
 			ClientName = environment.GetValue("P4CLIENT");
 
 			AssemblyName entryAssemblyName = Assembly.GetEntryAssembly()!.GetName();
@@ -118,6 +150,7 @@ namespace EpicGames.Perforce
 			ServerAndPort = other.ServerAndPort;
 			UserName = other.UserName;
 			Password = other.Password;
+			HostName = other.HostName;
 			ClientName = other.ClientName;
 			AppName = other.AppName;
 			AppVersion = other.AppVersion;
@@ -166,16 +199,16 @@ namespace EpicGames.Perforce
 		/// Gets the command line arguments to launch an external program, such as P4V or P4VC
 		/// </summary>
 		/// <param name="settings"></param>
-		/// <param name="bIncludeClient"></param>
+		/// <param name="includeClient"></param>
 		/// <returns></returns>
-		public static string GetArgumentsForExternalProgram(this IPerforceSettings settings, bool bIncludeClient)
+		public static string GetArgumentsForExternalProgram(this IPerforceSettings settings, bool includeClient)
 		{
 			StringBuilder basicCommandArgs = new StringBuilder();
 
 			basicCommandArgs.AppendFormat("-p \"{0}\"", settings.ServerAndPort);
 			basicCommandArgs.AppendFormat(" -u \"{0}\"", settings.UserName);
 
-			if (bIncludeClient && settings.ClientName != null)
+			if (includeClient && settings.ClientName != null)
 			{
 				basicCommandArgs.AppendFormat(" -c \"{0}\" ", settings.ClientName);
 			}

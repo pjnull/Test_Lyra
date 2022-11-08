@@ -41,6 +41,11 @@ class FRayTracingDeferredMaterialCHS : public FGlobalShader
 		OutEnvironment.SetDefine(TEXT("UE_RAY_TRACING_LIGHTWEIGHT_CLOSEST_HIT_SHADER"), 1);
 	}
 
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Deferred;
+	}
+
 	using FParameters = FEmptyShaderParameters;
 };
 
@@ -59,6 +64,11 @@ class FRayTracingDeferredMaterialMS : public FGlobalShader
 	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Deferred;
 	}
 
 	using FParameters = FEmptyShaderParameters;

@@ -13,7 +13,9 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon;
+using Amazon.AutoScaling;
 using Amazon.CloudWatch;
+using Amazon.EC2;
 using Amazon.Extensions.NETCore.Setup;
 using EpicGames.AspNet;
 using EpicGames.Core;
@@ -81,7 +83,6 @@ using OpenTracing.Contrib.Grpc.Interceptors;
 using OpenTracing.Util;
 using Serilog;
 using Serilog.Events;
-using StackExchange.Redis;
 using StatsdClient;
 using Status = Grpc.Core.Status;
 using Horde.Build.Users;
@@ -93,7 +94,6 @@ using Horde.Build.Auditing;
 using Horde.Build.Agents.Fleet.Providers;
 using Horde.Build.Server.Notices;
 using Horde.Build.Notifications.Sinks;
-using EpicGames.Horde.Storage.Bundles;
 using StatusCode = Grpc.Core.StatusCode;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -268,25 +268,11 @@ namespace Horde.Build
 					return new FileSystemStorageBackend(options);
 				case StorageBackendType.Aws:
 					return new AwsStorageBackend(sp.GetRequiredService<IConfiguration>(), options, sp.GetRequiredService<ILogger<AwsStorageBackend>>());
-				case StorageBackendType.Transient:
-					return new TransientStorageBackend();
-				case StorageBackendType.Relay:
-					return new RelayStorageBackend(options);
+				case StorageBackendType.Memory:
+					return new MemoryStorageBackend();
 				default:
 					throw new NotImplementedException();
 			}
-		}
-
-		static IBlobStore CreateBlobStore(IServiceProvider sp, BlobStoreOptions options)
-		{
-			IStorageBackend backend = CreateStorageBackend(sp, options);
-			return new BasicBlobStore(sp.GetRequiredService<MongoService>(), backend, sp.GetRequiredService<IMemoryCache>(), sp.GetRequiredService<ILogger<BasicBlobStore>>());
-		}
-
-		static ITreeStore CreateTreeStore(IServiceProvider sp, TreeStoreOptions options)
-		{
-			IBlobStore store = CreateBlobStore(sp, options);
-			return new BundleStore(store, options.Bundle);
 		}
 
 		public Startup(IConfiguration configuration)
@@ -306,11 +292,7 @@ namespace Horde.Build
 			IConfigurationSection configSection = Configuration.GetSection("Horde");
 			ServerSettings settings = new ServerSettings();
 			configSection.Bind(settings);
-
 			settings.Validate();
-
-			services.Configure<CommitServiceOptions>(configSection.GetSection("Commits"));
-			services.Configure<ReplicationServiceOptions>(configSection.GetSection("Replication"));
 
 			if (settings.GlobalThreadPoolMinSize != null)
 			{
@@ -325,7 +307,7 @@ namespace Horde.Build
 			RedisService redisService = new RedisService(settings);
 #pragma warning restore CA2000 // Dispose objects before losing scope
 			services.AddSingleton<RedisService>(sp => redisService);
-			services.AddDataProtection().PersistKeysToStackExchangeRedis(() => redisService.Database, "aspnet-data-protection");
+			services.AddDataProtection().PersistKeysToStackExchangeRedis(() => redisService.DatabaseSingleton, "aspnet-data-protection");
 
 			if (settings.CorsEnabled)
 			{
@@ -353,7 +335,6 @@ namespace Horde.Build
 			services.AddSingleton<IAgentCollection, AgentCollection>();
 			services.AddSingleton<IAgentSoftwareCollection, AgentSoftwareCollection>();
 			services.AddSingleton<IArtifactCollection, ArtifactCollection>();
-			services.AddSingleton<ICommitCollection, CommitCollection>();
 			services.AddSingleton<IGraphCollection, GraphCollection>();
 			services.AddSingleton<IIssueCollection, IssueCollection>();
 			services.AddSingleton<IJobCollection, JobCollection>();
@@ -365,6 +346,7 @@ namespace Horde.Build
 			services.AddSingleton<INotificationTriggerCollection, NotificationTriggerCollection>();
 			services.AddSingleton<IPoolCollection, PoolCollection>();
 			services.AddSingleton<IProjectCollection, ProjectCollection>();
+			services.AddSingleton<IRefCollection, RefCollection>();
 			services.AddSingleton<ISessionCollection, SessionCollection>();
 			services.AddSingleton<IServiceAccountCollection, ServiceAccountCollection>();
 			services.AddSingleton<ISubscriptionCollection, SubscriptionCollection>();
@@ -387,22 +369,12 @@ namespace Horde.Build
 			services.AddSingleton(typeof(IAuditLogFactory<>), typeof(AuditLogFactory<>));
 			services.AddSingleton(typeof(ISingletonDocument<>), typeof(SingletonDocument<>));
 
-			services.AddSingleton<AutoscaleService>();
-			services.AddSingleton<AutoscaleServiceV2>();
-			services.AddSingleton<LeaseUtilizationStrategy>();
-			services.AddSingleton<JobQueueStrategy>();
-			services.AddSingleton<NoOpPoolSizeStrategy>();
-			services.AddSingleton<ComputeQueueAwsMetricStrategy>();
+			services.AddSingleton<FleetService>();
+			services.AddSingleton<IFleetManagerFactory, FleetManagerFactory>();
 			
-			switch (settings.FleetManager)
-			{
-				case FleetManagerType.Aws:
-					services.AddSingleton<IFleetManager, AwsReuseFleetManager>();
-					break;
-				default:
-					services.AddSingleton<IFleetManager, DefaultFleetManager>();
-					break;
-			}
+			// Associate IFleetManager interface with the default implementation from config for convenience
+			// Though most fleet managers are created on a per-pool basis
+			services.AddSingleton<IFleetManager>(ctx => ctx.GetRequiredService<IFleetManagerFactory>().CreateFleetManager(FleetManagerType.Default));
 
 			services.AddSingleton<AclService>();
 			services.AddSingleton<AgentService>();			
@@ -411,6 +383,7 @@ namespace Horde.Build
 			services.AddSingleton<RequestTrackerService>();
 			services.AddSingleton<CredentialService>();
 			services.AddSingleton<MongoService>();
+			services.AddSingleton<GlobalsService>();
 			services.AddSingleton<IDogStatsd>(ctx =>
 			{
 				string? datadogAgentHost = Environment.GetEnvironmentVariable("DD_AGENT_HOST");
@@ -429,8 +402,7 @@ namespace Horde.Build
 				}
 				return new NoOpDogStatsd();
 			});
-			services.AddSingleton<CommitService>();
-			services.AddSingleton<ICommitService>(sp => sp.GetRequiredService<CommitService>());
+			services.AddSingleton<ICommitService, CommitService>();
 			services.AddSingleton<IClock, Clock>();
 			services.AddSingleton<IDowntimeService, DowntimeService>();
 			services.AddSingleton<IssueService>();
@@ -438,7 +410,8 @@ namespace Horde.Build
 			services.AddSingleton<LifetimeService>();
 			services.AddSingleton<ILogFileService, LogFileService>();
 			services.AddSingleton<INotificationService, NotificationService>();
-			services.AddSingleton<IPerforceService, PerforceService>();
+			services.AddSingleton<PerforceServiceCache>();
+			services.AddSingleton<IPerforceService>(sp => sp.GetRequiredService<PerforceServiceCache>());
 
 			services.AddSingleton<PerforceLoadBalancer>();
 			services.AddSingleton<PoolService>();
@@ -449,9 +422,10 @@ namespace Horde.Build
 			services.AddSingleton<IAvatarService, SlackNotificationSink>(sp => sp.GetRequiredService<SlackNotificationSink>());
 			services.AddSingleton<INotificationSink, SlackNotificationSink>(sp => sp.GetRequiredService<SlackNotificationSink>());
 			services.AddSingleton<StreamService>();
-			services.AddSingleton<UpgradeService>();
 			services.AddSingleton<DeviceService>();						
 			services.AddSingleton<NoticeService>();
+			services.AddSingleton<StorageService>();
+			services.AddSingleton<TestDataService>();
 
 			if (settings.JiraUrl != null)
 			{
@@ -465,18 +439,22 @@ namespace Horde.Build
 			// Storage providers
 			services.AddSingleton(sp => CreateStorageBackend(sp, settings.LogStorage).ForType<PersistentLogStorage>());
 			services.AddSingleton(sp => CreateStorageBackend(sp, settings.ArtifactStorage).ForType<ArtifactCollection>());
-			services.AddSingleton(sp => CreateTreeStore(sp, settings.CommitStorage).ForType<ReplicationService>());
 
 			services.AddHordeStorage(settings => configSection.GetSection("Storage").Bind(settings));
-			
-			AWSOptions awsOptions = Configuration.GetAWSOptions();
-			services.AddDefaultAWSOptions(awsOptions);
-			if (awsOptions.Region == null && Environment.GetEnvironmentVariable("AWS_REGION") == null)
+
+			if (settings.WithAws)
 			{
-				awsOptions.Region = RegionEndpoint.USEast1;
+				AWSOptions awsOptions = Configuration.GetAWSOptions();
+				services.AddDefaultAWSOptions(awsOptions);
+				if (awsOptions.Region == null && Environment.GetEnvironmentVariable("AWS_REGION") == null)
+				{
+					awsOptions.Region = RegionEndpoint.USEast1;
+				}
+				
+				services.AddAWSService<IAmazonCloudWatch>();
+				services.AddAWSService<IAmazonAutoScaling>();
+				services.AddAWSService<IAmazonEC2>();
 			}
-			
-			services.AddAWSService<IAmazonCloudWatch>();
 
 			ConfigureLogStorage(services);
 
@@ -555,6 +533,11 @@ namespace Horde.Build
 							options.Authority = settings.OidcAuthority;
 							options.ClientId = settings.OidcClientId;
 
+							if (settings.FeatureFlags.AuthSettingsV2)
+							{
+								options.Scope.Remove("groups");								
+							}
+
 							if (!String.IsNullOrEmpty(settings.OidcSigninRedirect))
 							{
 								options.Events = new OpenIdConnectEvents
@@ -617,10 +600,10 @@ namespace Horde.Build
 			{
 				services.AddHostedService<MongoUpgradeService>();
 
-				services.AddHostedService(provider => provider.GetRequiredService<AutoscaleServiceV2>());
+				services.AddHostedService(provider => provider.GetRequiredService<FleetService>());
 				
 				services.AddHostedService(provider => provider.GetRequiredService<AgentService>());
-				services.AddHostedService(provider => provider.GetRequiredService<CommitService>());
+				services.AddHostedService(provider => provider.GetRequiredService<PerforceServiceCache>());
 				services.AddHostedService(provider => provider.GetRequiredService<ConsistencyService>());
 				services.AddHostedService(provider => provider.GetRequiredService<IssueService>());
 				services.AddHostedService<IssueReportService>();
@@ -638,7 +621,7 @@ namespace Horde.Build
 				services.AddHostedService(provider => provider.GetRequiredService<SlackNotificationSink>());
 				services.AddHostedService<ConfigUpdateService>();
 				services.AddHostedService<TelemetryService>();
-				services.AddHostedService(provider => provider.GetRequiredService<DeviceService>());
+				services.AddHostedService(provider => provider.GetRequiredService<DeviceService>());				
 			}
 
 			services.AddHostedService(provider => provider.GetRequiredService<IExternalIssueService>());
@@ -803,16 +786,16 @@ namespace Horde.Build
 				}
 		*/
 
-		public sealed class BlobIdBsonSerializer : SerializerBase<BlobId>
+		public sealed class BlobIdBsonSerializer : SerializerBase<BlobLocator>
 		{
 			/// <inheritdoc/>
-			public override BlobId Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+			public override BlobLocator Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
 			{
-				return new BlobId(context.Reader.ReadString());
+				return new BlobLocator(context.Reader.ReadString());
 			}
 
 			/// <inheritdoc/>
-			public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, BlobId value)
+			public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, BlobLocator value)
 			{
 				context.Writer.WriteString(value.ToString());
 			}
@@ -848,6 +831,36 @@ namespace Horde.Build
 			}
 		}
 
+		public sealed class IoHashBsonSerializer : SerializerBase<IoHash>
+		{
+			/// <inheritdoc/>
+			public override IoHash Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+			{
+				return IoHash.Parse(context.Reader.ReadString());
+			}
+
+			/// <inheritdoc/>
+			public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, IoHash value)
+			{
+				context.Writer.WriteString(value.ToString());
+			}
+		}
+
+		public sealed class NamespaceIdBsonSerializer : SerializerBase<NamespaceId>
+		{
+			/// <inheritdoc/>
+			public override NamespaceId Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+			{
+				return new NamespaceId(context.Reader.ReadString());
+			}
+
+			/// <inheritdoc/>
+			public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, NamespaceId value)
+			{
+				context.Writer.WriteString(value.ToString());
+			}
+		}
+
 		static int s_haveConfiguredMongoDb = 0;
 
 		public static void ConfigureMongoDbClient()
@@ -864,6 +877,8 @@ namespace Horde.Build
 				BsonSerializer.RegisterSerializer(new BlobIdBsonSerializer());
 				BsonSerializer.RegisterSerializer(new RefIdBsonSerializer());
 				BsonSerializer.RegisterSerializer(new RefNameBsonSerializer());
+				BsonSerializer.RegisterSerializer(new IoHashBsonSerializer());
+				BsonSerializer.RegisterSerializer(new NamespaceIdBsonSerializer());
 				BsonSerializer.RegisterSerializer(new ConditionSerializer());
 				BsonSerializer.RegisterSerializationProvider(new BsonSerializationProvider());
 				BsonSerializer.RegisterSerializationProvider(new StringIdSerializationProvider());
@@ -906,7 +921,7 @@ namespace Horde.Build
 				options.GetLevel = GetRequestLoggingLevel;
 				options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
 				{
-					diagnosticContext.Set("RemoteIP", httpContext.Connection.RemoteIpAddress);
+					diagnosticContext.Set("RemoteIP", httpContext?.Connection?.RemoteIpAddress);
 				};
 			});
 
@@ -978,6 +993,7 @@ namespace Horde.Build
 			if (context.Request != null && context.Request.Path.HasValue)
 			{
 				string requestPath = context.Request.Path;
+
 				if (requestPath.Equals("/Horde.HordeRpc/QueryServerStateV2", StringComparison.OrdinalIgnoreCase))
 				{
 					return LogEventLevel.Verbose;
@@ -991,6 +1007,30 @@ namespace Horde.Build
 					return LogEventLevel.Verbose;
 				}
 				if (requestPath.Equals("/Horde.HordeRpc/WriteOutput", StringComparison.OrdinalIgnoreCase))
+				{
+					return LogEventLevel.Information;
+				}
+				if (requestPath.StartsWith("/Horde.HordeRpc", StringComparison.OrdinalIgnoreCase))
+				{
+					return LogEventLevel.Debug;
+				}
+
+				if (requestPath.StartsWith("/health", StringComparison.OrdinalIgnoreCase))
+				{
+					return LogEventLevel.Debug;
+				}
+
+				if (requestPath.StartsWith("/grpc.health", StringComparison.OrdinalIgnoreCase))
+				{
+					return LogEventLevel.Debug;
+				}
+
+				if (requestPath.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
+				{
+					return LogEventLevel.Debug;
+				}
+
+				if (requestPath.StartsWith("/ugs/api", StringComparison.OrdinalIgnoreCase))
 				{
 					return LogEventLevel.Verbose;
 				}

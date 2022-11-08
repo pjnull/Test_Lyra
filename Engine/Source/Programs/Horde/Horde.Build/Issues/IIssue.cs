@@ -169,6 +169,11 @@ namespace Horde.Build.Issues
 		/// </summary>
 		public DateTime? QuarantineTimeUtc { get; set; }
 
+		/// <summary>
+		/// User who force closed the issue
+		/// </summary>
+		public UserId? ForceClosedByUserId { get; set; }
+
 	}
 
 	/// <summary>

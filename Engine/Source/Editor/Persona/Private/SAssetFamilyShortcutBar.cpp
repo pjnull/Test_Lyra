@@ -28,6 +28,7 @@
 #include "Styling/ToolBarStyle.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
+#include "PersonaAssetFamilyManager.h"
 
 #define LOCTEXT_NAMESPACE "SAssetFamilyShortcutBar"
 
@@ -87,7 +88,7 @@ public:
 				.IsChecked(this, &SAssetShortcut::GetCheckState)
 				.Visibility(this, &SAssetShortcut::GetSoloButtonVisibility)
 				.ToolTipText(this, &SAssetShortcut::GetButtonTooltip)
-				.Padding(0.0)
+				.Padding(0.0f)
 				[
 					SNew(SOverlay)
 
@@ -123,7 +124,7 @@ public:
 				.IsChecked(this, &SAssetShortcut::GetCheckState)
 				.Visibility(this, &SAssetShortcut::GetComboButtonVisibility)
 				.ToolTipText(this, &SAssetShortcut::GetButtonTooltip)
-				.Padding(0.0)
+				.Padding(0.0f)
 				[
 					SNew(SOverlay)
 
@@ -154,7 +155,7 @@ public:
 			[
 				SNew(SSeparator)
 				.Visibility(this, &SAssetShortcut::GetComboVisibility)
-				.Thickness(1.0)
+				.Thickness(1.0f)
 				.Orientation(EOrientation::Orient_Vertical)
 			]
 			+SHorizontalBox::Slot()
@@ -296,8 +297,8 @@ public:
 
 				MenuBuilder.AddWidget(
 					SNew(SBox)
-					.WidthOverride(300)
-					.HeightOverride(600)
+					.WidthOverride(300.f)
+					.HeightOverride(600.f)
 					[
 						ContentBrowserModule.Get().CreateAssetPicker(AssetPickerConfig)
 					],
@@ -382,11 +383,15 @@ public:
 
 	void HandleAssetAdded(const FAssetData& InAssetData)
 	{
-		if (AssetFamily->IsAssetCompatible(InAssetData))
+		const IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+		if(!AssetRegistry.IsLoadingAssets())
 		{
-			TArray<FAssetData> Assets;
-			AssetFamily->FindAssetsOfType(AssetData.GetClass(), Assets);
-			bMultipleAssetsExist = Assets.Num() > 1;
+			if (AssetFamily->IsAssetCompatible(InAssetData))
+			{
+				TArray<FAssetData> Assets;
+				AssetFamily->FindAssetsOfType(AssetData.GetClass(), Assets);
+				bMultipleAssetsExist = Assets.Num() > 1;
+			}
 		}
 	}
 
@@ -439,7 +444,7 @@ public:
 
 			// switch to new asset if needed
 			FAssetData NewAssetData = AssetFamily->FindAssetOfType(AssetData.GetClass());
-			if (!bAssetBeingEdited && NewAssetData.IsValid() && NewAssetData != AssetData)
+			if (!bAssetBeingEdited && NewAssetData != AssetData)
 			{
 				AssetData = NewAssetData;
 
@@ -516,23 +521,38 @@ private:
 	bool bPackageDirty;
 };
 
-void SAssetFamilyShortcutBar::Construct(const FArguments& InArgs, const TSharedRef<class FWorkflowCentricApplication>& InHostingApp, const TSharedRef<class IAssetFamily>& InAssetFamily)
+void SAssetFamilyShortcutBar::Construct(const FArguments& InArgs, const TSharedRef<FWorkflowCentricApplication>& InHostingApp, const TSharedRef<IAssetFamily>& InAssetFamily)
 {
+	WeakHostingApp = InHostingApp;
+	AssetFamily = InAssetFamily;
+
 	ThumbnailPool = MakeShareable(new FAssetThumbnailPool(16, false));
 
-	TSharedRef<SHorizontalBox> HorizontalBox = SNew(SHorizontalBox);
+	InAssetFamily->GetOnAssetFamilyChanged().AddSP(this, &SAssetFamilyShortcutBar::OnAssetFamilyChanged);
 
+	HorizontalBox = SNew(SHorizontalBox);
+
+	BuildShortcuts();
+
+	ChildSlot
+	[
+		HorizontalBox.ToSharedRef()
+	];
+}
+
+void SAssetFamilyShortcutBar::BuildShortcuts()
+{
 	TArray<UClass*> AssetTypes;
-	InAssetFamily->GetAssetTypes(AssetTypes);
+	AssetFamily->GetAssetTypes(AssetTypes);
 
 	for (UClass* Class : AssetTypes)
 	{
-		FAssetData AssetData = InAssetFamily->FindAssetOfType(Class);
+		FAssetData AssetData = AssetFamily->FindAssetOfType(Class);
 		HorizontalBox->AddSlot()
 		.AutoWidth()
 		.Padding(0.0f, 4.0f, 16.0f, 4.0f)
 		[
-			SNew(SAssetShortcut, InHostingApp, InAssetFamily, AssetData, ThumbnailPool.ToSharedRef())
+			SNew(SAssetShortcut, WeakHostingApp.Pin().ToSharedRef(), AssetFamily.ToSharedRef(), AssetData, ThumbnailPool.ToSharedRef())
 			.Visibility_Lambda([Class]()
 			{
 				IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -540,11 +560,22 @@ void SAssetFamilyShortcutBar::Construct(const FArguments& InArgs, const TSharedR
 			})
 		];
 	}
+}
 
-	ChildSlot
-	[
-		HorizontalBox
-	];
+void SAssetFamilyShortcutBar::OnAssetFamilyChanged()
+{
+	HorizontalBox->ClearChildren();
+
+	const TArray<UObject*>* CurrentObjects = WeakHostingApp.Pin()->GetObjectsCurrentlyBeingEdited();
+	if(CurrentObjects && CurrentObjects->Num() > 0 && (*CurrentObjects)[0])
+	{
+		AssetFamily->GetOnAssetFamilyChanged().RemoveAll((this));
+		AssetFamily.Reset();
+		AssetFamily = FPersonaAssetFamilyManager::Get().CreatePersonaAssetFamily((*CurrentObjects)[0]);
+		AssetFamily->GetOnAssetFamilyChanged().AddSP(this, &SAssetFamilyShortcutBar::OnAssetFamilyChanged);
+
+		BuildShortcuts();
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -538,14 +538,49 @@ bool FD3D12DynamicRHI::SetupDisplayHDRMetaData()
 	// Determines if any displays support HDR
 	check(GetNumAdapters() >= 1);
 
-	DisplayList.Empty();
+	TArray<TRefCountPtr<IDXGIAdapter> > DXGIAdapters;
+	bool bStaleAdapters = false;
 
-	bool bSupportsHDROutput = false;
 	const int32 NumAdapters = GetNumAdapters();
 	for (int32 AdapterIndex = 0; AdapterIndex < NumAdapters; ++AdapterIndex)
 	{
-		FD3D12Adapter& Adapter = GetAdapter(AdapterIndex);
-		IDXGIAdapter* DXGIAdapter = Adapter.GetAdapter();
+		FD3D12Adapter& CurrentAdapter = GetAdapter(AdapterIndex);
+		DXGIAdapters.Add(GetAdapter(AdapterIndex).GetAdapter());
+		if (CurrentAdapter.GetDXGIFactory2() != nullptr && !CurrentAdapter.GetDXGIFactory2()->IsCurrent())
+		{
+			bStaleAdapters = true;
+		}
+	}
+
+#if PLATFORM_WINDOWS
+	// if we found that the list of adapters is stale (changed windows HDR setting), try to update it with the new list
+	if (bStaleAdapters)
+	{
+		if (!DXGIFactoryForDisplayList.IsValid() || !DXGIFactoryForDisplayList->IsCurrent())
+		{
+			FD3D12Adapter::CreateDXGIFactory(DXGIFactoryForDisplayList, false, GetAdapter(0).GetDxgiDllHandle());
+		}
+
+		if (DXGIFactoryForDisplayList.IsValid() && DXGIFactoryForDisplayList->IsCurrent())
+		{
+			DXGIAdapters.Empty();
+			TRefCountPtr<IDXGIAdapter> TempAdapter;
+			for (uint32 AdapterIndex = 0; DXGIFactoryForDisplayList->EnumAdapters(AdapterIndex, TempAdapter.GetInitReference()) != DXGI_ERROR_NOT_FOUND; ++AdapterIndex)
+			{
+				DXGIAdapters.Add(TempAdapter);
+			}
+		}
+
+	}
+#endif
+
+	DisplayList.Empty();
+
+	bool bSupportsHDROutput = false;
+	const int32 NumDXGIAdapters = DXGIAdapters.Num();
+	for (int32 AdapterIndex = 0; AdapterIndex < NumDXGIAdapters; ++AdapterIndex)
+	{
+		IDXGIAdapter* DXGIAdapter = DXGIAdapters[AdapterIndex];
 
 		for (uint32 DisplayIndex = 0; true; ++DisplayIndex)
 		{
@@ -583,6 +618,17 @@ bool FD3D12DynamicRHI::SetupDisplayHDRMetaData()
 
 	return bSupportsHDROutput;
 }
+
+#if PLATFORM_WINDOWS
+extern void HDRSettingChangedSinkCallback();
+void FD3D12DynamicRHI::RHIHandleDisplayChange()
+{
+	RHIBlockUntilGPUIdle();
+	GRHISupportsHDROutput = SetupDisplayHDRMetaData();
+	// make sure CVars are being updated properly
+	HDRSettingChangedSinkCallback();
+}
+#endif
 
 static bool IsAdapterBlocked(const FD3D12Adapter* InAdapter)
 {
@@ -629,12 +675,14 @@ static bool IsAdapterSupported(const FD3D12Adapter* InAdapter, ERHIFeatureLevel:
 	return AdapterMaxFeatureLevel != ERHIFeatureLevel::Num && AdapterMaxFeatureLevel >= InRequestedFeatureLevel;
 }
 
+#if !PLATFORM_HOLOLENS
 static bool CheckIfAgilitySDKLoaded()
 {
 	const TCHAR* AgilitySDKDllName = TEXT("D3D12Core.dll");
 	HMODULE AgilitySDKDllHandle = ::GetModuleHandle(AgilitySDKDllName);
 	return AgilitySDKDllHandle != NULL;
 }
+#endif // !PLATFORM_HOLOLENS
 
 bool FD3D12DynamicRHIModule::IsSupported(ERHIFeatureLevel::Type RequestedFeatureLevel)
 {
@@ -865,12 +913,14 @@ void FD3D12DynamicRHIModule::FindAdapter()
 
 				const bool bIsWARP = AdapterDesc.VendorId == 0x1414;
 
+#if !PLATFORM_HOLOLENS
 				if (!bIsWARP)
 				{
 					const FGPUDriverInfo GPUDriverInfo = FPlatformMisc::GetGPUDriverInfo(AdapterDesc.Description, false);
 					UE_LOG(LogD3D12RHI, Log, TEXT("  Driver Version: %s (internal:%s, unified:%s)"), *GPUDriverInfo.UserDriverVersion, *GPUDriverInfo.InternalDriverVersion, *GPUDriverInfo.GetUnifiedDriverVersion());
 					UE_LOG(LogD3D12RHI, Log, TEXT("     Driver Date: %s"), *GPUDriverInfo.DriverDate);
 				}
+#endif // !PLATFORM_HOLOLENS
 
 				FD3D12AdapterDesc CurrentAdapter(AdapterDesc, AdapterIndex, DeviceInfo);
 
@@ -940,7 +990,9 @@ void FD3D12DynamicRHIModule::FindAdapter()
 		ChosenAdapters.Add(NewAdapter);
 	}
 
+#if !PLATFORM_HOLOLENS
 	UE_LOG(LogD3D12RHI, Log, TEXT("DirectX Agility SDK runtime %s."), CheckIfAgilitySDKLoaded() ? TEXT("found") : TEXT("not found"));
+#endif
 
 	if (ChosenAdapters.Num() > 0 && ChosenAdapters[0]->GetDesc().IsValid())
 	{
@@ -1627,12 +1679,6 @@ void FD3D12DynamicRHI::DisableQuadBufferStereo()
 {
 	bIsQuadBufferStereoEnabled = false;
 }
-
-int32 FD3D12DynamicRHI::GetResourceBarrierBatchSizeLimit()
-{
-	return INT32_MAX;
-}
-
 
 void FD3D12Device::CreateSamplerInternal(const D3D12_SAMPLER_DESC& Desc, D3D12_CPU_DESCRIPTOR_HANDLE Descriptor)
 {

@@ -25,6 +25,7 @@
 #if UE_WITH_IRIS
 #include "Engine/NetConnection.h"
 #include "Iris/IrisConfig.h"
+#include "Iris/ReplicationSystem/ReplicationFragment.h"
 #include "Iris/ReplicationSystem/ReplicationFragmentUtil.h"
 #include "Iris/ReplicationSystem/ReplicationSystem.h"
 #include "Iris/ReplicationSystem/Conditionals/ReplicationCondition.h"
@@ -909,10 +910,7 @@ void AActor::BeginReplication()
 
 void AActor::EndReplication(EEndPlayReason::Type EndPlayReason)
 {
-	if (GetIsReplicated())
-	{
-		UE::Net::FReplicationSystemUtil::EndReplication(this, EndPlayReason);
-	}
+	UE::Net::FReplicationSystemUtil::EndReplication(this, EndPlayReason);
 }
 
 void AActor::UpdateOwningNetConnection() const

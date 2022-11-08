@@ -102,7 +102,6 @@ void FControlRigConnectionDrawingPolicy::DrawPinGeometries(TMap<TSharedRef<SWidg
 
 						const FVector2D StartPoint = FGeometryHelper::VerticalMiddleRightOf(LinkStartWidgetGeometry->Geometry) - FVector2D(StartFudgeX, 0.0f);
 						const FVector2D EndPoint = FGeometryHelper::VerticalMiddleLeftOf(LinkEndWidgetGeometry->Geometry) - FVector2D(EndFudgeX, 0);
-						const FVector2D FakeTangent = (EndPoint - StartPoint).GetSafeNormal();
 
 						static TArray<FVector2D> LinePoints;
 						LinePoints.SetNum(2);
@@ -244,6 +243,11 @@ void FControlRigConnectionDrawingPolicy::DetermineWiringStyle(UEdGraphPin* Outpu
 	if (OutputPin == nullptr || InputPin == nullptr || UseLowDetailConnections())
 	{
 		return;
+	}
+
+	if(OutputPin->Direction == EGPD_Input)
+	{
+		Swap(OutputPin, InputPin);
 	}
 
 	UControlRigGraphNode* OutputNode = Cast<UControlRigGraphNode>(OutputPin->GetOwningNode());

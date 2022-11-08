@@ -977,11 +977,12 @@ void FScene::AllocateAndCaptureFrameSkyEnvMap(
 
 #define DEBUG_TIME_SLICE 0
 #if DEBUG_TIME_SLICE
-		RealTimeSlicedReflectionCaptureState = -1;
-		RealTimeSlicedReflectionCaptureStateStep = 0;
+		Capture = FRealTimeSlicedReflectionCapture();
+		Capture.FirstFrameState = FRealTimeSlicedReflectionCapture::EFirstFrameState::BEYOND_FIRST_FRAME;
+		Capture.GpusWithFullCube |= MainView.GPUMask.GetNative();
 		while(true)
 		{
-			if (RealTimeSlicedReflectionCaptureState+1 >= TimeSliceCount)
+			if (Capture.State+1 >= TimeSliceCount)
 			{
 				break;
 			}
@@ -1003,7 +1004,7 @@ void FScene::AllocateAndCaptureFrameSkyEnvMap(
 			}
 
 			// Update the current time-slicing state if this is a new frame and if the current step is done.
-			// Note: RealTimeSlicedReflectionCaptureState will initially be -1.
+			// Note: Capture.State will initially be -1.
 			if (bStateFaceStepsDone)
 			{
 				if (++Capture.State >= TimeSliceCount)
@@ -1111,6 +1112,9 @@ void FScene::AllocateAndCaptureFrameSkyEnvMap(
 
 #if DEBUG_TIME_SLICE
 		}
+		ConvolvedSkyRenderTargetReadyIndex = 1 - ConvolvedSkyRenderTargetReadyIndex;
+		Capture.State = 0;
+		Capture.StateSubStep = 0;
 #endif
 	}
 

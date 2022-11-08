@@ -67,6 +67,8 @@ struct FPerforceExe
 
 #if PLATFORM_MAC
 		FPlatformProcess::ExecProcess(TEXT("/usr/bin/mdfind"), TEXT("\"kMDItemFSName = 'p4' && kMDItemContentType = 'public.unix-executable'\""), &ReturnCode, &OutResults, &OutErrors);
+		// in case it returns multiple p4's, pick the first one
+		OutResults = Split(OutResults, LINE_TERMINATOR)[0];
 #elif PLATFORM_LINUX
 		FPlatformProcess::ExecProcess(TEXT("which"), TEXT("p4"), &ReturnCode, &OutResults, &OutErrors);
 #endif // PLATFORM_MAC
@@ -84,21 +86,41 @@ struct FPerforceExe
 		return ExecutablePath;
 	}
 
-	inline int InnerRunCommand(const FString& CommandLine, TArray<FString>& OutLines, FEvent* AbortEvent)
+	inline int InnerRunCommand(const FString& CommandLine, TArray<FString>& OutLines, FEvent* AbortEvent, const FString WriteChildText = FString())
 	{
-		uint32 ProcId;
-		void* ReadPipe = nullptr;
-		void* WritePipe = nullptr;
-		FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
+		void* ParentReadPipe  = nullptr;
+		void* ParentWritePipe = nullptr;
+		void* ChildReadPipe   = nullptr;
+		void* ChildWritePipe  = nullptr;
 
-		FProcHandle P4Proc = FPlatformProcess::CreateProc(*GetPerforceExe(), *CommandLine, false, true, true, &ProcId, 0, nullptr, WritePipe, ReadPipe);
+		// Create pipe for reading from child stdout
+		FPlatformProcess::CreatePipe(ParentReadPipe, ChildWritePipe);
 
+		// Create pipe for writing to child stdin
+		const bool bWriting = !WriteChildText.IsEmpty();
+		if (bWriting)
+		{
+			FPlatformProcess::CreatePipe(ChildReadPipe, ParentWritePipe);
+		}
+
+		FProcHandle P4Proc = FPlatformProcess::CreateProc(*GetPerforceExe(), *CommandLine, false, true, true, nullptr, 0, nullptr, ChildWritePipe, ChildReadPipe);
+
+		// Write to child process's stdin
+		if (FPlatformProcess::IsProcRunning(P4Proc) && bWriting)
+		{
+			FPlatformProcess::WritePipe(ParentWritePipe, WriteChildText);
+		}
+
+		// Done writing
+		FPlatformProcess::ClosePipe(ChildReadPipe, ParentWritePipe);
+
+		// Read from child process's stdout
 		FString P4Output;
-		FString LatestOutput = FPlatformProcess::ReadPipe(ReadPipe);
+		FString LatestOutput = FPlatformProcess::ReadPipe(ParentReadPipe);
 		while (FPlatformProcess::IsProcRunning(P4Proc) || !LatestOutput.IsEmpty())
 		{
 			P4Output += LatestOutput;
-			LatestOutput = FPlatformProcess::ReadPipe(ReadPipe);
+			LatestOutput = FPlatformProcess::ReadPipe(ParentReadPipe);
 
 			if (AbortEvent->Wait(FTimespan::Zero()))
 			{
@@ -107,14 +129,15 @@ struct FPerforceExe
 			}
 		}
 
-		FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+		// Done reading
+		FPlatformProcess::ClosePipe(ParentReadPipe, ChildWritePipe);
 
 		OutLines = Split(P4Output, LINE_TERMINATOR);
 
 		int ExitCode = -1;
-		bool GotReturnCode = FPlatformProcess::GetProcReturnCode(P4Proc, &ExitCode);
 
-		if (GotReturnCode)
+		const bool bGotReturnCode = FPlatformProcess::GetProcReturnCode(P4Proc, &ExitCode);
+		if (bGotReturnCode)
 		{
 			return ExitCode;
 		}
@@ -122,11 +145,11 @@ struct FPerforceExe
 		return -1;
 	}
 
-	int RunCommand(const FString& CommandLine, TArray<FString>& OutLines, FEvent* AbortEvent)
+	int RunCommand(const FString& CommandLine, TArray<FString>& OutLines, FEvent* AbortEvent, const FString& WritePipeText = FString())
 	{
 		if (bValidP4)
 		{
-			return InnerRunCommand(CommandLine, OutLines, AbortEvent);
+			return InnerRunCommand(CommandLine, OutLines, AbortEvent, WritePipeText);
 		}
 
 		return -1;
@@ -505,12 +528,11 @@ bool FPerforceConnection::FindClients(TArray<FPerforceClientRecord>& Clients, FE
 	return RunCommand(TEXT("clients"), Clients, ECommandOptions::NoClient, AbortEvent, Log);
 }
 
-bool FPerforceConnection::FindClients(const FString& ForUserName, TArray<FString>& ClientNames, FEvent* AbortEvent, FOutputDevice& Log) const
+bool FPerforceConnection::FindClients(TArray<FPerforceClientRecord>& Clients, const FString& ForUserName, FEvent* AbortEvent, FOutputDevice& Log) const
 {
 	TArray<FString> Lines;
-	if(!RunCommand(FString::Printf(TEXT("clients -u%s"), *ForUserName), Lines, ECommandOptions::None, AbortEvent, Log))
+	if(!RunCommand(FString::Printf(TEXT("clients -u%s"), *ForUserName), Clients, ECommandOptions::NoClient, AbortEvent, Log))
 	{
-		ClientNames.Empty();
 		return false;
 	}
 
@@ -520,10 +542,6 @@ bool FPerforceConnection::FindClients(const FString& ForUserName, TArray<FString
 		if(Tokens.Num() < 5 || Tokens[0] != TEXT("Client") || Tokens[3] != TEXT("root"))
 		{
 			Log.Logf(TEXT("Couldn't parse client from line '%s'"), *Line);
-		}
-		else
-		{
-			ClientNames.Add(Tokens[1]);
 		}
 	}
 	return true;
@@ -543,6 +561,15 @@ bool FPerforceConnection::TryGetClientSpec(const FString& InClientName, TSharedP
 		return false;
 	}
 	return true;
+}
+
+bool FPerforceConnection::CreateClient(const FPerforceClientRecord& Client, const FString& Stream, FEvent* AbortEvent, FOutputDevice& Log) const
+{
+	const FString PipeInput = FString::Printf(
+		TEXT("Client: %s\nStream: %s\nRoot: %s\nOwner: %s\nHost: %s\nDescription: Created by %s in SlateUGS\n"),
+		*Client.Name, *Stream, *Client.Root, *Client.Owner, *Client.Host, *Client.Owner);
+
+	return RunCommand(TEXT("client -i"), ECommandOptions::None, AbortEvent, Log, PipeInput);
 }
 
 bool FPerforceConnection::TryGetStreamSpec(const FString& StreamName, TSharedPtr<FPerforceSpec>& OutSpec, FEvent* AbortEvent, FOutputDevice& Log) const
@@ -726,7 +753,7 @@ bool FPerforceConnection::FindFileChanges(const FString& FilePath, int MaxResult
 
 bool FPerforceConnection::TryParseFileChangeSummary(const TArray<FString>& Lines, int& LineIdx, FPerforceFileChangeSummary& OutChange) const
 {
-	TArray<FString> Tokens = Split(Lines[LineIdx], TEXT(" "), true);
+	TArray<FString> Tokens = Split(Lines[LineIdx].TrimStartAndEnd(), TEXT(" "), true);
 	if(Tokens.Num() != 10 || !Tokens[0].StartsWith(TEXT("#")) || Tokens[1] != TEXT("change") || Tokens[4] != TEXT("on") || Tokens[7] != TEXT("by"))
 	{
 		return false;
@@ -741,7 +768,7 @@ bool FPerforceConnection::TryParseFileChangeSummary(const TArray<FString>& Lines
 	}
 
 	int UserClientIdx;
-	if(Tokens[8].FindChar('@', UserClientIdx))
+	if(!Tokens[8].FindChar('@', UserClientIdx))
 	{
 		return false;
 	}
@@ -1110,25 +1137,25 @@ bool FPerforceConnection::RunCommand(const FString& CommandLine, TArray<TMap<FSt
 	return true;
 }
 
-bool FPerforceConnection::RunCommand(const FString& CommandLine, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log) const
+bool FPerforceConnection::RunCommand(const FString& CommandLine, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log, const FString& WritePipeText) const
 {
 	TArray<FString> Lines;
-	return RunCommand(CommandLine, Lines, Options, AbortEvent, Log);
+	return RunCommand(CommandLine, Lines, Options, AbortEvent, Log, WritePipeText);
 }
 
-bool FPerforceConnection::RunCommand(const FString& CommandLine, TArray<FString>& OutLines, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log) const
+bool FPerforceConnection::RunCommand(const FString& CommandLine, TArray<FString>& OutLines, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log, const FString& WritePipeText) const
 {
-	return RunCommand(CommandLine, EPerforceOutputChannel::Info, OutLines, Options, AbortEvent, Log);
+	return RunCommand(CommandLine, EPerforceOutputChannel::Info, OutLines, Options, AbortEvent, Log, WritePipeText);
 }
 
-bool FPerforceConnection::RunCommand(const FString& CommandLine, EPerforceOutputChannel Channel, TArray<FString>& OutLines, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log) const
+bool FPerforceConnection::RunCommand(const FString& CommandLine, EPerforceOutputChannel Channel, TArray<FString>& OutLines, ECommandOptions Options, FEvent* AbortEvent, FOutputDevice& Log, const FString& WritePipeText) const
 {
 	FString FullCommandLine = GetFullCommandLine(CommandLine, Options);
 	Log.Logf(TEXT("p4> %s %s"), *FPaths::GetCleanFilename(GPerforceExe.GetPerforceExe()), *FullCommandLine);
 
 	TArray<FString> RawOutputLines;
 
-	int ExitCode = GPerforceExe.RunCommand(FullCommandLine, RawOutputLines, AbortEvent);
+	int ExitCode = GPerforceExe.RunCommand(FullCommandLine, RawOutputLines, AbortEvent, WritePipeText);
 	if (ExitCode != 0 && !EnumHasAnyFlags(Options, ECommandOptions::IgnoreExitCode))
 	{
 		return false;
@@ -1412,11 +1439,11 @@ bool FPerforceConnection::RunCommandWithBinaryOutput(const FString& CommandLine,
 	FString FullCommandLine(TEXT("-G ") + CommandLine);
 
 	uint32 ProcId;
-	void* ReadPipe = nullptr;
-	void* WritePipe = nullptr;
-	FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
+	void* ChildWritePipe  = nullptr;
+	void* ParentReadPipe = nullptr;
+	FPlatformProcess::CreatePipe(ParentReadPipe, ChildWritePipe);
 
-	FProcHandle P4Proc = FPlatformProcess::CreateProc(*GPerforceExe.GetPerforceExe(), *FullCommandLine, false, true, true, &ProcId, 0, nullptr, WritePipe, ReadPipe);
+	FProcHandle P4Proc = FPlatformProcess::CreateProc(*GPerforceExe.GetPerforceExe(), *FullCommandLine, false, true, true, &ProcId, 0, nullptr, ChildWritePipe);
 
 	size_t BufferPos = 0;
 	size_t BufferEnd = 0;
@@ -1437,7 +1464,7 @@ bool FPerforceConnection::RunCommandWithBinaryOutput(const FString& CommandLine,
 
 		// Read data from the child process
 		TArray<uint8> TempBuffer;
-		bool bRead = FPlatformProcess::ReadPipeToArray(ReadPipe, TempBuffer);
+		bool bRead = FPlatformProcess::ReadPipeToArray(ParentReadPipe, TempBuffer);
 		size_t BytesRead = TempBuffer.Num();
 
 		// Add new data to the end of the Buffer
@@ -1487,7 +1514,7 @@ bool FPerforceConnection::RunCommandWithBinaryOutput(const FString& CommandLine,
 		}
 	}
 
-	FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+	FPlatformProcess::ClosePipe(ParentReadPipe, ChildWritePipe);
 
 	int ExitCode = -1;
 

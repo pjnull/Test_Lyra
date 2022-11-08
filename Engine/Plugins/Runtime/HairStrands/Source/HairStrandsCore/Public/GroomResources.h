@@ -320,6 +320,7 @@ struct FHairStrandsRestResource : public FHairCommonResource
 		Total += GetBufferTotalNumBytes(Attribute0Buffer);
 		Total += GetBufferTotalNumBytes(Attribute1Buffer);
 		Total += GetBufferTotalNumBytes(MaterialBuffer);
+		Total += GetBufferTotalNumBytes(CurveBuffer);
 		return Total;
 	}
 
@@ -340,6 +341,9 @@ struct FHairStrandsRestResource : public FHairCommonResource
 
 	/* Strand hair material buffer */
 	FRDGExternalBuffer MaterialBuffer;
+
+	/* Strand hair curves buffer (contains curves' points offset and count */
+	FRDGExternalBuffer CurveBuffer;
 
 	/* Reference to the hair strands render data */
 	FHairStrandsBulkData& BulkData;
@@ -372,6 +376,7 @@ struct FHairStrandsDeformedResource : public FHairCommonResource
 		Total += GetBufferTotalNumBytes(DeformedPositionBuffer[0]);
 		Total += GetBufferTotalNumBytes(DeformedPositionBuffer[1]);
 		Total += GetBufferTotalNumBytes(TangentBuffer);
+		Total += GetBufferTotalNumBytes(DeformerBuffer);
 		return Total;
 	}
 
@@ -383,6 +388,9 @@ struct FHairStrandsDeformedResource : public FHairCommonResource
 
 	/* Strand hair tangent buffer */
 	FRDGExternalBuffer TangentBuffer;
+
+	/* Strand hair deformer buffer. This buffer is optionally created & filled in by a mesh deformer */
+	FRDGExternalBuffer DeformerBuffer;
 
 	/* Position offset as the deformed positions are expressed in relative coordinate (16bits) */
 	FVector PositionOffset[2] = {FVector::ZeroVector, FVector::ZeroVector};
@@ -419,6 +427,9 @@ struct FHairStrandsDeformedResource : public FHairCommonResource
 	inline uint32& GetUniqueViewID(EFrameType T)				{ return UniqueViewIDs[GetIndex(T)]; }
 	inline uint32 GetUniqueViewID(EFrameType T) const			{ return UniqueViewIDs[GetIndex(T)]; }
 	//bool NeedsToUpdateTangent();
+
+	// Return deformer buffer
+	FRDGExternalBuffer& GetDeformerBuffer(FRDGBuilder& GraphBuilder);
 };
 
 struct FHairStrandsClusterCullingResource : public FHairCommonResource

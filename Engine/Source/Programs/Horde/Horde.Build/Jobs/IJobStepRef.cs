@@ -16,7 +16,7 @@ namespace Horde.Build.Jobs
 	using LogId = ObjectId<ILogFile>;
 	using PoolId = StringId<IPool>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 
 	/// <summary>
 	/// Unique id struct for JobStepRef objects. Includes a job id, batch id, and step id to uniquely identify the step.
@@ -134,7 +134,7 @@ namespace Horde.Build.Jobs
 		/// <summary>
 		/// Template for the job being executed
 		/// </summary>
-		public TemplateRefId TemplateId { get; }
+		public TemplateId TemplateId { get; }
 
 		/// <summary>
 		/// The change number being built
@@ -160,6 +160,11 @@ namespace Horde.Build.Jobs
 		/// Outcome of the step, once complete.
 		/// </summary>
 		public JobStepOutcome? Outcome { get; }
+
+		/// <summary>
+		/// Whether this step should update issues
+		/// </summary>
+		public bool UpdateIssues { get; }
 
 		/// <summary>
 		/// The last change that succeeded. Note that this is only set when the ref is updated; it is not necessarily consistent with steps run later.

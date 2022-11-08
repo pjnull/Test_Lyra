@@ -24,7 +24,6 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "Animation/AnimBlueprintGeneratedClass.h"
 #include "Animation/AnimBlueprint.h"
-#include "SkeletalRender.h"
 #include "HAL/LowLevelMemTracker.h"
 #include "SkinnedAssetCompiler.h"
 #include "Rendering/SkeletalMeshRenderData.h"
@@ -363,10 +362,13 @@ void USkeletalMeshComponent::Serialize(FArchive& Ar)
 	}
 
 	Ar.UsingCustomVersion(FAnimPhysObjectVersion::GUID);
+
+#if WITH_EDITORONLY_DATA
 	if (Ar.IsLoading() && Ar.CustomVer(FAnimPhysObjectVersion::GUID) < FAnimPhysObjectVersion::RenameDisableAnimCurvesToAllowAnimCurveEvaluation)
 	{
 		bAllowAnimCurveEvaluation = !bDisableAnimCurves_DEPRECATED;
 	}
+#endif
 
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
@@ -547,9 +549,9 @@ bool USkeletalMeshComponent::NeedToSpawnAnimScriptInstance() const
 		// Fall back to mesh skeleton (anim BP could have been a template)
 		AnimSkeleton = MeshAsset ? MeshAsset->GetSkeleton() : nullptr;
 	}
-	const bool bSkeletonCompatible = (MeshAsset && AnimSkeleton && MeshAsset->GetSkeleton()) ? MeshAsset->GetSkeleton()->IsCompatible(AnimSkeleton) : false;
+	const bool bSkeletonsExist = (MeshAsset && AnimSkeleton && MeshAsset->GetSkeleton());
 	const bool bSkelMeshCompatible = (MeshAsset && AnimSkeleton) ? AnimSkeleton->IsCompatibleMesh(MeshAsset, false) : false;
-	const bool bAnimSkelValid = !AnimClassInterface || (bSkeletonCompatible && bSkelMeshCompatible);
+	const bool bAnimSkelValid = !AnimClassInterface || (bSkeletonsExist && bSkelMeshCompatible);
 
 	if (AnimationMode == EAnimationMode::AnimationBlueprint && AnimClass && bAnimSkelValid)
 	{
@@ -785,11 +787,11 @@ void USkeletalMeshComponent::InitAnim(bool bForceReinit)
 
 		const bool bClearAnimInstance = AnimScriptInstance && !AnimSkeleton;
 		const bool bSkeletonMismatch = AnimSkeleton && (AnimScriptInstance->CurrentSkeleton!=GetSkeletalMeshAsset()->GetSkeleton());
-		const bool bSkeletonCompatible = AnimSkeleton && GetSkeletalMeshAsset()->GetSkeleton() && !bSkeletonMismatch && GetSkeletalMeshAsset()->GetSkeleton()->IsCompatible(AnimSkeleton);
+		const bool bSkeletonsExist = AnimSkeleton && GetSkeletalMeshAsset()->GetSkeleton() && !bSkeletonMismatch;
 
 		LastPoseTickFrame = 0;
 
-		if (bBlueprintMismatch || bSkeletonMismatch || !bSkeletonCompatible || bClearAnimInstance)
+		if (bBlueprintMismatch || bSkeletonMismatch || !bSkeletonsExist || bClearAnimInstance)
 		{
 			ClearAnimScriptInstance();
 		}
@@ -1126,14 +1128,14 @@ void USkeletalMeshComponent::PostEditChangeProperty(FPropertyChangedEvent& Prope
 
 		if ( PropertyThatChanged->GetFName() == GET_MEMBER_NAME_CHECKED( FSingleAnimationPlayData, AnimToPlay ))
 		{
-			// make sure the animation skeleton matches the current skeletalmesh
-			if (AnimationData.AnimToPlay && SkelMesh && SkelMesh->GetSkeleton() && SkelMesh->GetSkeleton()->IsCompatible(AnimationData.AnimToPlay->GetSkeleton()))
+			// make sure the animation skeleton is valid
+			if (AnimationData.AnimToPlay && AnimationData.AnimToPlay->GetSkeleton())
 			{
 				PlayAnimation(AnimationData.AnimToPlay, false);
 			}
 			else
 			{
-				UE_LOG(LogAnimation, Warning, TEXT("Invalid animation"));
+				UE_LOG(LogAnimation, Warning, TEXT("Invalid animation skeleton"));
 				AnimationData.AnimToPlay = nullptr;
 			}
 		}
@@ -3854,11 +3856,6 @@ void USkeletalMeshComponent::ValidateAnimation()
 				UE_LOG(LogAnimation, Warning, TEXT("Animation %s is incompatible because it has no skeleton, removing animation from actor."), *AnimationData.AnimToPlay->GetName());
 				AnimationData.AnimToPlay = nullptr;
 			}
-			else if (!AnimationData.AnimToPlay->GetSkeleton()->IsCompatible(SkelMesh->GetSkeleton()))
-			{
-				UE_LOG(LogAnimation, Warning, TEXT("Animation %s is incompatible with the skeletal mesh's skeleton, removing animation from actor."), *AnimationData.AnimToPlay->GetName());
-				AnimationData.AnimToPlay = nullptr;
-			}
 		}
 	}
 	else if (AnimationMode == EAnimationMode::AnimationBlueprint)
@@ -3874,11 +3871,6 @@ void USkeletalMeshComponent::ValidateAnimation()
 			else if (SkelMesh->GetSkeleton() == nullptr)
 			{
 				UE_LOG(LogAnimation, Warning, TEXT("AnimBP %s is incompatible because mesh %s has no skeleton, removing AnimBP from actor."), *AnimClass->GetName(), *SkelMesh->GetName());
-				AnimClass = nullptr;
-			}
-			else if (!AnimClassInterface->GetTargetSkeleton()->IsCompatible(SkelMesh->GetSkeleton()))
-			{
-				UE_LOG(LogAnimation, Warning, TEXT("AnimBP %s is incompatible with skeleton %s, removing AnimBP from actor."), *AnimClass->GetName(), *SkelMesh->GetSkeleton()->GetName());
 				AnimClass = nullptr;
 			}
 		}
@@ -4264,30 +4256,6 @@ void USkeletalMeshComponent::FinalizeBoneTransform()
 	TRACE_SKELETAL_MESH_COMPONENT(this);
 }
 
-void USkeletalMeshComponent::GetCurrentRefToLocalMatrices(TArray<FMatrix44f>& OutRefToLocals, int32 InLodIdx) const
-{
-	USkeletalMesh* SkelMesh = GetSkeletalMeshAsset();
-	if(SkelMesh)
-	{
-		FSkeletalMeshRenderData* RenderData = SkelMesh->GetResourceForRendering();
-		if (ensureMsgf(RenderData->LODRenderData.IsValidIndex(InLodIdx),
-			TEXT("GetCurrentRefToLocalMatrices (SkelMesh :%s) input LODIndex (%d) doesn't match with render data size (%d)."),
-			*SkelMesh->GetPathName(), InLodIdx, RenderData->LODRenderData.Num()))
-		{
-			UpdateRefToLocalMatrices(OutRefToLocals, this, RenderData, InLodIdx, nullptr);
-		}
-		else
-		{
-			const FReferenceSkeleton& RefSkeleton = SkelMesh->GetRefSkeleton();
-			OutRefToLocals.AddUninitialized(RefSkeleton.GetNum());
-			for (int32 Index = 0; Index < OutRefToLocals.Num(); ++Index)
-			{
-				OutRefToLocals[Index] = FMatrix44f::Identity;
-			}
-		}
-	}
-}
-
 bool USkeletalMeshComponent::ShouldUpdatePostProcessInstance() const
 {
 	return PostProcessAnimInstance && !bDisablePostProcessBlueprint;
@@ -4469,7 +4437,7 @@ void USkeletalMeshComponent::SetUpdateClothInEditor(const bool NewUpdateState)
 
 float USkeletalMeshComponent::GetTeleportRotationThreshold() const
 {
-	return TeleportDistanceThreshold;
+	return TeleportRotationThreshold;
 }
 
 void USkeletalMeshComponent::SetTeleportRotationThreshold(float Threshold)

@@ -10,6 +10,7 @@
 #include "Net/Core/Trace/NetTrace.h"
 #include "UObject/Object.h"
 #include "UObject/UObjectGlobals.h"
+#include "UObject/CoreNetTypes.h"
 
 namespace UE::Net::Private
 {
@@ -678,7 +679,7 @@ void FNetHandleManager::RemoveDependentObject(FNetHandle ParentHandle, FNetHandl
 	FInternalNetHandle ParentInternalIndex = GetInternalIndex(ParentHandle);
 	FInternalNetHandle DependentInternalIndex = GetInternalIndex(DependentHandle);
 
-	if (!(ParentInternalIndex != InvalidInternalIndex) && (DependentInternalIndex != InvalidInternalIndex))
+	if ((ParentInternalIndex == InvalidInternalIndex) || (DependentInternalIndex == InvalidInternalIndex))
 	{
 		return;
 	}

@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
@@ -20,11 +21,15 @@ namespace Horde.Agent.Commands.Bundles
 
 		public override async Task<int> ExecuteAsync(ILogger logger)
 		{
-			using ITreeStore store = CreateTreeStore(logger);
+			using IStorageClientOwner storeOwner = CreateStorageClient(logger);
+			IStorageClient store = storeOwner.Store;
 
-			DirectoryNode node = await store.ReadTreeAsync<DirectoryNode>(RefName);
+			Stopwatch timer = Stopwatch.StartNew();
+
+			DirectoryNode node = await store.ReadNodeAsync<DirectoryNode>(RefName);
 			await node.CopyToDirectoryAsync(OutputDir.ToDirectoryInfo(), logger, CancellationToken.None);
 
+			logger.LogInformation("Elapsed: {Time}s", timer.Elapsed.TotalSeconds);
 			return 0;
 		}
 	}

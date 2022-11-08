@@ -7,20 +7,23 @@ public class LiveLinkXR : ModuleRules
 	public LiveLinkXR(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
+
+		PrivateIncludePaths.AddRange(
+			new string[]
+			{
+				"LiveLinkXR/Private",
+				"LiveLinkXROpenXRExt/Private",
+			}
+		);
+
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
-				"Networking",
-				"Sockets",
 				"LiveLinkInterface",
-				"Messaging",
-				"UdpMessaging",
 			}
-			);
-			
-		
+		);
+
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -29,7 +32,9 @@ public class LiveLinkXR : ModuleRules
 				"HeadMountedDisplay",
 				"Slate",
 				"SlateCore",
+				"OpenXRHMD",
+				"LiveLinkXROpenXRExt",
 			}
-			);
+		);
 	}
 }

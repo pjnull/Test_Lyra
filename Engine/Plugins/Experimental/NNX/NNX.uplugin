@@ -1,0 +1,83 @@
+{
+	"FileVersion": 3,
+	"Version": 0.5,
+	"VersionName": "0.5.0-alpha",
+	"FriendlyName": "NNX (NNI - Next)",
+	"Description": "Cross-platform framework for running deep learning and neural network inference in Unreal Engine, supporting both CPU and GPU acceleration.",
+	"Category": "Experimental",
+	"CreatedBy": "Epic Games, Inc.",
+	"CreatedByURL": "https://epicgames.com",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EnabledByDefault": false,
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"SupportedTargetPlatforms": [
+		"Win64", "Linux", "Mac"
+	],
+	"Modules": [
+		{
+			"Name": "NNXCore",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNEHlslShaders",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "PostConfigInit",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNXUtils",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNEProfiling",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNXQA",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNXRuntimeCPU",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNXRuntimeRDG",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNXRuntimeORT",
+			"Type": "EditorAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "NNX_ONNXRuntime",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		},
+		{
+			"Name": "ORTHelper",
+			"Type": "RuntimeAndProgram",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Linux", "Mac" ]
+		}
+	]
+}

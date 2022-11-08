@@ -19,6 +19,8 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SComboButton.h"
 
+#include "Animation/WidgetAnimation.h"
+
 #include "Components/CanvasPanelSlot.h"
 #include "Blueprint/WidgetTree.h"
 #include "Settings/WidgetDesignerSettings.h"
@@ -3029,8 +3031,8 @@ FText SDesignerView::GetCurrentDPIScaleText() const
 	Options.MaximumFractionalDigits = 2;
 	Options.MinimumFractionalDigits = 1;
 
-	const UUserInterfaceSettings* UISettings = GetDefault<UUserInterfaceSettings>(UUserInterfaceSettings::StaticClass());
-	if (UISettings && UISettings->UIScaleRule == EUIScalingRule::Custom)
+	const UUserInterfaceSettings* UISettings = GetDefault<UUserInterfaceSettings>();
+	if (UISettings->UIScaleRule == EUIScalingRule::Custom)
 	{
 		UClass* CustomScalingRuleClassInstance = UISettings->CustomScalingRuleClass.TryLoadClass<UDPICustomScalingRule>();
 
@@ -3046,8 +3048,8 @@ FText SDesignerView::GetCurrentDPIScaleText() const
 
 FSlateColor SDesignerView::GetCurrentDPIScaleColor() const
 {
-	const UUserInterfaceSettings* UISettings = GetDefault<UUserInterfaceSettings>(UUserInterfaceSettings::StaticClass());
-	if (UISettings && UISettings->UIScaleRule == EUIScalingRule::Custom)
+	const UUserInterfaceSettings* UISettings = GetDefault<UUserInterfaceSettings>();
+	if (UISettings->UIScaleRule == EUIScalingRule::Custom)
 	{
 		UClass* CustomScalingRuleClassInstance = UISettings->CustomScalingRuleClass.TryLoadClass<UDPICustomScalingRule>();
 
@@ -3121,6 +3123,15 @@ EVisibility SDesignerView::GetDesignerOutlineVisibility() const
 		return EVisibility::HitTestInvisible;
 	}
 
+	if ( Sequencer.IsValid() )
+	{
+		UWidgetAnimation* WidgetAnimation = Cast<UWidgetAnimation>(Sequencer->GetFocusedMovieSceneSequence());
+		if ( WidgetAnimation != UWidgetAnimation::GetNullAnimation() )
+		{
+			return EVisibility::HitTestInvisible;
+		}
+	}
+
 	return EVisibility::Hidden;
 }
 
@@ -3128,13 +3139,25 @@ FSlateColor SDesignerView::GetDesignerOutlineColor() const
 {
 	if ( GEditor->bIsSimulatingInEditor || GEditor->PlayWorld != nullptr )
 	{
-		return FLinearColor(0.863f, 0.407, 0.0f);
+		FLinearColor SimulatingIndicatorColor = FLinearColor(0.863f, 0.407, 0.0f);
+		return SimulatingIndicatorColor;
 	}
 
 	TSharedPtr<ISequencer> Sequencer = BlueprintEditor.Pin()->GetSequencer();
 	if ( Sequencer.IsValid() && Sequencer->GetAutoChangeMode() != EAutoChangeMode::None )
 	{
-		return FLinearColor::FromSRGBColor(FColor(251, 37, 0));
+		FLinearColor AnimRecordingIndicatorColor = FLinearColor::FromSRGBColor(FColor(251, 37, 0));
+		return AnimRecordingIndicatorColor;
+	}
+
+	if ( Sequencer.IsValid() )
+	{
+		UWidgetAnimation* WidgetAnimation = Cast<UWidgetAnimation>(Sequencer->GetFocusedMovieSceneSequence());
+		if ( WidgetAnimation != UWidgetAnimation::GetNullAnimation() )
+		{
+			FLinearColor AnimSelectedIndicatorColor = FLinearColor::FromSRGBColor(FColor(0, 67, 240));
+			return AnimSelectedIndicatorColor;
+		}
 	}
 
 	return FLinearColor::Transparent;
@@ -3146,11 +3169,22 @@ FText SDesignerView::GetDesignerOutlineText() const
 	{
 		return LOCTEXT("SIMULATING", "SIMULATING");
 	}
-	
+
 	TSharedPtr<ISequencer> Sequencer = BlueprintEditor.Pin()->GetSequencer();
 	if ( Sequencer.IsValid() && Sequencer->GetAutoChangeMode() != EAutoChangeMode::None )
 	{
 		return LOCTEXT("RECORDING", "RECORDING");
+	}
+
+	if ( Sequencer.IsValid() )
+	{
+		UWidgetAnimation* WidgetAnimation = Cast<UWidgetAnimation>(Sequencer->GetFocusedMovieSceneSequence());
+		if ( WidgetAnimation != UWidgetAnimation::GetNullAnimation() )
+		{
+			FFormatNamedArguments Args;
+			Args.Add(TEXT("Name"), FText::FromString(WidgetAnimation->GetDisplayLabel()));
+			return FText::Format(LOCTEXT("SELECTED", "SELECTED: {Name}"), Args);
+		}
 	}
 
 	return FText::GetEmpty();

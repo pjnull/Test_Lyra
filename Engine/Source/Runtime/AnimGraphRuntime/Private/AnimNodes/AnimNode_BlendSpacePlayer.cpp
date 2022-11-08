@@ -79,7 +79,7 @@ void FAnimNode_BlendSpacePlayerBase::UpdateInternal(const FAnimationUpdateContex
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_ANIMNODE(UpdateInternal)
 
 	UBlendSpace* CurrentBlendSpace = GetBlendSpace();
-	if ((CurrentBlendSpace != nullptr) && (Context.AnimInstanceProxy->IsSkeletonCompatible(CurrentBlendSpace->GetSkeleton())))
+	if (CurrentBlendSpace != nullptr && CurrentBlendSpace->GetSkeleton() != nullptr)
 	{	
 		if (PreviousBlendSpace != CurrentBlendSpace)
 		{
@@ -125,10 +125,10 @@ void FAnimNode_BlendSpacePlayerBase::Evaluate_AnyThread(FPoseContext& Output)
 	DECLARE_SCOPE_HIERARCHICAL_COUNTER_ANIMNODE(Evaluate_AnyThread) 
 
 	UBlendSpace* CurrentBlendSpace = GetBlendSpace();
-	if ((CurrentBlendSpace != nullptr) && (Output.AnimInstanceProxy->IsSkeletonCompatible(CurrentBlendSpace->GetSkeleton())))
+	if (CurrentBlendSpace != nullptr && CurrentBlendSpace->GetSkeleton() != nullptr)
 	{
 		FAnimationPoseData AnimationPoseData(Output);
-		CurrentBlendSpace->GetAnimationPose(BlendSampleDataCache, FAnimExtractContext(InternalTimeAccumulator, Output.AnimInstanceProxy->ShouldExtractRootMotion(), DeltaTimeRecord, GetLoop()), AnimationPoseData);
+		CurrentBlendSpace->GetAnimationPose(BlendSampleDataCache, FAnimExtractContext(static_cast<double>(InternalTimeAccumulator), Output.AnimInstanceProxy->ShouldExtractRootMotion(), DeltaTimeRecord, GetLoop()), AnimationPoseData);
 	}
 	else
 	{
@@ -155,6 +155,15 @@ float FAnimNode_BlendSpacePlayerBase::GetTimeFromEnd(float CurrentTime) const
 	// Blend-spaces use normalized time value
 	const float PlayLength = 1.0f;
 	return GetBlendSpace() != nullptr ? PlayLength - CurrentTime : 0.0f;
+}
+
+void FAnimNode_BlendSpacePlayerBase::SnapToPosition(const FVector& NewPosition)
+{
+	const int32 NumAxis = FMath::Min(BlendFilter.FilterPerAxis.Num(), 3);
+	for (int32 Idx = 0; Idx < NumAxis; Idx++)
+	{
+		BlendFilter.FilterPerAxis[Idx].SetToValue(static_cast<float>(NewPosition[Idx]));
+	}
 }
 
 UAnimationAsset* FAnimNode_BlendSpacePlayerBase::GetAnimAsset() const
@@ -316,10 +325,10 @@ FVector FAnimNode_BlendSpacePlayer::GetPosition() const
 bool FAnimNode_BlendSpacePlayer::SetPosition(FVector InPosition)
 {
 #if WITH_EDITORONLY_DATA
-	X = InPosition[0];
-	Y = InPosition[1];
-	GET_MUTABLE_ANIM_NODE_DATA(float, X) = InPosition[0];
-	GET_MUTABLE_ANIM_NODE_DATA(float, Y) = InPosition[1];
+	X = static_cast<float>(InPosition[0]);
+	Y = static_cast<float>(InPosition[1]);
+	GET_MUTABLE_ANIM_NODE_DATA(float, X) = static_cast<float>(InPosition[0]);
+	GET_MUTABLE_ANIM_NODE_DATA(float, Y) = static_cast<float>(InPosition[1]);
 #endif
 
 	float* XPtr = GET_INSTANCE_ANIM_NODE_DATA_PTR(float, X);
@@ -327,8 +336,8 @@ bool FAnimNode_BlendSpacePlayer::SetPosition(FVector InPosition)
 
 	if (XPtr && YPtr)
 	{
-		*XPtr = InPosition[0];
-		*YPtr = InPosition[1];
+		*XPtr = static_cast<float>(InPosition[0]);
+		*YPtr = static_cast<float>(InPosition[1]);
 		return true;
 	}
 

@@ -422,8 +422,8 @@ void FKismetDebugUtilities::OnScriptException(const UObject* ActiveObject, const
 					TSharedPtr<SMultiLineEditableText> TextBlock;
 					TSharedRef<SWidget> DisplayWidget =
 						SNew(SBox)
-						.MaxDesiredHeight(512)
-						.MaxDesiredWidth(512)
+						.MaxDesiredHeight(512.0f)
+						.MaxDesiredWidth(512.0f)
 						.Content()
 						[
 							SNew(SBorder)
@@ -1691,7 +1691,7 @@ bool FKismetDebugUtilities::CanInspectPinValue(const UEdGraphPin* Pin)
 	}
 
 	// Can't inspect if not in PIE
-	const UWorld* OwningWorld = Object->GetTypedOuter<UWorld>();
+	const UWorld* OwningWorld = Object->GetWorld();
 	if (!OwningWorld || !(OwningWorld->IsPlayInEditor() || OwningWorld->IsPreviewWorld()))
 	{
 		return false;
@@ -2152,15 +2152,35 @@ TSharedPtr<FPropertyInstanceInfo> FPropertyInstanceInfo::FindOrMake(FPropertyIns
 	{
 		return *Found;
 	}
-	
+
 	// wait to populate children until after inserting into VisitedNodes.
 	// this way we will catch circular references
-	TSharedPtr<FPropertyInstanceInfo> DebugInfo = VisitedNodes.Add(
+	TSharedPtr<FPropertyInstanceInfo> DebugInfo = MakeShared<FPropertyInstanceInfo>(PropertyInstance);
+
+	bool bFoundObject = false;
+	if (DebugInfo->Object.IsValid())
+	{
+		for (const TPair<FPropertyInstance, TSharedPtr<FPropertyInstanceInfo>>& VisitedNode : VisitedNodes)
+		{
+			if (VisitedNode.Value->Object == DebugInfo->Object)
+			{
+				bFoundObject = true;
+				DebugInfo->ReferencedObject = VisitedNode.Value;
+				break;
+			}
+		}
+	}
+	
+	VisitedNodes.Add(
 		PropertyInstance,
-		MakeShared<FPropertyInstanceInfo>(PropertyInstance)
+		DebugInfo
 	);
 
-	DebugInfo->PopulateChildren(PropertyInstance, VisitedNodes);
+	if (!bFoundObject)
+	{
+		DebugInfo->PopulateChildren(PropertyInstance, VisitedNodes);
+	}
+
 	return DebugInfo;
 }
 
@@ -2358,9 +2378,22 @@ FString FPropertyInstanceInfo::GetWatchText() const
 
 			return WatchText;
 		}
+
+
 	}
 
 	return Value.ToString();
+}
+
+const TArray<TSharedPtr<FPropertyInstanceInfo>>& FPropertyInstanceInfo::GetChildren() const
+{
+	// If this node represents an object that was already added elsewhere in the tree, return its children instead
+	if (ReferencedObject.IsValid())
+	{
+		return ReferencedObject->GetChildren();
+	}
+
+	return Children;
 }
 
 FText FKismetDebugUtilities::GetAndClearLastExceptionMessage()

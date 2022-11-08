@@ -31,7 +31,7 @@ class UMorphTarget;
 class UPhysicsAsset;
 class USkeleton;
 struct FSkinnedAssetAsyncBuildTask;
-
+enum class ESkeletalMeshVertexFlags : uint8;
 enum class ESkinnedAssetAsyncPropertyLockType
 {
 	None = 0,
@@ -215,7 +215,7 @@ public:
 	virtual void SetSkinWeightProfilesData(int32 LODIndex, struct FSkinWeightProfilesData& SkinWeightProfilesData) {}
 
 	/** Computes flags for building vertex buffers. */
-	virtual uint32 GetVertexBufferFlags() const;
+	virtual ESkeletalMeshVertexFlags GetVertexBufferFlags() const;
 
 	/**
 	 * Take the BoneSpaceTransforms array (translation vector, rotation quaternion and scale vector) and update the array of component-space bone transformation matrices (ComponentSpaceTransforms).

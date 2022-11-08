@@ -1,25 +1,27 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Animation/SkinWeightProfile.h"
-#include "Engine/SkeletalMesh.h"
-#include "UObject/UObjectIterator.h"
-#include "ContentStreaming.h"
-#include "UObject/AnimObjectVersion.h"
+
+#include "Animation/SkinWeightProfileManager.h"
+#include "ComponentRecreateRenderStateContext.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "ContentStreaming.h"
+#include "Engine/GameEngine.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/World.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkinWeightVertexBuffer.h"
-#include "Animation/SkinWeightProfileManager.h"
+#include "SkeletalMeshTypes.h"
+#include "UObject/AnimObjectVersion.h"
+#include "UObject/ObjectVersion.h"
+#include "UObject/UE5MainStreamObjectVersion.h"
+#include "UObject/UObjectIterator.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 #if WITH_EDITOR
-#include "Rendering/SkeletalMeshLODImporterData.h"
 #include "Animation/DebugSkelMeshComponent.h"
+#include "Rendering/SkeletalMeshLODImporterData.h"
 #endif
-#include "ComponentRecreateRenderStateContext.h"
-#include "SkeletalMeshTypes.h"
-#include "UObject/WeakObjectPtrTemplates.h"
-#include "Engine/GameEngine.h"
-#include "UObject/ObjectVersion.h"
-#include "Engine/World.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SkinWeightProfile)
 
@@ -188,6 +190,7 @@ FArchive& operator<<(FArchive& Ar, FImportedSkinWeightProfileData& ProfileData)
 FArchive& operator<<(FArchive& Ar, FRawSkinWeight& OverrideEntry)
 {
 	Ar.UsingCustomVersion(FAnimObjectVersion::GUID);
+	Ar.UsingCustomVersion(FUE5MainStreamObjectVersion::GUID);
 
 	if (Ar.IsLoading())
 	{
@@ -199,7 +202,7 @@ FArchive& operator<<(FArchive& Ar, FRawSkinWeight& OverrideEntry)
 	{
 		for (int32 InfluenceIndex = 0; InfluenceIndex < EXTRA_BONE_INFLUENCES; ++InfluenceIndex)
 		{
-			if (Ar.IsLoading() && Ar.CustomVer(FAnimObjectVersion::GUID) < FAnimObjectVersion::IncreaseBoneIndexLimitPerChunk)
+			if (Ar.CustomVer(FAnimObjectVersion::GUID) < FAnimObjectVersion::IncreaseBoneIndexLimitPerChunk)
 			{
 				uint8 BoneIndex = 0;
 				Ar << BoneIndex;
@@ -210,7 +213,19 @@ FArchive& operator<<(FArchive& Ar, FRawSkinWeight& OverrideEntry)
 				Ar << OverrideEntry.InfluenceBones[InfluenceIndex];
 			}
 
-			Ar << OverrideEntry.InfluenceWeights[InfluenceIndex];
+			uint8 Weight = 0;
+			Ar << Weight;
+			OverrideEntry.InfluenceWeights[InfluenceIndex] = (static_cast<uint16>(Weight) << 8) | Weight;
+		}
+	}
+	else if (Ar.CustomVer(FUE5MainStreamObjectVersion::GUID) < FUE5MainStreamObjectVersion::IncreasedSkinWeightPrecision)
+	{
+		for (int32 InfluenceIndex = 0; InfluenceIndex < MAX_TOTAL_INFLUENCES; ++InfluenceIndex)
+		{
+			uint8 Weight = 0;
+			Ar << OverrideEntry.InfluenceBones[InfluenceIndex];
+			Ar << Weight;
+			OverrideEntry.InfluenceWeights[InfluenceIndex] = (static_cast<uint16>(Weight) << 8) | Weight;
 		}
 	}
 	else

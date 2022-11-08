@@ -1,21 +1,25 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Modules/ModuleManager.h"
-#include "Misc/DateTime.h"
+
 #include "HAL/FileManager.h"
+#include "Internationalization/StringTableCore.h"
+#include "Misc/App.h"
+#include "Misc/DataDrivenPlatformInfoRegistry.h"
+#include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
-#include "Stats/Stats.h"
-#include "Misc/App.h"
 #include "Misc/ScopeExit.h"
-#include "Modules/ModuleManifest.h"
 #include "Misc/ScopeLock.h"
-#include "Misc/DataDrivenPlatformInfoRegistry.h"
+#include "Modules/ModuleManifest.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Serialization/LoadTimeTrace.h"
-#include "Internationalization/StringTableCore.h"
-#include "Misc/FileHelper.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
+#include "Stats/Stats.h"
+#include "Trace/Trace.h"
+#include "Trace/Trace.inl"
 
 DEFINE_LOG_CATEGORY_STATIC(LogModuleManager, Log, All);
 
@@ -395,6 +399,21 @@ IModuleInterface& FModuleManager::LoadModuleChecked( const FName InModuleName )
 	return *Module;
 }
 
+#if CPUPROFILERTRACE_ENABLED
+
+UE_TRACE_EVENT_BEGIN(Cpu, LoadModule, NoSync)
+	UE_TRACE_EVENT_FIELD(UE::Trace::WideString, Name)
+UE_TRACE_EVENT_END()
+
+UE_TRACE_EVENT_BEGIN(Cpu, FPlatformProcess_GetDllHandle, NoSync)
+	UE_TRACE_EVENT_FIELD(UE::Trace::WideString, Name)
+UE_TRACE_EVENT_END()
+
+UE_TRACE_EVENT_BEGIN(Cpu, StartupModule, NoSync)
+	UE_TRACE_EVENT_FIELD(UE::Trace::WideString, Name)
+UE_TRACE_EVENT_END()
+
+#endif // CPUPROFILERTRACE_ENABLED
 
 IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModuleName, EModuleLoadResult& OutFailureReason, ELoadModuleFlags InLoadModuleFlags)
 {
@@ -430,9 +449,12 @@ IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModu
 //	ensureMsgf(IsInGameThread(), TEXT("ModuleManager: Attempting to load '%s' outside the main thread.  Please call LoadModule on the main/game thread only.  You can use GetModule or GetModuleChecked instead, those are safe to call outside the game thread."), *InModuleName.ToString());
 
 	UE_SCOPED_ENGINE_ACTIVITY(TEXT("Loading Module %s"), *InModuleName.ToString());
-	SCOPED_BOOT_TIMING("LoadModule");
-	TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*FString::Printf(TEXT("LoadModule_%s"), *InModuleName.ToString()));
+	FScopedBootTiming BootTimingScope("LoadModule");
 	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("Module Load"), STAT_ModuleLoad, STATGROUP_LoadTime);
+#if CPUPROFILERTRACE_ENABLED
+	UE_TRACE_LOG_SCOPED_T(Cpu, LoadModule, CpuChannel)
+		<< LoadModule.Name(*InModuleName.ToString());
+#endif // CPUPROFILERTRACE_ENABLED
 
 #if	STATS
 	// This is fine here, we only load a handful of modules.
@@ -482,6 +504,7 @@ IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModu
 		{
 			FScopedBootTiming BootScope("LoadModule  - ", InModuleName);
 			TRACE_LOADTIME_REQUEST_GROUP_SCOPE(TEXT("LoadModule - %s"), *InModuleName.ToString());
+
 #if USE_PER_MODULE_UOBJECT_BOOTSTRAP || WITH_VERSE
 			{
 				// Defer String Table find/load during CDO registration, as it may happen 
@@ -491,8 +514,15 @@ IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModu
 				ProcessLoadedObjectsCallback.Broadcast(InModuleName, bCanProcessNewlyLoadedObjects);
 			}
 #endif
+
 			// Startup the module
-			ModuleInfo->Module->StartupModule();
+			{
+#if CPUPROFILERTRACE_ENABLED
+				UE_TRACE_LOG_SCOPED_T(Cpu, StartupModule, CpuChannel)
+					<< StartupModule.Name(*InModuleName.ToString());
+#endif // CPUPROFILERTRACE_ENABLED
+				ModuleInfo->Module->StartupModule();
+			}
 
 			// The module might try to load other dependent modules in StartupModule. In this case, we want those modules shut down AFTER this one because we may still depend on the module at shutdown.
 			ModuleInfo->LoadOrder = FModuleInfo::CurrentLoadOrder++;
@@ -570,7 +600,10 @@ IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModu
 		if (FPaths::FileExists(ModuleFileToLoad))
 		{
 			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(FPlatformProcess::GetDllHandle);
+#if CPUPROFILERTRACE_ENABLED
+				UE_TRACE_LOG_SCOPED_T(Cpu, FPlatformProcess_GetDllHandle, CpuChannel)
+					<< FPlatformProcess_GetDllHandle.Name(*ModuleFileToLoad);
+#endif // CPUPROFILERTRACE_ENABLED
 				ModuleInfo->Handle = FPlatformProcess::GetDllHandle(*ModuleFileToLoad);
 			}
 			
@@ -606,12 +639,16 @@ IModuleInterface* FModuleManager::LoadModuleWithFailureReason(const FName InModu
 						// Initialize the module!
 						ModuleInfo->Module = TUniquePtr<IModuleInterface>(InitializeModuleFunctionPtr());
 
-						if ( ModuleInfo->Module.IsValid() )
+						if (ModuleInfo->Module.IsValid())
 						{
-							TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*(InModuleName.ToString() + TEXT("::StartupModule")));
-
 							// Startup the module
-							ModuleInfo->Module->StartupModule();
+							{
+#if CPUPROFILERTRACE_ENABLED
+								UE_TRACE_LOG_SCOPED_T(Cpu, StartupModule, CpuChannel)
+									<< StartupModule.Name(*InModuleName.ToString());
+#endif // CPUPROFILERTRACE_ENABLED
+								ModuleInfo->Module->StartupModule();
+							}
 
 							// The module might try to load other dependent modules in StartupModule. In this case, we want those modules shut down AFTER this one because we may still depend on the module at shutdown.
 							ModuleInfo->LoadOrder = FModuleInfo::CurrentLoadOrder++;

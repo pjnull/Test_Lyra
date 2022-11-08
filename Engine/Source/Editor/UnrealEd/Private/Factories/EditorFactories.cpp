@@ -1234,8 +1234,8 @@ UObject* ULevelFactory::FactoryCreateText
 
 		// Import properties if the new actor is 
 		bool		bActorChanged = false;
-		FString&	PropText = ActorMapElement.Value;
-		if ( Actor->ShouldImport(&PropText, bIsMoveToStreamingLevel) )
+		const FString&	PropText = ActorMapElement.Value;
+		if ( Actor->ShouldImport(FStringView(PropText), bIsMoveToStreamingLevel) )
 		{
 			Actor->PreEditChange(nullptr);
 			ImportObjectProperties( (uint8*)Actor, *PropText, Actor->GetClass(), Actor, Actor, Warn, 0, INDEX_NONE, NULL, &ExistingToNewMap );
@@ -3210,6 +3210,7 @@ UTexture* UTextureFactory::ImportTextureUDIM(UClass* Class, UObject* InParent, F
 	const EImageImportFlags ImportFlags = EImageImportFlags::None;
 
 	bool bMismatchedFormats = false;
+	bool bMismatchedGammaSpace = false;
 
 	for (const auto& It : UDIMIndexToFile)
 	{
@@ -3231,9 +3232,17 @@ UTexture* UTextureFactory::ImportTextureUDIM(UClass* Class, UObject* InParent, F
 					TCSettings = Image.CompressionSettings;
 				}
 
-				if ( Format != Image.Format )
+				if (bSRGB != Image.SRGB)
+				{
+					bMismatchedGammaSpace = true;
+					bSRGB = false;
+					Format = TSF_RGBA32F;
+				}
+
+				if (Format != Image.Format)
 				{
 					bMismatchedFormats = true;
+					Format = FImageCoreUtils::GetCommonSourceFormat(Format, Image.Format);
 				}
 
 				const int32 UDIMIndex = It.Key;
@@ -3255,32 +3264,23 @@ UTexture* UTextureFactory::ImportTextureUDIM(UClass* Class, UObject* InParent, F
 		return nullptr;
 	}
 
-	if ( bMismatchedFormats )
+	if (bMismatchedGammaSpace || bMismatchedFormats)
 	{
-		Warn->Logf(ELogVerbosity::Warning, TEXT("Mismatched UDIM image formats, converting all to BGRA8 or RGBA16F ..."));
-		
-		if ( FTextureSource::IsHDR(Format) )
-		{
-			Format = TSF_RGBA16F;
-			bSRGB = false;
-		}
-		else
-		{
-			Format = TSF_BGRA8;
-			bSRGB = true;
-		}
+		Warn->Logf(ELogVerbosity::Warning, TEXT("Mismatched UDIM image %s, converting all to %s/%s ..."), bMismatchedGammaSpace ? TEXT("gamma spaces") : TEXT("pixel formats"),
+			ERawImageFormat::GetName(FImageCoreUtils::ConvertToRawImageFormat(Format)), bSRGB ? TEXT("sRGB") : TEXT("Linear"));
 
 		for( FImportImage & Image : SourceImages )
 		{
-			if ( Image.Format != Format )
+			if (Image.SRGB != bSRGB || Image.Format != Format)
 			{
-				ERawImageFormat::Type ImageRawFormat = FImageCoreUtils::ConvertToRawImageFormat( Image.Format );
-				FImageView SourceImage( Image.RawData.GetData(), Image.SizeX, Image.SizeY, ImageRawFormat );
-				FImage DestImage( Image.SizeX, Image.SizeY, FImageCoreUtils::ConvertToRawImageFormat(Format) );
-				FImageCore::CopyImage(SourceImage,DestImage);
+				ERawImageFormat::Type ImageRawFormat = FImageCoreUtils::ConvertToRawImageFormat(Image.Format);
+				FImageView SourceImage(Image.RawData.GetData(), Image.SizeX, Image.SizeY, 1, ImageRawFormat, Image.SRGB ? EGammaSpace::sRGB : EGammaSpace::Linear);
+				FImage DestImage(Image.SizeX, Image.SizeY, FImageCoreUtils::ConvertToRawImageFormat(Format), bSRGB ? EGammaSpace::sRGB : EGammaSpace::Linear);
+				FImageCore::CopyImage(SourceImage, DestImage);
 
 				Image.RawData = MoveTemp(DestImage.RawData);
 				Image.Format = Format;
+				Image.SRGB = bSRGB;
 			}				
 		}
 	}
@@ -4065,46 +4065,39 @@ UObject* UTextureFactory::FactoryCreateBinary
 	//	notice above that CompressionSettings is primed from Texture->CompressionSettings
 	//	but LODGroup is not pulled from Texture->LODGroup
 
-	// Figure out whether we're using a normal map LOD group.
-	bool bIsNormalMapLODGroup = false;
-	if( LODGroup == TEXTUREGROUP_WorldNormalMap 
-	||	LODGroup == TEXTUREGROUP_CharacterNormalMap
-	||	LODGroup == TEXTUREGROUP_VehicleNormalMap
-	||	LODGroup == TEXTUREGROUP_WeaponNormalMap )
+	// If the TextureFactory LODGroup is set to a normal map LOD group, then set CompressionSettings to Normalmap
+	bool bIsNormalMapLODGroup = ( LODGroup == TEXTUREGROUP_WorldNormalMap 
+		||	LODGroup == TEXTUREGROUP_CharacterNormalMap
+		||	LODGroup == TEXTUREGROUP_VehicleNormalMap
+		||	LODGroup == TEXTUREGROUP_WeaponNormalMap );
+
+	if ( bIsNormalMapLODGroup )
 	{
 		// Change from default to normal map.
 		if( CompressionSettings == TC_Default )
 		{
 			CompressionSettings = TC_Normalmap;
 		}
-		bIsNormalMapLODGroup = true;
+	}
+		
+	// Propagate options.
+	Texture->CompressionSettings	= CompressionSettings;
+	Texture->LODGroup				= LODGroup;
+	
+	if(!FCString::Stricmp(Type, TEXT("ies")))
+	{
+		Texture->LODGroup = TEXTUREGROUP_IESLightProfile;
 	}
 
-	// Packed normal map
-	if( Texture->IsNormalMap() )
+	// note that NormalmapIdentification has not run yet
+	//	so I think the only way you get in this branch is if bIsNormalMapLODGroup == true
+	if( Texture->IsNormalMap() ) // TC == TC_Normalmap
 	{
 		Texture->SRGB = 0;
 		if( !bIsNormalMapLODGroup )
 		{
-			LODGroup = TEXTUREGROUP_WorldNormalMap;
+			Texture->LODGroup = TEXTUREGROUP_WorldNormalMap;
 		}
-	}
-
-	if(!FCString::Stricmp(Type, TEXT("ies")))
-	{
-		LODGroup = TEXTUREGROUP_IESLightProfile;
-	}
-	
-	// Propagate options.
-	Texture->CompressionSettings	= CompressionSettings;
-	Texture->LODGroup				= LODGroup;
-
-	// Revert the LODGroup to the default if it was forcibly set by the texture being a normal map.
-	// This handles the case where multiple textures are being imported consecutively and
-	// LODGroup unexpectedly changes because some textures were normal maps and others weren't.
-	if ( LODGroup == TEXTUREGROUP_WorldNormalMap && !bIsNormalMapLODGroup )
-	{
-		LODGroup = TEXTUREGROUP_World;
 	}
 
 	Texture->CompressionNone				= NoCompression;
@@ -4146,6 +4139,9 @@ UObject* UTextureFactory::FactoryCreateBinary
 				Texture->CompressionSettings = TC_EditorIcon; // "UserInterface2D"
 			}
 		}
+
+		// @@CB move this to ApplyDefaultsForNewlyImportedTextures so it can be shared with Interchange, not code-duped
+		// also set LODGroup to UI ?
 	}
 			
 	static const auto CVarVirtualTexturesEnabled = IConsoleManager::Get().FindTConsoleVariableDataInt(TEXT("r.VirtualTextures"));
@@ -4258,6 +4254,11 @@ UObject* UTextureFactory::FactoryCreateBinary
 			Texture->bFlipGreenChannel = bFlipNormalMapGreenChannel;
 		}
 	}
+	
+	// Texture property setup is almost done
+	//  ApplyDefaultsForNewlyImportedTextures before ApplyAutoImportSettings so user settings can override
+	bool bIsReimport = ExistingTexture && bUsingExistingSettings;
+	UE::TextureUtilitiesCommon::ApplyDefaultsForNewlyImportedTextures(Texture,bIsReimport);
 
 	if(IsAutomatedImport())
 	{

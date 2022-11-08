@@ -15,6 +15,7 @@
 #include "VolumetricLightmapShared.ush"
 #include "ForwardShadowingCommon.ush"
 #include "ParticipatingMediaCommon.ush"
+#include "LightDataUniforms.ush"
 #define FrontLayerTranslucencyReflectionsStruct LumenGIVolumeStruct
 #include "Lumen/LumenTranslucencyVolumeShared.ush"
 #include "Random.ush"
@@ -279,30 +280,7 @@ void InjectShadowedLocalLightPS(
 	// This triggers the HistoryMissSuperSampleCount path causing significant overhead for shading off-screen pixels.
 	if (all(int3(GridCoordinate) < VolumetricFog.GridSizeInt))
 	{
-		FDeferredLightData LightData;
-		LightData.TranslatedWorldPosition = DeferredLightUniforms.TranslatedWorldPosition;
-		LightData.InvRadius = DeferredLightUniforms.InvRadius;
-		LightData.Color = DeferredLightUniforms.Color;
-		LightData.FalloffExponent = DeferredLightUniforms.FalloffExponent;
-		LightData.Direction = DeferredLightUniforms.Direction;
-        LightData.Tangent = DeferredLightUniforms.Tangent;
-		LightData.SpotAngles = DeferredLightUniforms.SpotAngles;
-		LightData.SourceRadius = DeferredLightUniforms.SourceRadius;
-		LightData.SourceLength = DeferredLightUniforms.SourceLength;
-        LightData.SoftSourceRadius = DeferredLightUniforms.SoftSourceRadius;
-		LightData.SpecularScale = DeferredLightUniforms.SpecularScale;
-		LightData.ContactShadowLength = abs(DeferredLightUniforms.ContactShadowLength);
-		LightData.ContactShadowLengthInWS = DeferredLightUniforms.ContactShadowLength < 0.0f;
-		LightData.ContactShadowNonShadowCastingIntensity = DeferredLightUniforms.ContactShadowNonShadowCastingIntensity;
-		LightData.DistanceFadeMAD = DeferredLightUniforms.DistanceFadeMAD;
-		LightData.ShadowMapChannelMask = DeferredLightUniforms.ShadowMapChannelMask;
-		LightData.ShadowedBits = DeferredLightUniforms.ShadowedBits;
-		LightData.RectLightBarnCosAngle = DeferredLightUniforms.RectLightBarnCosAngle;
-		LightData.RectLightBarnLength = DeferredLightUniforms.RectLightBarnLength;
-		LightData.bInverseSquared = DeferredLightUniforms.FalloffExponent == 0;
-		LightData.bRadialLight = true;
-		LightData.bSpotLight = LightData.SpotAngles.x > -2.0f;
-		LightData.bRectLight = LightData.RectLightBarnLength > -2.0f;
+		FDeferredLightData LightData = InitDeferredLightFromUniforms();
 
 		float VolumetricScatteringIntensity = DeferredLightUniforms.VolumetricScatteringIntensity;
 
@@ -686,33 +664,11 @@ void LightScatteringCS(
 		{
 			const FLocalLightData LocalLight = GetLocalLightData(CulledLightsGrid.DataStartIndex + LocalLightListIndex, 0);
 
-			float VolumetricScatteringIntensity = f16tof32(asuint(LocalLight.SpotAnglesAndSourceRadiusPacked.w) >> 16);
+			const float VolumetricScatteringIntensity = UnpackVolumetricScatteringIntensity(LocalLight);
 
 			if (VolumetricScatteringIntensity > 0)
 			{
-				FDeferredLightData LightData = (FDeferredLightData)0;
-				LightData.TranslatedWorldPosition = LocalLight.LightPositionAndInvRadius.xyz;
-				LightData.InvRadius = LocalLight.LightPositionAndInvRadius.w;
-				LightData.Color = LocalLight.LightColorAndFalloffExponent.xyz;
-				LightData.FalloffExponent = LocalLight.LightColorAndFalloffExponent.w;
-				LightData.Direction = LocalLight.LightDirectionAndShadowMask.xyz;
-				LightData.SpotAngles = LocalLight.SpotAnglesAndSourceRadiusPacked.xy;
-				LightData.SourceRadius = LocalLight.SpotAnglesAndSourceRadiusPacked.z;
-				LightData.SourceLength = f16tof32(asuint(LocalLight.SpotAnglesAndSourceRadiusPacked.w));
-				LightData.Tangent = LocalLight.LightTangentAndSoftSourceRadius.xyz;
-				LightData.SoftSourceRadius = LocalLight.LightTangentAndSoftSourceRadius.w;
-				LightData.bInverseSquared = LightData.FalloffExponent == 0;
-				LightData.RectLightBarnCosAngle = LocalLight.RectBarnDoorAndVirtualShadowMapIdAndSpecularScale.x;
-				LightData.RectLightBarnLength = LocalLight.RectBarnDoorAndVirtualShadowMapIdAndSpecularScale.y;
-				LightData.RectLightAtlasUVOffset = 0;
-				LightData.RectLightAtlasUVScale  = 0;
-				LightData.RectLightAtlasMaxLevel = MAX_RECT_ATLAS_MIP;
-
-				LightData.bRadialLight = true;
-				LightData.bSpotLight = LightData.SpotAngles.x > -2.0f;
-				LightData.bRectLight = LightData.RectLightBarnLength > -2.0f;
-
-				float3 LightColor = LightData.Color;
+				const FDeferredLightData LightData = ConvertToDeferredLight(LocalLight);
 
 				float3 L = 0;
 				float3 ToLight = 0;
@@ -735,7 +691,7 @@ void LightScatteringCS(
 
 				float CombinedAttenuation = Lighting * LightMask;
 
-				LightScattering += LightColor * (PhaseFunction(PhaseG, dot(L, -CameraVector)) * CombinedAttenuation * VolumetricScatteringIntensity);
+				LightScattering += LightData.Color * (PhaseFunction(PhaseG, dot(L, -CameraVector)) * CombinedAttenuation * VolumetricScatteringIntensity);
 
 				// To debug culling
 				//LightScattering += LocalLight.LightColorAndFalloffExponent.xyz * .0000001f;

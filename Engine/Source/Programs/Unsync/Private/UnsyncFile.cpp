@@ -30,7 +30,14 @@ bool GForceBufferedFiles = false;
 static FPath
 MakeExtendedAbsolutePath(const FPath& InAbsolutePath)
 {
-	UNSYNC_ASSERT(InAbsolutePath.is_absolute());
+	if (InAbsolutePath.empty())
+	{
+		return FPath();
+	}
+
+	UNSYNC_ASSERTF(InAbsolutePath.is_absolute(),
+		L"Input path '%ls' must be absolute",
+		InAbsolutePath.wstring().c_str());
 
 #if UNSYNC_PLATFORM_WINDOWS
 	const std::wstring& InFilenameString = InAbsolutePath.native();
@@ -631,6 +638,26 @@ ToWindowsFileTime(const std::filesystem::file_time_type& T)
 {
 	return T.time_since_epoch().count();
 }
+
+uint64
+GetAvailableDiskSpace(const FPath& Path)
+{
+	ULARGE_INTEGER AvailableBytes = {};
+	ULARGE_INTEGER TotalBytes	  = {};
+	ULARGE_INTEGER FreeBytes	  = {};
+
+	BOOL bOk = GetDiskFreeSpaceExW(Path.native().c_str(), &AvailableBytes, &TotalBytes, &FreeBytes);
+
+	if (bOk)
+	{
+		return AvailableBytes.QuadPart;
+	}
+	else
+	{
+		return ~0ull;
+	}
+}
+
 #endif	// UNSYNC_PLATFORM_WINDOWS
 
 #if UNSYNC_PLATFORM_UNIX
@@ -791,6 +818,12 @@ ToWindowsFileTime(const std::filesystem::file_time_type& FileTime)
 	uint64 ticks = (FullSeconds + SECONDS_BETWEEN_WINDOWS_AND_UNIX) * TICKS_PER_SECOND + (SubsecondNanos / NANOS_PER_TICK);
 
 	return ticks;
+}
+
+uint64
+GetAvailableDiskSpace(const FPath& Path)
+{
+	return ~0ull; // TODO: query available space via statvfs()
 }
 
 #endif	// UNSYNC_PLATFORM_UNIX

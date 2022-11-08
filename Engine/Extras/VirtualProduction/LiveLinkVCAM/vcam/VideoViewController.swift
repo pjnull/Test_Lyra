@@ -36,6 +36,7 @@ class VideoViewController : BaseViewController {
 
     weak var liveLink : LiveLinkProvider?
     var dismissOnDisconnect = false
+    var forceDisconnectTimer : Timer?
     
     var statsTimer : Timer?
     
@@ -43,8 +44,6 @@ class VideoViewController : BaseViewController {
     weak var gameController : GCController? {
         didSet {
             if let gc = gameController {
-                //gc.extendedGamepad?.leftThumbstick.valueChangedHandler = self.directionalPadValueChanged
-                //gc.extendedGamepad?.rightThumbstick.valueChangedHandler = self.directionalPadValueChanged
                 gc.extendedGamepad?.dpad.up.pressedChangedHandler = self.buttonValueChanged
                 gc.extendedGamepad?.dpad.down.pressedChangedHandler = self.buttonValueChanged
                 gc.extendedGamepad?.dpad.left.pressedChangedHandler = self.buttonValueChanged
@@ -65,27 +64,6 @@ class VideoViewController : BaseViewController {
         }
     }
     
-    var relayTouchEvents = true {
-        didSet {
-
-            // if we are stopping touch events sent to OSC, then we need to send an "ended" event
-            // for all of the current touches so the UI doesn't think it's still occurring
-            /*
-            if relayTouchEvents == false {
-
-                for i in 0..<self.currentTouches.count {
-                    if let t = self.currentTouches[i] {
-                        self.sendTouch(.ended, point: t.location(in: self.renderView), finger: i, force: 0);
-                    }
-                }
-                self.currentTouches.removeAll()
-
-            }
-             */
-            
-        }
-    }
-
     @IBOutlet weak var arView : ARSCNView!
 
     @IBOutlet weak var reconnectingBlurView : UIVisualEffectView!
@@ -141,48 +119,6 @@ class VideoViewController : BaseViewController {
         
         self.streamingConnection?.renderView = self.renderView
         
-        /*
-        
-        arView.session.run(config, options: [ .resetTracking ] )
-        arView.session.delegate = self
-        arView.delegate = self
-        
-        if self.demoMode {
-            arView.automaticallyUpdatesLighting = true
-            arView.debugOptions = [ .showWorldOrigin ]
-
-            let floor = SCNNode(geometry: SCNPlane(width: 14, height: 14))
-            floor.rotation = SCNVector4(1, 0, 0, GLKMathDegreesToRadians(-90))
-            floor.position = SCNVector3(0, -1, 0)
-            floor.geometry?.firstMaterial?.diffuse.contents = UIImage(named: "checkerboard")
-            floor.geometry?.firstMaterial?.diffuse.contentsTransform = SCNMatrix4MakeScale(50, 50, 0)
-            floor.geometry?.firstMaterial?.diffuse.wrapS = .repeat
-            floor.geometry?.firstMaterial?.diffuse.wrapT = .repeat
-            arView.scene.rootNode.addChildNode(floor)
-
-            for x in 0...1 {
-                for z in 0...1 {
-                    let box = SCNNode(geometry: SCNBox(width: 1, height: 1, length: 1, chamferRadius: 0))
-                    box.position = SCNVector3(-5.0 + Double(x) * 10.0, -0.5, -5.0 + Double(z) * 10.0)
-                    box.rotation = SCNVector4(0,1,0, Float.random(in: 0...3.14))
-                    for i in 0...5 {
-                        let mat = SCNMaterial()
-                        mat.diffuse.contents = UIImage(named: "UnrealLogo")
-                        if i == 0 {
-                            box.geometry?.firstMaterial = mat
-                        } else {
-                            box.geometry?.materials.append(mat)
-                        }
-                    }
-                    arView.scene.rootNode.addChildNode(box)
-                }
-            }
-
-        } else {
-            arView.scene.background.contents = UIColor.black
-        }
-        
-         */
         
         let coachingOverlayView = ARCoachingOverlayView()
         
@@ -237,18 +173,30 @@ class VideoViewController : BaseViewController {
             dismissOnDisconnect = true
             disconnect()
         } else {
-            disconnect()
-            self.presentingViewController?.dismiss(animated: true, completion: nil)
+            self.forceDisconnectAndDismiss()
         }
     }
     
     func reconnect() {
+        
+        showReconnecting(true, animated: true)
         self.streamingConnection?.reconnect()
     }
     
     func disconnect() {
+        self.forceDisconnectTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false, block: { timer in
+            Log.info("Forcing disconnect due to timeout.")
+            self.forceDisconnectAndDismiss()
+        })
         self.streamingConnection?.disconnect()
-        
+    }
+    
+    func forceDisconnectAndDismiss() {
+        self.forceDisconnectTimer?.invalidate()
+        self.forceDisconnectTimer = nil
+        self.streamingConnection?.delegate = nil
+        self.streamingConnection = nil
+        self.presentingViewController?.dismiss(animated: true, completion: nil)
     }
     
     func updateStreamingStats() {
@@ -348,118 +296,89 @@ class VideoViewController : BaseViewController {
         self.headerViewY = self.headerView.layer.presentation()?.frame.minY ?? 0
     }
     
-    func sendThumbstickUpdate(key : String, controller : Int, oldValue : Float?, newValue : Float) {
-
-        assertionFailure()
-        /*
-        guard let osc = oscConnection else { return }
-
-        if (newValue != 0.0) || ((oldValue ?? 0.0) != newValue) {
-            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: key, controller: controller, value: newValue)) ])
-        }
-         */
-    }
-    
-    func sendControllerUpdate() {
+    func sendControllerThumbstickUpdate() {
         
+        guard let sc = streamingConnection else { return }
         guard let gc = gameController else { return }
-        assertionFailure()
         
-        /*
-        guard let _ = oscConnection else { return }
-
         let snapshot = gc.capture()
         guard let gp = snapshot.extendedGamepad else { return }
 
         let controllerIndex = gc.playerIndex.rawValue
-        
-        sendThumbstickUpdate(key: "Gamepad_LeftX", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.xAxis.value, newValue :gp.leftThumbstick.xAxis.value)
-        sendThumbstickUpdate(key: "Gamepad_LeftY", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.yAxis.value, newValue :gp.leftThumbstick.yAxis.value)
-        sendThumbstickUpdate(key: "Gamepad_RightX", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.xAxis.value, newValue :gp.rightThumbstick.xAxis.value)
-        sendThumbstickUpdate(key: "Gamepad_RightY", controller: controllerIndex, oldValue : self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.yAxis.value, newValue :gp.rightThumbstick.yAxis.value)
-        
-        self.gameControllerSnapshot = snapshot
-         */
-    }
 
-    func directionalPadValueChanged(directionalPad : GCControllerDirectionPad, xValue : Float, yValue : Float) {
-        assertionFailure()
-        /*
-        guard let osc = oscConnection else { return }
-        guard let gc = gameController else { return }
-        guard let gp = gc.extendedGamepad else { return }
-
-        let controllerIndex = gc.playerIndex.rawValue
+        // dict of type -> oldValue, newValue
+        let inputs : [StreamingConnectionControllerInputType : ( oldValue: Float?, newValue : Float)]  = [
+            .thumbstickLeftX : ( self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.xAxis.value,  gp.leftThumbstick.xAxis.value),
+            .thumbstickLeftY : ( self.gameControllerSnapshot?.extendedGamepad?.leftThumbstick.yAxis.value,  gp.leftThumbstick.yAxis.value),
+            .thumbstickRightX : ( self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.xAxis.value,  gp.rightThumbstick.xAxis.value),
+            .thumbstickRightY : ( self.gameControllerSnapshot?.extendedGamepad?.rightThumbstick.yAxis.value,  gp.rightThumbstick.yAxis.value),
+        ]
         
-        switch directionalPad {
-        case gp.leftThumbstick:
-            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_LeftX", controller: controllerIndex, value: xValue)) ])
-            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_LeftY", controller: controllerIndex, value: yValue)) ])
-        case gp.rightThumbstick:
-            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_RightX", controller: controllerIndex, value: xValue)) ])
-            osc.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: "Gamepad_RightY", controller: controllerIndex, value: yValue)) ])
-        default:
-            Log.warning("directionalPadValueChanged() encounted unsupported '\(directionalPad.localizedName ?? "UNK")'")
-            break
+        for input in inputs {
+            
+            if (input.value.newValue != 0.0) || ((input.value.oldValue ?? 0.0) != input.value.newValue) {
+                sc.sendControllerAnalog(input.key, controllerIndex: UInt8(controllerIndex), value: input.value.newValue)
+            }
         }
-         */
+
+        self.gameControllerSnapshot = snapshot
     }
-    
+
     func buttonValueChanged(button : GCControllerButtonInput, value : Float, pressed : Bool) {
 
-        assertionFailure()
-        /*
-        guard let osc = oscConnection else { return }
+        
+        guard let sc = streamingConnection else { return }
         guard let gc = gameController else { return }
         guard let gp = gc.extendedGamepad else { return }
 
-        let address = button.isPressed ? OSCAddressPattern.controllerButtonPressed : OSCAddressPattern.controllerButtonReleased
         let controllerIndex = gc.playerIndex.rawValue
         let isRepeat = false
+        
+        var inputType : StreamingConnectionControllerInputType!
 
         switch button {
         case gp.leftThumbstickButton:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftThumbstick", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .thumbstickLeftButton
         case gp.rightThumbstickButton:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightThumbstick", controller: controllerIndex, isRepeat: isRepeat)) ])
-
+            inputType = .thumbstickRightButton
         case gp.buttonA:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Bottom", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .faceButtonBottom
         case gp.buttonB:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .faceButtonRight
         case gp.buttonX:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .faceButtonLeft
         case gp.buttonY:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_FaceButton_Top", controller: controllerIndex, isRepeat: isRepeat)) ])
-
+            inputType = .faceButtonTop
         case gp.leftShoulder:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftShoulder", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .shoulderButtonLeft
         case gp.rightShoulder:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightShoulder", controller: controllerIndex, isRepeat: isRepeat)) ])
-
+            inputType = .shoulderButtonRight
         case gp.leftTrigger:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_LeftTrigger", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .triggerButtonLeft
         case gp.rightTrigger:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_RightTrigger", controller: controllerIndex, isRepeat: isRepeat)) ])
-
+            inputType = .triggerButtonRight
         case gp.dpad.up:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Up", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .dpadUp
         case gp.dpad.down:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Down", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .dpadDown
         case gp.dpad.left:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .dpadLeft
         case gp.dpad.right:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_DPad_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
-            
+            inputType = .dpadRight
         case gp.buttonOptions:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_Special_Left", controller: controllerIndex, isRepeat: isRepeat)) ])
+            inputType = .specialButtonLeft
         case gp.buttonMenu:
-            osc.send(address, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: "Gamepad_Special_Right", controller: controllerIndex, isRepeat: isRepeat)) ])
-
+            inputType = .specialButtonRight
         default:
-            Log.warning("buttonValueChanged() encounted unsupported '\(button.localizedName ?? "UNK")'")
+            Log.warning("Couldn't find mapping for input button \(button.description)")
+            return
         }
-         */
+        
+        if button.isPressed {
+            sc.sendControllerButtonPressed(inputType!, controllerIndex: UInt8(controllerIndex), isRepeat: isRepeat)
+        } else {
+            sc.sendControllerButtonReleased(inputType!, controllerIndex: UInt8(controllerIndex))
+        }
     }
 }
 

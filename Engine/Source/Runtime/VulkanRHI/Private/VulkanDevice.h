@@ -11,17 +11,14 @@
 class FVulkanDescriptorSetCache;
 class FVulkanDescriptorPool;
 class FVulkanDescriptorPoolsManager;
+class FVulkanBindlessDescriptorManager;
 class FVulkanCommandListContextImmediate;
 class FVulkanTransientHeapCache;
 class FVulkanDeviceExtension;
-#if VULKAN_USE_NEW_QUERIES
 class FVulkanOcclusionQueryPool;
-#else
-class FOLDVulkanQueryPool;
-#endif
+class FVulkanRenderPassManager;
 
 #if VULKAN_RHI_RAYTRACING
-class FVulkanBasicRaytracingPipeline;
 class FVulkanRayTracingCompactionRequestHandler;
 #endif
 
@@ -53,6 +50,7 @@ struct FOptionalVulkanDeviceExtensions
 			uint64 HasRayTracingPipeline : 1;
 			uint64 HasRayQuery : 1;
 			uint64 HasDeferredHostOperations : 1;
+			uint64 HasEXTCalibratedTimestamps : 1;
 
 			// Vendor specific
 			uint64 HasAMDBufferMarker : 1;
@@ -82,6 +80,8 @@ struct FOptionalVulkanDeviceExtensions
 			// Promoted to 1.3
 			uint64 HasEXTTextureCompressionASTCHDR : 1;
 			uint64 HasKHRMaintenance4 : 1;
+			uint64 HasKHRSynchronization2 : 1;
+			uint64 HasEXTSubgroupSizeControl : 1;
 		};
 		uint64 Packed;
 	};
@@ -312,6 +312,11 @@ public:
 		return DeviceMemoryManager.HasUnifiedMemory();
 	}
 
+	inline bool SupportsBindless() const
+	{
+		return (BindlessDescriptorManager != nullptr);
+	}
+
 	inline uint64 GetTimestampValidBitsMask() const
 	{
 		return TimestampValidBitsMask;
@@ -369,6 +374,11 @@ public:
 		return FenceManager;
 	}
 
+	inline FVulkanRenderPassManager& GetRenderPassManager()
+	{
+		return *RenderPassManager;
+	}
+
 	inline FVulkanDescriptorSetCache& GetDescriptorSetCache()
 	{
 		return *DescriptorSetCache;
@@ -377,6 +387,11 @@ public:
 	inline FVulkanDescriptorPoolsManager& GetDescriptorPoolsManager()
 	{
 		return *DescriptorPoolsManager;
+	}
+
+	inline FVulkanBindlessDescriptorManager* GetBindlessDescriptorManager()
+	{
+		return BindlessDescriptorManager;
 	}
 
 	inline TMap<uint32, FSamplerStateRHIRef>& GetSamplerMap()
@@ -456,6 +471,11 @@ public:
 		return OptionalDeviceExtensions;
 	}
 
+	inline bool SupportsParallelRendering() const
+	{
+		return OptionalDeviceExtensions.HasSeparateDepthStencilLayouts && OptionalDeviceExtensions.HasKHRSynchronization2 && OptionalDeviceExtensions.HasKHRRenderPass2;
+	}
+
 #if VULKAN_SUPPORTS_GPU_CRASH_DUMPS
 	VkBuffer GetCrashMarkerBuffer() const
 	{
@@ -484,6 +504,10 @@ public:
 		bDebugMarkersFound = true;
 	}
 
+	// Performs a GPU and CPU timestamp at nearly the same time.
+	// This allows aligning GPU and CPU events on the same timeline in profile visualization.
+	FGPUTimingCalibrationTimestamp GetCalibrationTimestamp();
+
 private:
 	const VkFormatProperties& GetFormatProperties(VkFormat InFormat);
 	void MapBufferFormatSupport(FPixelFormatInfo& PixelFormatInfo, EPixelFormat UEFormat, VkFormat VulkanFormat);
@@ -508,12 +532,16 @@ private:
 
 	VulkanRHI::FFenceManager FenceManager;
 
+	FVulkanRenderPassManager* RenderPassManager;
+
 	FVulkanTransientHeapCache* TransientHeapCache = nullptr;
 
 	// Active on ES3.1
 	FVulkanDescriptorSetCache* DescriptorSetCache = nullptr;
 	// Active on >= SM4
 	FVulkanDescriptorPoolsManager* DescriptorPoolsManager = nullptr;
+
+	FVulkanBindlessDescriptorManager* BindlessDescriptorManager = nullptr;
 
 	FVulkanShaderFactory ShaderFactory;
 
@@ -532,7 +560,6 @@ private:
 
 #if VULKAN_RHI_RAYTRACING
 	FRayTracingProperties RayTracingProperties;
-	FVulkanBasicRaytracingPipeline* BasicRayTracingPipeline = nullptr;
 	FVulkanRayTracingCompactionRequestHandler* RayTracingCompactionRequestHandler = nullptr;
 #endif // VULKAN_RHI_RAYTRACING
 

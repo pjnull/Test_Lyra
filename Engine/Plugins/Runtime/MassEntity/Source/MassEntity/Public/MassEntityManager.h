@@ -43,6 +43,8 @@ struct MASSENTITY_API FMassEntityManager : public TSharedFromThis<FMassEntityMan
 	friend FMassEntityQuery;
 	friend FMassDebugger;
 
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnNewArchetypeDelegate, const FMassArchetypeHandle&);
+
 private:
 	// Index 0 is reserved so we can treat that index as an invalid entity handle
 	constexpr static int32 NumReservedEntities = 1;
@@ -319,7 +321,14 @@ public:
 	FMassExecutionContext CreateExecutionContext(const float DeltaSeconds);
 
 	FScopedProcessing NewProcessingScope() { return FScopedProcessing(ProcessingScopeCount); }
+
+	/** 
+	 * Indicates whether there are processors out there performing operations on this instance of MassEntityManager. 
+	 * Used to ensure that mutating operations (like entity destruction) are not performed while processors are running, 
+	 * which rely on the assumption that the data layout doesn't change during calculations. 
+	 */
 	bool IsProcessing() const { return ProcessingScopeCount > 0; }
+
 	FMassCommandBuffer& Defer() const { return *DeferredCommandBuffer.Get(); }
 	/** 
 	 * @param InCommandBuffer if not set then the default command buffer will be flushed. If set and there's already 
@@ -379,6 +388,7 @@ public:
 
 	FMassObserverManager& GetObserverManager() { return ObserverManager; }
 
+	FOnNewArchetypeDelegate& GetOnNewArchetypeEvent() { return OnNewArchetypeEvent; }
 	/** 
 	 * Fetches the world associated with the Owner. 
 	 * @note that it's ok for a given EntityManager to not have an owner or the owner not being part of a UWorld, depending on the use case
@@ -470,6 +480,8 @@ private:
 #endif // WITH_MASSENTITY_DEBUG
 
 	TWeakObjectPtr<UObject> Owner;
+
+	FOnNewArchetypeDelegate OnNewArchetypeEvent;
 
 	bool bInitialized = false;
 };

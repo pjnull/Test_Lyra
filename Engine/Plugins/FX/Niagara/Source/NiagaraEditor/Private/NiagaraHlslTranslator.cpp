@@ -2180,7 +2180,7 @@ void FHlslNiagaraTranslator::HandleSimStageSetupAndTeardown(int32 InWhichStage, 
 	// Now take a look at any of the variables that were actually written to / read from in this stage.
 	TArray<FNiagaraVariable> ReadVars;
 	TArray<FNiagaraVariable> WriteVars;
-
+	TArray<FNiagaraVariable> AllVars;
 	for (int32 ParamHistoryIdx = 0; ParamHistoryIdx < ParamMapHistories.Num(); ParamHistoryIdx++)
 	{
 		if (InWhichStage != ParamHistoryIdx && TranslationStage.ShouldDoSpawnOnlyLogic() == false)
@@ -2196,6 +2196,20 @@ void FHlslNiagaraTranslator::HandleSimStageSetupAndTeardown(int32 InWhichStage, 
 					ReadVars.Emplace(Var);
 				if (ParamMapHistories[ParamHistoryIdx].PerVariableWriteHistory[i].Num() > 0 && !WriteVars.Contains(Var))
 					WriteVars.Emplace(Var);
+			}
+		}
+	}
+
+	for (int32 ParamHistoryIdx = 0; ParamHistoryIdx < ParamMapHistories.Num(); ParamHistoryIdx++)
+	{		
+		for (int32 i = 0; i < ParamMapHistories[ParamHistoryIdx].Variables.Num(); i++)
+		{
+			const FNiagaraVariable& Var = ParamMapHistories[ParamHistoryIdx].Variables[i];
+
+			if (Var.IsInNameSpace(TranslationStage.IterationSource))
+			{
+				if (!AllVars.Contains(Var))
+					AllVars.Emplace(Var);
 			}
 		}
 	}
@@ -2367,7 +2381,7 @@ void FHlslNiagaraTranslator::HandleSimStageSetupAndTeardown(int32 InWhichStage, 
 				AttributeHLSLNames.Emplace(TEXT("Map.") + GetSanitizedSymbolName(Var.GetName().ToString()));
 			}
 
-			if (CDO->GenerateIterationSourceNamespaceWriteAttributesHLSL(DIInstanceInfo, IterationSourceVar, MakeArrayView(Sig.Inputs), MakeArrayView(WriteVars), MakeArrayView(AttributeHLSLNames), bSpawnOnly, bPartialWrites, GeneratedErrors, AttributeWriteGeneratedHLSL) && AttributeWriteGeneratedHLSL.Len() > 0)
+			if (CDO->GenerateIterationSourceNamespaceWriteAttributesHLSL(DIInstanceInfo, IterationSourceVar, MakeArrayView(Sig.Inputs), MakeArrayView(WriteVars), MakeArrayView(AttributeHLSLNames), MakeArrayView(AllVars), bSpawnOnly, bPartialWrites, GeneratedErrors, AttributeWriteGeneratedHLSL) && AttributeWriteGeneratedHLSL.Len() > 0)
 			{
 				Sig.Name = *FString::Printf(TEXT("TeardownFromIterationSource_%s_GeneratedWriteAttributes"), *GetSanitizedFunctionNameSuffix(TranslationStage.PassNamespace));
 				FNiagaraFunctionSignature SignatureOut = Sig;
@@ -3320,17 +3334,21 @@ void FHlslNiagaraTranslator::DefineMainGPUFunctions(
 			"\n"
 			"[numthreads(THREADGROUP_SIZE_X, THREADGROUP_SIZE_Y, THREADGROUP_SIZE_Z)]\n"
 			"void SimulateMainComputeCS(\n"
-			"	uint3 DispatchThreadId : SV_DispatchThreadID,\n"
-			"	uint3 GroupThreadId : SV_GroupThreadID)\n"
+			"	uint3 InDispatchThreadId	: SV_DispatchThreadID,\n"
+			"	uint3 InGroupId				: SV_GroupID,\n"
+			"	uint3 InGroupThreadId		: SV_GroupThreadID,\n"
+			"	uint  InGroupIndex			: SV_GroupIndex)\n"
 			"{\n"
-			"	GLinearThreadId = DispatchThreadId.x + (DispatchThreadId.y * DispatchThreadIdToLinear.y);\n"
+			"	GDispatchThreadId	= InDispatchThreadId;\n"
+			"	GGroupId			= InGroupId;\n"
+			"	GGroupThreadId		= InGroupThreadId;\n"
+			"	GGroupIndex			= InGroupIndex;\n"
+			"	GLinearThreadId		= GDispatchThreadId.x + (GDispatchThreadId.y * DispatchThreadIdToLinear.y);\n"
 			"	#if NIAGARA_DISPATCH_TYPE >= NIAGARA_DISPATCH_TYPE_THREE_D\n"
-			"		GLinearThreadId += DispatchThreadId.z * DispatchThreadIdToLinear.z;\n"
+			"		GLinearThreadId += GDispatchThreadId.z * DispatchThreadIdToLinear.z;\n"
 			"	#endif\n"
-			"	GDispatchThreadId = DispatchThreadId;\n"
-			"	GGroupThreadId = GroupThreadId;\n"
-			"	GEmitterTickCounter = EmitterTickCounter;\n"
-			"	GRandomSeedOffset = 0;\n"
+			"	GEmitterTickCounter	= EmitterTickCounter;\n"
+			"	GRandomSeedOffset	= 0;\n"
 			"\n"
 		);
 
@@ -3420,7 +3438,7 @@ void FHlslNiagaraTranslator::DefineMainGPUFunctions(
 			//		 can really be variable, everything else is driven from CPU code.
 			HlslOutput += TEXT(
 				"	const uint MaxInstances = SimulationStage_GetInstanceCount();\n"
-				"	GLinearThreadId = all(DispatchThreadId < DispatchThreadIdBounds) ? GLinearThreadId : MaxInstances;\n"
+				"	GLinearThreadId = all(GDispatchThreadId < DispatchThreadIdBounds) ? GLinearThreadId : MaxInstances;\n"
 				"	GSpawnStartInstance = MaxInstances;\n"
 				"	const bool bRunUpdateLogic = (GLinearThreadId < GSpawnStartInstance) && (SimStart != 1);\n"
 				"	const bool bRunSpawnLogic = (GLinearThreadId < GSpawnStartInstance) && (SimStart == 1);\n"
@@ -5732,7 +5750,7 @@ void FHlslNiagaraTranslator::SetConstantByStaticVariable(int32& OutValue, const 
 			PinToTest = InDefaultPin->LinkedTo[0];
 		}
 		FGraphTraversalHandle PinHandle(ActiveHistoryForFunctionCalls.ActivePath);
-		PinHandle.Push(PinToTest);
+		PinHandle.PushPin(PinToTest);
 
 		const FString* ConstantPtr = CompileData->PinToConstantValues.Find(PinHandle);
 		if (ConstantPtr != nullptr)

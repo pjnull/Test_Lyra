@@ -18,7 +18,9 @@
 #include "Components/MeshComponent.h"
 #include "Containers/SortedMap.h"
 #include "LODSyncInterface.h"
+#include "MeshDeformerInterface.h"
 #include "BoneContainer.h"
+#include "ClothingSystemRuntimeTypes.h"
 #include "SkinnedMeshComponent.generated.h"
 
 enum class ESkinCacheUsage : uint8;
@@ -158,12 +160,14 @@ struct ENGINE_API FSkelMeshComponentLODInfo
 
 	void ReleaseOverrideVertexColorsAndBlock();
 	void BeginReleaseOverrideVertexColors();
+	void EndReleaseOverrideVertexColors();
 private:
 	void CleanUpOverrideVertexColors();
 
 public:
 	void ReleaseOverrideSkinWeightsAndBlock();
 	void BeginReleaseOverrideSkinWeights();
+	void EndReleaseOverrideSkinWeights();
 private:
 	void CleanUpOverrideSkinWeights();
 };
@@ -189,7 +193,7 @@ using FExternalMorphSets = TMap<int32, TSharedPtr<FExternalMorphSet>>;
  * @see USkeletalMeshComponent
 */
 UCLASS(hidecategories=Object, config=Engine, editinlinenew, abstract)
-class ENGINE_API USkinnedMeshComponent : public UMeshComponent, public ILODSyncInterface
+class ENGINE_API USkinnedMeshComponent : public UMeshComponent, public ILODSyncInterface, public IMeshDeformerInterface
 {
 	GENERATED_UCLASS_BODY()
 
@@ -256,7 +260,7 @@ protected:
 
 public:
 	/** Get the currently active MeshDeformer Instance. */
-	UMeshDeformerInstance const* GetMeshDeformerInstance() const { return MeshDeformerInstance; }
+	virtual UMeshDeformerInstance const* GetMeshDeformerInstance() const override { return MeshDeformerInstance; }
 
 	/** const getters for previous transform idea */
 	const TArray<uint8>& GetPreviousBoneVisibilityStates() const
@@ -582,9 +586,11 @@ public:
 	UPROPERTY()
 	uint8 bForceWireframe:1;
 
+#if WITH_EDITORONLY_DATA
 	/** Draw the skeleton hierarchy for this skel mesh. */
 	UPROPERTY()
 	uint8 bDisplayBones_DEPRECATED:1;
+#endif
 
 	/** Disable Morphtarget for this component. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, BlueprintReadWrite, Category = SkeletalMesh)
@@ -770,6 +776,9 @@ public:
 
 	/** Gets the skeletal mesh resource used for rendering the component. */
 	FSkeletalMeshRenderData* GetSkeletalMeshRenderData() const;
+
+	/** Override this function to pass on cloth simulation data (or any deformable using the cloth pipeline) to the skeletal renderer. */
+	virtual void GetUpdateClothSimulationData_AnyThread(TMap<int32, FClothSimulData>& OutClothSimulData, FMatrix& OutLocalToWorld, float& OutClothBlendWeight);
 
 	/** 
 	 * Override the Physics Asset of the mesh. It uses SkeletalMesh.PhysicsAsset, but if you'd like to override use this function
@@ -1121,6 +1130,9 @@ public:
 
 	/** Caches the RefToLocal matrices. */
 	void CacheRefToLocalMatrices(TArray<FMatrix44f>& OutRefToLocal) const;
+
+	/** Return the skinning matrices used for rendering. */
+	void GetCurrentRefToLocalMatrices(TArray<FMatrix44f>& OutRefToLocals, int32 InLodIdx) const;
 
 	FORCEINLINE	const USkinnedMeshComponent* GetBaseComponent()const
 	{

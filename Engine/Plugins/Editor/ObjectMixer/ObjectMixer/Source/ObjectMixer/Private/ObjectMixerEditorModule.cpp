@@ -18,6 +18,7 @@
 #include "ToolMenus.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
+#include "Views/Widgets/ObjectMixerEditorListMenuContext.h"
 
 const FName FObjectMixerEditorModule::BaseObjectMixerModuleName("ObjectMixerEditor");
 
@@ -42,6 +43,12 @@ void FObjectMixerEditorModule::ShutdownModule()
 	UnregisterMenuGroup();
 	
 	Teardown();
+}
+
+UWorld* FObjectMixerEditorModule::GetWorld()
+{
+	check(GEditor);
+	return GEditor->GetEditorWorldContext().World();
 }
 
 void FObjectMixerEditorModule::Initialize()
@@ -139,6 +146,14 @@ void FObjectMixerEditorModule::RefreshList() const
 	if (MainPanel.IsValid())
 	{
 		MainPanel->RefreshList();
+	}
+}
+
+void FObjectMixerEditorModule::OnRenameCommand()
+{
+	if (MainPanel.IsValid())
+	{
+		MainPanel->OnRenameCommand();
 	}
 }
 
@@ -338,7 +353,7 @@ void FObjectMixerEditorModule::BindDelegates()
 
 	DelegateHandles.Add(FCoreUObjectDelegates::OnObjectTransacted.AddLambda([this](UObject*, const FTransactionObjectEvent& Event)
 	{
-		if (Event.GetEventType() == ETransactionObjectEventType::Finalized && Event.HasPropertyChanges())
+		if (Event.GetEventType() == ETransactionObjectEventType::Finalized && Event.HasNameChange())
 		{
 			RequestRebuildList();
 		}

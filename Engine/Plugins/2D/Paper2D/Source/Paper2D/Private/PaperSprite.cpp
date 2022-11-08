@@ -639,6 +639,11 @@ void UPaperSprite::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 		bBothModified = false;
 	}
 
+	if (bBothModified)
+	{
+		RefreshBakedData();
+	}
+
 	if (bCollisionDataModified || bBothModified)
 	{
 		RebuildCollisionData();
@@ -649,10 +654,7 @@ void UPaperSprite::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 		RebuildRenderData();
 	}
 
-	if (bBothModified)
-	{
-		RefreshBakedData();
-	}
+	
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
@@ -1456,6 +1458,7 @@ void UPaperSprite::InitializeSprite(const FSpriteAssetInitParameters& InitParams
 	}
 
 	RefreshBakedData();
+	CustomPivotPoint = GetPivotPosition();
 }
 
 void UPaperSprite::SetTrim(bool bTrimmed, const FVector2D& OriginInSourceImage, const FVector2D& SourceImageDimension, bool bRebuildData /*= true*/)

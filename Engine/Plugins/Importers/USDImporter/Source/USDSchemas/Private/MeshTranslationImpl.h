@@ -27,13 +27,11 @@ namespace UsdUtils
 /** Implementation that can be shared between the SkelRoot translator and GeomMesh translators */
 namespace MeshTranslationImpl
 {
-	/** Retrieves the target materials described on AssignmentInfo, considering that the previous material assignment on the mesh was ExistingAssignments */
+	/** Resolves the material assignments in AssignmentInfo, returning an UMaterialInterface for each material slot */
 	TMap<const UsdUtils::FUsdPrimMaterialSlot*, UMaterialInterface*> ResolveMaterialAssignmentInfo(
 		const pxr::UsdPrim& UsdPrim,
 		const TArray<UsdUtils::FUsdPrimMaterialAssignmentInfo>& AssignmentInfo,
-		const TArray<UMaterialInterface*>& ExistingAssignments,
 		UUsdAssetCache& AssetCache,
-		float Time,
 		EObjectFlags Flags
 	);
 
@@ -52,6 +50,35 @@ namespace MeshTranslationImpl
 		const FName& RenderContext,
 		const FName& MaterialPurpose
 	);
+
+	enum class EUsdBaseMaterialProperties
+	{
+		None = 0,
+		Translucent = 1,
+		VT = 2,
+		TwoSided = 4
+	};
+	ENUM_CLASS_FLAGS( EUsdBaseMaterialProperties )
+
+	// Returns one of the alternatives of the UsdPreviewSurface base material depending on the material overrides
+	// provided, and nullptr otherwise
+	UMaterialInterface* GetBasePreviewSurfaceMaterial( EUsdBaseMaterialProperties BaseMaterialProperties );
+
+	// Returns the VT version of the provided UsdPreviewSurface BaseMaterial. Returns the provided BaseMaterial back if
+	// it is already a VT-capable base material, and returns nullptr if BaseMaterial isn't one of our base material
+	// alternatives.
+	// Example: Receives UsdPreviewSurfaceTwoSided -> Returns UsdPreviewSurfaceTwoSidedVT
+	// Example: Receives UsdPreviewSurfaceTwoSidedVT -> Returns UsdPreviewSurfaceTwoSidedVT
+	// Example: Receives SomeOtherBaseMaterial -> Returns nullptr
+	UMaterialInterface* GetVTVersionOfBasePreviewSurfaceMaterial( UMaterialInterface* BaseMaterial );
+
+	// Returns the two-sided version of the provided UsdPreviewSurface BaseMaterial. Returns the provided BaseMaterial
+	// back if it is already a two-sided-capable base material, and returns nullptr if BaseMaterial isn't one of our base
+	// material alternatives.
+	// Example: Receives UsdPreviewSurfaceTranslucent -> Returns UsdPreviewSurfaceTwoSidedTranslucent
+	// Example: Receives UsdPreviewSurfaceTwoSidedTranslucent -> Returns UsdPreviewSurfaceTwoSidedTranslucent
+	// Example: Receives SomeOtherBaseMaterial -> Returns nullptr
+	UMaterialInterface* GetTwoSidedVersionOfBasePreviewSurfaceMaterial( UMaterialInterface* BaseMaterial );
 }
 
 #endif // #if USE_USD_SDK

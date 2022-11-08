@@ -702,7 +702,7 @@ void FBulkData::GetCopy( void** Dest, bool bDiscardInternalCopy )
 			// single use bulk data.
 			if( bDiscardInternalCopy && CanDiscardInternalData() )
 			{
-#if USE_RUNTIME_BULKDATA
+#if USE_RUNTIME_BULKDATA && !WITH_LOW_LEVEL_TESTS 
 				UE_LOG(LogSerialization, Warning, TEXT("FBulkData::GetCopy both copied and discarded it's data, passing in an empty pointer would avoid an extra allocate and memcpy!"));
 #endif
 				FreeData();
@@ -1578,24 +1578,22 @@ void FBulkData::GetBulkDataVersions(FArchive& InlineArchive, FPackageFileVersion
 	EPackageSegment Segment;
 	bool bExternal;
 
-	if (UE::TryGetPackageNameFromChunkId(BulkChunkId, PackageName, Segment, bExternal) == false)
+	if (UE::TryGetPackageNameFromChunkId(BulkChunkId, PackageName, Segment, bExternal))
 	{
-		return;
-	}
+		IPackageResourceManager& ResourceMgr = IPackageResourceManager::Get();
 
-	IPackageResourceManager& ResourceMgr = IPackageResourceManager::Get();
-
-	if (TUniquePtr<FArchive> Ar = ResourceMgr.OpenReadExternalResource(EPackageExternalResource::WorkspaceDomainFile, PackageName.ToString()))
-	{
-		FPackageFileSummary Summary;
-		*Ar << Summary;
-
-		if (Ar->IsError() == false && Summary.Tag == PACKAGE_FILE_TAG)
+		if (TUniquePtr<FArchive> Ar = ResourceMgr.OpenReadExternalResource(EPackageExternalResource::WorkspaceDomainFile, PackageName.ToString()))
 		{
-			OutUEVersion = Summary.GetFileVersionUE();
-			OutLicenseeUEVersion = Summary.GetFileVersionLicenseeUE();
-			OutCustomVersions = Summary.GetCustomVersionContainer();
-			return;
+			FPackageFileSummary Summary;
+			*Ar << Summary;
+
+			if (Ar->IsError() == false && Summary.Tag == PACKAGE_FILE_TAG)
+			{
+				OutUEVersion = Summary.GetFileVersionUE();
+				OutLicenseeUEVersion = Summary.GetFileVersionLicenseeUE();
+				OutCustomVersions = Summary.GetCustomVersionContainer();
+				return;
+			}
 		}
 	}
 

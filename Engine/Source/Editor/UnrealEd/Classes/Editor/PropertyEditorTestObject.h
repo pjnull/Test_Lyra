@@ -3,6 +3,7 @@
 #pragma once 
 
 #include "CoreMinimal.h"
+#include "Misc/Timecode.h"
 #include "UObject/ObjectMacros.h"
 #include "UObject/Object.h"
 #include "UObject/PrimaryAssetId.h"
@@ -377,7 +378,10 @@ class UPropertyEditorTestObject : public UObject
 	TArray<FColor> ColorPropertyArray;
 
 	UPROPERTY(EditAnywhere, Category=ArraysOfProperties)
-	TArray<TEnumAsByte<enum EPropertyEditorTestEnum> > EnumPropertyArray;
+	TArray<FTimecode> TimecodePropertyArray;
+
+	UPROPERTY(EditAnywhere, Category=ArraysOfProperties)
+	TArray<TEnumAsByte<EPropertyEditorTestEnum> > EnumPropertyArray;
 
 	UPROPERTY(EditAnywhere, Category=ArraysOfProperties)
 	TArray<FPropertyEditorTestBasicStruct> StructPropertyArray;

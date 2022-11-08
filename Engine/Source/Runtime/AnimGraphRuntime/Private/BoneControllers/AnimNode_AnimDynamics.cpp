@@ -724,13 +724,13 @@ void FAnimNode_AnimDynamics::InitPhysics(FComponentSpacePoseContext& Output)
 			switch (PhysicsBody.CollisionType)
 			{
 			case AnimPhysCollisionType::CustomSphere:
-				PhysicsBody.SphereCollisionRadius = PhysicsBodyDef.SphereCollisionRadius;
+				PhysicsBody.SphereCollisionRadius = static_cast<float>(PhysicsBodyDef.SphereCollisionRadius);
 				break;
 			case AnimPhysCollisionType::InnerSphere:
-				PhysicsBody.SphereCollisionRadius = PhysicsBodyDef.BoxExtents.GetAbsMin() / 2.0f;
+				PhysicsBody.SphereCollisionRadius = static_cast<float>(PhysicsBodyDef.BoxExtents.GetAbsMin() / 2.0);
 				break;
 			case AnimPhysCollisionType::OuterSphere:
-				PhysicsBody.SphereCollisionRadius = PhysicsBodyDef.BoxExtents.GetAbsMax() / 2.0f;
+				PhysicsBody.SphereCollisionRadius = static_cast<float>(PhysicsBodyDef.BoxExtents.GetAbsMax() / 2.0);
 				break;
 			default:
 				break;
@@ -1011,11 +1011,11 @@ void FAnimNode_AnimDynamics::UpdateLimits(FComponentSpacePoseContext& Output)
 
 bool FAnimNode_AnimDynamics::HasPreUpdate() const
 {
-	if(CVarEnableDynamics.GetValueOnGameThread() == 1)
+	if(CVarEnableDynamics.GetValueOnAnyThread() == 1)
 	{
-		return (CVarEnableWind.GetValueOnGameThread() == 1 && (bEnableWind || bWindWasEnabled))
+		return (CVarEnableWind.GetValueOnAnyThread() == 1 && (bEnableWind || bWindWasEnabled))
 #if ENABLE_ANIM_DRAW_DEBUG
-				|| (CVarShowDebug.GetValueOnGameThread() == 1 && !CVarDebugBone.GetValueOnGameThread().IsEmpty())
+				|| (CVarShowDebug.GetValueOnAnyThread() == 1 && !CVarDebugBone.GetValueOnAnyThread().IsEmpty())
 #endif
 				;
 	}

@@ -15,6 +15,8 @@
 #include "Stats/Stats.h"
 #include "Utilities/Utilities.h"
 #include "Utilities/StringHelpers.h"
+#include "Utilities/UtilsMPEGVideo.h"
+#include "Decoder/VideoDecoderHelpers.h"
 
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
@@ -744,6 +746,10 @@ void FVideoDecoderH264::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
 
 		if (!AU->AccessUnit->bIsDummyData)
 		{
+			// Take note of changes in codec specific data.
+			CurrentStreamFormatInfo.UpdateFromCSD(AU);
+			AU->SPSs = CurrentStreamFormatInfo.SPSs;
+
 			// Process NALUs
 			AU->bIsDiscardable = true;
 			AU->bIsIDR = AU->AccessUnit->bIsSyncSample;
@@ -824,7 +830,10 @@ void FVideoDecoderH264::PrepareAU(TSharedPtrTS<FDecoderInput> AU)
 			if (StartTime >= AU->AccessUnit->LatestPTS)
 			{
 				StartTime.SetToInvalid();
-				AU->bIsDiscardable = true;
+				if (AU->AccessUnit->DTS.IsValid() && AU->AccessUnit->DTS >= AU->AccessUnit->LatestPTS)
+				{
+					AU->bIsDiscardable = true;
+				}
 			}
 			else if (EndTime >= AU->AccessUnit->LatestPTS)
 			{
@@ -1024,6 +1033,30 @@ bool FVideoDecoderH264::ConvertDecodedImage(const TRefCountPtr<IMFSample>& Decod
 
 	OutputBufferSampleProperties->Set("pixelfmt",	  FVariantValue((int64)EPixelFormat::PF_NV12));
 
+	// Set the bit depth and the colorimetry.
+	uint8 colour_primaries=2, transfer_characteristics=2, matrix_coeffs=2;
+	uint8 video_full_range_flag=0, video_format=5;
+	uint8 num_bits = 8;
+	if (MatchingInput.IsValid() && MatchingInput->SPSs.Num())
+	{
+		check(MatchingInput->SPSs[0].bit_depth_luma_minus8 == MatchingInput->SPSs[0].bit_depth_chroma_minus8);
+		num_bits = MatchingInput->SPSs[0].bit_depth_luma_minus8 + 8;
+		if (MatchingInput->SPSs[0].colour_description_present_flag)
+		{
+			colour_primaries = MatchingInput->SPSs[0].colour_primaries;
+			transfer_characteristics = MatchingInput->SPSs[0].transfer_characteristics;
+			matrix_coeffs = MatchingInput->SPSs[0].matrix_coefficients;
+		}
+		if (MatchingInput->SPSs[0].video_signal_type_present_flag)
+		{
+			video_full_range_flag = MatchingInput->SPSs[0].video_full_range_flag;
+			video_format = MatchingInput->SPSs[0].video_format;
+		}
+	}
+	OutputBufferSampleProperties->Set("bits_per", FVariantValue((int64)num_bits));
+	Colorimetry.Update(colour_primaries, transfer_characteristics, matrix_coeffs, video_full_range_flag, video_format);
+	Colorimetry.UpdateParamDict(*OutputBufferSampleProperties);
+
 	if (CurrentRenderOutputBuffer != nullptr)
 	{
 		if (!SetupDecodeOutputData(FIntPoint(videoArea.Area.cx, videoArea.Area.cy), DecodedOutputSample, OutputBufferSampleProperties.Get()))
@@ -1117,8 +1150,12 @@ bool FVideoDecoderH264::Decode(TSharedPtrTS<FDecoderInput> AU, bool bResolutionC
 			// Check if we got an output buffer. When flushing or terminating AcquireOutputBuffer() may return with no buffer!
 			if (CurrentRenderOutputBuffer)
 			{
-				// Setup texture sample to receive data during decode
-				PreInitDecodeOutputForSW(FIntPoint(CurrentSampleInfo.GetResolution().Width, CurrentSampleInfo.GetResolution().Height));
+				// Setup texture sample to receive data during decode. If this created a new IMFSample then we need to
+				// reset and re-create the output buffer to update the sample in there.
+				if (PreInitDecodeOutputForSW(FIntPoint(CurrentSampleInfo.GetResolution().Width, CurrentSampleInfo.GetResolution().Height)))
+				{
+					CurrentDecoderOutputBuffer.Reset();
+				}
 			}
 			else
 			{
@@ -1415,6 +1452,9 @@ void FVideoDecoderH264::WorkerThread()
 	bool bGotLastSequenceAU = false;
 	TOptional<int64> SequenceIndex;
 
+	CurrentStreamFormatInfo.Reset();
+	Colorimetry.Reset();
+
 	// Require a new media input type based on the actual first access unit.
 	bool bNeedInitialReconfig = true;
 	while(!TerminateThreadSignal.IsSignaled())
@@ -1615,6 +1655,8 @@ void FVideoDecoderH264::WorkerThread()
 			SequenceIndex.Reset();
 			CurrentSampleInfo.SetResolution(FStreamCodecInformation::FResolution(Align(Config.MaxFrameWidth, 16), Align(Config.MaxFrameHeight, 16)));
 			NewSampleInfo = CurrentSampleInfo;
+			CurrentStreamFormatInfo.Reset();
+			Colorimetry.Reset();
 
 			// Reset done state.
 			bDone = false;

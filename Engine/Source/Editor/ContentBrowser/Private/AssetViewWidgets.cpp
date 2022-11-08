@@ -167,6 +167,7 @@ TSharedRef<SWidget> FAssetViewItemHelper::CreateListTileItemContents(T* const In
 		// TODO: Allow items to customize their widget
 
 		const bool bDeveloperFolder = ContentBrowserUtils::IsItemDeveloperContent(InTileOrListItem->AssetItem->GetItem());
+		const bool bCodeFolder = EnumHasAnyFlags(InTileOrListItem->AssetItem->GetItem().GetItemCategory(), EContentBrowserItemFlags::Category_Class);
 
 		const bool bCollectionFolder = EnumHasAnyFlags(InTileOrListItem->AssetItem->GetItem().GetItemCategory(), EContentBrowserItemFlags::Category_Collection);
 		ECollectionShareType::Type CollectionFolderShareType = ECollectionShareType::CST_All;
@@ -177,7 +178,9 @@ TSharedRef<SWidget> FAssetViewItemHelper::CreateListTileItemContents(T* const In
 
 		const FSlateBrush* FolderBaseImage = bDeveloperFolder
 			? FAppStyle::GetBrush("ContentBrowser.ListViewDeveloperFolderIcon") 
-			: FAppStyle::GetBrush("ContentBrowser.ListViewFolderIcon");
+			: bCodeFolder
+				? FAppStyle::GetBrush("ContentBrowser.ListViewCodeFolderIcon")
+				: FAppStyle::GetBrush("ContentBrowser.ListViewFolderIcon");
 
 		// Folder base
 		ItemContentsOverlay->AddSlot()
@@ -1889,7 +1892,6 @@ void SAssetTileItem::Construct( const FArguments& InArgs )
 							.Padding(2.0f,0.0f, 0.0f, 2.0f)
 							[
 								SAssignNew(ClassTextWidget, STextBlock)
-								.Visibility(this, &SAssetTileItem::GetAssetClassLabelVisibility)
 								.TextStyle(FAppStyle::Get(), "ContentBrowser.ClassFont")
 								.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 								.Text(this, &SAssetTileItem::GetAssetClassText)

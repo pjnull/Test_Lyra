@@ -332,6 +332,7 @@ void FLightRenderParameters::MakeShaderParameters(const FViewMatrices& ViewMatri
 	OutShaderParameters.RectLightAtlasUVOffset = RectLightAtlasUVOffset;
 	OutShaderParameters.RectLightAtlasUVScale = RectLightAtlasUVScale;
 	OutShaderParameters.RectLightAtlasMaxLevel = RectLightAtlasMaxLevel;
+	OutShaderParameters.IESAtlasIndex = IESAtlasIndex;
 }
 
 // match logic in EyeAdaptationInverseLookup(...)
@@ -411,6 +412,7 @@ FLightSceneProxy::FLightSceneProxy(const ULightComponent* InLightComponent)
 	, ShadowAmount(1.0f)
 	, SamplesPerPixel(1)
 	, DeepShadowLayerDistribution(InLightComponent->DeepShadowLayerDistribution)
+	, IESAtlasId(~0u)
 #if ACTOR_HAS_LABELS
 	, OwnerNameOrLabel(InLightComponent->GetOwner() ? InLightComponent->GetOwner()->GetActorNameOrLabel() : InLightComponent->GetName())
 #endif
@@ -664,7 +666,7 @@ void ULightComponent::PostLoad()
 	if (LightFunctionMaterial && HasStaticLighting())
 	{
 		// Light functions can only be used on dynamic lights
-		LightFunctionMaterial = NULL;
+		ClearLightFunctionMaterial();
 	}
 
 	PreviewShadowMapChannel = INDEX_NONE;
@@ -782,8 +784,19 @@ void ULightComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 	if (HasStaticLighting())
 	{
 		// Lightmapped lights must not have light functions
-		LightFunctionMaterial = NULL;
+		ClearLightFunctionMaterial();
 	}
+#if WITH_EDITOR
+	else if (PropertyName == GET_MEMBER_NAME_STRING_CHECKED(ULightComponent, LightFunctionMaterial))
+	{
+		StashedLightFunctionMaterial = nullptr;
+	}
+	else if (StashedLightFunctionMaterial != nullptr)
+	{
+		// Light has been made non-static, restore previous light function
+		LightFunctionMaterial = StashedLightFunctionMaterial;
+	}
+#endif
 
 	// Unbuild lighting because a property changed
 	// Exclude properties that don't affect built lighting
@@ -1088,9 +1101,20 @@ void ULightComponent::SetLightFunctionMaterial(UMaterialInterface* NewLightFunct
 	if (AreDynamicDataChangesAllowed()
 		&& NewLightFunctionMaterial != LightFunctionMaterial)
 	{
+#if WITH_EDITOR
+		StashedLightFunctionMaterial = nullptr;
+#endif
 		LightFunctionMaterial = NewLightFunctionMaterial;
 		MarkRenderStateDirty();
 	}
+}
+
+void ULightComponent::ClearLightFunctionMaterial()
+{
+#if WITH_EDITOR
+	StashedLightFunctionMaterial = LightFunctionMaterial;
+#endif
+	LightFunctionMaterial = nullptr;
 }
 
 void ULightComponent::SetLightFunctionScale(FVector NewLightFunctionScale)
@@ -1495,6 +1519,9 @@ void ULightComponent::SetMaterial(int32 ElementIndex, UMaterialInterface* InMate
 {
 	if (ElementIndex == 0)
 	{
+#if WITH_EDITOR
+		StashedLightFunctionMaterial = nullptr;
+#endif
 		LightFunctionMaterial = InMaterial;
 		MarkRenderStateDirty();
 	}

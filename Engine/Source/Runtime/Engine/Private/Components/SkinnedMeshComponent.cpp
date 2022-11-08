@@ -31,9 +31,11 @@
 #include "Animation/MeshDeformerInstance.h"
 #include "Animation/MorphTarget.h"
 #include "AnimationRuntime.h"
+#include "BoneWeights.h"
 #include "Animation/SkinWeightProfileManager.h"
 #include "GPUSkinCache.h"
 #include "PipelineStateCache.h"
+#include "SkeletalRender.h"
 #include "UObject/UE5MainStreamObjectVersion.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSkinnedMeshComp, Log, All);
@@ -1123,6 +1125,25 @@ void USkinnedMeshComponent::InitLODInfos()
 	{
 		if (GetSkinnedAsset()->GetLODNum() != LODInfo.Num())
 		{
+			// Perform cleanup if LOD infos have been initialized before 
+			if (!LODInfo.IsEmpty())
+			{
+				// Batch release all resources of LOD infos we're about to destruct.
+				// This is relevant when overrides have been set but LODInfos are
+				// re-initialized, for example by changing the mesh at runtime.
+				for (int32 Idx = 0; Idx < LODInfo.Num(); ++Idx)
+				{
+					LODInfo[Idx].BeginReleaseOverrideSkinWeights();
+					LODInfo[Idx].BeginReleaseOverrideVertexColors();
+				}
+				FlushRenderingCommands();
+				for (int32 Idx = 0; Idx < LODInfo.Num(); ++Idx)
+				{
+					LODInfo[Idx].EndReleaseOverrideSkinWeights();
+					LODInfo[Idx].EndReleaseOverrideVertexColors();
+				}
+			}
+			
 			LODInfo.Empty(GetSkinnedAsset()->GetLODNum());
 			for (int32 Idx=0; Idx < GetSkinnedAsset()->GetLODNum(); Idx++)
 			{
@@ -2081,6 +2102,13 @@ FSkeletalMeshRenderData* USkinnedMeshComponent::GetSkeletalMeshRenderData() cons
 	{
 		return nullptr;
 	}
+}
+
+void USkinnedMeshComponent::GetUpdateClothSimulationData_AnyThread(TMap<int32, FClothSimulData>& OutClothSimulData, FMatrix& OutLocalToWorld, float& OutClothBlendWeight)
+{
+	OutClothSimulData.Reset();
+	OutLocalToWorld = FMatrix::Identity;
+	OutClothBlendWeight = 0.f;
 }
 
 bool USkinnedMeshComponent::AllocateTransformData()
@@ -3237,6 +3265,30 @@ void USkinnedMeshComponent::CacheRefToLocalMatrices(TArray<FMatrix44f>& OutRefTo
 	}
 }
 
+void USkinnedMeshComponent::GetCurrentRefToLocalMatrices(TArray<FMatrix44f>& OutRefToLocals, int32 InLodIdx) const
+{
+	if (const USkinnedAsset* const Asset = GetSkinnedAsset())
+	{
+		const FSkeletalMeshRenderData* const RenderData = Asset->GetResourceForRendering();
+		
+		if (ensureMsgf(RenderData->LODRenderData.IsValidIndex(InLodIdx),
+			TEXT("GetCurrentRefToLocalMatrices (SkelMesh :%s) input LODIndex (%d) doesn't match with render data size (%d)."),
+			*Asset->GetPathName(), InLodIdx, RenderData->LODRenderData.Num()))
+		{
+			UpdateRefToLocalMatrices(OutRefToLocals, this, RenderData, InLodIdx, nullptr);
+		}
+		else
+		{
+			const FReferenceSkeleton& RefSkeleton = Asset->GetRefSkeleton();
+			OutRefToLocals.AddUninitialized(RefSkeleton.GetNum());
+			for (int32 Index = 0; Index < OutRefToLocals.Num(); ++Index)
+			{
+				OutRefToLocals[Index] = FMatrix44f::Identity;
+			}
+		}
+	}
+}
+
 void USkinnedMeshComponent::ComputeSkinnedPositions(USkinnedMeshComponent* Component, TArray<FVector3f> & OutPositions, TArray<FMatrix44f>& CachedRefToLocals, const FSkeletalMeshLODRenderData& LODData, const FSkinWeightVertexBuffer& SkinWeightBuffer)
 {
 	OutPositions.Empty();
@@ -3872,6 +3924,11 @@ void FSkelMeshComponentLODInfo::BeginReleaseOverrideVertexColors()
 	}
 }
 
+void FSkelMeshComponentLODInfo::EndReleaseOverrideVertexColors()
+{
+	CleanUpOverrideVertexColors();
+}
+
 void FSkelMeshComponentLODInfo::CleanUpOverrideVertexColors()
 {
 	if (OverrideVertexColors)
@@ -3901,6 +3958,11 @@ void FSkelMeshComponentLODInfo::BeginReleaseOverrideSkinWeights()
 		// enqueue a rendering command to release
 		OverrideSkinWeights->BeginReleaseResources();
 	}
+}
+
+void FSkelMeshComponentLODInfo::EndReleaseOverrideSkinWeights()
+{
+	CleanUpOverrideSkinWeights();
 }
 
 void FSkelMeshComponentLODInfo::CleanUpOverrideSkinWeights()
@@ -4047,7 +4109,8 @@ void CreateSectionSkinWeightsArray(
 				TargetWeight.InfluenceWeights[InfIndex] = 0;
 
 				// if we have a valid weight, see if we have a valid bone mapping for desired bone
-				uint8 InfWeight = SrcWeight.Weights[InfIndex];
+				// Map from 8-bit weights to 16-bit by aligning the min/max range.
+				const uint16 InfWeight = (SrcWeight.Weights[InfIndex] << 8) | SrcWeight.Weights[InfIndex];
 				if (InfWeight > 0)
 				{
 					const int32 SkelBoneIndex = SrcWeight.Bones[InfIndex];
@@ -4073,7 +4136,7 @@ void CreateSectionSkinWeightsArray(
 			bWeightUnderrun = true;
 
 			TargetWeight.InfluenceBones[0] = 0;
-			TargetWeight.InfluenceWeights[0] = 255;
+			TargetWeight.InfluenceWeights[0] = UE::AnimationCore::MaxRawBoneWeight;
 
 			for (int32 InfIndex = 1; InfIndex < MAX_TOTAL_INFLUENCES; InfIndex++)
 			{
@@ -4592,7 +4655,7 @@ void GetTypedSkinnedTangentBasis(
 #endif
 	{
 		const int32 MeshBoneIndex = Section.BoneMap[SkinWeightVertexBuffer.GetBoneIndex(BufferVertIndex, InfluenceIndex)];
-		const float	Weight = (float)SkinWeightVertexBuffer.GetBoneWeight(BufferVertIndex, InfluenceIndex) / 255.0f;
+		const float	Weight = (float)SkinWeightVertexBuffer.GetBoneWeight(BufferVertIndex, InfluenceIndex) * UE::AnimationCore::InvMaxRawBoneWeightFloat;
 		const FMatrix44f& RefToLocal = RefToLocals[MeshBoneIndex];
 		OutTangentX += RefToLocal.TransformVector(VertexTangentX) * Weight;
 		OutTangentY += RefToLocal.TransformVector(VertexTangentY) * Weight;
@@ -4643,7 +4706,7 @@ FVector3f GetTypedSkinnedVertexPosition(
 			TransformBoneIndex = LeaderBoneMap[MeshBoneIndex];
 		}
 
-		const float	Weight = (float)SkinWeightVertexBuffer.GetBoneWeight(BufferVertIndex, InfluenceIndex) / 255.0f;
+		const float	Weight = (float)SkinWeightVertexBuffer.GetBoneWeight(BufferVertIndex, InfluenceIndex) * UE::AnimationCore::InvMaxRawBoneWeightFloat;
 		{
 			if (bCachedMatrices)
 			{

@@ -157,3 +157,14 @@
 /* An unknown or unsupported value was found */
 "value-unknown" = "不明";
 
+/* Type of UE connection to use (remote session or pixel streaming) */
+"connectiontype-title" = "接続タイプ";
+
+/* Footer describing the connection type option */
+"connectiontype-footer" = "Unreal Engine Pixel Streaming が Unreal Engine 5.1 でエディタでサポートされるようになり、この接続タイプが Live Link VCAM で推奨されるものになりました。従来のリモート セッション 接続タイプも過去のプロジェクトのために引き続き Live Link VCAM ではサポートされます。";
+
+/* Remote Session */
+"connectiontype-value-remotesession" = "リモート セッション";
+
+/* Pixel Streaming */
+"connectiontype-value-pixelstreaming" = "ピクセルストリーミング";

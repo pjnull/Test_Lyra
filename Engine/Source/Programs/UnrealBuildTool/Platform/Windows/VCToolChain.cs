@@ -54,6 +54,11 @@ namespace UnrealBuildTool
 				}
 			}
 		}
+		
+		public override FileReference? GetCppCompilerPath()
+		{
+			return EnvVars.CompilerPath;
+		}
 
 		/// <summary>
 		/// Prepares the environment for building
@@ -267,7 +272,7 @@ namespace UnrealBuildTool
 				// compiler version of 19.xx).
 				Arguments.Add($"-fms-compatibility-version=19.{EnvVars.ToolChainVersion.GetComponent(1)}");
 				
-				if (Target.StaticAnalyzer == StaticAnalyzer.Default && CompileEnvironment.PrecompiledHeaderAction != PrecompiledHeaderAction.Create && !CompileEnvironment.StaticAnalyzerDisabledCheckers.Contains("all") && !CompileEnvironment.bDisableStaticAnalysis)
+				if (Target.StaticAnalyzer == StaticAnalyzer.Default && CompileEnvironment.PrecompiledHeaderAction != PrecompiledHeaderAction.Create && !CompileEnvironment.bDisableStaticAnalysis)
 				{
 					Arguments.Add("-Wno-unused-command-line-argument");
 
@@ -896,7 +901,7 @@ namespace UnrealBuildTool
 			if (Target.WindowsPlatform.Compiler.IsClang())
 			{
 				// Enable codeview ghash for faster lld links
-				if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && WindowsPlatform.bAllowClangLinker)
+				if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && Target.WindowsPlatform.bAllowClangLinker)
 				{
 					Arguments.Add("-gcodeview-ghash");
 				}
@@ -1047,7 +1052,7 @@ namespace UnrealBuildTool
 
 		protected virtual void AppendLinkArguments(LinkEnvironment LinkEnvironment, List<string> Arguments)
 		{
-			if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && WindowsPlatform.bAllowClangLinker)
+			if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && Target.WindowsPlatform.bAllowClangLinker)
 			{
 				// @todo clang: The following static libraries aren't linking correctly with Clang:
 				//		tbbmalloc.lib, zlib_64.lib, libpng_64.lib, freetype2412MT.lib, IlmImf.lib
@@ -1088,7 +1093,7 @@ namespace UnrealBuildTool
 			if (LinkEnvironment.bCreateDebugInfo && LinkEnvironment.bUseFastPDBLinking)
 			{
 				// Allow partial PDBs for faster linking
-				if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && WindowsPlatform.bAllowClangLinker)
+				if (Target.WindowsPlatform.Compiler == WindowsCompiler.Clang && Target.WindowsPlatform.bAllowClangLinker)
 				{
 					Arguments[Arguments.Count - 1] = "/DEBUG:GHASH";
 				}
@@ -2138,6 +2143,11 @@ namespace UnrealBuildTool
 				{
 					InputFileNames.Add(string.Format("\"{0}\"", SystemLibrary));
 				}
+
+				if (Target.WindowsPlatform.ManifestFile != null)
+				{
+					PrerequisiteItems.Add(FileItem.GetItemByPath(Target.WindowsPlatform.ManifestFile));
+				}
 			}
 
 			Arguments.AddRange(InputFileNames);
@@ -2388,7 +2398,7 @@ namespace UnrealBuildTool
 		public static string GetVCIncludePaths(UnrealTargetPlatform Platform, WindowsCompiler Compiler, string? CompilerVersion, ILogger Logger)
 		{
 			// Make sure we've got the environment variables set up for this target
-			VCEnvironment EnvVars = VCEnvironment.Create(Compiler, WindowsCompiler.Default, Platform, WindowsArchitecture.x64, CompilerVersion, null, null, false, Logger);
+			VCEnvironment EnvVars = VCEnvironment.Create(Compiler, WindowsCompiler.Default, Platform, WindowsArchitecture.x64, CompilerVersion, null, null, false, false, Logger);
 
 			// Also add any include paths from the INCLUDE environment variable.  MSVC is not necessarily running with an environment that
 			// matches what UBT extracted from the vcvars*.bat using SetEnvironmentVariablesFromBatchFile().  We'll use the variables we

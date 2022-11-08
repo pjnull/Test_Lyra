@@ -8,6 +8,8 @@
 
 #if RHI_RAYTRACING
 
+#include "RayTracingPayloadType.h"
+
 ENGINE_API uint8 ComputeBlendModeMask(const EBlendMode BlendMode);
 
 class RENDERER_API FRayTracingMeshProcessor
@@ -138,6 +140,11 @@ class RENDERER_API FHiddenMaterialHitGroup : public FGlobalShader
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
 	}
 
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::RayTracingMaterial;
+	}
+
 	using FParameters = FEmptyShaderParameters;
 };
 
@@ -151,6 +158,11 @@ class RENDERER_API FOpaqueShadowHitGroup : public FGlobalShader
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
 	}
 
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::RayTracingMaterial;
+	}
+
 	using FParameters = FEmptyShaderParameters;
 };
 
@@ -162,6 +174,11 @@ class RENDERER_API FDefaultCallableShader : public FGlobalShader
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return ShouldCompileRayTracingCallableShadersForProject(Parameters.Platform);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return ERayTracingPayloadType::Decals;
 	}
 
 	using FParameters = FEmptyShaderParameters;

@@ -104,7 +104,7 @@ void FDatasmithStaticParameterSetTemplate::Apply( UMaterialInstanceConstant* Des
 			}
 		}
 
-		for ( FStaticSwitchParameter& DestinationSwitchParameter : DestinationStaticParameters.EditorOnly.StaticSwitchParameters )
+		for ( FStaticSwitchParameter& DestinationSwitchParameter : DestinationStaticParameters.StaticSwitchParameters )
 		{
 			if ( DestinationSwitchParameter.ParameterInfo.Name == It->Key )
 			{
@@ -133,9 +133,9 @@ void FDatasmithStaticParameterSetTemplate::Load( const UMaterialInstanceConstant
 	FStaticParameterSet SourceStaticParameters;
 	const_cast< UMaterialInstanceConstant& >( Source ).GetStaticParameterValues( SourceStaticParameters );
 
-	StaticSwitchParameters.Empty( SourceStaticParameters.EditorOnly.StaticSwitchParameters.Num() );
+	StaticSwitchParameters.Empty( SourceStaticParameters.StaticSwitchParameters.Num() );
 
-	for ( const FStaticSwitchParameter& SourceSwitch : SourceStaticParameters.EditorOnly.StaticSwitchParameters )
+	for ( const FStaticSwitchParameter& SourceSwitch : SourceStaticParameters.StaticSwitchParameters )
 	{
 		if ( !bOverridesOnly || SourceSwitch.bOverride )
 		{

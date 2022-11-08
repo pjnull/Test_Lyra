@@ -309,6 +309,7 @@ public:
 		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
 
 		OutEnvironment.SetDefine(TEXT("THREADGROUP_SIZE"), GetGroupSize());
+		OutEnvironment.SetDefine(TEXT("USE_GLOBAL_GPU_SCENE_DATA"), 1);
 		OutEnvironment.SetDefine(TEXT("ENABLE_VISUALIZE_MODE"), 1);
 
 		// Workaround for an internal PC FXC compiler crash when compiling with disabled optimizations
@@ -762,6 +763,9 @@ FScreenPassTexture AddVisualizeLumenScenePass(FRDGBuilder& GraphBuilder, const F
 				AddDrawCanvasPass(GraphBuilder, RDG_EVENT_NAME("LumenVisualizeLabels"), View, FScreenPassRenderTarget(Output, ERenderTargetLoadAction::ELoad),
 					[&ViewRect = Inputs.SceneColor.ViewRect, &VisualizeTiles](FCanvas& Canvas)
 				{
+					const float DPIScale = Canvas.GetDPIScale();
+					Canvas.SetBaseTransform(FMatrix(FScaleMatrix(DPIScale)* Canvas.CalcBaseTransform2D(Canvas.GetViewRect().Width(), Canvas.GetViewRect().Height())));
+
 					const FLinearColor LabelColor(1, 1, 0);
 
 					for (int32 TileIndex = 0; TileIndex < LumenVisualize::NumOverviewTilesPerRow; ++TileIndex)
@@ -770,7 +774,8 @@ FScreenPassTexture AddVisualizeLumenScenePass(FRDGBuilder& GraphBuilder, const F
 						FIntPoint OutputViewOffset;
 						GetVisualizeTileOutputView(ViewRect, TileIndex, OutputViewOffset, OutputViewSize);
 
-						Canvas.DrawShadowedString(OutputViewOffset.X + 2 * LumenVisualize::OverviewTileMargin, OutputViewOffset.Y + OutputViewSize.Y - 20, VisualizeTiles[TileIndex].Name, GetStatsFont(), LabelColor);
+						FIntPoint LabelLocation(OutputViewOffset.X + 2 * LumenVisualize::OverviewTileMargin, OutputViewOffset.Y + OutputViewSize.Y - 20);
+						Canvas.DrawShadowedString(LabelLocation.X / DPIScale, LabelLocation.Y / DPIScale, VisualizeTiles[TileIndex].Name, GetStatsFont(), LabelColor);
 					}
 				});
 			}

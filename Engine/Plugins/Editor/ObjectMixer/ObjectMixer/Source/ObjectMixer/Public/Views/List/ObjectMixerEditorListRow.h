@@ -2,15 +2,18 @@
 
 #pragma once
 
+#include "ObjectFilter/ObjectMixerEditorObjectFilter.h"
+
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
 #include "DragAndDrop/DecoratedDragDropOp.h"
+#include "Folder.h"
+#include "GameFramework/Actor.h"
+#include "ISceneOutlinerTreeItem.h"
 #include "Layout/Visibility.h"
-#include "ObjectFilter/ObjectMixerEditorObjectFilter.h"
 #include "PropertyHandle.h"
 #include "Templates/SharedPointer.h"
 #include "UObject/Object.h"
-#include "UObject/WeakObjectPtr.h"
 
 class SObjectMixerEditorList;
 class UObjectMixerObjectFilter;
@@ -19,6 +22,8 @@ struct FSlateBrush;
 
 struct FObjectMixerEditorListRow;
 typedef TSharedPtr<FObjectMixerEditorListRow> FObjectMixerEditorListRowPtr;
+
+DECLARE_DELEGATE(FOnRenameCommand)
 
 class FObjectMixerListRowDragDropOp : public FDecoratedDragDropOp
 {
@@ -32,7 +37,7 @@ public:
 	static TSharedRef<FObjectMixerListRowDragDropOp> New(const TArray<FObjectMixerEditorListRowPtr>& InItems);
 };
 
-struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<FObjectMixerEditorListRow>
+struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow : TSharedFromThis<FObjectMixerEditorListRow>
 {
 	enum EObjectMixerEditorListRowType : uint8
 	{
@@ -41,6 +46,22 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 		ContainerObject, // Usually an actor that contains a matching subobject or is the attach parent of a matching actor
 		MatchingContainerObject, // An Actor that is a matching object and contains matching subobjects 
 		MatchingObject // The object that has the properties we wish to affect
+	};	
+
+	struct FTransientEditorVisibilityRules
+	{
+		/**
+		 * If true, the user wants the row to be hidden temporarily in the editor.
+		 * This is transient visibility like the eye icon in the Scene Outliner, not the bVisible or bHiddenInGame properties.
+		 */
+		bool bShouldBeHiddenInEditor = false;
+
+		/**
+		 * If true, the user wants the row to have solo visibility. Multiple rows at once can be set to solo.
+		 * Solo rows' objects are exclusively visible,
+		 * so all other objects found in the panel will be invisible while at least one row is in a solo state.
+		 */
+		bool bShouldBeSolo = false;
 	};
 
 	~FObjectMixerEditorListRow();
@@ -73,9 +94,9 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 	{}
 
 	FObjectMixerEditorListRow(
-		const FName InFolderPath, const EObjectMixerEditorListRowType InRowType, 
+		const FFolder InFolder, const EObjectMixerEditorListRowType InRowType, 
 		const TSharedRef<SObjectMixerEditorList>& InListView, const FText& InDisplayNameOverride = FText::GetEmpty())
-	: FolderPath(InFolderPath)
+	: FolderRef(InFolder)
 	, RowType(InRowType)
 	, ListViewPtr(InListView)
 	, DisplayNameOverride(InDisplayNameOverride)
@@ -91,9 +112,31 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 		return nullptr;
 	}
 
+	[[nodiscard]] AActor* GetSelfOrOuterAsActor() const
+	{
+		if (UObject* Object = GetObject())
+		{
+			AActor* Actor = Cast<AActor>(Object);
+
+			if (!Actor)
+			{
+				Actor = Object->GetTypedOuter<AActor>();
+			}
+
+			return Actor;
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] const FFolder& GetFolder() const
+	{
+		return FolderRef;
+	}
+
 	[[nodiscard]] FName GetFolderPath() const
 	{
-		return FolderPath;
+		return FolderRef.GetPath();
 	}
 
 	UObjectMixerObjectFilter* GetObjectFilter() const;
@@ -122,6 +165,8 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 	void AddToChildRows(const FObjectMixerEditorListRowPtr& InRow);
 	void InsertChildRowAtIndex(const FObjectMixerEditorListRowPtr& InRow, const int32 AtIndex = 0);
 
+	void SetChildRowsSelected(const bool bNewSelected, const bool bRecursive, const bool bSelectOnlyVisible = true);
+
 	[[nodiscard]] bool GetIsTreeViewItemExpanded();
 	void SetIsTreeViewItemExpanded(const bool bNewExpanded);
 
@@ -143,11 +188,14 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 	void SetDoesRowPassFilters(const bool bPass);
 
 	[[nodiscard]] bool GetIsSelected();
+	void SetIsSelected(const bool bNewSelected);
 
 	[[nodiscard]] bool ShouldRowWidgetBeVisible() const;
 	[[nodiscard]] EVisibility GetDesiredRowWidgetVisibility() const;
 
 	[[nodiscard]] bool HasVisibleChildRowWidgets() const;
+
+	[[nodiscard]] bool HasAtLeastOneChildThatIsNotSolo(const bool bRecursive = true) const;
 
 	[[nodiscard]] FText GetDisplayName(const bool bIsHybridRow = false) const;
 
@@ -175,26 +223,44 @@ struct OBJECTMIXEREDITOR_API FObjectMixerEditorListRow final : TSharedFromThis<F
 
 	const FSlateBrush* GetObjectIconBrush();
 
-	bool GetObjectVisibility();
-	void SetObjectVisibility(const bool bNewIsVisible, const bool bIsRecursive = false);
+	bool GetCurrentEditorObjectVisibility();
+	void SetCurrentEditorObjectVisibility(const bool bNewIsVisible, const bool bIsRecursive = false);
+	
+	[[nodiscard]] const FTransientEditorVisibilityRules& GetVisibilityRules() const;
+	void SetVisibilityRules(const FTransientEditorVisibilityRules& InVisibilityRules);
 
-	bool IsThisRowSolo();
+	bool IsUserSetHiddenInEditor() const;
+	void SetUserHiddenInEditor(const bool bNewHidden);
+	
+	bool GetRowSoloState() const;
 	void SetRowSoloState(const bool bNewSolo);
 
 	void ClearSoloRows() const;
+
+	FOnRenameCommand& OnRenameCommand()
+	{
+		return OnRenameCommandDelegate;
+	}
+
+	void CallOnRenameCommandDelegate()
+	{
+		OnRenameCommandDelegate.ExecuteIfBound();
+	}
 	
 	TMap<FName, TWeakPtr<IPropertyHandle>> PropertyNamesToHandles;
 
 private:
 
 	FObjectMixerEditorListRowPtr GetAsShared();
-
+	
 	TWeakObjectPtr<UObject> ObjectRef;
-	FName FolderPath = NAME_None;
+	FFolder FolderRef;
 	EObjectMixerEditorListRowType RowType = MatchingObject;
 	TArray<FObjectMixerEditorListRowPtr> ChildRows;
 	
 	TWeakPtr<SObjectMixerEditorList> ListViewPtr;
+
+	FTransientEditorVisibilityRules VisibilityRules;
 
 	FText DisplayNameOverride;
 
@@ -212,4 +278,6 @@ private:
 	bool bShouldExpandAllChildren = false;
 
 	int32 CachedHybridRowIndex = INDEX_NONE;
+
+	FOnRenameCommand OnRenameCommandDelegate;
 };

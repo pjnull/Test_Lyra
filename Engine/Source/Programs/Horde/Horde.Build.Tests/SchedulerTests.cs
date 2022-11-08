@@ -25,14 +25,14 @@ namespace Horde.Build.Tests
 	using LogId = ObjectId<ILogFile>;
 	using ProjectId = StringId<IProject>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 
 	[TestClass]
     public class SchedulerTests : TestSetup
 	{
 		ProjectId ProjectId { get; } = new ProjectId("ue5");
 		StreamId StreamId { get; } = new StreamId("ue5-main");
-		TemplateRefId TemplateRefId { get; } = new TemplateRefId("template1");
+		TemplateId TemplateId { get; } = new TemplateId("template1");
 
 		readonly ITemplate _template;
 		readonly HashSet<JobId> _initialJobIds;
@@ -41,7 +41,9 @@ namespace Horde.Build.Tests
 		{
 			IUser bob = UserCollection.FindOrAddUserByLoginAsync("Bob").Result;
 
-			IProject ? project = ProjectService.Collection.AddOrUpdateAsync(ProjectId, "", "", 0, new ProjectConfig { Name = "UE5" }).Result;
+			const string ProjectConfigRevision = "projectconfig";
+			ConfigCollection.AddConfigAsync(ProjectConfigRevision, new ProjectConfig { Name = "UE4" }).Wait();
+			IProject? project = ProjectService.Collection.AddOrUpdateAsync(ProjectId, ProjectConfigRevision, 0).Result;
 			Assert.IsNotNull(project);
 
 			_template = TemplateCollection.AddAsync("Test template").Result;
@@ -49,12 +51,12 @@ namespace Horde.Build.Tests
 			_initialJobIds = new HashSet<JobId>(JobCollection.FindAsync().Result.Select(x => x.Id));
 
 			PerforceService.Changes.Clear();
-			PerforceService.AddChange("//UE5/Main", 100, bob, "", new[] { "code.cpp" });
-			PerforceService.AddChange("//UE5/Main", 101, bob, "", new[] { "content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 102, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 100, bob, "", new[] { "code.cpp" });
+			PerforceService.AddChange(StreamId, 101, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 102, bob, "", new[] { "content.uasset" });
 		}
 
-		async Task<IStream> SetScheduleAsync(CreateScheduleRequest schedule)
+		async Task<IStream> SetScheduleAsync(ScheduleConfig schedule)
 		{
 			await ScheduleService.ResetAsync();
 
@@ -62,8 +64,8 @@ namespace Horde.Build.Tests
 
 			StreamConfig config = new StreamConfig();
 			config.Name = "//UE5/Main";
-			config.Tabs.Add(new CreateJobsTabRequest { Title = "foo", Templates = new List<TemplateRefId> { TemplateRefId } });
-			config.Templates.Add(new TemplateRefConfig { Id = TemplateRefId, Name = "Test", Schedule = schedule });
+			config.Tabs.Add(new JobsTabConfig { Title = "foo", Templates = new List<TemplateId> { TemplateId } });
+			config.Templates.Add(new TemplateRefConfig { Id = TemplateId, Name = "Test", Schedule = schedule });
 
 			return (await CreateOrReplaceStreamAsync(StreamId, stream, ProjectId, config))!; 
 		}
@@ -73,21 +75,21 @@ namespace Horde.Build.Tests
 			IUser bob = await UserCollection.FindOrAddUserByLoginAsync("Bob", "Bob");
 
 			PerforceService.Changes.Clear();
-			PerforceService.AddChange("//UE5/Main", 100, bob, "", new[] { "code.cpp" });
-			PerforceService.AddChange("//UE5/Main", 101, bob, "", new[] { "content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 102, bob, "", new[] { "content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 103, bob, "", new[] { "foo/code.cpp" });
-			PerforceService.AddChange("//UE5/Main", 104, bob, "", new[] { "bar/code.cpp" });
-			PerforceService.AddChange("//UE5/Main", 105, bob, "", new[] { "foo/bar/content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 106, bob, "", new[] { "bar/foo/content.uasset" });
+			PerforceService.AddChange(StreamId, 100, bob, "", new[] { "code.cpp" });
+			PerforceService.AddChange(StreamId, 101, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 102, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 103, bob, "", new[] { "foo/code.cpp" });
+			PerforceService.AddChange(StreamId, 104, bob, "", new[] { "bar/code.cpp" });
+			PerforceService.AddChange(StreamId, 105, bob, "", new[] { "foo/bar/content.uasset" });
+			PerforceService.AddChange(StreamId, 106, bob, "", new[] { "bar/foo/content.uasset" });
 
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
 			schedule.MaxChanges = 10;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { Interval = 1 });
+			schedule.Patterns.Add(new SchedulePatternConfig { Interval = 1 });
 			schedule.Files = files.ToList();
 			await SetScheduleAsync(schedule);
 
@@ -132,8 +134,8 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Utc); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			Schedule schedule = new Schedule(Clock.UtcNow, requireSubmittedChange: false);
-			schedule.Patterns.Add(new SchedulePattern(new List<DayOfWeek> { DayOfWeek.Friday, DayOfWeek.Sunday }, 13 * 60, null, null));
+			ScheduleConfig schedule = new ScheduleConfig { RequireSubmittedChange = false };
+			schedule.Patterns.Add(new SchedulePatternConfig(new List<DayOfWeek> { DayOfWeek.Friday, DayOfWeek.Sunday }, 13 * 60, null, null));
 
 			DateTime? nextTime = schedule.GetNextTriggerTimeUtc(startTime, TimeZoneInfo.Utc);
 			Assert.AreEqual(startTime + TimeSpan.FromHours(1.0), nextTime!.Value);
@@ -154,8 +156,8 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Utc); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			Schedule schedule = new Schedule(Clock.UtcNow, requireSubmittedChange: false);
-			schedule.Patterns.Add(new SchedulePattern(null, 13 * 60, 14 * 60, 15));
+			ScheduleConfig schedule = new ScheduleConfig { RequireSubmittedChange = false };
+			schedule.Patterns.Add(new SchedulePatternConfig(null, 13 * 60, 14 * 60, 15));
 
 			DateTime? nextTime = schedule.GetNextTriggerTimeUtc(startTime, TimeZoneInfo.Utc);
 			Assert.AreEqual(startTime + TimeSpan.FromHours(1.0), nextTime!.Value);
@@ -182,9 +184,9 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			Schedule schedule = new Schedule(Clock.UtcNow, requireSubmittedChange: false);
-			schedule.Patterns.Add(new SchedulePattern(null, 11 * 60, 0, 0));
-			schedule.Patterns.Add(new SchedulePattern(null, 19 * 60, 0, 0));
+			ScheduleConfig schedule = new ScheduleConfig { RequireSubmittedChange = false };
+			schedule.Patterns.Add(new SchedulePatternConfig(null, 11 * 60, 0, 0));
+			schedule.Patterns.Add(new SchedulePatternConfig(null, 19 * 60, 0, 0));
 
 			DateTime? nextTime = schedule.GetNextTriggerTimeUtc(startTime, TimeZoneInfo.Utc);
 			Assert.AreEqual(startTime + TimeSpan.FromHours(11), nextTime!.Value);
@@ -199,9 +201,9 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 //			Schedule.LastTriggerTime = StartTime;
 			await SetScheduleAsync(schedule);
 
@@ -227,9 +229,9 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			IStream stream = await SetScheduleAsync(schedule);
 
 			// Initial tick
@@ -248,9 +250,9 @@ namespace Horde.Build.Tests
 			Assert.AreEqual(100, jobs2[0].CodeChange);
 
 			IStream stream2 = (await StreamCollection.GetAsync(stream.Id))!;
-			Schedule schedule2 = stream2.Templates.First().Value.Schedule!;
+			ITemplateSchedule schedule2 = stream2.Templates.First().Value.Schedule!;
 			Assert.AreEqual(102, schedule2.LastTriggerChange);
-			Assert.AreEqual(Clock.UtcNow, schedule2.LastTriggerTime);
+			Assert.AreEqual(Clock.UtcNow, schedule2.LastTriggerTimeUtc);
 
 			// Trigger another job
 			await Clock.AdvanceAsync(TimeSpan.FromHours(0.5));
@@ -266,11 +268,11 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			schedule.MaxChanges = 2;
-			schedule.Filter = new List<ChangeContentFlags> { ChangeContentFlags.ContainsCode };
+			schedule.Commits.Add(CommitTag.Code);
 			await SetScheduleAsync(schedule);
 
 			// Initial tick
@@ -281,10 +283,10 @@ namespace Horde.Build.Tests
 
 			// Trigger some jobs
 			IUser bob = await UserCollection.FindOrAddUserByLoginAsync("Bob");
-			PerforceService.AddChange("//UE5/Main", 103, bob, "", new string[] { "foo.cpp" });
-			PerforceService.AddChange("//UE5/Main", 104, bob, "", new string[] { "foo.cpp" });
-			PerforceService.AddChange("//UE5/Main", 105, bob, "", new string[] { "foo.uasset" });
-			PerforceService.AddChange("//UE5/Main", 106, bob, "", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 103, bob, "", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 104, bob, "", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 105, bob, "", new string[] { "foo.uasset" });
+			PerforceService.AddChange(StreamId, 106, bob, "", new string[] { "foo.cpp" });
 
 			await Clock.AdvanceAsync(TimeSpan.FromHours(1.25));
 			await ScheduleService.TickForTestingAsync();
@@ -303,11 +305,11 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			schedule.MaxChanges = 2;
-			schedule.Filter = new List<ChangeContentFlags> { ChangeContentFlags.ContainsCode };
+			schedule.Commits.Add(CommitTag.Code);
 			await SetScheduleAsync(schedule);
 
 			// Initial tick
@@ -318,10 +320,10 @@ namespace Horde.Build.Tests
 
 			// Trigger some jobs
 			IUser bob = await UserCollection.FindOrAddUserByLoginAsync("Bob");
-			PerforceService.AddChange("//UE5/Main", 103, bob, "", new string[] { "foo.cpp" });
-			PerforceService.AddChange("//UE5/Main", 104, bob, "Don't build this change!\n#skipci", new string[] { "foo.cpp" });
-			PerforceService.AddChange("//UE5/Main", 105, bob, "", new string[] { "foo.uasset" });
-			PerforceService.AddChange("//UE5/Main", 106, bob, "", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 103, bob, "", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 104, bob, "Don't build this change!\n#skipci", new string[] { "foo.cpp" });
+			PerforceService.AddChange(StreamId, 105, bob, "", new string[] { "foo.uasset" });
+			PerforceService.AddChange(StreamId, 106, bob, "", new string[] { "foo.cpp" });
 
 			await Clock.AdvanceAsync(TimeSpan.FromHours(1.25));
 			await ScheduleService.TickForTestingAsync();
@@ -340,10 +342,10 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
 			schedule.RequireSubmittedChange = false;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			schedule.MaxActive = 1;
 			await SetScheduleAsync(schedule);
 
@@ -382,9 +384,9 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			/*IStream stream = */await SetScheduleAsync(schedule);
 
 			// Trigger a job
@@ -413,21 +415,22 @@ namespace Horde.Build.Tests
 			// Create two templates, the second dependent on the first
 			ITemplate? newTemplate1 = await TemplateCollection.AddAsync("Test template 1");
 			//TemplateRef newTemplateRef1 = new TemplateRef(newTemplate1);
-			TemplateRefId newTemplateRefId1 = new TemplateRefId("new-template-1");
+			TemplateId newTemplateRefId1 = new TemplateId("new-template-1");
 
 			ITemplate? newTemplate2 = await TemplateCollection.AddAsync("Test template 2");
-			TemplateRef newTemplateRef2 = new TemplateRef(newTemplate2);
-			newTemplateRef2.Schedule = new Schedule(Clock.UtcNow);
-			newTemplateRef2.Schedule.Gate = new ScheduleGate(newTemplateRefId1, "TriggerNext");
-			newTemplateRef2.Schedule.Patterns.Add(new SchedulePattern(null, 0, null, 10));
-			newTemplateRef2.Schedule.LastTriggerTime = startTime;
-			TemplateRefId newTemplateRefId2 = new TemplateRefId("new-template-2");
+//			TemplateRef newTemplateRef2 = new TemplateRef(newTemplate2);
+//			newTemplateRef2.Schedule = new Schedule(Clock.UtcNow);
+//			newTemplateRef2.Schedule.Gate = new ScheduleGate(newTemplateRefId1, "TriggerNext");
+//			newTemplateRef2.Schedule.Patterns.Add(new SchedulePattern(null, 0, null, 10));
+//			newTemplateRef2.Schedule.LastTriggerTime = startTime;
+			TemplateId newTemplateRefId2 = new TemplateId("new-template-2");
 
 			IStream? stream = await StreamService.GetStreamAsync(StreamId);
 
 			StreamConfig config = new StreamConfig();
 			config.Name = "//UE5/Main";
-			config.Tabs.Add(new CreateJobsTabRequest { Title = "foo", Templates = new List<TemplateRefId> { newTemplateRefId1, newTemplateRefId2 } });
+			config.Tabs.Add(new JobsTabConfig { Title = "foo", Templates = new List<TemplateId> { newTemplateRefId1, newTemplateRefId2 } });
+			config.Templates = new() { new TemplateRefConfig { Id = newTemplateRefId1 }, new TemplateRefConfig { Id = newTemplateRefId2 }  };
 
 			stream = (await CreateOrReplaceStreamAsync(StreamId, stream, ProjectId, config))!;
 
@@ -442,7 +445,11 @@ namespace Horde.Build.Tests
 			Assert.AreEqual(0, jobs2.Count);
 
 			// Create a job and fail it
-			IJob job1 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", 1234, 1233, 999, null, null, null, null, null, null, null, null, true, true, null, null, new List<string> { "-Target=TriggerNext" });
+			CreateJobOptions options1 = new CreateJobOptions();
+			options1.PreflightChange = 999;
+			options1.Arguments.Add("-Target=TriggerNext");
+
+			IJob job1 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", 1234, 1233, options1);
 			SubResourceId batchId1 = job1.Batches[0].Id;
 			SubResourceId stepId1 = job1.Batches[0].Steps[0].Id;
 			job1 = Deref(await JobService.UpdateBatchAsync(job1, batchId1, LogId.GenerateNewId(), JobStepBatchState.Running));
@@ -458,7 +465,11 @@ namespace Horde.Build.Tests
 			Assert.AreEqual(0, jobs3.Count);
 
 			// Create a job and make it succeed
-			IJob job2 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", 1234, 1233, 999, null, null, null, null, null, null, null, null, true, true, null, null, new List<string> { "-Target=TriggerNext" });
+			CreateJobOptions options2 = new CreateJobOptions();
+			options2.PreflightChange = 999;
+			options2.Arguments.Add("-Target=TriggerNext");
+
+			IJob job2 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", 1234, 1233, options2);
 			SubResourceId batchId2 = job2.Batches[0].Id;
 			SubResourceId stepId2 = job2.Batches[0].Steps[0].Id;
 			job2 = Deref(await JobService.UpdateBatchAsync(job2, batchId2, LogId.GenerateNewId(), JobStepBatchState.Running));
@@ -482,32 +493,32 @@ namespace Horde.Build.Tests
 			Clock.UtcNow = startTime;
 
 			PerforceService.Changes.Clear();
-			PerforceService.AddChange("//UE5/Main", 1230, bob, "", new[] { "code.cpp" });
-			PerforceService.AddChange("//UE5/Main", 1231, bob, "", new[] { "content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 1232, bob, "", new[] { "content.uasset" });
-			PerforceService.AddChange("//UE5/Main", 1233, bob, "", new[] { "code.cpp" });
+			PerforceService.AddChange(StreamId, 1230, bob, "", new[] { "code.cpp" });
+			PerforceService.AddChange(StreamId, 1231, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 1232, bob, "", new[] { "content.uasset" });
+			PerforceService.AddChange(StreamId, 1233, bob, "", new[] { "code.cpp" });
 
 			// Create two templates, the second dependent on the first
-			TemplateRefId newTemplateRefId1 = new TemplateRefId("new-template-1");
+			TemplateId newTemplateRefId1 = new TemplateId("new-template-1");
 			TemplateRefConfig newTemplate1 = new TemplateRefConfig();
 			newTemplate1.Id = newTemplateRefId1;
 
-			TemplateRefId newTemplateRefId2 = new TemplateRefId("new-template-2");
+			TemplateId newTemplateRefId2 = new TemplateId("new-template-2");
 			TemplateRefConfig newTemplate2 = new TemplateRefConfig();
 			newTemplate2.Id = newTemplateRefId2;
 			newTemplate2.Name = "Test template 2";
-			newTemplate2.Schedule = new CreateScheduleRequest();
+			newTemplate2.Schedule = new ScheduleConfig();
 			newTemplate2.Schedule.MaxChanges = 4;
-			newTemplate2.Schedule.Filter = new List<ChangeContentFlags> { ChangeContentFlags.ContainsCode };
-			newTemplate2.Schedule.Gate = new CreateScheduleGateRequest { TemplateId = newTemplateRefId1.ToString(), Target = "TriggerNext" };
-			newTemplate2.Schedule.Patterns.Add(new CreateSchedulePatternRequest { Interval = 10 });// (null, 0, null, 10));
+			newTemplate2.Schedule.Commits.Add(CommitTag.Code);
+			newTemplate2.Schedule.Gate = new ScheduleGateConfig { TemplateId = newTemplateRefId1, Target = "TriggerNext" };
+			newTemplate2.Schedule.Patterns.Add(new SchedulePatternConfig { Interval = 10 });// (null, 0, null, 10));
 //			NewTemplate2.Schedule.LastTriggerTime = StartTime;
 
 			IStream? stream = await StreamService.GetStreamAsync(StreamId);
 
 			StreamConfig config = new StreamConfig();
 			config.Name = "//UE5/Main";
-			config.Tabs.Add(new CreateJobsTabRequest { Title = "foo", Templates = new List<TemplateRefId> { newTemplateRefId1, newTemplateRefId2 } });
+			config.Tabs.Add(new JobsTabConfig { Title = "foo", Templates = new List<TemplateId> { newTemplateRefId1, newTemplateRefId2 } });
 			config.Templates.Add(newTemplate1);
 			config.Templates.Add(newTemplate2);
 
@@ -528,7 +539,10 @@ namespace Horde.Build.Tests
 			{
 				int codeChange = (change < 1233) ? 1230 : 1233;
 
-				IJob job1 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", change, codeChange, null, null, null, null, null, null, false, null, null, true, true, null, null, new List<string> { "-Target=TriggerNext" });
+				CreateJobOptions options1 = new CreateJobOptions();
+				options1.Arguments.Add("-Target=TriggerNext");
+
+				IJob job1 = await JobService.CreateJobAsync(null, stream, newTemplateRefId1, _template.Id, graphA, "Hello", change, codeChange, options1);
 				for (int batchIdx = 0; batchIdx < job1.Batches.Count; batchIdx++)
 				{
 					SubResourceId batchId1 = job1.Batches[batchIdx].Id;
@@ -558,10 +572,10 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Local); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
 			schedule.RequireSubmittedChange = false;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			schedule.MaxActive = 2;
 			await SetScheduleAsync(schedule);
 
@@ -575,7 +589,7 @@ namespace Horde.Build.Tests
 
 			// Make sure the job is registered
 			IStream? stream1 = await StreamService.GetStreamAsync(StreamId);
-			TemplateRef templateRef1 = stream1!.Templates.First().Value;
+			ITemplateRef templateRef1 = stream1!.Templates.First().Value;
 			Assert.AreEqual(1, templateRef1.Schedule!.ActiveJobs.Count);
 			Assert.AreEqual(jobs1[0].Id, templateRef1.Schedule!.ActiveJobs[0]);
 
@@ -584,7 +598,7 @@ namespace Horde.Build.Tests
 
 			// Make sure the job is still registered
 			IStream? stream2 = await StreamService.GetStreamAsync(StreamId);
-			TemplateRef templateRef2 = stream2!.Templates.First().Value;
+			ITemplateRef templateRef2 = stream2!.Templates.First().Value;
 			Assert.AreEqual(1, templateRef2.Schedule!.ActiveJobs.Count);
 			Assert.AreEqual(jobs1[0].Id, templateRef2.Schedule!.ActiveJobs[0]);
 		}
@@ -595,9 +609,9 @@ namespace Horde.Build.Tests
 			DateTime startTime = new DateTime(2021, 1, 1, 12, 0, 0, DateTimeKind.Utc); // Friday Jan 1, 2021 
 			Clock.UtcNow = startTime;
 
-			CreateScheduleRequest schedule = new CreateScheduleRequest();
+			ScheduleConfig schedule = new ScheduleConfig();
 			schedule.Enabled = true;
-			schedule.Patterns.Add(new CreateSchedulePatternRequest { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
+			schedule.Patterns.Add(new SchedulePatternConfig { MinTime = 13 * 60, MaxTime = 14 * 60, Interval = 15 });
 			IStream stream = await SetScheduleAsync(schedule);
 
 			IStreamCollection streamCollection = ServiceProvider.GetRequiredService<IStreamCollection>();

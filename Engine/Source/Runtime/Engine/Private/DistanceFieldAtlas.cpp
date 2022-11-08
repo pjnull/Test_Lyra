@@ -39,6 +39,8 @@
 #include "IMeshBuilderModule.h"
 #endif
 
+#include <atomic>
+
 #define LOCTEXT_NAMESPACE "DistanceField"
 
 #if ENABLE_COOK_STATS
@@ -239,15 +241,14 @@ void FDistanceFieldVolumeData::CacheDerivedData(const FString& InStaticMeshDeriv
 
 #endif
 
-uint64 NextDistanceFieldVolumeDataId = 1;
+std::atomic<uint64> NextDistanceFieldVolumeDataId { 1 };
 
 FDistanceFieldVolumeData::FDistanceFieldVolumeData() :
 	LocalSpaceMeshBounds(ForceInit),
 	bMostlyTwoSided(false),
 	bAsyncBuilding(false)
 {
-	Id = NextDistanceFieldVolumeDataId;
-	NextDistanceFieldVolumeDataId++;
+	Id = NextDistanceFieldVolumeDataId++;
 }
 
 void FDistanceFieldVolumeData::Serialize(FArchive& Ar, UObject* Owner)

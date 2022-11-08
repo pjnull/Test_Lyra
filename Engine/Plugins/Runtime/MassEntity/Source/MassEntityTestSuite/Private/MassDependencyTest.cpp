@@ -22,7 +22,7 @@ static FName GetProcessorName()
 struct FDependencySolverBase : FAITestBase
 {
 	TArray<UMassTestProcessorBase*> Processors;
-	TArray<FProcessorDependencySolver::FOrderInfo> Result;
+	TArray<FMassProcessorOrderInfo> Result;
 	
 	virtual bool SetUp() override
 	{
@@ -33,7 +33,7 @@ struct FDependencySolverBase : FAITestBase
 	void Solve()
 	{
 		Result.Reset();
-		FProcessorDependencySolver Solver(MakeArrayView((UMassProcessor**)Processors.GetData(), Processors.Num()), TEXT("Test") );
+		FMassProcessorDependencySolver Solver(MakeArrayView((UMassProcessor**)Processors.GetData(), Processors.Num()));
 		Solver.ResolveDependencies(Result);
 	}
 };	
@@ -153,7 +153,7 @@ struct FDeepGroup : FDependencySolverBase
 		// dump all the group information from the Result collection for easier ordering testing
 		for (int32 i = 0; i < Result.Num(); ++i)
 		{
-			if (Result[i].NodeType != EDependencyNodeType::Processor)
+			if (Result[i].NodeType != FMassProcessorOrderInfo::EDependencyNodeType::Processor)
 			{
 				Result.RemoveAt(i--, 1, /*bAllowShrinking=*/false);
 			}
@@ -210,9 +210,11 @@ struct FComplexScenario : FDependencySolverBase
 	{
 		Solve();
 
+		AITEST_TRUE("None of the processors should have been pruned", Result.Num() == Processors.Num());
+
 		for (int32 i = 0; i < Result.Num(); ++i)
 		{
-			AITEST_EQUAL("We expect only processor nodes in the results", Result[i].NodeType, EDependencyNodeType::Processor);
+			AITEST_EQUAL("We expect only processor nodes in the results", Result[i].NodeType, FMassProcessorOrderInfo::EDependencyNodeType::Processor);
 		}
 
 		AITEST_TRUE("D is the only fully dependency-less processor so should be first", Result[0].Name == GetProcessorName<UMassTestProcessor_D>());		
@@ -307,16 +309,16 @@ struct FGroupNamesGeneration : FAITestBase
 	{
 		TArray<FString> SubGroupNames;
 		FName EmptyName;
-		FProcessorDependencySolver::CreateSubGroupNames(EmptyName, SubGroupNames);
+		FMassProcessorDependencySolver::CreateSubGroupNames(EmptyName, SubGroupNames);
 
 		AITEST_TRUE("Empty group name is supported", SubGroupNames.Num() > 0);
 		AITEST_TRUE("Empty group name handled like any other name", SubGroupNames[0] == EmptyName.ToString());
 		
-		FProcessorDependencySolver::CreateSubGroupNames(TEXT("X"), SubGroupNames);
+		FMassProcessorDependencySolver::CreateSubGroupNames(TEXT("X"), SubGroupNames);
 		AITEST_TRUE("Trivial group name is supported", SubGroupNames.Num() > 0);
 		AITEST_TRUE("Trivial group name shouldn\'t get decorated", SubGroupNames[0] == TEXT("X"));
 
-		FProcessorDependencySolver::CreateSubGroupNames(TEXT("W.X.Y.Z"), SubGroupNames);
+		FMassProcessorDependencySolver::CreateSubGroupNames(TEXT("W.X.Y.Z"), SubGroupNames);
 		AITEST_TRUE("Complex group name should be result in a number of group names equal to group name\'s depth", SubGroupNames.Num() == 4);
 		AITEST_TRUE("Group name W.X.Y.Z should contain subgroup W", SubGroupNames.Find(TEXT("W")) != INDEX_NONE);
 		AITEST_TRUE("Group name W.X.Y.Z should contain subgroup W.X", SubGroupNames.Find(TEXT("W.X")) != INDEX_NONE);

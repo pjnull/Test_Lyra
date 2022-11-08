@@ -635,6 +635,7 @@ void FVirtualTextureDataBuilder::BuildTiles(const TArray<FVTSourceTileEntry>& Ti
 			const FTextureSourceBlockData& Block = SourceBlocks[Tile.BlockIndex];
 			const FImage& SourceMip = Block.MipsPerLayer[LayerIndex][Tile.MipIndexInBlock];
 			check(SourceMip.Format == LayerData.ImageFormat);
+			check(SourceMip.GammaSpace == LayerData.GammaSpace);
 
 			FPixelDataRectangle SourceData(LayerData.SourceFormat,
 				SourceMip.SizeX,
@@ -642,7 +643,7 @@ void FVirtualTextureDataBuilder::BuildTiles(const TArray<FVTSourceTileEntry>& Ti
 				const_cast<uint8*>(SourceMip.RawData.GetData()));
 
 			TArray<FImage> TileImages;
-			FImage* TileImage = new(TileImages) FImage(PhysicalTileSize, PhysicalTileSize, LayerData.ImageFormat, BuildSettingsForLayer.GetDestGammaSpace());
+			FImage* TileImage = new(TileImages) FImage(PhysicalTileSize, PhysicalTileSize, LayerData.ImageFormat, LayerData.GammaSpace);
 			FPixelDataRectangle TileData(LayerData.SourceFormat, PhysicalTileSize, PhysicalTileSize, TileImage->RawData.GetData());
 
 			TileData.Clear();
@@ -830,10 +831,18 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 		const FTextureBuildSettings& BuildSettingsForLayer = SettingsPerLayer[LayerIndex];
 		FVirtualTextureSourceLayerData& LayerData = SourceLayers[LayerIndex];
 
-		LayerData.GammaSpace = BuildSettingsForLayer.GetDestGammaSpace();
-		LayerData.bHasAlpha = BuildSettingsForLayer.bForceAlphaChannel;
-
+		// Specify the format we are processing to in this step :
 		LayerData.ImageFormat = UE::TextureBuildUtilities::GetVirtualTextureBuildIntermediateFormat(BuildSettingsForLayer);
+		LayerData.GammaSpace = BuildSettingsForLayer.GetDestGammaSpace();
+		// Gamma correction can either be applied in step 1 or step 2 of the VT build
+		//	depending on whether the Intermediate format is U8 or not
+		if ( ! ERawImageFormat::GetFormatNeedsGammaSpace(LayerData.ImageFormat) )
+		{
+			LayerData.GammaSpace = EGammaSpace::Linear;
+		}
+
+		// LayerData.bHasAlpha will be updated after the Build to detect if there is actual alpha in the layers
+		LayerData.bHasAlpha = BuildSettingsForLayer.bForceAlphaChannel;
 		
 		LayerData.FormatName = FImageCoreUtils::ConvertToUncompressedTextureFormatName(LayerData.ImageFormat);
 		LayerData.PixelFormat = FImageCoreUtils::GetPixelFormatForRawImageFormat(LayerData.ImageFormat);
@@ -997,8 +1006,9 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 				Image->SizeX = CompressedMip.SizeX;
 				Image->SizeY = CompressedMip.SizeY;
 				Image->Format = LayerData.ImageFormat;
-				Image->GammaSpace = BuildSettingsForLayer.GetDestGammaSpace();
+				Image->GammaSpace = LayerData.GammaSpace;
 				Image->NumSlices = 1;
+				check( Image->IsImageInfoValid() );
 				Image->RawData = MoveTemp(CompressedMip.RawData);
 			}
 
@@ -1119,8 +1129,9 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 				Image->SizeX = CompressedMip.SizeX;
 				Image->SizeY = CompressedMip.SizeY;
 				Image->Format = LayerData.ImageFormat;
-				Image->GammaSpace = BuildSettingsForLayer.GetDestGammaSpace();
+				Image->GammaSpace = LayerData.GammaSpace;
 				Image->NumSlices = 1;
+				check( Image->IsImageInfoValid() );
 				Image->RawData = MoveTemp(CompressedMip.RawData);
 			}
 		}
@@ -1141,6 +1152,11 @@ void FVirtualTextureDataBuilder::BuildSourcePixels(const FTextureSourceData& Sou
 		const FTextureBuildSettings& BuildSettingsForLayer = SettingsPerLayer[LayerIndex];
 		FVirtualTextureSourceLayerData& LayerData = SourceLayers[LayerIndex];
 
+		// Note that this code is duplicated at GetBuildSettingsPerFormat in TextureDerivedData.cpp so that the DDC key for 
+		// the VT ends up the same for child platforms, preventing re-encoding of the same texture data over and over. 
+		// As a result, this code shouldn't be doing anything when used via the ddc texture build/cook path - the prefix 
+		// should already be removed.
+		// 
 		// Don't want platform specific swizzling for VT tile data, this tends to add extra padding for textures with odd dimensions
 		// (VT physical tiles generally not power-of-2 after adding border)
 		FName TextureFormatPrefix;

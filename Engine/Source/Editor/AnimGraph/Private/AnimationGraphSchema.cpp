@@ -93,8 +93,8 @@ FReply FAnimationLayerDragDropAction::DroppedOnPanel(const TSharedRef< class SWi
 			const FName GraphName = TargetRigGraph->GetFName();
 			LinkedAnimLayerNode->SetupFromLayerId(SourceFuncName);
 			LinkedInputLayerNodeCreator.Finalize();
-			LinkedAnimLayerNode->NodePosX = GraphPosition.X;
-			LinkedAnimLayerNode->NodePosY = GraphPosition.Y;
+			LinkedAnimLayerNode->NodePosX = static_cast<int32>(GraphPosition.X);
+			LinkedAnimLayerNode->NodePosY = static_cast<int32>(GraphPosition.Y);
 		}
 	}
 	return FReply::Unhandled();
@@ -564,7 +564,7 @@ void UAnimationGraphSchema::SpawnNodeFromAsset(UAnimationAsset* Asset, const FVe
 
 	UAnimBlueprint* AnimBlueprint = Cast<UAnimBlueprint>(FBlueprintEditorUtils::FindBlueprintForGraph(Graph));
 
-	const bool bSkelMatch = (AnimBlueprint != nullptr) && (AnimBlueprint->TargetSkeleton != nullptr) && (AnimBlueprint->TargetSkeleton->IsCompatible(Asset->GetSkeleton()));
+	const bool bSkelMatch = (AnimBlueprint != nullptr) && (AnimBlueprint->TargetSkeleton != nullptr) && (AnimBlueprint->TargetSkeleton->IsCompatibleForEditor(Asset->GetSkeleton()));
 	const bool bTypeMatch = (PinIfAvailable == nullptr) || UAnimationGraphSchema::IsLocalSpacePosePin(PinIfAvailable->PinType);
 	const bool bDirectionMatch = (PinIfAvailable == nullptr) || (PinIfAvailable->Direction == EGPD_Input);
 
@@ -673,7 +673,7 @@ void UAnimationGraphSchema::GetAssetsNodeHoverMessage(const TArray<FAssetData>& 
 
 	// this one only should happen when there is an Anim Blueprint
 	UAnimBlueprint* AnimBlueprint = Cast<UAnimBlueprint>(FBlueprintEditorUtils::FindBlueprintForNode(HoverNode));
-	const bool bSkelMatch = (AnimBlueprint != NULL) && (AnimBlueprint->TargetSkeleton->IsCompatible(Asset->GetSkeleton()));
+	const bool bSkelMatch = (AnimBlueprint != NULL) && (AnimBlueprint->TargetSkeleton->IsCompatibleForEditor(Asset->GetSkeleton()));
 
 	if (!bSkelMatch)
 	{
@@ -705,7 +705,7 @@ void UAnimationGraphSchema::GetAssetsPinHoverMessage(const TArray<FAssetData>& A
 	// this one only should happen when there is an Anim Blueprint
 	UAnimBlueprint* AnimBlueprint = Cast<UAnimBlueprint>(FBlueprintEditorUtils::FindBlueprintForNode(HoverPin->GetOwningNode()));
 
-	const bool bSkelMatch = (AnimBlueprint != NULL) && (AnimBlueprint->TargetSkeleton->IsCompatible(Asset->GetSkeleton()));
+	const bool bSkelMatch = (AnimBlueprint != NULL) && (AnimBlueprint->TargetSkeleton->IsCompatibleForEditor(Asset->GetSkeleton()));
 	const bool bTypeMatch = UAnimationGraphSchema::IsLocalSpacePosePin(HoverPin->PinType);
 	const bool bDirectionMatch = HoverPin->Direction == EGPD_Input;
 
@@ -726,7 +726,7 @@ void UAnimationGraphSchema::GetAssetsGraphHoverMessage(const TArray<FAssetData>&
 	if (UAnimationAsset* AnimationAsset = FAssetData::GetFirstAsset<UAnimationAsset>(Assets))
 	{
 		UAnimBlueprint* AnimBlueprint = Cast<UAnimBlueprint>(FBlueprintEditorUtils::FindBlueprintForGraph(HoverGraph));
-		const bool bSkelMatch = (AnimBlueprint != nullptr) && (AnimBlueprint->TargetSkeleton != nullptr) && (AnimBlueprint->TargetSkeleton->IsCompatible(AnimationAsset->GetSkeleton()));
+		const bool bSkelMatch = (AnimBlueprint != nullptr) && (AnimBlueprint->TargetSkeleton != nullptr) && (AnimBlueprint->TargetSkeleton->IsCompatibleForEditor(AnimationAsset->GetSkeleton()));
 		if (!bSkelMatch)
 		{
 			OutOkIcon = false;
@@ -966,35 +966,35 @@ void UAnimationGraphSchema::AutoArrangeInterfaceGraph(UEdGraph& Graph)
 
 	FBox2D RootBounds(FVector2D(Root->NodePosX, Root->NodePosY), FVector2D(Root->NodePosX + 130, Root->NodePosY + 200));
 
-	float TotalHeight = 0.0f;
-	float MaxWidth = 0.0f;
+	double TotalHeight = 0.0;
+	double MaxWidth = 0.0;
 	const int32 HeightPerProperty = 30;
 
 	for(UAnimGraphNode_LinkedInputPose* Node : LinkedInputPoseNodes)
 	{
 		FBox2D LinkedInputPoseBounds(
 			FVector2D(Node->NodePosX, Node->NodePosY),
-			FVector2D(Node->NodePosX + 400, Node->NodePosY + 100 + (Node->GetNumInputs() * HeightPerProperty))
+			FVector2D(Node->NodePosX + 400.0, Node->NodePosY + 100.0 + (Node->GetNumInputs() * HeightPerProperty))
 		);
 
 		FVector2D BoundsSize = LinkedInputPoseBounds.GetSize();
-		TotalHeight += BoundsSize.Y + 10.0f;
+		TotalHeight += BoundsSize.Y + 10.0;
 		MaxWidth = FMath::Max(BoundsSize.X, MaxWidth);
 	}
 
-	float NodeOffset = RootBounds.GetCenter().Y - (TotalHeight * 0.5f);
-	float NodePosX = RootBounds.Min.X - (MaxWidth + 100.0f);
+	double NodeOffset = RootBounds.GetCenter().Y - (TotalHeight * 0.5);
+	double NodePosX = RootBounds.Min.X - (MaxWidth + 100.0);
 	for(UAnimGraphNode_LinkedInputPose* Node : LinkedInputPoseNodes)
 	{
-		Node->NodePosX = NodePosX;
-		Node->NodePosY = NodeOffset;
+		Node->NodePosX = static_cast<int32>(NodePosX);
+		Node->NodePosY = static_cast<int32>(NodeOffset);
 
 		FBox2D LinkedInputPoseBounds(
 			FVector2D(Node->NodePosX, Node->NodePosY),
-			FVector2D(Node->NodePosX + 400, Node->NodePosY + 100 + (Node->GetNumInputs() * HeightPerProperty))
+			FVector2D(Node->NodePosX + 400.0, Node->NodePosY + 100.0 + (Node->GetNumInputs() * HeightPerProperty))
 		);
 
-		NodeOffset += LinkedInputPoseBounds.GetSize().Y + 10.0f;
+		NodeOffset += LinkedInputPoseBounds.GetSize().Y + 10.0;
 	}
 }
 
@@ -1068,8 +1068,8 @@ void UAnimationGraphSchema::ConformAnimGraphToInterface(UBlueprint* InBlueprint,
 							LinkedInputPoseNodeCreator.Finalize();
 
 							FVector2D NewPosition = GetPositionForNewLinkedInputPoseNode(InGraph);
-							LinkedInputPoseNode->NodePosX = NewPosition.X;
-							LinkedInputPoseNode->NodePosY = NewPosition.Y;
+							LinkedInputPoseNode->NodePosX = static_cast<int32>(NewPosition.X);
+							LinkedInputPoseNode->NodePosY = static_cast<int32>(NewPosition.Y);
 						}
 
 						CurrentPoseIndex++;

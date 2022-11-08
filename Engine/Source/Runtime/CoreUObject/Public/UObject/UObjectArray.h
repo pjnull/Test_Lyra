@@ -103,7 +103,7 @@ struct FUObjectItem
 
 	FORCEINLINE EInternalObjectFlags GetFlags() const
 	{
-		return EInternalObjectFlags(Flags);
+		return EInternalObjectFlags(GetFlagsInternal());
 	}
 
 	FORCEINLINE void ClearFlags(EInternalObjectFlags FlagsToClear)
@@ -123,7 +123,7 @@ struct FUObjectItem
 		bool bIChangedIt = false;
 		while (1)
 		{
-			int32 StartValue = int32(Flags);
+			int32 StartValue = GetFlagsInternal();
 			if (!(StartValue & int32(FlagToClear)))
 			{
 				break;
@@ -144,7 +144,7 @@ struct FUObjectItem
 		bool bIChangedIt = false;
 		while (1)
 		{
-			int32 StartValue = int32(Flags);
+			int32 StartValue = GetFlagsInternal();
 			if ((StartValue & int32(FlagToSet)) == int32(FlagToSet))
 			{
 				break;
@@ -161,7 +161,7 @@ struct FUObjectItem
 
 	FORCEINLINE bool HasAnyFlags(EInternalObjectFlags InFlags) const
 	{
-		return !!(Flags & int32(InFlags));
+		return !!(GetFlagsInternal() & int32(InFlags));
 	}
 
 	FORCEINLINE void SetUnreachable()
@@ -174,7 +174,7 @@ struct FUObjectItem
 	}
 	FORCEINLINE bool IsUnreachable() const
 	{
-		return !!(Flags & int32(EInternalObjectFlags::Unreachable));
+		return !!(GetFlagsInternal() & int32(EInternalObjectFlags::Unreachable));
 	}
 	FORCEINLINE bool ThisThreadAtomicallyClearedRFUnreachable()
 	{
@@ -196,7 +196,7 @@ struct FUObjectItem
 	FORCEINLINE bool IsPendingKill() const
 	{
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		return !!(Flags & int32(EInternalObjectFlags::PendingKill));
+		return !!(GetFlagsInternal() & int32(EInternalObjectFlags::PendingKill));
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
@@ -210,7 +210,7 @@ struct FUObjectItem
 	}
 	FORCEINLINE bool IsRootSet() const
 	{
-		return !!(Flags & int32(EInternalObjectFlags::RootSet));
+		return !!(GetFlagsInternal() & int32(EInternalObjectFlags::RootSet));
 	}
 
 	FORCEINLINE void ResetSerialNumberAndFlags()
@@ -223,6 +223,11 @@ struct FUObjectItem
 #if STATS || ENABLE_STATNAMEDEVENTS_UOBJECT
 	COREUOBJECT_API void CreateStatID() const;
 #endif
+private:
+	FORCEINLINE int32 GetFlagsInternal() const
+	{
+		return FPlatformAtomics::AtomicRead_Relaxed((int32*)&Flags);
+	}
 };
 
 /**
@@ -579,6 +584,8 @@ public:
 class COREUOBJECT_API FUObjectArray
 {
 	friend class UObject;
+	friend COREUOBJECT_API UObject* StaticAllocateObject(const UClass*, UObject*, FName, EObjectFlags, EInternalObjectFlags, bool, bool*, UPackage*);
+
 private:
 	/**
 	 * Reset the serial number from the game thread to invalidate all weak object pointers to it
@@ -687,7 +694,7 @@ public:
 	 *
 	 * @param	Object Object to allocate an index for
 	 */
-	void AllocateUObjectIndex(class UObjectBase* Object, bool bMergingThreads = false);
+	void AllocateUObjectIndex(class UObjectBase* Object, bool bMergingThreads = false, int32 AlreadyAllocatedIndex = -1);
 
 	/**
 	 * Returns a UObject index top to the global uobject array
@@ -1105,6 +1112,9 @@ private:
 
 	/** Current primary serial number **/
 	FThreadSafeCounter	PrimarySerialNumber;
+
+	/** If set to false object indices won't be recycled to the global pool and can be explicitly reused when creating new objects */
+	bool bShouldRecycleObjectIndices = true;
 
 public:
 

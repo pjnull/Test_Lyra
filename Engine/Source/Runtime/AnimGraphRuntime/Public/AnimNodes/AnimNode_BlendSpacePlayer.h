@@ -52,6 +52,9 @@ public:
 	// @return the current sample coordinates after going through the filtering
 	FVector GetFilteredPosition() const { return BlendFilter.GetFilterLastOutput(); }
 
+	// Forces the Position to the specified value
+	void SnapToPosition(const FVector& NewPosition);
+
 public:
 
 	// Get the blendspace asset to play
@@ -118,6 +121,7 @@ struct ANIMGRAPHRUNTIME_API FAnimNode_BlendSpacePlayer : public FAnimNode_BlendS
 {
 	GENERATED_BODY()
 
+	friend class UAnimGraphNode_BlendSpaceBase;
 	friend class UAnimGraphNode_BlendSpacePlayer;
 	friend class UAnimGraphNode_BlendSpaceEvaluator;
 	friend class UAnimGraphNode_RotationOffsetBlendSpace;
@@ -273,7 +277,7 @@ public:
 	virtual bool ShouldResetPlayTimeWhenBlendSpaceChanges() const override { return bResetPlayTimeWhenBlendSpaceChanges; }
 	virtual bool SetResetPlayTimeWhenBlendSpaceChanges(bool bReset) override { bResetPlayTimeWhenBlendSpaceChanges = bReset; return true; }
 	virtual bool SetBlendSpace(UBlendSpace* InBlendSpace) override { BlendSpace = InBlendSpace; return true; }
-	virtual bool SetPosition(FVector InPosition) override { X = InPosition[0]; Y = InPosition[1]; return true; }
+	virtual bool SetPosition(FVector InPosition) override { X = static_cast<float>(InPosition[0]); Y = static_cast<float>(InPosition[1]); return true; }
 	virtual bool SetPlayRate(float InPlayRate) override { PlayRate = InPlayRate; return true; }
 	virtual bool SetLoop(bool bInLoop) override { bLoop = bInLoop; return true; }
 	// End of FAnimNode_BlendSpacePlayerBase interface

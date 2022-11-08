@@ -106,18 +106,28 @@ public:
 
 public:
 	// input settings
+	FRandomStream RotationRandomStream;
+	FRandomStream ScaleRandomStream;
+	FRandomStream TranslationRandomStream;
+	
 	FQuaterniond StartRotation = FQuaterniond::Identity();
 	FQuaterniond EndRotation = FQuaterniond::Identity();
-	bool bInterpolateRotation = false;			// if false, only StartRotation is used
-
+	FRotator RotationJitterRange = FRotator::ZeroRotator;	// using an FRotator so that the sampling can be done about 3 axes individually and converted to a quat when needed
+	bool bInterpolateRotation = false;						// if false, only StartRotation is used
+	bool bJitterRotation = false;
+	
 	FVector3d StartTranslation = FVector3d::Zero();
 	FVector3d EndTranslation = FVector3d::Zero();
-	bool bInterpolateTranslation = false;		// if false, only StartTranslation is used
+	FVector3d TranslationJitterRange = FVector3d::Zero();
+	bool bInterpolateTranslation = false;					// if false, only StartTranslation is used
+	bool bJitterTranslation = false;
 
 	FVector3d StartScale = FVector3d::One();
 	FVector3d EndScale = FVector3d::One();
-	bool bInterpolateScale = false;				// if false, only StartScale is used
-
+	FVector3d ScaleJitterRange = FVector3d::Zero();
+	bool bInterpolateScale = false;							// if false, only StartScale is used
+	bool bJitterScale = false;
+	
 	FAxisAlignedBox3d Dimensions = FAxisAlignedBox3d(FVector3d::Zero(), 10.0);
 
 public:
@@ -167,6 +177,45 @@ public:
 		{
 			Transform.SetTranslation( Transform.GetTranslation() + StartTranslation );
 		}
+		
+		// Lerp operations are performed on a vector-component basis because each component should be able to independently
+		// vary without respect for the other two components. This is true for rotation, scale, and translation.
+		if (bJitterRotation)
+		{
+			FRotator RotationJitter;
+
+			// TODO: maybe RotationJitterRange should have user-definable lower and upper bound like scale.
+			RotationJitter.Pitch = FMath::Lerp(-RotationJitterRange.Pitch, RotationJitterRange.Pitch, RotationRandomStream.GetFraction());
+			RotationJitter.Roll  = FMath::Lerp(-RotationJitterRange.Roll,  RotationJitterRange.Roll,  RotationRandomStream.GetFraction());
+			RotationJitter.Yaw   = FMath::Lerp(-RotationJitterRange.Yaw,   RotationJitterRange.Yaw,   RotationRandomStream.GetFraction());
+
+			Transform.SetRotation(Transform.GetRotation() * FQuaterniond(RotationJitter));
+		}
+
+		if (bJitterScale)
+		{
+			FVector3d ScaleJitter;
+			FVector3d TransformScale = Transform.GetScale();
+
+			ScaleJitter.X = FMath::Max(UPatternTool_ScaleSettings::MinScale, TransformScale.X + FMath::Lerp(-ScaleJitterRange.X, ScaleJitterRange.X, ScaleRandomStream.GetFraction()));
+			ScaleJitter.Y = FMath::Max(UPatternTool_ScaleSettings::MinScale, TransformScale.Y + FMath::Lerp(-ScaleJitterRange.Y, ScaleJitterRange.Y, ScaleRandomStream.GetFraction()));
+			ScaleJitter.Z = FMath::Max(UPatternTool_ScaleSettings::MinScale, TransformScale.Z + FMath::Lerp(-ScaleJitterRange.Z, ScaleJitterRange.Z, ScaleRandomStream.GetFraction()));
+				
+			Transform.SetScale( ScaleJitter );
+		}
+
+
+		if (bJitterTranslation)
+		{
+			FVector3d TranslationJitter;
+
+			// TODO: maybe TranslationJitterRange should have user-definable lower and upper bound like scale.
+			TranslationJitter.X = FMath::Lerp(-TranslationJitterRange.X, TranslationJitterRange.X, TranslationRandomStream.GetFraction());
+			TranslationJitter.Y = FMath::Lerp(-TranslationJitterRange.Y, TranslationJitterRange.Y, TranslationRandomStream.GetFraction());
+			TranslationJitter.Z = FMath::Lerp(-TranslationJitterRange.Z, TranslationJitterRange.Z, TranslationRandomStream.GetFraction());
+			
+			Transform.SetTranslation( Transform.GetTranslation() + TranslationJitter);
+		}
 	}
 
 
@@ -215,7 +264,6 @@ public:
 			check(false);
 		}
 	}
-
 };
 
 
@@ -270,7 +318,6 @@ public:
 
 	void UpdatePattern_LineFill();
 	void UpdatePattern_RectangleFill();
-
 };
 
 
@@ -485,24 +532,39 @@ void UPatternTool::Setup()
 	Settings = NewObject<UPatternToolSettings>();
 	AddToolPropertySource(Settings);
 	Settings->RestoreProperties(this);
+	Settings->WatchProperty(Settings->Seed, [this](int32 NewSeed) { MarkPatternDirty(); } );
+	Settings->WatchProperty(Settings->bProjectElementsDown, [this](bool bNewValue) { MarkPatternDirty(); } );
+	Settings->WatchProperty(Settings->ProjectionOffset, [this](float NewValue) { MarkPatternDirty(); } );
+	Settings->WatchProperty(Settings->bHideSources, [this](bool bNewValue) { OnSourceVisibilityToggled(!bNewValue); } );
+	Settings->WatchProperty(Settings->bUseRelativeTransforms, [this](bool bNewValue) { MarkPatternDirty(); } );
 	Settings->WatchProperty(Settings->Shape, [this](EPatternToolShape) { OnShapeUpdated(); } );
 	Settings->WatchProperty(Settings->SingleAxis, [this](EPatternToolSingleAxis) { OnParametersUpdated(); } );
 	Settings->WatchProperty(Settings->SinglePlane, [this](EPatternToolSinglePlane) { OnParametersUpdated(); } );
-	Settings->WatchProperty(Settings->bHideSources, [this](bool bNewValue) { OnSourceVisibilityToggled(!bNewValue); } );
 
+	BoundingBoxSettings = NewObject<UPatternTool_BoundingBoxSettings>();
+	AddToolPropertySource(BoundingBoxSettings);
+	BoundingBoxSettings->RestoreProperties(this);
+	BoundingBoxSettings->WatchProperty(BoundingBoxSettings->bIgnoreTransforms, [this](bool bNewValue) { MarkPatternDirty(); } );
+	BoundingBoxSettings->WatchProperty(BoundingBoxSettings->Adjustment, [this](float NewScale) { MarkPatternDirty(); });
+	SetToolPropertySourceEnabled(BoundingBoxSettings, false);
+	
 	LinearSettings = NewObject<UPatternTool_LinearSettings>();
 	AddToolPropertySource(LinearSettings);
 	LinearSettings->RestoreProperties(this);
+	LinearSettings->WatchProperty(LinearSettings->SpacingMode, [this](EPatternToolAxisSpacingMode NewSpacingMode) { OnSpacingModeUpdated(); });
 	SetToolPropertySourceEnabled(LinearSettings, false);
 
 	GridSettings = NewObject<UPatternTool_GridSettings>();
 	AddToolPropertySource(GridSettings);
 	GridSettings->RestoreProperties(this);
+	GridSettings->WatchProperty(GridSettings->SpacingX, [this](EPatternToolAxisSpacingMode NewSpacingMode) { OnSpacingModeUpdated(); });
+	GridSettings->WatchProperty(GridSettings->SpacingY, [this](EPatternToolAxisSpacingMode NewSpacingMode) { OnSpacingModeUpdated(); });
 	SetToolPropertySourceEnabled(GridSettings, false);
 
 	RadialSettings = NewObject<UPatternTool_RadialSettings>();
 	AddToolPropertySource(RadialSettings);
 	RadialSettings->RestoreProperties(this);
+	RadialSettings->WatchProperty(RadialSettings->SpacingMode, [this](EPatternToolAxisSpacingMode NewSpacingMode) { OnSpacingModeUpdated(); });
 	SetToolPropertySourceEnabled(RadialSettings, false);
 
 	RotationSettings = NewObject<UPatternTool_RotationSettings>();
@@ -517,44 +579,78 @@ void UPatternTool::Setup()
 	AddToolPropertySource(ScaleSettings);
 	ScaleSettings->RestoreProperties(this);
 
-	auto OnUniformChanged = [this](bool bNewValue)
+	auto OnProportionalChanged = [this](bool bNewValue)
 	{
 		if (bNewValue)
 		{
-			constexpr float Tolerance = 1E-08;
-			const FVector DefaultDirection = FVector::OneVector.GetUnsafeNormal();
-			
-			StartScaleDirection = ScaleSettings->StartScale.GetSafeNormal(Tolerance, DefaultDirection);
-			EndScaleDirection = ScaleSettings->EndScale.GetSafeNormal(Tolerance, DefaultDirection);
+			CachedStartScale = ScaleSettings->StartScale;
+			CachedEndScale = ScaleSettings->EndScale;
+			CachedJitterScale = ScaleSettings->Jitter;
 		}
 	};
-	ScaleSettings->WatchProperty(ScaleSettings->bUniform, OnUniformChanged);
-	
-	StartScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->StartScale, [this](const FVector& NewStartScale)
+	ScaleSettings->WatchProperty(ScaleSettings->bProportional, OnProportionalChanged);
+	OnProportionalChanged(true);	// Initialize StartScaleDirection and EndScaleDirection
+
+	auto ApplyProportionalScale = [this](FVector& NewVector, FVector& CachedVector)
 	{
-		if (ScaleSettings->bUniform)
+		// Determines which component of the vector is being changed by looking at which component is
+		// most different from the previous values
+		FVector Difference = NewVector - CachedVector;
+		int32 DifferenceMaxElementIndex = MaxAbsElementIndex(Difference);
+		
+		// This approach to proportional scaling is desirable because when a user manually enters data
+		// numerically, we scale the other two components such that the entered value is unchanged unless
+		// doing so would result in component values less than MinScale, in which case the the resulting
+		// vector will be in the correct direction but lengthened to a degree to ensure all components are
+		// greater than or equal to MinScale.
+		double ScaleFactor = FMath::Max(NewVector[DifferenceMaxElementIndex] / CachedVector[DifferenceMaxElementIndex], UPatternTool_ScaleSettings::MinScale / CachedVector[MinElementIndex(CachedVector)]);
+		
+		NewVector = CachedVector * ScaleFactor;
+		CachedVector = NewVector;
+	};
+	
+	StartScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->StartScale, [this, &ApplyProportionalScale](const FVector& NewStartScale)
+	{
+		if (ScaleSettings->bProportional)
 		{
-			ScaleSettings->StartScale = StartScaleDirection * NewStartScale.Size();
+			ApplyProportionalScale(ScaleSettings->StartScale, CachedStartScale);
 			ScaleSettings->SilentUpdateWatcherAtIndex(StartScaleWatcherIdx);
+
+			// This is needed in addition to the call in OnPropertyModified due to the fact that these watchers are
+			// called after OnPropertyModified and in some cases the scale values used were inconsistent with the scale
+			// values being displayed in the details panel.
+			OnParametersUpdated();
 		}
 	});
 	
-	EndScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->EndScale, [this](const FVector& NewEndScale)
+	EndScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->EndScale, [this, &ApplyProportionalScale](const FVector& NewEndScale)
 	{
-		if (ScaleSettings->bUniform)
+		if (ScaleSettings->bProportional)
 		{
-			ScaleSettings->EndScale = EndScaleDirection * NewEndScale.Size();
+			ApplyProportionalScale(ScaleSettings->EndScale, CachedEndScale);
 			ScaleSettings->SilentUpdateWatcherAtIndex(EndScaleWatcherIdx);
+			
+			OnParametersUpdated();
 		}
 	});
 
-	// Initialize StartScaleDirection and EndScaleDirection
-	OnUniformChanged(true);
+	JitterScaleWatcherIdx = ScaleSettings->WatchProperty(ScaleSettings->Jitter, [this, &ApplyProportionalScale](const FVector& NewJitterScale)
+	{
+		if (ScaleSettings->bProportional)
+		{
+			ApplyProportionalScale(ScaleSettings->Jitter, CachedJitterScale);
+			ScaleSettings->SilentUpdateWatcherAtIndex(JitterScaleWatcherIdx);
+			
+			OnParametersUpdated();
+		}
+	});
 	
 	OutputSettings = NewObject<UPatternTool_OutputSettings>();
 	AddToolPropertySource(OutputSettings);
 	OutputSettings->RestoreProperties(this);
 
+	BoundingBoxVisualizer.LineThickness = 2.0f;
+	
 	InitializeElements();
 	for (const FPatternElement& Element : Elements)
 	{
@@ -605,6 +701,7 @@ void UPatternTool::OnShutdown(EToolShutdownType ShutdownType)
 		Component->DestroyComponent();
 	}
 	AllComponents.Reset();
+	AllPreviewComponents.Reset();
 	PreviewComponents.Reset();
 	StaticMeshPools.Reset();
 	DynamicMeshPools.Reset();
@@ -612,6 +709,7 @@ void UPatternTool::OnShutdown(EToolShutdownType ShutdownType)
 	PreviewGeometry->Disconnect();
 
 	Settings->SaveProperties(this);
+	BoundingBoxSettings->SaveProperties(this);
 	LinearSettings->SaveProperties(this);
 	GridSettings->SaveProperties(this);
 	RadialSettings->SaveProperties(this);
@@ -640,6 +738,14 @@ void UPatternTool::Render(IToolsContextRenderAPI* RenderAPI)
 	DragAlignmentMechanic->Render(RenderAPI);
 	PlaneMechanic->Render(RenderAPI);
 
+	// We should only render here if bVisualize is true and also visible in the details panel.
+	// We don't want to leave the user with no obvious way to turn it off which might happen if they
+	// enable bVisualize and then change the spacing mode to something other than packed
+	if (BoundingBoxSettings->IsPropertySetEnabled() && BoundingBoxSettings->bVisualize)
+	{
+		RenderBoundingBoxes(RenderAPI);
+	}
+	
 	if (bPatternNeedsUpdating)
 	{
 		// throttle update rate as it is somewhat expensive
@@ -653,7 +759,46 @@ void UPatternTool::Render(IToolsContextRenderAPI* RenderAPI)
 	}
 }
 
+void UPatternTool::RenderBoundingBoxes(IToolsContextRenderAPI* RenderAPI)
+{
+	BoundingBoxVisualizer.BeginFrame(RenderAPI);
 
+	// Render the individual elements' PatternBounds along the current pattern with green lines
+	BoundingBoxVisualizer.LineColor = FLinearColor::Green;
+	for (int32 ElemIdx = 0; ElemIdx < Elements.Num(); ++ElemIdx)
+	{
+		FPatternElement& Element = Elements[ElemIdx];
+		
+		if (Settings->bUseRelativeTransforms)
+		{
+			const FTransformSRT3d RelativePositionTransform(FQuaterniond(RotationSettings->StartRotation), FVector3d::ZeroVector, ScaleSettings->StartScale);
+			BoundingBoxVisualizer.PushTransform(FTransform(RelativePositionTransform.TransformVector(Element.RelativePosition)));
+		}
+	
+		for (int32 k = 0; k < CurrentPattern.Num(); ++k)
+		{
+			BoundingBoxVisualizer.PushTransform(FTransform(CurrentPattern[k].GetTranslation()) * CurrentStartFrameWorld.ToFTransform());
+			BoundingBoxVisualizer.DrawWireBox(FBox(Element.PatternBounds));
+			BoundingBoxVisualizer.PopTransform();
+		}
+
+		if (Settings->bUseRelativeTransforms)
+		{
+			BoundingBoxVisualizer.PopTransform();
+		}
+	}
+
+	// Render the CombinedPatternBounds along the current pattern with red lines
+	BoundingBoxVisualizer.LineColor = FLinearColor::Red;
+	for (int32 k = 0; k < CurrentPattern.Num(); ++k)
+	{
+		BoundingBoxVisualizer.PushTransform(FTransform(CurrentPattern[k].GetTranslation()) * CurrentStartFrameWorld.ToFTransform());
+		BoundingBoxVisualizer.DrawWireBox(FBox(CombinedPatternBounds));
+		BoundingBoxVisualizer.PopTransform();
+	}
+	
+	BoundingBoxVisualizer.EndFrame();
+}
 
 void UPatternTool::OnSourceVisibilityToggled(bool bVisible)
 {
@@ -689,6 +834,7 @@ void UPatternTool::InitializeElements()
 		Element.SourceComponent = UE::ToolTarget::GetTargetComponent(Targets[TargetIdx]);
 		Element.SourceMaterials = UE::ToolTarget::GetMaterialSet(Targets[TargetIdx], false).Materials;
 		Element.SourceTransform = UE::ToolTarget::GetLocalToWorldTransform(Targets[TargetIdx]);
+		Element.RelativePosition = Element.SourceTransform.GetTranslation() - Elements[0].SourceTransform.GetTranslation();
 		Element.BaseRotateScale = Element.SourceTransform;
 		Element.BaseRotateScale.SetTranslation(FVector3d::Zero());		// clear translation from base transform
 		Element.SourceTransform.SetRotation(FQuaterniond::Identity());	// clear rotate/scale from source transform, so only location is used
@@ -699,24 +845,26 @@ void UPatternTool::InitializeElements()
 		if (UStaticMeshComponent* StaticMeshComp = Cast<UStaticMeshComponent>(Element.SourceComponent))
 		{
 			Element.SourceStaticMesh = StaticMeshComp->GetStaticMesh();
-			Element.LocalBounds = (FAxisAlignedBox3d)Element.SourceStaticMesh->GetBounds().GetBox();
-			Element.PatternBounds = Element.LocalBounds;
-		}
+			Element.LocalBounds = Element.SourceStaticMesh->GetBounds().GetBox();
+		}	
 		else if (UDynamicMeshComponent* DynamicMeshComp = Cast<UDynamicMeshComponent>(Element.SourceComponent))
 		{
 			Element.SourceDynamicMesh = DynamicMeshComp->GetDynamicMesh();
 			Element.SourceDynamicMesh->ProcessMesh([&](const FDynamicMesh3& Mesh) {
 				Element.LocalBounds = Mesh.GetBounds(true);
 			});
-			Element.PatternBounds = Element.LocalBounds;
 		}
 		else
 		{
 			Element.bValid = false;
 		}
+		
+		Element.PatternBounds = Element.LocalBounds;
 	}
 
 	PreviewComponents.SetNum(NumElements);
+
+	ComputeCombinedPatternBounds();
 }
 
 
@@ -724,15 +872,31 @@ void UPatternTool::InitializeElements()
 
 void UPatternTool::OnPropertyModified(UObject* PropertySet, FProperty* Property)
 {
-	if (PropertySet == RadialSettings 
-		|| PropertySet == LinearSettings 
-		|| PropertySet == GridSettings
-		|| PropertySet == RotationSettings
-		|| PropertySet == TranslationSettings
-		|| PropertySet == ScaleSettings )
+	if (PropertySet == Settings || PropertySet == OutputSettings)
 	{
-		OnParametersUpdated();
+		return;
 	}
+
+	if (PropertySet == ScaleSettings && ScaleSettings->bProportional)
+	{
+		// We are silencing all watchers if Property corresponds to an FVector UProperty because this indicates that
+		// the "Reset to Default" button was pressed. If individual components are modified instead, then Property will
+		// not be castable to an FStructProperty
+		
+		const FStructProperty* StructProperty = CastField<FStructProperty>(Property);
+		if (StructProperty != nullptr && StructProperty->Struct->GetName() == FString("Vector"))
+		{
+			CachedStartScale = ScaleSettings->StartScale;
+			CachedEndScale = ScaleSettings->EndScale;
+			CachedJitterScale = ScaleSettings->Jitter;
+			
+			ScaleSettings->SilentUpdateWatcherAtIndex(StartScaleWatcherIdx);
+			ScaleSettings->SilentUpdateWatcherAtIndex(EndScaleWatcherIdx);
+			ScaleSettings->SilentUpdateWatcherAtIndex(JitterScaleWatcherIdx);
+		}
+	}
+
+	OnParametersUpdated();
 }
 
 
@@ -756,6 +920,36 @@ void UPatternTool::OnShapeUpdated()
 	OnParametersUpdated();
 }
 
+void UPatternTool::OnSpacingModeUpdated()
+{
+	bool bBoundingBoxSettings = false;
+	
+	if (Settings->Shape == EPatternToolShape::Line)
+	{
+		if (LinearSettings->SpacingMode == EPatternToolAxisSpacingMode::Packed)
+		{
+			bBoundingBoxSettings = true;
+		}
+	}
+	else if (Settings->Shape == EPatternToolShape::Grid)
+	{
+		if (GridSettings->SpacingX == EPatternToolAxisSpacingMode::Packed || GridSettings->SpacingY == EPatternToolAxisSpacingMode::Packed)
+		{
+			bBoundingBoxSettings = true;
+		}
+	}
+	else if (Settings->Shape == EPatternToolShape::Circle)
+	{
+		if (RadialSettings->SpacingMode == EPatternToolAxisSpacingMode::Packed)
+		{
+			bBoundingBoxSettings = true;
+		}
+	}
+
+	SetToolPropertySourceEnabled(BoundingBoxSettings, bBoundingBoxSettings);
+
+	OnParametersUpdated();
+}
 
 void UPatternTool::OnParametersUpdated()
 {
@@ -795,7 +989,15 @@ void UPatternTool::ResetPreviews()
 
 static void InitializeGenerator(FPatternGenerator& Generator, UPatternTool* Tool)
 {
+	// The way this is seeded is kind of arbitrary but is reliable for the purpose of deterministically
+	// providing each type of jitter a random stream independent of the others given a single input seed.
+	Generator.RotationRandomStream.Initialize(Tool->Settings->Seed);
+	Generator.ScaleRandomStream.Initialize(Generator.RotationRandomStream.GetUnsignedInt());
+	Generator.TranslationRandomStream.Initialize(Generator.RotationRandomStream.GetUnsignedInt());
+	
 	Generator.bInterpolateRotation = Tool->RotationSettings->bInterpolate;
+	Generator.bJitterRotation = Tool->RotationSettings->bJitter;
+	Generator.RotationJitterRange = Tool->RotationSettings->Jitter;
 	if (Generator.bInterpolateRotation)
 	{
 		Generator.StartRotation = FQuaterniond(Tool->RotationSettings->StartRotation);
@@ -807,6 +1009,8 @@ static void InitializeGenerator(FPatternGenerator& Generator, UPatternTool* Tool
 	}
 
 	Generator.bInterpolateTranslation = Tool->TranslationSettings->bInterpolate;
+	Generator.bJitterTranslation = Tool->TranslationSettings->bJitter;
+	Generator.TranslationJitterRange = Tool->TranslationSettings->Jitter;
 	if (Generator.bInterpolateTranslation)
 	{
 		Generator.StartTranslation = Tool->TranslationSettings->StartTranslation;
@@ -818,6 +1022,8 @@ static void InitializeGenerator(FPatternGenerator& Generator, UPatternTool* Tool
 	}
 
 	Generator.bInterpolateScale = Tool->ScaleSettings->bInterpolate;
+	Generator.bJitterScale = Tool->ScaleSettings->bJitter;
+	Generator.ScaleJitterRange = Tool->ScaleSettings->Jitter;
 	if (Generator.bInterpolateScale)
 	{
 		Generator.StartScale = Tool->ScaleSettings->StartScale;
@@ -835,8 +1041,10 @@ void UPatternTool::GetPatternTransforms_Linear(TArray<UE::Geometry::FTransformSR
 {
 	FLinearPatternGenerator Generator;
 	InitializeGenerator(Generator, this);
-	Generator.Dimensions = this->Elements[0].PatternBounds;
-
+	
+	ComputeCombinedPatternBounds();
+	Generator.Dimensions = CombinedPatternBounds;
+	
 	double ExtentX = LinearSettings->Extent;
 
 	Generator.StartFrame = FFrame3d();
@@ -867,8 +1075,10 @@ void UPatternTool::GetPatternTransforms_Grid(TArray<UE::Geometry::FTransformSRT3
 {
 	FLinearPatternGenerator Generator;
 	InitializeGenerator(Generator, this);
-	Generator.Dimensions = this->Elements[0].PatternBounds;
-
+	
+	ComputeCombinedPatternBounds();
+	Generator.Dimensions = CombinedPatternBounds;
+	
 	double ExtentX = GridSettings->ExtentX;
 	double ExtentY = GridSettings->ExtentY;
 
@@ -918,8 +1128,10 @@ void UPatternTool::GetPatternTransforms_Radial(TArray<UE::Geometry::FTransformSR
 {
 	FRadialPatternGenerator Generator;
 	InitializeGenerator(Generator, this);
-	Generator.Dimensions = this->Elements[0].PatternBounds;
 
+	ComputeCombinedPatternBounds();
+	Generator.Dimensions = CombinedPatternBounds;
+	
 	// Orient the CenterFrame based on the plane setting of the tool & determine which axis is used if bOriented is true
 	const FVector3d Origin(0, 0, 0);
 	switch (Settings->SinglePlane)
@@ -959,12 +1171,10 @@ void UPatternTool::GetPatternTransforms_Radial(TArray<UE::Geometry::FTransformSR
 	TransformsOut = MoveTemp(Generator.Pattern);
 }
 
-
-
 void UPatternTool::UpdatePattern()
 {
 	TArray<FTransformSRT3d> Pattern;
-
+	
 	if (Settings->Shape == EPatternToolShape::Line)
 	{
 		GetPatternTransforms_Linear(Pattern);
@@ -977,7 +1187,7 @@ void UPatternTool::UpdatePattern()
 	{
 		GetPatternTransforms_Radial(Pattern);
 	}
-
+	
 	// Return all current preview components in use to the preview component pool
 	ResetPreviews();
 
@@ -991,6 +1201,11 @@ void UPatternTool::UpdatePattern()
 		FTransformSRT3d ElementTransform = Element.BaseRotateScale;
 		FComponentSet& ElemComponents = PreviewComponents[ElemIdx];
 
+		if (Settings->bUseRelativeTransforms)
+		{
+			ElementTransform.SetTranslation(ElementTransform.GetTranslation() + Element.RelativePosition);
+		}
+		
 		for (int32 k = 0; k < NumPatternItems; ++k)
 		{
 			UPrimitiveComponent* Component = nullptr;
@@ -1004,14 +1219,14 @@ void UPatternTool::UpdatePattern()
 			}
 			if (Component != nullptr)
 			{
-				FTransform PatternTransform = (FTransform)Pattern[k];
-				FTransform WorldTransform = (FTransform)ElementTransform * PatternTransform * CurrentStartFrameWorld.ToFTransform();
+				FTransform WorldTransform;
+				ComputeWorldTransform(WorldTransform, ElementTransform, Pattern[k]);
+				
 				Component->SetWorldTransform( WorldTransform );
 				Component->SetVisibility(true);
-
+		
 				ElemComponents.Components.Add(Component);
 			}
-
 		}
 	}
 
@@ -1025,8 +1240,67 @@ void UPatternTool::UpdatePattern()
 	CurrentPattern = MoveTemp(Pattern);
 }
 
+void UPatternTool::ComputeWorldTransform(FTransform& OutWorldTransform, const FTransform& InElementTransform, const FTransform& InPatternTransform) const
+{
+	OutWorldTransform = InElementTransform * InPatternTransform * CurrentStartFrameWorld.ToFTransform();
+	
+	if (Settings->bProjectElementsDown)
+	{
+		FVector3d ProjectionAxis = -CurrentStartFrameWorld.Z();
+		const FRay WorldRay(OutWorldTransform.GetTranslation(), ProjectionAxis);
+		FHitResult HitResult;
+	
+		if (ToolSceneQueriesUtil::FindNearestVisibleObjectHit(this, HitResult, WorldRay, &AllPreviewComponents, nullptr))
+		{
+			FVector3d ProjectionTranslation = ProjectionAxis * (HitResult.Distance + Settings->ProjectionOffset);
+			OutWorldTransform.SetTranslation(OutWorldTransform.GetTranslation() + ProjectionTranslation);
+		}
+	}
+}
 
+void UPatternTool::ComputePatternBounds(int32 ElemIdx)
+{
+	FPatternElement& Element = Elements[ElemIdx];
+	FTransformSRT3d Transform = Element.BaseRotateScale;
+	
+	if (!BoundingBoxSettings->bIgnoreTransforms)
+	{
+		Transform = (FTransform) FTransformSRT3d(FQuaterniond(RotationSettings->StartRotation), FVector3d::ZeroVector, ScaleSettings->StartScale) * Transform;
+	}
 
+	Element.PatternBounds = FAxisAlignedBox3d(Element.LocalBounds, Transform);
+}
+
+void UPatternTool::ComputeCombinedPatternBounds()
+{
+	// CombinedPatternBounds is the bounding box that contains every pattern element and is computed by setting it
+	// to the first element's pattern bounds and then expanding the box to contain each following element.
+
+	ComputePatternBounds(0);
+	CombinedPatternBounds = Elements[0].PatternBounds;
+
+	// If StartScale or StartRotation are not zero vectors, then Element.RelativePosition must be transformed to be accurate if bUseRelativeTransforms is true
+	const FTransformSRT3d RelativePositionTransform(FQuaterniond(RotationSettings->StartRotation), FVector3d::ZeroVector, ScaleSettings->StartScale);
+	
+	for (int32 ElemIdx = 1; ElemIdx < Elements.Num(); ++ElemIdx)
+	{
+		const FPatternElement& Element = Elements[ElemIdx];
+		ComputePatternBounds(ElemIdx);
+		
+		if (Settings->bUseRelativeTransforms)
+		{
+			CombinedPatternBounds.Contain(Element.PatternBounds.Min + RelativePositionTransform.TransformVector(Element.RelativePosition));
+			CombinedPatternBounds.Contain(Element.PatternBounds.Max + RelativePositionTransform.TransformVector(Element.RelativePosition));
+		}
+		else
+		{
+			CombinedPatternBounds.Contain(Element.PatternBounds);
+		}
+	}
+
+	// The user can manually adjust the box if desired to fine tune packed behavior
+	CombinedPatternBounds.Expand(BoundingBoxSettings->Adjustment);
+}
 
 UStaticMeshComponent* UPatternTool::GetPreviewStaticMesh(FPatternElement& Element)
 {
@@ -1057,6 +1331,7 @@ UStaticMeshComponent* UPatternTool::GetPreviewStaticMesh(FPatternElement& Elemen
 	StaticMeshComp->RegisterComponent();
 
 	AllComponents.Add(StaticMeshComp);
+	AllPreviewComponents.Add(StaticMeshComp);
 
 	return StaticMeshComp;
 }
@@ -1112,8 +1387,9 @@ UDynamicMeshComponent* UPatternTool::GetPreviewDynamicMesh(FPatternElement& Elem
 
 	FDynamicMesh3 ElementMeshCopy(Element.SourceDynamicMesh->GetMeshRef());
 	DynamicMeshComp->SetMesh(MoveTemp(ElementMeshCopy));
-
+	
 	AllComponents.Add(DynamicMeshComp);
+	AllPreviewComponents.Add(DynamicMeshComp);
 
 	return DynamicMeshComp;
 }
@@ -1179,6 +1455,26 @@ void UPatternTool::EmitResults()
 
 	TArray<AActor*> NewActors;		// set of new actors created by operation
 
+	// Used when constructing actors, not appending components to an actor. Otherwise UPrimitiveComponent::SetVisibility()
+	// is used instead. Keeping everything invisible until the end allows us to avoid hitting the created components
+	// when projecting downward, just like we do in the previews via ignored components.
+	constexpr bool bPropagateToChildren = true;
+	auto SetActorComponentsVisibility = [bPropagateToChildren](AActor* InActor, const bool bNewVisibility)
+	{
+		if (const AStaticMeshActor* ActorAsStaticMeshActor = Cast<AStaticMeshActor, AActor>(InActor))
+		{
+			ActorAsStaticMeshActor->GetStaticMeshComponent()->SetVisibility(bNewVisibility, bPropagateToChildren);
+		}
+		
+		for (UActorComponent* Component : InActor->GetComponents())
+		{
+			if (UPrimitiveComponent* ActorComponentAsPrimitiveComponent = Cast<UPrimitiveComponent, UActorComponent>(Component))
+			{
+				ActorComponentAsPrimitiveComponent->SetVisibility(bNewVisibility, bPropagateToChildren);
+			}
+		}
+	};
+
 	// TODO: investigate use of CopyPropertiesForUnrelatedObjects to transfer settings from source to target Components/Actors
 
 	for (int32 ElemIdx = 0; ElemIdx < NumElements; ++ElemIdx)
@@ -1190,6 +1486,11 @@ void UPatternTool::EmitResults()
 		}
 		FTransformSRT3d ElementTransform = Element.BaseRotateScale;
 
+		if (Settings->bUseRelativeTransforms)
+		{
+			ElementTransform.SetTranslation(ElementTransform.GetTranslation() + Element.RelativePosition);
+		}
+		
 		if (Element.SourceDynamicMesh != nullptr || bConvertToDynamic )
 		{
 			FDynamicMesh3 ElementMesh = UE::ToolTarget::GetDynamicMeshCopy(Targets[ElemIdx], true);
@@ -1219,8 +1520,9 @@ void UPatternTool::EmitResults()
 				for (int32 k = 0; k < NumPatternItems; ++k)
 				{
 					FTransformSRT3d PatternTransform = CurrentPattern[k];
-					FTransform WorldTransform = (FTransform)ElementTransform * (FTransform)PatternTransform * CurrentStartFrameWorld.ToFTransform();
-
+					FTransform WorldTransform;
+					ComputeWorldTransform(WorldTransform, (FTransform)ElementTransform, (FTransform)PatternTransform);
+					
 					FDynamicMesh3 PatternItemMesh = ElementMesh;
 					// TODO: may need to bake nonuniform scale in here, if we allow scaling in transform
 					FCreateMeshObjectResult Result = EmitDynamicMeshActor(MoveTemp(PatternItemMesh),
@@ -1228,6 +1530,7 @@ void UPatternTool::EmitResults()
 					if (Result.IsOK())
 					{
 						NewActors.Add(Result.NewActor);
+						SetActorComponentsVisibility(Result.NewActor, false);
 					}
 				}
 			}
@@ -1239,20 +1542,29 @@ void UPatternTool::EmitResults()
 				FMeshIndexMappings Mappings;
 				for (int32 k = 0; k < NumPatternItems; ++k)
 				{
+					FTransformSRT3d PatternTransform = CurrentPattern[k];
+					FTransform WorldTransform;
+					ComputeWorldTransform(WorldTransform, (FTransform)ElementTransform, (FTransform)PatternTransform);
+
+					// We have world transforms of the components, but need their local transforms in the space of the
+					// final mesh, whose pivot is determined by CurrentStartFrameWorld. So we apply the inverse of that
+					// while appending them (the inverse FTransform is accurate in this case because
+					// CurrentStartFrameWorld can't be nonuniformly scaled).
 					FTransformSequence3d TransformSeq;
-					TransformSeq.Append(ElementTransform);
-					TransformSeq.Append(CurrentPattern[k]);
+					TransformSeq.Append(WorldTransform);
+					TransformSeq.Append(CurrentStartFrameWorld.ToFTransform().Inverse());
 					Mappings.Reset();
 					Editor.AppendMesh(&ElementMesh, Mappings,
 						[&](int, const FVector3d& Position) { return TransformSeq.TransformPosition(Position); },
 						[&](int, const FVector3d& Normal) { return TransformSeq.TransformNormal(Normal); } );
 				}
-
+				
 				FCreateMeshObjectResult Result = EmitDynamicMeshActor(MoveTemp(CombinedPatternMesh),
-					FString::Printf(TEXT("Pattern_%d"), ElemIdx), CurrentStartFrameWorld.ToFTransform());
+				FString::Printf(TEXT("Pattern_%d"), ElemIdx), CurrentStartFrameWorld.ToFTransform());
 				if (Result.IsOK())
 				{
 					NewActors.Add(Result.NewActor);
+					SetActorComponentsVisibility(Result.NewActor, false);
 				}
 			}
 		}
@@ -1267,8 +1579,9 @@ void UPatternTool::EmitResults()
 				for (int32 k = 0; k < NumPatternItems; ++k)
 				{
 					FTransformSRT3d PatternTransform = CurrentPattern[k];
-					FTransform WorldTransform = (FTransform)ElementTransform * (FTransform)PatternTransform * CurrentStartFrameWorld.ToFTransform();
-
+					FTransform WorldTransform;
+					ComputeWorldTransform(WorldTransform, (FTransform)ElementTransform, (FTransform)PatternTransform);
+					
 					FActorSpawnParameters SpawnInfo;
 					SpawnInfo.Template = SourceActor;
 					AStaticMeshActor* NewActor = GetTargetWorld()->SpawnActor<AStaticMeshActor>(SpawnInfo);
@@ -1276,6 +1589,7 @@ void UPatternTool::EmitResults()
 					{
 						NewActor->SetActorTransform(WorldTransform);
 						NewActors.Add(NewActor);
+						SetActorComponentsVisibility(NewActor, false);
 					}
 				}
 			}
@@ -1288,6 +1602,7 @@ void UPatternTool::EmitResults()
 					NewActors.Add(NewActor);
 
 					UInstancedStaticMeshComponent* ISMComponent = NewObject<UInstancedStaticMeshComponent>(NewActor);
+					ISMComponent->SetVisibility(false, bPropagateToChildren);
 					ISMComponent->SetFlags(RF_Transactional);
 					ISMComponent->bHasPerInstanceHitProxies = true;
 
@@ -1306,7 +1621,11 @@ void UPatternTool::EmitResults()
 					for (int32 k = 0; k < NumPatternItems; ++k)
 					{
 						FTransformSRT3d PatternTransform = CurrentPattern[k];
-						ISMComponent->AddInstance((FTransform)ElementTransform * (FTransform)PatternTransform);
+						FTransform WorldTransform;
+						ComputeWorldTransform(WorldTransform, (FTransform)ElementTransform, (FTransform)PatternTransform);
+
+						constexpr bool bTransformInWorldSpace = true;
+						ISMComponent->AddInstance(WorldTransform, bTransformInWorldSpace);
 					}
 
 					ISMComponent->RegisterComponent();
@@ -1321,14 +1640,18 @@ void UPatternTool::EmitResults()
 				for (int32 k = 0; k < NumPatternItems; ++k)
 				{
 					FTransformSRT3d PatternTransform = CurrentPattern[k];
-					FTransform WorldTransform = (FTransform)PatternTransform * CurrentStartFrameWorld.ToFTransform();
+					FTransform WorldTransform;
+					ComputeWorldTransform(WorldTransform, (FTransform)ElementTransform, (FTransform)PatternTransform);
+					
 					if (k == 0)
 					{
 						FActorSpawnParameters SpawnInfo;
 						SpawnInfo.Template = SourceActor;
 						ParentActor = GetTargetWorld()->SpawnActor<AStaticMeshActor>(SpawnInfo);
+						NewActors.Add(ParentActor);
 						ParentActor->SetActorTransform(CurrentStartFrameWorld.ToFTransform());
 						ParentActor->GetStaticMeshComponent()->SetWorldTransform(WorldTransform);
+						ParentActor->GetStaticMeshComponent()->SetVisibility(false, bPropagateToChildren);
 					}
 					else if (k == 1)
 					{
@@ -1339,6 +1662,7 @@ void UPatternTool::EmitResults()
 						ParentActor->AddInstanceComponent(TemplateComponent);
 						TemplateComponent->RegisterComponent();
 						TemplateComponent->SetWorldTransform( WorldTransform );
+						TemplateComponent->SetVisibility(false, bPropagateToChildren);
 					}
 					else
 					{
@@ -1349,11 +1673,17 @@ void UPatternTool::EmitResults()
 						ParentActor->AddInstanceComponent(NewCloneComponent);
 						NewCloneComponent->RegisterComponent();
 						NewCloneComponent->SetWorldTransform( WorldTransform );
+						NewCloneComponent->SetVisibility(false, bPropagateToChildren);
 					}
 				}			
-
 			}
 		}
+	}
+
+	// Make all components visible now that they have all been created
+	for (auto Actor : NewActors)
+	{
+		SetActorComponentsVisibility(Actor, true);
 	}
 
 	if (NewActors.Num() > 0)

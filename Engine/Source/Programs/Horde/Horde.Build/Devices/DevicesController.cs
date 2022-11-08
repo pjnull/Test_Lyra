@@ -12,6 +12,7 @@ using Horde.Build.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -147,7 +148,13 @@ namespace Horde.Build.Devices
 					continue;
 				}
 
-				responses.Add(new GetDeviceResponse(device.Id.ToString(), device.PlatformId.ToString(), device.PoolId.ToString(), device.Name, device.Enabled, device.Address, device.ModelId?.ToString(), device.ModifiedByUser, device.Notes, device.ProblemTimeUtc, device.MaintenanceTimeUtc, device.Utilization, device.CheckedOutByUser, device.CheckOutTime));
+				DateTime? checkoutExpiration = null;
+				if (device.CheckOutTime != null)
+				{
+					checkoutExpiration = device.CheckOutTime.Value.AddDays(_deviceService.sharedDeviceCheckoutDays);
+				}
+
+				responses.Add(new GetDeviceResponse(device.Id.ToString(), device.PlatformId.ToString(), device.PoolId.ToString(), device.Name, device.Enabled, device.Address, device.ModelId?.ToString(), device.ModifiedByUser, device.Notes, device.ProblemTimeUtc, device.MaintenanceTimeUtc, device.Utilization, device.CheckedOutByUser, device.CheckOutTime, checkoutExpiration));
 			}
 
 			return responses;
@@ -179,7 +186,13 @@ namespace Horde.Build.Devices
 				return Forbid();
 			}
 
-			return new GetDeviceResponse(device.Id.ToString(), device.PlatformId.ToString(), device.PoolId.ToString(), device.Name, device.Enabled, device.Address, device.ModelId?.ToString(), device.ModifiedByUser?.ToString(), device.Notes, device.ProblemTimeUtc, device.MaintenanceTimeUtc, device.Utilization, device.CheckedOutByUser, device.CheckOutTime);
+			DateTime? checkoutExpiration = null;
+			if (device.CheckOutTime != null)
+			{
+				checkoutExpiration = device.CheckOutTime.Value.AddDays(_deviceService.sharedDeviceCheckoutDays);
+			}
+
+			return new GetDeviceResponse(device.Id.ToString(), device.PlatformId.ToString(), device.PoolId.ToString(), device.Name, device.Enabled, device.Address, device.ModelId?.ToString(), device.ModifiedByUser?.ToString(), device.Notes, device.ProblemTimeUtc, device.MaintenanceTimeUtc, device.Utilization, device.CheckedOutByUser, device.CheckOutTime, checkoutExpiration);
 		}
 
 		/// <summary>
@@ -539,8 +552,7 @@ namespace Horde.Build.Devices
 			return response;
 		}
 
-
-		// RESERVATIONS
+		#region Reservations
 
 		/// <summary>
 		/// Create a new device reservation
@@ -718,6 +730,8 @@ namespace Horde.Build.Devices
 			return Ok();
 		}
 
+		#endregion
+
 		/// <summary>
 		/// Get device telemetry
 		/// </summary>		
@@ -832,9 +846,7 @@ namespace Horde.Build.Devices
 
 			if (String.IsNullOrEmpty(poolId))
 			{
-				_logger.LogError("No pool specified, defaulting to UE4 {Details} JobId: {JobId}, StepId: {StepId}", details, request.JobId, request.StepId);
-				string message = $"No pool specified, defaulting to UE4" + details;
-				await _deviceService.NotifyDeviceServiceAsync(message, null, request.JobId, request.StepId);
+				// @todo: We default to ue4, though this should be an error, or a configuration setting
 				poolId = "ue4";
 				//return BadRequest(Message);
 			}
@@ -845,7 +857,6 @@ namespace Horde.Build.Devices
 			{
 				_logger.LogError("Unknown pool {PoolId} {Details}", poolId, details);
 				string message = $"Unknown pool {poolId} " + details;
-				await _deviceService.NotifyDeviceServiceAsync(message, null, request.JobId, request.StepId);
 				return BadRequest(message);
 			}
 
@@ -868,26 +879,23 @@ namespace Horde.Build.Devices
 					constraint = tokens[1];
 				}
 
-				DevicePlatformId platformId;
-
 				DevicePlatformMapV1 mapV1 = await _deviceService.GetPlatformMapV1();
 
-				if (!mapV1.PlatformMap.TryGetValue(platformName, out platformId))
-				{
-					string message = $"Unknown platform {platformName}" + details;
-					_logger.LogError("Unknown platform {PlatformName} {Details}", platformName, details);
-					await _deviceService.NotifyDeviceServiceAsync(message, null, request.JobId, request.StepId);
-					return BadRequest(message);
-				}
+				DevicePlatformId platformId = DevicePlatformId.Sanitize(platformName);
 
 				IDevicePlatform? platform = platforms.FirstOrDefault(x => x.Id == platformId);
 
 				if (platform == null)
 				{
-					string message = $"Unknown platform {platformId}" + details;
-					_logger.LogError("Unknown platform {PlatformId} {Details}", platformId, details);
-					await _deviceService.NotifyDeviceServiceAsync(message, null, request.JobId, request.StepId);
-					return BadRequest(message);
+					if (mapV1.PlatformMap.TryGetValue(platformName, out platformId))
+					{
+						platform = platforms.FirstOrDefault(x => x.Id == platformId);
+					}
+				}
+
+				if (platform == null)
+				{
+					return BadRequest($"Unknown platform {platformId}" + details);
 				}
 
 				List<string> includeModels = new List<string>();
@@ -920,26 +928,19 @@ namespace Horde.Build.Devices
 				}
 				else
 				{
-					string? model = platform.Models?.FirstOrDefault(x => x == constraint);
-					if (model == null)
-					{
-						return NotFound($"Platform {platform.Id} has no model {model}");
-					}
+					string[] requestedModels = constraint.Split(';');
 
-					string modelPerfSpec = "Minimum";
-					string? specModel = null;
-
-					if (mapV1.PerfSpecHighMap.TryGetValue(platform.Id, out specModel))
+					if (requestedModels.Length > 0)
 					{
-						if (model == specModel)
+						List<string>? models = platform.Models?.Where(x => requestedModels.Contains(x, StringComparer.OrdinalIgnoreCase)).ToList();
+
+						if (models == null || models.Count == 0)
 						{
-							modelPerfSpec = "High";
+							return NotFound($"Invalid model constraint for platform {platform.Id}: {constraint}");
 						}
+
+						includeModels = models;
 					}
-
-					perfSpecs.Add(modelPerfSpec);
-
-					includeModels.Add(constraint);
 				}
 
 				requestedDevices.Add(new DeviceRequestData(platformId, platformName, includeModels, excludeModels));
@@ -1066,16 +1067,9 @@ namespace Horde.Build.Devices
 			DevicePlatformMapV1 mapV1 = await _deviceService.GetPlatformMapV1();
 
 			if (String.IsNullOrEmpty(platformName))
-			{
-				if (!mapV1.PlatformReverseMap.TryGetValue(device.PlatformId, out platformName))
-				{
-					return BadRequest($"Unable to map platform for {deviceName} : {device.PlatformId}");
-				}
-			}
-
-			if (String.IsNullOrEmpty(platformName))
-			{
-				return BadRequest($"Unable to get platform for {deviceName} from reservation or mapping : {device.PlatformId}");
+			{				
+				_logger.LogError("Unable to map platform for {DeviceName} : {PlatformId} from reservation", deviceName, device.PlatformId);			
+				return BadRequest($"Unable to get platform for {deviceName} from reservation : {device.PlatformId}");
 			}
 
 			GetLegacyDeviceResponse response = new GetLegacyDeviceResponse();
@@ -1117,7 +1111,6 @@ namespace Horde.Build.Devices
 
 			if (device == null)
 			{
-				_logger.LogError("Device error reported for unknown device {DeviceName}", deviceName);
 				return BadRequest($"Unknown device {deviceName}");
 			}
 
@@ -1145,46 +1138,10 @@ namespace Horde.Build.Devices
 						message += $" - Host {reservation.Hostname}";
 					}
 				}
-			}
-
-			_logger.LogError("{DeviceError}", message);
-
-			await _deviceService.NotifyDeviceServiceAsync(message, device.Id, jobId, stepId);
+			}			
 
 			return Ok();
 
-		}
-
-		/// <summary>
-		/// Updates the platform map for v1 requests
-		/// </summary>
-		[HttpPut]
-		[Route("/api/v1/devices/platformmap")]
-		public async Task<ActionResult> UpdatePlatformMapV1([FromBody] UpdatePlatformMapRequest request)
-		{
-			if (!await _aclService.AuthorizeAsync(AclAction.AdminWrite, User))
-			{
-				return Forbid();
-			}
-
-			bool result;
-			try
-			{
-				result = await _deviceService.UpdatePlatformMapAsync(request);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(ex, "Error updating device platform map {Message}", ex.Message);
-				throw;
-			}
-
-			if (!result)
-			{
-				_logger.LogError("Unable to update device platform mapping");
-				return BadRequest();
-			}
-
-			return Ok();
 		}
 	}
 }

@@ -16,10 +16,12 @@ using Horde.Build.Utilities;
 using HordeCommon;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Options;
 
 namespace Horde.Build.Issues
 {
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 	using WorkflowId = StringId<WorkflowConfig>;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
@@ -64,10 +66,11 @@ namespace Horde.Build.Issues
 
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 
-	[SingletonDocument("6268871c211d05611b3e4fd8")]
+	[SingletonDocument("issue-report-state", "6268871c211d05611b3e4fd8")]
 	class IssueReportState : SingletonBase
 	{
-		public Dictionary<string, DateTime> KeyToLastReportTime { get; set; } = new Dictionary<string, DateTime>();
+		[BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+		public Dictionary<string, DateTime> ReportTimes { get; set; } = new Dictionary<string, DateTime>();
 	}
 
 	/// <summary>
@@ -118,7 +121,7 @@ namespace Horde.Build.Issues
 		async ValueTask TickAsync(CancellationToken cancellationToken)
 		{
 			IssueReportState state = await _state.GetAsync();
-			HashSet<string> invalidKeys = new HashSet<string>(state.KeyToLastReportTime.Keys, StringComparer.Ordinal);
+			HashSet<string> invalidKeys = new HashSet<string>(state.ReportTimes.Keys, StringComparer.Ordinal);
 
 			DateTime currentTime = _clock.UtcNow;
 
@@ -145,9 +148,9 @@ namespace Horde.Build.Issues
 						invalidKeys.Remove(key);
 						
 						DateTime lastReportTime;
-						if (!state.KeyToLastReportTime.TryGetValue(key, out lastReportTime))
+						if (!state.ReportTimes.TryGetValue(key, out lastReportTime))
 						{
-							state = await _state.UpdateAsync(s => s.KeyToLastReportTime[key] = currentTime);
+							state = await _state.UpdateAsync(s => s.ReportTimes[key] = currentTime);
 							continue;
 						}
 
@@ -208,11 +211,11 @@ namespace Horde.Build.Issues
 				{
 					foreach (string updateKey in updateKeys)
 					{
-						state.KeyToLastReportTime[updateKey] = currentTime;
+						state.ReportTimes[updateKey] = currentTime;
 					}
 					foreach (string invalidKey in invalidKeys)
 					{
-						state.KeyToLastReportTime.Remove(invalidKey);
+						state.ReportTimes.Remove(invalidKey);
 					}
 				}
 				state = await _state.UpdateAsync(UpdateKeys);
@@ -224,7 +227,7 @@ namespace Horde.Build.Issues
 			List<IJob> jobs = await _jobCollection.FindAsync(streamId: stream.Id, minCreateTime: minTime);
 
 			Dictionary<WorkflowId, WorkflowStats> workflowIdToStats = new Dictionary<WorkflowId, WorkflowStats>();
-			foreach (IGrouping<TemplateRefId, IJob> templateGroup in jobs.GroupBy(x => x.TemplateId))
+			foreach (IGrouping<TemplateId, IJob> templateGroup in jobs.GroupBy(x => x.TemplateId))
 			{
 				WorkflowId? templateWorkflowId = null;
 				if (stream.Config.TryGetTemplate(templateGroup.Key, out TemplateRefConfig? templateRefConfig))

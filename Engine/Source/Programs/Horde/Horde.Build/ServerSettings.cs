@@ -1,14 +1,16 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using EpicGames.Horde.Common;
 using EpicGames.Horde.Storage;
-using EpicGames.Horde.Storage.Bundles;
 using EpicGames.Horde.Storage.Nodes;
 using Horde.Build.Agents.Fleet;
-using Horde.Build.Storage;
+using Horde.Build.Agents.Software;
 using Horde.Build.Storage.Backends;
 using Horde.Build.Utilities;
+using Serilog.Events;
 using TimeZoneConverter;
 
 namespace Horde.Build
@@ -31,18 +33,13 @@ namespace Horde.Build
 		/// <summary>
 		/// In-memory only (for testing)
 		/// </summary>
-		Transient,
-
-		/// <summary>
-		/// Relay to another server (useful for testing against prod)
-		/// </summary>
-		Relay,
+		Memory,
 	};
 
 	/// <summary>
 	/// Common settings for different storage backends
 	/// </summary>
-	public interface IStorageBackendOptions : IFileSystemStorageOptions, IAwsStorageOptions, IRelayStorageOptions
+	public interface IStorageBackendOptions : IFileSystemStorageOptions, IAwsStorageOptions
 	{
 		/// <summary>
 		/// The type of storage backend to use
@@ -78,12 +75,6 @@ namespace Horde.Build
 
 		/// <inheritdoc/>
 		public string? AwsRegion { get; set; }
-
-		/// <inheritdoc/>
-		public string? RelayServer { get; set; }
-
-		/// <inheritdoc/>
-		public string? RelayToken { get; set; }
 	}
 
 	/// <summary>
@@ -101,7 +92,7 @@ namespace Horde.Build
 		/// <summary>
 		/// Options for creating bundles
 		/// </summary>
-		BundleOptions Bundle { get; }
+		TreeOptions Bundle { get; }
 
 		/// <summary>
 		/// Options for chunking content
@@ -115,28 +106,12 @@ namespace Horde.Build
 	public class TreeStoreOptions : BlobStoreOptions, ITreeStoreOptions
 	{
 		/// <inheritdoc/>
-		public BundleOptions Bundle { get; set; } = new BundleOptions();
+		public TreeOptions Bundle { get; set; } = new TreeOptions();
 
 		/// <inheritdoc/>
 		public ChunkingOptions Chunking { get; set; } = new ChunkingOptions();
 	}
 
-	/// <summary>
-	/// Specifies the service to use for controlling the size of the fleet
-	/// </summary>
-	public enum FleetManagerType
-	{
-		/// <summary>
-		/// Default (empty) instance
-		/// </summary>
-		None,
-
-		/// <summary>
-		/// Use AWS EC2 instances
-		/// </summary>
-		Aws,
-	}
-	
 	/// <summary>
 	/// Authentication method used for logging users in
 	/// </summary>
@@ -195,6 +170,47 @@ namespace Horde.Build
 	/// </summary>
 	public class FeatureFlagSettings
 	{
+		/// <summary>
+		/// Use new auth config for custom auth servers in Okta
+		/// </summary>
+		public bool AuthSettingsV2 { get; set; } = false;
+		
+		/// <summary>
+		/// Limit concurrent log chunk writes and await them to reduce mem and I/O usage
+		/// </summary>
+		public bool LimitConcurrentLogChunkWriting { get; set; } = false;
+
+		/// <summary>
+		/// Enable new test data collections and service, feature flag added 22/11/7
+		/// </summary>
+		public bool EnableTestDataV2 { get; set; } = false;
+
+	}
+
+	/// <summary>
+	/// Options for the commit service
+	/// </summary>
+	public class CommitSettings
+	{
+		/// <summary>
+		/// Whether to mirror commit metadata to the database
+		/// </summary>
+		public bool ReplicateMetadata { get; set; } = true;
+
+		/// <summary>
+		/// Whether to mirror commit metadata to the database
+		/// </summary>
+		public bool ReplicateContent { get; set; } = false;
+
+		/// <summary>
+		/// Options for how objects are packed together
+		/// </summary>
+		public TreeOptions Bundle { get; set; } = new TreeOptions();
+
+		/// <summary>
+		/// Options for how objects are sliced
+		/// </summary>
+		public ChunkingOptions Chunking { get; set; } = new ChunkingOptions();
 	}
 
 	/// <summary>
@@ -204,7 +220,17 @@ namespace Horde.Build
 	{
 		/// <inheritdoc cref="RunMode" />
 		public RunMode[]? RunModes { get; set; } = null;
-		
+
+		/// <summary>
+		/// Override the data directory used by Horde. Defaults to C:\ProgramData\HordeServer on Windows, {AppDir}/Data on other platforms.
+		/// </summary>
+		public string? DataDir { get; set; } = null;
+
+		/// <summary>
+		/// Output level for console
+		/// </summary>
+		public LogEventLevel ConsoleLogLevel { get; set; } = LogEventLevel.Debug;
+
 		/// <summary>
 		/// Main port for serving HTTP. Uses the default Kestrel port (5000) if not specified.
 		/// </summary>
@@ -322,7 +348,7 @@ namespace Horde.Build
 		public string? JwtSecret { get; set; } = null!;
 
 		/// <summary>
-		/// Length of time before JWT tokens expire, in hourse
+		/// Length of time before JWT tokens expire, in hours
 		/// </summary>
 		public int JwtExpiryTimeHours { get; set; } = 4;
 
@@ -400,9 +426,14 @@ namespace Horde.Build
 		public bool LogSessionRequests { get; set; } = false;
 
 		/// <summary>
-		/// Which fleet manager service to use
+		/// Default fleet manager to use (when not specified by pool)
 		/// </summary>
-		public FleetManagerType FleetManager { get; set; } = FleetManagerType.None;
+		public FleetManagerType FleetManagerV2 { get; set; } = FleetManagerType.NoOp;
+		
+		/// <summary>
+		/// Config for the fleet manager (serialized JSON)
+		/// </summary>
+		public string? FleetManagerV2Config { get; set; }
 
 		/// <summary>
 		/// Whether to run scheduled jobs.
@@ -443,14 +474,9 @@ namespace Horde.Build
 		/// Channel to send stream notification update failures to
 		/// </summary>
 		public string? UpdateStreamsNotificationChannel { get; set; }
-
-		/// <summary>
-		/// Channel to send device notifications to
-		/// </summary>
-		public string? DeviceServiceNotificationChannel { get; set; }
 		
 		/// <summary>
-		/// Slack channel to send job related notifications to
+		/// Slack channel to send job related notifications to. Multiple channels can be specified, separated by ;
 		/// </summary>
 		public string? JobNotificationChannel { get; set; }
 
@@ -525,6 +551,11 @@ namespace Horde.Build
 		public Uri? JiraUrl { get; set; }
 
 		/// <summary>
+		/// The number of days shared device checkouts are held
+		/// </summary>
+		public int SharedDeviceCheckoutDays { get; set; } = 3;
+
+		/// <summary>
 		/// Default agent pool sizing strategy for pools that doesn't have one explicitly configured
 		/// </summary>
 		public PoolSizeStrategy DefaultAgentPoolSizeStrategy { get; set; } = PoolSizeStrategy.LeaseUtilization;
@@ -553,6 +584,11 @@ namespace Horde.Build
 		public bool WithDatadog { get; set; }
 
 		/// <summary>
+		/// Whether to enable Amazon Web Services (AWS) specific features
+		/// </summary>
+		public bool WithAws { get; set; } = false;
+
+		/// <summary>
 		/// Path to the root config file
 		/// </summary>
 		public string ConfigPath { get; set; } = "Defaults/globals.json";
@@ -568,9 +604,14 @@ namespace Horde.Build
 		public NamespaceId ToolNamespaceId { get; set; } = new NamespaceId("horde.p4");
 
 		/// <summary>
-		/// Whether to 
+		/// Whether to use the local Perforce environment
 		/// </summary>
 		public bool UseLocalPerforceEnv { get; set; }
+
+		/// <summary>
+		/// Number of pooled perforce connections to keep
+		/// </summary>
+		public int PerforceConnectionPoolSize { get; set; } = 5;
 
 		/// <summary>
 		/// Lazily computed timezone value
@@ -579,10 +620,7 @@ namespace Horde.Build
 		{
 			get
 			{
-				if (_cachedTimeZoneInfo == null)
-				{
-					_cachedTimeZoneInfo = (ScheduleTimeZone == null) ? TimeZoneInfo.Local : TZConvert.GetTimeZoneInfo(ScheduleTimeZone);
-				}
+				_cachedTimeZoneInfo ??= (ScheduleTimeZone == null) ? TimeZoneInfo.Local : TZConvert.GetTimeZoneInfo(ScheduleTimeZone);
 				return _cachedTimeZoneInfo;
 			}
 		}
@@ -596,6 +634,11 @@ namespace Horde.Build
 
 		/// <inheritdoc cref="FeatureFlags" />
 		public FeatureFlagSettings FeatureFlags { get; set; } = new ();
+
+		/// <summary>
+		/// Options for the commit service
+		/// </summary>
+		public CommitSettings Commits { get; set; } = new CommitSettings();
 
 		/// <summary>
 		/// Helper method to check if this process has activated the given mode

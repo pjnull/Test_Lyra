@@ -66,8 +66,10 @@ FVulkanCmdBuffer::FVulkanCmdBuffer(FVulkanDevice* InDevice, FVulkanCommandBuffer
 	, CommandBufferPool(InCommandBufferPool)
 	, Timing(nullptr)
 	, LastValidTiming(0)
+	, LayoutManager(InDevice->SupportsParallelRendering(), 
+		InDevice->SupportsParallelRendering() ? nullptr :
+		&InCommandBufferPool->GetMgr().GetCommandListContext()->GetQueue()->GetLayoutManager())
 {
-
 	{
 		FScopeLock ScopeLock(CommandBufferPool->GetCS());
 		AllocMemory();
@@ -202,7 +204,6 @@ void FVulkanCmdBuffer::BeginRenderPass(const FVulkanRenderTargetLayout& Layout, 
 	}
 #endif
 
-#if VULKAN_SUPPORTS_RENDERPASS2
 	if (Device->GetOptionalExtensions().HasKHRRenderPass2)
 	{
 		VkSubpassBeginInfo SubpassInfo;
@@ -211,7 +212,6 @@ void FVulkanCmdBuffer::BeginRenderPass(const FVulkanRenderTargetLayout& Layout, 
 		VulkanRHI::vkCmdBeginRenderPass2KHR(CommandBufferHandle, &Info, &SubpassInfo);
 	}
 	else
-#endif
 	{
 		VulkanRHI::vkCmdBeginRenderPass(CommandBufferHandle, &Info, VK_SUBPASS_CONTENTS_INLINE);
 	}
@@ -252,15 +252,18 @@ void FVulkanCmdBuffer::End()
 
 	for (PendingQuery& Query : PendingTimestampQueries)
 	{
-		uint64 Index = Query.Index;
-		VkBuffer BufferHandle = Query.BufferHandle;
-		VkQueryPool PoolHandle = Query.PoolHandle;
-		VkQueryResultFlags BlockingFlags = Query.bBlocking ?  VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
-		uint32 Width = (Query.bBlocking ? 1 : 2);
-		uint32 Stride = sizeof(uint64) * Width;
+		const uint64 Index = Query.Index;
+		const VkBuffer BufferHandle = Query.BufferHandle;
+		const VkQueryPool PoolHandle = Query.PoolHandle;
+		const VkQueryResultFlags BlockingFlags = Query.bBlocking ?  VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
+		const uint32 Width = (Query.bBlocking ? 1 : 2);
+		const uint32 Stride = sizeof(uint64) * Width;
 
 		VulkanRHI::vkCmdCopyQueryPoolResults(GetHandle(), PoolHandle, Index, Query.Count, BufferHandle, Stride * Index, Stride, VK_QUERY_RESULT_64_BIT | BlockingFlags);
-		VulkanRHI::vkCmdResetQueryPool(GetHandle(), PoolHandle, Index, Query.Count);
+		if (Query.bBlocking)
+		{
+			VulkanRHI::vkCmdResetQueryPool(GetHandle(), PoolHandle, Index, Query.Count);
+		}
 	}
 
 	PendingTimestampQueries.Reset();
@@ -279,18 +282,24 @@ inline void FVulkanCmdBuffer::InitializeTimings(FVulkanCommandListContext* InCon
 
 			// Upload cb's can be submitted multiple times in a single frame, so we use an expanded pool to catch timings
 			// Any overflow will wrap
-			uint32 PoolSize = bIsUploadOnly ? 256 : 32;
+			const uint32 PoolSize = bIsUploadOnly ? 256 : 32;
 			Timing->Initialize(PoolSize);
 		}
 	}
 }
 
-void FVulkanCmdBuffer::AddWaitSemaphore(VkPipelineStageFlags InWaitFlags, VulkanRHI::FSemaphore* InWaitSemaphore)
+void FVulkanCmdBuffer::AddWaitSemaphore(VkPipelineStageFlags InWaitFlags, TArrayView<VulkanRHI::FSemaphore*> InWaitSemaphores)
 {
-	WaitFlags.Add(InWaitFlags);
-	InWaitSemaphore->AddRef();
-	check(!WaitSemaphores.Contains(InWaitSemaphore));
-	WaitSemaphores.Add(InWaitSemaphore);
+	WaitFlags.Reserve(WaitFlags.Num() + InWaitSemaphores.Num());
+
+	for (VulkanRHI::FSemaphore* Sema : InWaitSemaphores)
+	{
+		WaitFlags.Add(InWaitFlags);
+		Sema->AddRef();
+		check(!WaitSemaphores.Contains(Sema));
+	}
+
+	WaitSemaphores.Append(InWaitSemaphores);
 }
 
 void FVulkanCmdBuffer::Begin()
@@ -323,6 +332,22 @@ void FVulkanCmdBuffer::Begin()
 		}
 	}
 	check(!CurrentDescriptorPoolSetContainer);
+
+	if (!bIsUploadOnly && Device->SupportsBindless())
+	{
+		FVulkanBindlessDescriptorManager* BindlessDescriptorManager = Device->GetBindlessDescriptorManager();
+		FVulkanQueue* Queue = GetOwner()->GetMgr().GetQueue();
+		const VkPipelineStageFlags SupportedStages = Queue->GetSupportedStageBits();
+		if (SupportedStages & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+		{
+			BindlessDescriptorManager->BindDescriptorSets(CommandBufferHandle, VK_PIPELINE_BIND_POINT_GRAPHICS);
+		}
+		if (SupportedStages & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
+		{
+			BindlessDescriptorManager->BindDescriptorSets(CommandBufferHandle, VK_PIPELINE_BIND_POINT_COMPUTE);
+		}
+		// todo-jn: bindless : raytracing
+	}
 
 	bNeedsDynamicStateSet = true;
 }

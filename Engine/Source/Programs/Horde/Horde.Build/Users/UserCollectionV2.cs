@@ -241,24 +241,21 @@ namespace Horde.Build.Users
 		public async Task<IUser?> FindUserByLoginAsync(string login)
 		{
 			string loginUpper = login.ToUpperInvariant();
-			return await _users.Find(x => x.LoginUpper == loginUpper).FirstOrDefaultAsync();
+			FilterDefinition<UserDocument> filter = Builders<UserDocument>.Filter.Eq(x => x.LoginUpper, loginUpper) & Builders<UserDocument>.Filter.Ne(x => x.Hidden, true);
+			return await _users.Find(filter).FirstOrDefaultAsync();
 		}
 
 		/// <inheritdoc/>
 		public async Task<IUser?> FindUserByEmailAsync(string email)
 		{
 			string emailUpper = email.ToUpperInvariant();
-			return await _users.Find(x => x.EmailUpper == emailUpper).FirstOrDefaultAsync();
+			FilterDefinition<UserDocument> filter = Builders<UserDocument>.Filter.Eq(x => x.EmailUpper, emailUpper) & Builders<UserDocument>.Filter.Ne(x => x.Hidden, true);
+			return await _users.Find(filter).FirstOrDefaultAsync();
 		}
 
 		/// <inheritdoc/>
 		public async Task<IUser> FindOrAddUserByLoginAsync(string login, string? name, string? email)
 		{
-			if (login.Contains(' ', StringComparison.Ordinal))
-			{
-				_logger.LogWarning("Potentially invalid login name: {Login} (from {Trace})", login, Environment.StackTrace);
-			}
-
 			UserId newUserId = UserId.GenerateNewId();
 			UpdateDefinition<UserDocument> update = Builders<UserDocument>.Update.SetOnInsert(x => x.Id, newUserId).SetOnInsert(x => x.Login, login).Unset(x => x.Hidden);
 
@@ -291,10 +288,7 @@ namespace Horde.Build.Users
 		public async Task<IUserClaims> GetClaimsAsync(UserId userId)
 		{
 			IUserClaims? claims = await _userClaims.Find(x => x.Id == userId).FirstOrDefaultAsync();
-			if(claims == null)
-			{
-				claims = new UserClaimsDocument(userId);
-			}
+			claims ??= new UserClaimsDocument(userId);
 			return claims;
 		}
 
@@ -310,10 +304,7 @@ namespace Horde.Build.Users
 		public async Task<IUserSettings> GetSettingsAsync(UserId userId)
 		{
 			IUserSettings? settings = await _userSettings.Find(x => x.Id == userId).FirstOrDefaultAsync();
-			if (settings == null)
-			{
-				settings = new UserSettingsDocument(userId);
-			}
+			settings ??= new UserSettingsDocument(userId);
 			return settings;
 		}
 

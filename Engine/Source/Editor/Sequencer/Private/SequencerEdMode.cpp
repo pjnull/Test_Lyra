@@ -936,7 +936,7 @@ void FSequencerEdMode::DrawAudioTracks(FPrimitiveDrawInterface* PDI)
 		{
 			UMovieSceneAudioTrack* AudioTrack = Cast<UMovieSceneAudioTrack>(Track);
 
-			if (!AudioTrack || !AudioTrack->IsAMasterTrack())
+			if (!AudioTrack)
 			{
 				continue;
 			}

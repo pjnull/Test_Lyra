@@ -262,8 +262,6 @@ void FTextureEditorToolkit::InitTextureEditor( const EToolkitMode::Type Mode, co
 	SpecifiedFace = 0;
 	bUseSpecifiedFace = false;
 
-	SavedCompressionSetting = false;
-
 	// Start at whatever the last used zoom mode, volume view mode and cubemap view mode were
 	const UTextureEditorSettings& Settings = *GetDefault<UTextureEditorSettings>();
 	ZoomMode = Settings.ZoomMode;
@@ -1157,7 +1155,7 @@ void FTextureEditorToolkit::CreateInternalWidgets()
 	// Default to Distribution
 	TSharedPtr<FString> InitialPackagingSetting = PackagingSettingsNames[2];
 
-	// Determine which oodle encoder they are using.
+	// Determine which oodle compressor they are using.
 	const TCHAR* CompressorName = 0;
 	{
 		// Validity check the string by trying to convert to enum.
@@ -1371,7 +1369,7 @@ void FTextureEditorToolkit::CreateInternalWidgets()
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("OodleTab_Label_OverrideCompression", "Enabled:"))
-							.ToolTipText(LOCTEXT("OodleTab_ToolTip_OverrideCompression", "If checked, allows you to experiment with Oodle RDO compression settings to visualize results."))
+							.ToolTipText(LOCTEXT("OodleTab_ToolTip_OverrideEncoding", "If checked, allows you to experiment with Oodle RDO encoder settings to visualize results."))
 						]
 					+ SVerticalBox::Slot()
 						.AutoHeight()
@@ -1497,7 +1495,7 @@ void FTextureEditorToolkit::CreateInternalWidgets()
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("OodleTab_Label_EncoderSettings", "Packaging Configuration:"))
-							.ToolTipText(LOCTEXT("OodleTab_ToolTip_EncoderSettings", "Which packaging configuration to pull from for determining which Oodle encoder and compression level to use."))
+							.ToolTipText(LOCTEXT("OodleTab_ToolTip_CompressorSettings", "Which packaging configuration to pull from for determining which Oodle compressor and compression level to use."))
 						]
 					+ SVerticalBox::Slot()
 						.AutoHeight()
@@ -1505,8 +1503,8 @@ void FTextureEditorToolkit::CreateInternalWidgets()
 						.Padding(6)
 						[
 							SNew(STextBlock)
-							.Text(LOCTEXT("OodleTab_Label_EstimateEncoder", "Oodle Encoder:"))
-							.ToolTipText(LOCTEXT("OodleTab_ToolTip_EstimateEncoder", "The oodle encoder to use for estimating. Pulled from the packaging configuration specified above."))
+							.Text(LOCTEXT("OodleTab_Label_EstimateCompressor", "Oodle Compressor:"))
+							.ToolTipText(LOCTEXT("OodleTab_ToolTip_EstimateCompressor", "The oodle compressor to use for estimating. Pulled from the packaging configuration specified above."))
 						]
 					+ SVerticalBox::Slot()
 						.AutoHeight()
@@ -1578,7 +1576,7 @@ void FTextureEditorToolkit::CreateInternalWidgets()
 						.VAlign(VAlign_Center)
 						.Padding(8)
 						[
-							SAssignNew(OodleEncoderUsed, STextBlock)
+							SAssignNew(OodleCompressorUsed, STextBlock)
 							.Text(FText::AsCultureInvariant(CompressorName))
 							.IsEnabled(this, &FTextureEditorToolkit::EstimateCompressionEnabled)
 						]
@@ -2398,12 +2396,6 @@ void FTextureEditorToolkit::HandleReimportManagerPostReimport( UObject* InObject
 		return;
 	}
 
-	if (!bSuccess)
-	{
-		// Failed, restore the compression flag
-		Texture->DeferCompression = SavedCompressionSetting;
-	}
-
 	// Re-enable viewport rendering now that the texture should be in a known state again
 	TextureViewport->EnableRendering();
 }
@@ -2416,10 +2408,6 @@ void FTextureEditorToolkit::HandleReimportManagerPreReimport( UObject* InObject 
 	{
 		return;
 	}
-
-	// Prevent the texture from being compressed immediately, so the user can see the results
-	SavedCompressionSetting = Texture->DeferCompression;
-	Texture->DeferCompression = true;
 
 	// Disable viewport rendering until the texture has finished re-importing
 	TextureViewport->DisableRendering();

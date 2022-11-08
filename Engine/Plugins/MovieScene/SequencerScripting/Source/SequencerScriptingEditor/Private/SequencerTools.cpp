@@ -202,7 +202,7 @@ bool ExportFBXInternal(const FSequencerExportFBXParams& InParams, UMovieSceneSeq
 	UMovieSceneSequence* Sequence = InParams.Sequence;
 	UMovieSceneSequence* RootSequence = InParams.RootSequence;
 	TArray<FMovieSceneBindingProxy> BindingProxies = InParams.Bindings;
-	TArray<UMovieSceneTrack*> MasterTracks = InParams.MasterTracks;
+	TArray<UMovieSceneTrack*> Tracks = InParams.Tracks;
 	UFbxExportOption* OverrideOptions = InParams.OverrideOptions;
 	FString FBXFileName = InParams.FBXFileName;
 
@@ -258,7 +258,7 @@ bool ExportFBXInternal(const FSequencerExportFBXParams& InParams, UMovieSceneSeq
 			Player->SetPlaybackPosition(FMovieSceneSequencePlaybackParams(StartTime, EUpdatePositionMethod::Play));
 		}
 
-		bDidExport = MovieSceneToolHelpers::ExportFBX(World, MovieScene, Player, Bindings, MasterTracks, NodeNameAdapter, Template, FBXFileName, RootToLocalTransform);
+		bDidExport = MovieSceneToolHelpers::ExportFBX(World, MovieScene, Player, Bindings, Tracks, NodeNameAdapter, Template, FBXFileName, RootToLocalTransform);
 	}
 
 	Player->Stop();

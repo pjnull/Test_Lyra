@@ -743,7 +743,7 @@ void UCrowdManager::GetAgentParams(const ICrowdAgentInterface* Agent, dtCrowdAge
 		AgentParams.collisionQueryRange = CrowdComponent->GetCrowdCollisionQueryRange();
 		AgentParams.pathOptimizationRange = CrowdComponent->GetCrowdPathOptimizationRange();
 		AgentParams.separationWeight = CrowdComponent->GetCrowdSeparationWeight();
-		AgentParams.obstacleAvoidanceType = CrowdComponent->GetCrowdAvoidanceQuality();
+		AgentParams.obstacleAvoidanceType = IntCastChecked<unsigned char>((int32)CrowdComponent->GetCrowdAvoidanceQuality());
 		AgentParams.avoidanceQueryMultiplier = CrowdComponent->GetCrowdAvoidanceRangeMultiplier();
 
 		if (CrowdComponent->IsCrowdSimulationEnabled())
@@ -922,7 +922,6 @@ void UCrowdManager::CreateCrowdManager()
 			const FCrowdAvoidanceSamplingPattern& Info = SamplingPatterns[Idx];
 			if (Info.Angles.Num() > 0 && Info.Angles.Num() == Info.Radii.Num())
 			{
-				// LWC_TODO_AI: Info.Angles and Info.Radii should be FReal. Probably not until after 5.0!
 				const TArray<FVector::FReal> Angles = UE::LWC::ConvertArrayType<FVector::FReal>(Info.Angles);
 				const TArray<FVector::FReal> Radii = UE::LWC::ConvertArrayType<FVector::FReal>(Info.Radii);
 
@@ -1283,7 +1282,7 @@ void UCrowdManager::DebugTick() const
 					FVector Pt0 = Recast2UnrealPoint(s);
 					FVector Pt1 = Recast2UnrealPoint(s + 3);
 
-					UE_VLOG_SEGMENT_THICK(LogOwner, LogCrowdFollowing, Log, Pt0 + FCrowdDebug::Offset, Pt1 + FCrowdDebug::Offset, Color, 3.0f, TEXT(""));
+					UE_VLOG_SEGMENT_THICK(LogOwner, LogCrowdFollowing, Log, Pt0 + FCrowdDebug::Offset, Pt1 + FCrowdDebug::Offset, Color, 3, TEXT(""));
 				}
 			}
 		}

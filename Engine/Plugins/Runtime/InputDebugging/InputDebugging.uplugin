@@ -6,7 +6,7 @@
 	"Description": "Input debugging and visualization.",
 	"Category": "Input",
 	"CreatedBy": "Epic Games, Inc.",
-	"CreatedByURL": "http://epicgames.com",
+	"CreatedByURL": "https://epicgames.com",
 	"DocsURL": "",
 	"MarketplaceURL": "",
 	"SupportURL": "",
@@ -20,6 +20,11 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"TargetConfigurationDenyList": [ "Shipping" ]
+		},
+		{
+			"Name": "InputDebuggingEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
 		}
 	]
 }

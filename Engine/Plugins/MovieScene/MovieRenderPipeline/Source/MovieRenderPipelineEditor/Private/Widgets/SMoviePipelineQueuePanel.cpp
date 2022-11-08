@@ -10,7 +10,7 @@
 #include "MoviePipelineBlueprintLibrary.h"
 #include "Sections/MovieSceneCinematicShotSection.h"
 #include "MoviePipelineQueue.h"
-#include "MoviePipelineMasterConfig.h"
+#include "MoviePipelinePrimaryConfig.h"
 #include "MoviePipelineQueueSubsystem.h"
 
 // Slate Includes
@@ -372,7 +372,7 @@ void SMoviePipelineQueuePanel::OnEditJobConfigRequested(TWeakObjectPtr<UMoviePip
 	}
 	else
 	{
-		ConfigType = UMoviePipelineMasterConfig::StaticClass();
+		ConfigType = UMoviePipelinePrimaryConfig::StaticClass();
 		BasePreset = InJob->GetPresetOrigin();
 		BaseConfig = InJob->GetConfiguration();
 	}
@@ -423,9 +423,9 @@ void SMoviePipelineQueuePanel::OnConfigUpdatedForJob(TWeakObjectPtr<UMoviePipeli
 		}
 		else
 		{
-			if (UMoviePipelineMasterConfig* MasterConfig = Cast<UMoviePipelineMasterConfig>(InConfig))
+			if (UMoviePipelinePrimaryConfig* PrimaryConfig = Cast<UMoviePipelinePrimaryConfig>(InConfig))
 			{
-				InJob->SetConfiguration(MasterConfig);
+				InJob->SetConfiguration(PrimaryConfig);
 			}
 		}
 	}
@@ -446,9 +446,9 @@ void SMoviePipelineQueuePanel::OnConfigUpdatedForJobToPreset(TWeakObjectPtr<UMov
 		}
 		else
 		{
-			if (UMoviePipelineMasterConfig* MasterConfig = Cast<UMoviePipelineMasterConfig>(InConfig))
+			if (UMoviePipelinePrimaryConfig* PrimaryConfig = Cast<UMoviePipelinePrimaryConfig>(InConfig))
 			{
-				InJob->SetPresetOrigin(MasterConfig);
+				InJob->SetPresetOrigin(PrimaryConfig);
 			}
 		}
 	}

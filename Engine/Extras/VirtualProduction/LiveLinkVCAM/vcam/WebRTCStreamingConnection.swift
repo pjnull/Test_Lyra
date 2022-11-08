@@ -30,7 +30,7 @@ class WebRTCStreamingConnection : StreamingConnection {
 
     override var name : String {
         get {
-            "WebRTC"
+            StreamingConnectionType.webRTC.rawValue
         }
     }
     override var destination : String {
@@ -45,6 +45,12 @@ class WebRTCStreamingConnection : StreamingConnection {
     override var isConnected: Bool {
         get {
             return (self.webRTCClientState ?? .disconnected) == .connected
+        }
+    }
+    
+    override var relayTouchEvents: Bool {
+        didSet {
+            self.touchControls?.relayTouchEvents = relayTouchEvents
         }
     }
 
@@ -113,40 +119,51 @@ class WebRTCStreamingConnection : StreamingConnection {
     }
     
     deinit {
-        _statsTimer?.invalidate()
+        
+        Log.info("Destroyed WebRTCStreamingConnection")
+
         webRTCClient = nil
     }
 
+    override func shutdown() {
+        _statsTimer?.invalidate()
+        disconnect()
+    }
+    
     override func connect() throws {
         
-        disconnect()
-        
-        // We will use 3rd party library for websockets.
-        let webSocketProvider: WebSocketProvider
-        
-        if #available(iOS 13.0, *) {
-            webSocketProvider = NativeWebSocketProvider(url: self._url!, timeout: 2.0)
-        } else {
-            webSocketProvider = StarscreamWebSocket(url: self._url!)
+        if signalClient == nil {
+            
+            // We will use 3rd party library for websockets.
+            let webSocketProvider: WebSocketProvider
+            
+            if #available(iOS 13.0, *) {
+                webSocketProvider = NativeWebSocketProvider(url: self._url!, timeout: 2.0)
+            } else {
+                webSocketProvider = StarscreamWebSocket(url: self._url!)
+            }
+            
+            self.signalClient = SignalingClient(webSocket: webSocketProvider)
+            self.signalClient?.delegate = self
+            self.signalClient?.connect()
+
         }
-        
-        self.signalClient = SignalingClient(webSocket: webSocketProvider)
-        self.signalClient?.delegate = self
-        self.signalClient?.connect()
     }
     
     override func reconnect() {
-        disconnect()
-        do {
-            try connect()
-        } catch {
-            Log.error(error.localizedDescription)
-        }
+        //disconnect()
+        //do {
+        //    try connect()
+        //} catch {
+        //    Log.error(error.localizedDescription)
+        //}
     }
     
     override func disconnect() {
-        self.signalClient?.close()
-        self.signalClient = nil
+        signalClient?.delegate = nil
+        signalClient?.close()
+        signalClient = nil
+
         signalingConnected = false
         hasLocalSdp = false
         hasRemoteSdp = false
@@ -200,6 +217,96 @@ class WebRTCStreamingConnection : StreamingConnection {
         client.sendData(Data(bytes))
     }
     
+    func inputTypeToIndex(_ type : StreamingConnectionControllerInputType) -> UInt8? {
+        switch type {
+        case .faceButtonBottom : return 0
+        case .faceButtonRight : return 1
+        case .faceButtonLeft : return 2
+        case .faceButtonTop : return 3
+            
+        case .shoulderButtonLeft : return 4
+        case .shoulderButtonRight : return 5
+
+        case .triggerButtonLeft : return 6
+        case .triggerButtonRight : return 7
+
+        case .specialButtonLeft : return 8
+        case .specialButtonRight : return 9
+            
+        case .thumbstickLeftButton : return 10
+        case .thumbstickRightButton : return 11
+            
+        case .dpadUp : return 12
+        case .dpadDown : return 13
+        case .dpadLeft : return 14
+        case .dpadRight : return 15
+            
+        case .thumbstickLeftX : return 1
+        case .thumbstickLeftY : return 2
+        case .thumbstickRightX : return 3
+        case .thumbstickRightY : return 4
+        }
+    }
+    
+    override func sendControllerAnalog(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8, value : Float) {
+        
+        guard let client = webRTCClient else { return }
+
+        guard let analogIndex = inputTypeToIndex(type) else {
+            Log.warning("Couldn't find an index for controller input type \(type.rawValue)")
+            return
+        }
+        
+        var bytes: [UInt8] = []
+
+        // Write message type using 1 byte
+        bytes.append(PixelStreamingToStreamerMessage.GamepadAnalog.rawValue)
+
+        bytes.append(controllerIndex)
+        bytes.append(analogIndex)
+        bytes.append(contentsOf: Double(value).toBytes())
+        
+        client.sendData(Data(bytes))
+    }
+    
+    override func sendControllerButtonPressed(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8, isRepeat : Bool) {
+
+        guard let client = webRTCClient else { return }
+
+        guard let buttonIndex = inputTypeToIndex(type) else {
+            Log.warning("Couldn't find an index for controller input type \(type.rawValue)")
+            return
+        }
+
+        var bytes: [UInt8] = []
+
+        bytes.append(PixelStreamingToStreamerMessage.GamepadButtonPressed.rawValue)
+        bytes.append(controllerIndex)
+        bytes.append(buttonIndex)
+        bytes.append(UInt8(isRepeat ? 1 : 0))
+        
+        client.sendData(Data(bytes))
+    }
+
+   override func sendControllerButtonReleased(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8) {
+
+       guard let client = webRTCClient else { return }
+
+       guard let buttonIndex = inputTypeToIndex(type) else {
+           Log.warning("Couldn't find an index for controller input type \(type.rawValue)")
+           return
+       }
+
+       var bytes: [UInt8] = []
+
+       bytes.append(PixelStreamingToStreamerMessage.GamepadButtonReleased.rawValue)
+       bytes.append(controllerIndex)
+       bytes.append(buttonIndex)
+       
+       client.sendData(Data(bytes))
+    }
+
+    
     func attachVideoTrack() {
         if let webRTC = webRTCClient, let view = self.webRTCView, let track = self.rtcVideoTrack {
             self.touchControls = TouchControls(webRTC, touchView: view)
@@ -225,6 +332,7 @@ extension WebRTCStreamingConnection: SignalClientDelegate {
     func signalClientDidDisconnect(_ signalClient: SignalingClient, error: Error?) {
         self.signalingConnected = false
         Log.info("Disconnected from signaling server")
+        self.delegate?.streamingConnection(self, didDisconnectWithError: error)
     }
     
     func signalClientDidReceiveError(_ signalClient: SignalingClient, error: Error?) {
@@ -329,6 +437,8 @@ extension WebRTCStreamingConnection: WebRTCClientDelegate {
             
         case .disconnected:
             self.delegate?.streamingConnection(self, didDisconnectWithError: nil)
+        case .failed:
+            self.delegate?.streamingConnection(self, didDisconnectWithError: NSError(domain: "", code: 1, userInfo: [NSLocalizedDescriptionKey : "Failed to connect." ] ))
         default:
             break
         }

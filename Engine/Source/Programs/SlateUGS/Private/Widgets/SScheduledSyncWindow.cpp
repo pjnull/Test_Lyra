@@ -6,6 +6,7 @@
 #include "UGSTab.h"
 #include "UGSTabManager.h"
 
+#include "Framework/Application/SlateApplication.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
@@ -20,9 +21,9 @@
 // Todo: remove checkbox and make the positive action button the thing that schedules the sync
 // Todo: show UI if a scheduled sync already exists and provide the ability to cancel it
 
-void SScheduledSyncWindow::Construct(const FArguments& InArgs)
+void SScheduledSyncWindow::Construct(const FArguments& InArgs, UGSTab* InTab)
 {
-	Tab = InArgs._Tab;
+	Tab = InTab;
 	UserSettings = Tab->GetUserSettings();
 
 	SWindow::Construct(SWindow::FArguments()
@@ -114,7 +115,7 @@ void SScheduledSyncWindow::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.HAlign(HAlign_Center)
-					.Text(LOCTEXT("CancelButtonText", "Cancel"))
+					.Text(LOCTEXT("CancelButtonText", "Close")) // Todo: temporary fix, change the text back to "Cancel" when canceling actually cancels changes
 					.OnClicked(this, &SScheduledSyncWindow::OnCancelClicked)
 				]
 			]

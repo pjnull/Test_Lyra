@@ -65,6 +65,7 @@
 #include "Misc/PackageAccessTrackingOps.h"
 #include "ProfilingDebugging/AssetMetadataTrace.h"
 #include "Containers/VersePath.h"
+#include "Serialization/LoadTimeTracePrivate.h"
 
 DEFINE_LOG_CATEGORY(LogObj);
 
@@ -1113,7 +1114,8 @@ void UObject::ConditionalPostLoad()
 				LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(Package, ELLMTagSet::Assets);
 				LLM_SCOPED_TAG_WITH_OBJECT_IN_SET(GetClass(), ELLMTagSet::AssetClasses);
 				UE_TRACE_METADATA_SCOPE_ASSET(Package, GetClass());
-
+				TRACE_LOADTIME_POSTLOAD_OBJECT_SCOPE(this);
+				
 				PostLoad();
 
 				LLM_PUSH_STATS_FOR_ASSET_TAGS();
@@ -1265,25 +1267,29 @@ bool UObject::Modify( bool bAlwaysMarkDirty/*=true*/ )
 
 	if (CanModify())
 	{
-		// Do not consider script packages, as they should never end up in the
-		// transaction buffer and we don't want to mark them dirty here either.
-		// We do want to consider PIE objects however
-		if ((GetOutermost()->HasAnyPackageFlags(PKG_ContainsScript | PKG_CompiledIn) == false || GetClass()->HasAnyClassFlags(CLASS_DefaultConfig | CLASS_Config)) &&
-			!HasAnyInternalFlags(EInternalObjectFlags::Async | EInternalObjectFlags::AsyncLoading))
+		// Only the game-thread should be allowed to touch the transaction buffer at all
+		if (!HasAnyInternalFlags(EInternalObjectFlags::Async | EInternalObjectFlags::AsyncLoading) && IsInGameThread())
 		{
-			// Attempt to mark the package dirty and save a copy of the object to the transaction
-			// buffer. The save will fail if there isn't a valid transactor, the object isn't
-			// transactional, etc.
-			bSavedToTransactionBuffer = SaveToTransactionBuffer(this, bAlwaysMarkDirty);
-
-			// If we failed to save to the transaction buffer, but the user requested the package
-			// marked dirty anyway, do so
-			if (!bSavedToTransactionBuffer && bAlwaysMarkDirty)
+			// Do not consider script packages, as they should never end up in the
+			// transaction buffer and we don't want to mark them dirty here either.
+			// We do want to consider PIE objects however
+			if (GetOutermost()->HasAnyPackageFlags(PKG_ContainsScript | PKG_CompiledIn) == false || GetClass()->HasAnyClassFlags(CLASS_DefaultConfig | CLASS_Config))
 			{
-				MarkPackageDirty();
+				// Attempt to mark the package dirty and save a copy of the object to the transaction
+				// buffer. The save will fail if there isn't a valid transactor, the object isn't
+				// transactional, etc.
+				bSavedToTransactionBuffer = SaveToTransactionBuffer(this, bAlwaysMarkDirty);
+
+				// If we failed to save to the transaction buffer, but the user requested the package
+				// marked dirty anyway, do so
+				if (!bSavedToTransactionBuffer && bAlwaysMarkDirty)
+				{
+					MarkPackageDirty();
+				}
 			}
+
+			FCoreUObjectDelegates::BroadcastOnObjectModified(this);
 		}
-		FCoreUObjectDelegates::BroadcastOnObjectModified(this);
 	}
 
 	return bSavedToTransactionBuffer;

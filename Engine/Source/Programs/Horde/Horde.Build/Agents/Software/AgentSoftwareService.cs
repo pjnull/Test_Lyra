@@ -65,14 +65,9 @@ namespace Horde.Build.Agents.Software
 	/// <summary>
 	/// Singleton document used to track different versions of the agent software
 	/// </summary>
-	[SingletonDocument("5f455039d97900f2b6c735a9")]
+	[SingletonDocument("agent-software-channels", "5f455039d97900f2b6c735a9")]
 	public class AgentSoftwareChannels : SingletonBase
 	{
-		/// <summary>
-		/// The next version number
-		/// </summary>
-		public int NextVersion { get; set; } = 1;
-
 		/// <summary>
 		/// List of channels
 		/// </summary>
@@ -213,32 +208,41 @@ namespace Horde.Build.Agents.Software
 		/// <summary>
 		/// Updates a new software revision
 		/// </summary>
-		/// <param name="name">Name of the channel</param>
-		/// <param name="author">Name of the user uploading this file</param>
 		/// <param name="data">The input data stream. This should be a zip archive containing the HordeAgent executable.</param>
-		/// <returns>Unique id for the file</returns>
-		public async Task<string> SetArchiveAsync(AgentSoftwareChannelName name, string? author, byte[] data)
+		/// <returns>Version number for the archive</returns>
+		public async Task<string> UploadArchiveAsync(byte[] data)
 		{
 			// Upload the software
 			string version = AgentUtilities.ReadVersion(data);
 			await _collection.AddAsync(version, data);
+			return version;
+		}
 
-			// Update the channel
-			for(; ;)
+		/// <summary>
+		/// Updates the software being used by a particular channel
+		/// </summary>
+		/// <param name="name">Name of the channel to update</param>
+		/// <param name="author">Name of the user updating the software</param>
+		/// <param name="version">New version of the software to use</param>
+		public async Task UpdateChannelAsync(AgentSoftwareChannelName name, string? author, string? version)
+		{
+			if (version != null)
 			{
-				AgentSoftwareChannels instance = await _singleton.GetAsync();
-
-				AgentSoftwareChannel channel = instance.FindOrAddChannel(name);
-				channel.ModifiedBy = author;
-				channel.ModifiedTime = DateTime.UtcNow;
-				channel.Version = version;
-
-				if (await _singleton.TryUpdateAsync(instance))
+				for (; ; )
 				{
-					break;
+					AgentSoftwareChannels instance = await _singleton.GetAsync();
+
+					AgentSoftwareChannel channel = instance.FindOrAddChannel(name);
+					channel.ModifiedBy = author;
+					channel.ModifiedTime = DateTime.UtcNow;
+					channel.Version = version;
+
+					if (await _singleton.TryUpdateAsync(instance))
+					{
+						break;
+					}
 				}
 			}
-			return version;
 		}
 
 		/// <summary>
@@ -270,6 +274,7 @@ namespace Horde.Build.Agents.Software
 		{
 			return _collection.GetAsync(version);
 		}
+
 		async Task RegisterDefaultAgent(int delayMs)
 		{
 			await Task.Delay(delayMs);
@@ -324,7 +329,8 @@ namespace Horde.Build.Agents.Software
 
 			bytes = AgentUtilities.UpdateAppSettings(bytes, agentSettings);
 
-			string version = await SetArchiveAsync(new AgentSoftwareChannelName("default"), null, bytes);
+			string version = await UploadArchiveAsync(bytes);
+			await UpdateChannelAsync(new AgentSoftwareChannelName("default"), null, version);
 
 			if (!DirectoryReference.Exists(agentHashFile.Directory))
 			{

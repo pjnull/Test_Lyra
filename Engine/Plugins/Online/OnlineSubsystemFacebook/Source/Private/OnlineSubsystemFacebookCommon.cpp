@@ -87,11 +87,16 @@ FString FOnlineSubsystemFacebookCommon::GetAppId() const
 
 bool FOnlineSubsystemFacebookCommon::Exec(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar)
 {
-	if (FOnlineSubsystemImpl::Exec(InWorld, Cmd, Ar))
+	bool bWasHandled = false;
+	if (FParse::Command(&Cmd, TEXT("FACEBOOK")))
 	{
-		return true;
+		bWasHandled = HandleFacebookExecCommands(InWorld, Cmd, Ar);
 	}
-	return false;
+	else if (FOnlineSubsystemImpl::Exec(InWorld, Cmd, Ar))
+	{
+		bWasHandled = true;
+	}
+	return bWasHandled;
 }
 
 IOnlineSessionPtr FOnlineSubsystemFacebookCommon::GetSessionInterface() const
@@ -212,4 +217,206 @@ IOnlineTournamentPtr FOnlineSubsystemFacebookCommon::GetTournamentInterface() co
 FText FOnlineSubsystemFacebookCommon::GetOnlineServiceName() const
 {
 	return NSLOCTEXT("OnlineSubsystemFacebook", "OnlineServiceName", "Facebook");
+}
+
+static bool ParseFacebookCommandArgsLocalNum(const TCHAR* Cmd, int32& LocalNum)
+{
+	FString LocalNumStr = FParse::Token(Cmd, false);
+	LocalNum = FCString::Atoi(*LocalNumStr);
+	return (!LocalNumStr.IsEmpty() && LocalNum >= 0 && LocalNum <= MAX_LOCAL_PLAYERS);
+}
+
+static bool ParseFacebookCommandArgsScopesAndLocalNum(const TCHAR* Cmd, EOnlineSharingCategory Mask, EOnlineSharingCategory& Scope, int32& LocalNum)
+{
+	FString ScopeStr = FParse::Token(Cmd, false);
+	Scope = EOnlineSharingCategory(FParse::HexNumber(*ScopeStr));
+	if ((Scope & Mask) == EOnlineSharingCategory::None)
+	{
+		return false;
+	}
+
+	return ParseFacebookCommandArgsLocalNum(Cmd, LocalNum);
+}
+
+bool FOnlineSubsystemFacebookCommon::HandleFacebookExecCommands(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar)
+{
+	bool bWasHandled = false;
+
+	if (FParse::Command(&Cmd, TEXT("LOGIN")))
+	{
+		bWasHandled = true;
+
+		int32 LocalNum = 0;
+		if (!ParseFacebookCommandArgsLocalNum(Cmd, LocalNum))
+		{
+			UE_LOG_ONLINE(Warning, TEXT("usage: LOGIN <localnum>"));
+		}
+		else
+		{
+			HandleFacebookLoginCommand(LocalNum);
+		}
+	}
+	else if (FParse::Command(&Cmd, TEXT("LOGOUT")))
+	{
+		bWasHandled = true;
+
+		int32 LocalNum = 0;
+		if (!ParseFacebookCommandArgsLocalNum(Cmd, LocalNum))
+		{
+			UE_LOG_ONLINE(Warning, TEXT("usage: LOGOUT <localnum>"));
+		}
+		else
+		{
+			HandleFacebookLogoutCommand(LocalNum);
+		}
+	}
+	else if (FParse::Command(&Cmd, TEXT("FRIENDS")))
+	{
+		bWasHandled = true;
+
+		int32 LocalNum = 0;
+		if (!ParseFacebookCommandArgsLocalNum(Cmd, LocalNum))
+		{
+			UE_LOG_ONLINE(Warning, TEXT("usage: LOGOUT <localnum>"));
+		}
+		else
+		{
+			HandleFacebookFriendsCommand(LocalNum);
+		}
+	}
+	else if (FParse::Command(&Cmd, TEXT("REQUESTREADSCOPES")))
+	{
+		bWasHandled = true;
+
+		EOnlineSharingCategory Scope = EOnlineSharingCategory::None;
+		int32 LocalNum = 0;
+
+		if (!ParseFacebookCommandArgsScopesAndLocalNum(Cmd, EOnlineSharingCategory::ReadPermissionMask, Scope, LocalNum))
+		{
+			UE_LOG_ONLINE(Warning, TEXT("usage: REQUESTREADSCOPES <read categories> <localnum>"));
+		}
+		else
+		{
+			HandleFacebookRequestReadScopesCommand(Scope, LocalNum);
+		}
+	}
+	else if (FParse::Command(&Cmd, TEXT("REQUESTPUBLISHSCOPES")))
+	{
+		bWasHandled = true;
+
+		EOnlineSharingCategory Scope = EOnlineSharingCategory::None;
+		int32 LocalNum = 0;
+
+		if (!ParseFacebookCommandArgsScopesAndLocalNum(Cmd, EOnlineSharingCategory::PublishPermissionMask, Scope, LocalNum))
+		{
+			UE_LOG_ONLINE(Warning, TEXT("usage: REQUESTPUBLISHSCOPES <publish categories> <localnum>"));
+		}
+		else
+		{
+			HandleFacebookRequestPublishScopesCommand(Scope, LocalNum);
+		}
+	}
+	return bWasHandled;
+}
+
+void FOnlineSubsystemFacebookCommon::HandleFacebookLoginCommand(int32 LocalNum)
+{
+	IOnlineIdentityPtr IdentityInt = GetIdentityInterface();
+	if (IdentityInt.IsValid())
+	{
+		if (IdentityInt->GetLoginStatus(LocalNum) == ELoginStatus::LoggedIn)
+		{
+			UE_LOG_ONLINE(Warning, TEXT("User %d already logged into Facebook. Nickname %s"), LocalNum, *IdentityInt->GetPlayerNickname(LocalNum));
+		}
+		else
+		{
+			FOnlineAccountCredentials AccountCredentials("", "", IdentityInt->GetAuthType());
+
+			TSharedPtr<FDelegateHandle> LoginCompleteHandle = MakeShared<FDelegateHandle>();
+			*LoginCompleteHandle = IdentityInt->AddOnLoginCompleteDelegate_Handle(LocalNum, FOnLoginCompleteDelegate::CreateLambda([IdentityInt = FacebookIdentity.Get(), LoginCompleteHandle](int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& /*UserId*/, const FString& Error)
+				{
+					if (bWasSuccessful)
+					{
+						UE_LOG_ONLINE(Log, TEXT("Facebook login succeeded for player %d. User nickname %s"), LocalUserNum, *IdentityInt->GetPlayerNickname(LocalUserNum));
+					}
+					else
+					{
+						UE_LOG_ONLINE(Log, TEXT("Facebook login failed for player %d: Error: %s"), LocalUserNum, *Error);
+					}
+					IdentityInt->ClearOnLoginCompleteDelegate_Handle(LocalUserNum, *LoginCompleteHandle);
+				}));
+			IdentityInt->Login(LocalNum, AccountCredentials);
+		}
+	}
+}
+
+void FOnlineSubsystemFacebookCommon::HandleFacebookLogoutCommand(int32 LocalNum)
+{
+	IOnlineIdentityPtr IdentityInt = GetIdentityInterface();
+	if (IdentityInt.IsValid())
+	{
+		if (IdentityInt->GetLoginStatus(LocalNum) == ELoginStatus::NotLoggedIn)
+		{
+			UE_LOG_ONLINE(Warning, TEXT("User %d not logged into Facebook"), LocalNum);
+			return;
+		}
+		TSharedPtr<FDelegateHandle> LogoutCompleteHandle = MakeShared<FDelegateHandle>();
+		*LogoutCompleteHandle = IdentityInt->AddOnLogoutCompleteDelegate_Handle(LocalNum, FOnLogoutCompleteDelegate::CreateLambda([IdentityInt = IdentityInt.Get(), LogoutCompleteHandle](int32 LocalUserNum, bool bWasSuccessful)
+			{
+				UE_LOG_ONLINE(Log, TEXT("Facebook logout %s for player %d"), bWasSuccessful ? TEXT("succeeded") : TEXT("failed"), LocalUserNum);
+				IdentityInt->ClearOnLogoutCompleteDelegate_Handle(LocalUserNum, *LogoutCompleteHandle);
+			}));
+		IdentityInt->Logout(LocalNum);
+	}
+}
+
+void FOnlineSubsystemFacebookCommon::HandleFacebookFriendsCommand(int32 LocalNum)
+{
+	IOnlineFriendsPtr FriendsInt = GetFriendsInterface();
+	if (FriendsInt.IsValid())
+	{
+		FriendsInt->ReadFriendsList(LocalNum, ToString(EFriendsLists::Default), FOnReadFriendsListComplete::CreateLambda([FriendsInt = FriendsInt.Get()](int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr) {
+			if (bWasSuccessful)
+			{
+				UE_LOG_ONLINE(Log, TEXT("Retrieve Facebook friends list %s for player %d succeeded"), *ListName, LocalUserNum);
+				TArray<TSharedRef<FOnlineFriend>> Friends;
+				FriendsInt->GetFriendsList(LocalUserNum, ListName, Friends);
+				UE_LOG_ONLINE(Log, TEXT("List of %d friends: %s"), Friends.Num(), *FString::JoinBy(Friends, TEXT(", "), [](const TSharedRef<FOnlineFriend>& Friend) { return Friend->GetRealName(); }));
+			}
+			else
+			{
+				UE_LOG_ONLINE(Warning, TEXT("Retrieve Facebook friends list %s for player %d failed: Error: %s"), *ListName, LocalUserNum, *ErrorStr);
+			}
+			}));
+	}
+}
+
+void FOnlineSubsystemFacebookCommon::HandleFacebookRequestPublishScopesCommand(EOnlineSharingCategory Scopes, int32 LocalNum)
+{
+	IOnlineSharingPtr SharingInt = GetSharingInterface();
+	if (SharingInt.IsValid())
+	{
+		TSharedPtr<FDelegateHandle> Handle = MakeShared<FDelegateHandle>();
+		*Handle = SharingInt->AddOnRequestNewPublishPermissionsCompleteDelegate_Handle(LocalNum, FOnRequestNewPublishPermissionsCompleteDelegate::CreateLambda([Handle, Scopes](int32 LocalUserNum, bool bWasSuccessful) mutable
+			{
+				UE_LOG_ONLINE(Log, TEXT("Publish permission request for player %d %s"), LocalUserNum, bWasSuccessful?TEXT("succeeded"):TEXT("failed"));
+				Handle.Reset();
+			}));
+		SharingInt->RequestNewPublishPermissions(LocalNum, Scopes, EOnlineStatusUpdatePrivacy::Everyone);
+	}
+}
+
+void FOnlineSubsystemFacebookCommon::HandleFacebookRequestReadScopesCommand(EOnlineSharingCategory Scopes, int32 LocalNum)
+{
+	IOnlineSharingPtr SharingInt = GetSharingInterface();
+	if (SharingInt.IsValid())
+	{
+		TSharedPtr<FDelegateHandle> Handle = MakeShared<FDelegateHandle>();
+		*Handle = SharingInt->AddOnRequestNewReadPermissionsCompleteDelegate_Handle(LocalNum, FOnRequestNewReadPermissionsCompleteDelegate::CreateLambda([Handle, Scopes](int32 LocalUserNum, bool bWasSuccessful) mutable
+			{
+				UE_LOG_ONLINE(Log, TEXT("Read permission request for player %d %s"), LocalUserNum, bWasSuccessful?TEXT("succeeded"):TEXT("failed"));
+				Handle.Reset();
+			}));
+		SharingInt->RequestNewReadPermissions(LocalNum, Scopes);
+	}
 }

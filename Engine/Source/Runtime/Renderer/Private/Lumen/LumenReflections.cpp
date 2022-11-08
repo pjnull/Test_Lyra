@@ -593,7 +593,7 @@ FLumenReflectionTileParameters ReflectionTileClassification(
 	FLumenReflectionTileParameters ReflectionTileParameters;
 
 	const bool bFrontLayer = FrontLayerReflectionGBuffer != nullptr;
-	const FIntPoint EffectiveTextureResolution = bFrontLayer ? SceneTextures.Config.Extent : Strata::GetStrataTextureResolution(SceneTextures.Config.Extent);
+	const FIntPoint EffectiveTextureResolution = bFrontLayer ? SceneTextures.Config.Extent : Strata::GetStrataTextureResolution(View, SceneTextures.Config.Extent);
 
 	const FIntPoint ResolveTileViewportDimensions(
 		FMath::DivideAndRoundUp(View.ViewRect.Size().X, GReflectionResolveTileSize), 
@@ -790,7 +790,7 @@ void UpdateHistoryReflections(
 	const FRDGSystemTextures& SystemTextures = FRDGSystemTextures::Get(GraphBuilder);
 	FRDGTextureRef VelocityTexture = GetIfProduced(SceneTextures.Velocity, SystemTextures.Black);
 
-	const FIntPoint EffectiveResolution = Strata::GetStrataTextureResolution(SceneTextures.Config.Extent);
+	const FIntPoint EffectiveResolution = Strata::GetStrataTextureResolution(View, SceneTextures.Config.Extent);
 
 	FRDGTextureDesc NumHistoryFramesAccumulatedDesc = FRDGTextureDesc::Create2D(EffectiveResolution, PF_G8, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV);
 	FRDGTextureRef NewNumHistoryFramesAccumulated = GraphBuilder.CreateTexture(NumHistoryFramesAccumulatedDesc, TEXT("Lumen.Reflections.NumHistoryFramesAccumulated"));
@@ -965,7 +965,7 @@ FRDGTextureRef FDeferredShadingSceneRenderer::RenderLumenReflections(
 	FIntPoint BufferSize = FIntPoint::DivideAndRoundUp(SceneTextures.Config.Extent, (int32)ReflectionTracingParameters.ReflectionDownsampleFactor);
 	if (!bFrontLayer && !bSingleLayerWater)
 	{
-		BufferSize = Strata::GetStrataTextureResolution(BufferSize);
+		BufferSize = Strata::GetStrataTextureResolution(View, BufferSize);
 	}
 
 	ReflectionTracingParameters.ReflectionTracingViewSize = ViewSize;
@@ -1084,7 +1084,7 @@ FRDGTextureRef FDeferredShadingSceneRenderer::RenderLumenReflections(
 		GVisualizeReflectionTracesData = GraphBuilder.ConvertToExternalBuffer(VisualizeTracesData);
 	}
 
-	const FIntPoint EffectiveTextureResolution = (bFrontLayer || bSingleLayerWater) ? SceneTextures.Config.Extent : Strata::GetStrataTextureResolution(SceneTextures.Config.Extent);
+	const FIntPoint EffectiveTextureResolution = (bFrontLayer || bSingleLayerWater) ? SceneTextures.Config.Extent : Strata::GetStrataTextureResolution(View, SceneTextures.Config.Extent);
 
 	FRDGTextureRef ResolvedSpecularIndirect = GraphBuilder.CreateTexture(
 			FRDGTextureDesc::Create2D(EffectiveTextureResolution, PF_FloatRGB, FClearValueBinding::Transparent, TexCreate_ShaderResource | TexCreate_UAV),

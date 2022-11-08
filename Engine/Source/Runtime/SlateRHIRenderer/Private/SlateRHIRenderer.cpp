@@ -203,6 +203,7 @@ FSlateRHIRenderer::FSlateRHIRenderer(TSharedRef<FSlateFontServices> InSlateFontS
 	, EnqueuedWindowDrawBuffer(NULL)
 	, FreeBufferIndex(0)
 	, FastPathRenderingDataCleanupList(nullptr)
+	, bUpdateHDRDisplayInformation(false)
 	, CurrentSceneIndex(-1)
 	, ResourceVersion(0)
 {
@@ -215,6 +216,7 @@ FSlateRHIRenderer::FSlateRHIRenderer(TSharedRef<FSlateFontServices> InSlateFontS
 
 	bTakingAScreenShot = false;
 	OutScreenshotData = NULL;
+	OutHDRScreenshotData = NULL;
 	ScreenshotViewportInfo = nullptr;
 	bIsStandaloneStereoOnlyDevice = IHeadMountedDisplayModule::IsAvailable() && IHeadMountedDisplayModule::Get().IsStandaloneStereoOnlyDevice();
 }
@@ -498,6 +500,14 @@ void FSlateRHIRenderer::ConditionalResizeViewport(FViewportInfo* ViewInfo, uint3
 		// Reset texture streaming texture updates.
 		ResumeTextureStreamingRenderTasks();
 	}
+}
+
+void FSlateRHIRenderer::OnVirtualDesktopSizeChanged(const FDisplayMetrics& NewDisplayMetric)
+{
+	// Defer the update to as we need to call FlushRenderingCommands() before sending the event to the RHI. 
+	// FlushRenderingCommands -> FRenderCommandFence::IsFenceComplete -> CheckRenderingThreadHealth -> FPlatformApplicationMisc::PumpMessages
+	// The Display change event is not been consumed yet, and we do BroadcastDisplayMetricsChanged -> OnVirtualDesktopSizeChanged again
+	bUpdateHDRDisplayInformation = true;
 }
 
 void FSlateRHIRenderer::UpdateFullscreenState(const TSharedRef<SWindow> Window, uint32 OverrideResX, uint32 OverrideResY)
@@ -1445,7 +1455,14 @@ void FSlateRHIRenderer::DrawWindow_RenderThread(FRHICommandListImmediate& RHICmd
 
 		if (!ClampedScreenshotRect.IsEmpty())
 		{
-			RHICmdList.ReadSurfaceData(BackBuffer, ClampedScreenshotRect, *OutScreenshotData, FReadSurfaceDataFlags());
+			if (OutHDRScreenshotData != nullptr)
+			{
+				RHICmdList.ReadSurfaceData(BackBuffer, ClampedScreenshotRect, *OutHDRScreenshotData, FReadSurfaceDataFlags());
+			}
+			else
+			{
+				RHICmdList.ReadSurfaceData(BackBuffer, ClampedScreenshotRect, *OutScreenshotData, FReadSurfaceDataFlags());
+			}
 		}
 		else
 		{
@@ -1453,6 +1470,7 @@ void FSlateRHIRenderer::DrawWindow_RenderThread(FRHICommandListImmediate& RHICmd
 		}
 		bTakingAScreenShot = false;
 		OutScreenshotData = nullptr;
+		OutHDRScreenshotData = nullptr;
 		ScreenshotViewportInfo = nullptr;
 	}
 
@@ -1552,6 +1570,18 @@ void FSlateRHIRenderer::PrepareToTakeScreenshot(const FIntRect& Rect, TArray<FCo
 	bTakingAScreenShot = true;
 	ScreenshotRect = Rect;
 	OutScreenshotData = OutColorData;
+	OutHDRScreenshotData = nullptr;
+	ScreenshotViewportInfo = *WindowToViewportInfo.Find(InScreenshotWindow);
+}
+
+void FSlateRHIRenderer::PrepareToTakeHDRScreenshot(const FIntRect& Rect, TArray<FLinearColor>* OutColorData, SWindow* InScreenshotWindow)
+{
+	check(OutColorData);
+
+	bTakingAScreenShot = true;
+	ScreenshotRect = Rect;
+	OutScreenshotData = nullptr;
+	OutHDRScreenshotData = OutColorData;
 	ScreenshotViewportInfo = *WindowToViewportInfo.Find(InScreenshotWindow);
 }
 
@@ -1564,6 +1594,12 @@ void FSlateRHIRenderer::DrawWindows_Private(FSlateDrawBuffer& WindowDrawBuffer)
 {
 	checkSlow(IsThreadSafeForSlateRendering());
 
+	if (bUpdateHDRDisplayInformation)
+	{
+		FlushRenderingCommands();
+		RHIHandleDisplayChange();
+		bUpdateHDRDisplayInformation = false;
+	}
 
 	FSlateRHIRenderingPolicy* Policy = RenderingPolicy.Get();
 	ENQUEUE_RENDER_COMMAND(SlateBeginDrawingWindowsCommand)(

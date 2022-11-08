@@ -1,300 +1,217 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-using EpicGames.Core;
-using EpicGames.Serialization;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Reflection.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
+using EpicGames.Core;
 
 namespace EpicGames.Horde.Storage
 {
 	/// <summary>
-	/// Base class for exceptions related to store
+	/// Exception for a ref not existing
 	/// </summary>
-	public class StorageException : Exception
+	public sealed class RefNameNotFoundException : Exception
 	{
 		/// <summary>
-		/// Constructor
+		/// Name of the missing ref
 		/// </summary>
-		public StorageException(string message, Exception? innerException)
-			: base(message, innerException)
-		{
-		}
-	}
-
-	/// <summary>
-	/// Base class for blob exceptions
-	/// </summary>
-	public class BlobException : StorageException
-	{
-		/// <summary>
-		/// Namespace containing the blob
-		/// </summary>
-		public NamespaceId NamespaceId { get; }
-
-		/// <summary>
-		/// Hash of the blob
-		/// </summary>
-		public IoHash Hash { get; }
+		public RefName Name { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public BlobException(NamespaceId namespaceId, IoHash hash, string message, Exception? innerException = null)
-			: base(message, innerException)
+		/// <param name="name"></param>
+		public RefNameNotFoundException(RefName name)
+			: base($"Ref name '{name}' not found")
 		{
-			NamespaceId = namespaceId;
-			Hash = hash;
+			Name = name;
 		}
 	}
 
 	/// <summary>
-	/// Exception thrown for missing blobs
+	/// Value for a ref
 	/// </summary>
-	public sealed class BlobNotFoundException : BlobException
+	[DebuggerDisplay("{Target}")]
+	public class RefValue
 	{
 		/// <summary>
-		/// Constructor
+		/// Target for the ref
 		/// </summary>
-		public BlobNotFoundException(NamespaceId namespaceId, IoHash hash, Exception? innerException = null)
-			: base(namespaceId, hash, $"Unable to find blob {hash} in {namespaceId}", innerException)
-		{
-		}
-	}
-
-	/// <summary>
-	/// Base class for ref exceptions
-	/// </summary>
-	public class RefException : StorageException
-	{
-		/// <summary>
-		/// Namespace containing the ref
-		/// </summary>
-		public NamespaceId NamespaceId { get; }
+		public NodeLocator Target { get; }
 
 		/// <summary>
-		/// Bucket containing the ref
+		/// Bundle referenced as the target
 		/// </summary>
-		public BucketId BucketId { get; }
-
-		/// <summary>
-		/// Identifier for the ref
-		/// </summary>
-		public RefId RefId { get; }
+		public Bundle Bundle { get; }
 
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public RefException(NamespaceId namespaceId, BucketId bucketId, RefId refId, string message, Exception? innerException = null)
-			: base(message, innerException)
+		public RefValue(NodeLocator target, Bundle bundle)
 		{
-			NamespaceId = namespaceId;
-			BucketId = bucketId;
-			RefId = refId;
+			Target = target;
+			Bundle = bundle;
 		}
 	}
 
 	/// <summary>
-	/// Indicates that a named reference wasn't found
+	/// Options for a new ref
 	/// </summary>
-	public sealed class RefNotFoundException : RefException
+	public class RefOptions
 	{
+		/// <summary>
+		/// Time until a ref is expired
+		/// </summary>
+		public TimeSpan? Lifetime { get; set; }
+
+		/// <summary>
+		/// Whether to extend the remaining lifetime of a ref whenever it is fetched. Defaults to true.
+		/// </summary>
+		public bool? Extend { get; set; }
+	}
+
+	/// <summary>
+	/// Locates a node in storage
+	/// </summary>
+	public struct NodeLocator
+	{
+		/// <summary>
+		/// Location of the blob containing this node
+		/// </summary>
+		public BlobLocator Blob { get; }
+
+		/// <summary>
+		/// Index of the export within the blob
+		/// </summary>
+		public int ExportIdx { get; }
+
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public RefNotFoundException(NamespaceId namespaceId, BucketId bucketId, RefId refId, Exception? innerException = null)
-			: base(namespaceId, bucketId, refId, $"Ref {namespaceId}/{bucketId}/{refId} not found", innerException)
+		public NodeLocator(BlobLocator blob, int exportIdx)
 		{
+			Blob = blob;
+			ExportIdx = exportIdx;
 		}
+
+		/// <summary>
+		/// Determines if this locator points to a valid entry
+		/// </summary>
+		public bool IsValid() => Blob.IsValid();
+
+		/// <inheritdoc/>
+		public override string ToString() => $"{Blob}#{ExportIdx}";
 	}
 
 	/// <summary>
-	/// Indicates that a ref cannot be finalized due to a missing blob
-	/// </summary>
-	public sealed class RefMissingBlobException : RefException
-	{
-		/// <summary>
-		/// Constructor
-		/// </summary>
-		public RefMissingBlobException(NamespaceId namespaceId, BucketId bucketId, RefId refId, List<IoHash> missingBlobs, Exception? innerException = null)
-			: base(namespaceId, bucketId, refId, $"Ref {namespaceId}/{bucketId}/{refId} cannot be finalized; missing {missingBlobs.Count} blobs ({missingBlobs[0]}...)", innerException)
-		{
-		}
-	}
-
-	/// <summary>
-	/// Interface for an object reference
-	/// </summary>
-	public interface IRef
-	{
-		/// <summary>
-		/// Namespace identifier
-		/// </summary>
-		NamespaceId NamespaceId { get; }
-
-		/// <summary>
-		/// Bucket identifier
-		/// </summary>
-		BucketId BucketId { get; }
-
-		/// <summary>
-		/// Ref identifier
-		/// </summary>
-		RefId RefId { get; }
-
-		/// <summary>
-		/// The value stored for this ref
-		/// </summary>
-		CbObject Value { get; }
-	}
-
-	/// <summary>
-	/// Base interface for a storage client that only records blobs.
+	/// Base interface for a low-level storage backend. Blobs added to this store are not content addressed, but referenced by <see cref="BlobLocator"/>.
 	/// </summary>
 	public interface IStorageClient
 	{
 		#region Blobs
 
 		/// <summary>
-		/// Opens a blob read stream
+		/// Reads raw data for a blob from the store
 		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="hash">Hash of the blob</param>
+		/// <param name="locator">The blob locator</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Stream for the blob, or null if it does not exist</returns>
-		Task<Stream> ReadBlobAsync(NamespaceId namespaceId, IoHash hash, CancellationToken cancellationToken = default);
-		
-		/// <summary>
-		/// Opens a blob read stream for compressed blobs
-		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="uncompressedHash">Hash of the uncompressed blob</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Stream for the blob, or null if it does not exist</returns>
-		Task<Stream> ReadCompressedBlobAsync(NamespaceId namespaceId, IoHash uncompressedHash, CancellationToken cancellationToken = default);
+		/// <returns>Stream containing the data</returns>
+		Task<Stream> ReadBlobAsync(BlobLocator locator, CancellationToken cancellationToken = default);
 
 		/// <summary>
-		/// Writes a blob to storage
+		/// Reads a ranged chunk from a blob
 		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="hash">Hash of the blob</param>
-		/// <param name="stream">The stream to write</param>
+		/// <param name="locator">Locator for the blob</param>
+		/// <param name="offset">Starting offset for the data to read</param>
+		/// <param name="length">Length of the data</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		Task WriteBlobAsync(NamespaceId namespaceId, IoHash hash, Stream stream, CancellationToken cancellationToken = default);
+		Task<Stream> ReadBlobRangeAsync(BlobLocator locator, int offset, int length, CancellationToken cancellationToken = default);
 
 		/// <summary>
-		/// Writes a blob to storage and calculates hash
+		/// Writes a new blob to the store
 		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="stream">The stream to write</param>
+		/// <param name="stream">Blob data</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Hash of the blob written</returns>
-		Task<IoHash> WriteBlobAsync(NamespaceId namespaceId, Stream stream, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Writes a compressed blob to storage
-		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="uncompressedHash">Hash of the blob</param>
-		/// <param name="compressedStream">Compressed stream to write</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		Task WriteCompressedBlobAsync(NamespaceId namespaceId, IoHash uncompressedHash, Stream compressedStream, CancellationToken cancellationToken = default);
-		
-		/// <summary>
-		/// Writes a compressed blob to storage and calculates hash
-		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="compressedStream">Compressed stream to write</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Hash of uncompressed blob</returns>
-		Task<IoHash> WriteCompressedBlobAsync(NamespaceId namespaceId, Stream compressedStream, CancellationToken cancellationToken = default);
-		
-		/// <summary>
-		/// Checks if the given blob exists
-		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="hash">Hash of the blob</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>True if the blob exists, false if it did not exist</returns>
-		Task<bool> HasBlobAsync(NamespaceId namespaceId, IoHash hash, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Checks if a list of blobs exist, returning the set of missing blobs
-		/// </summary>
-		/// <param name="namespaceId">Namespace to operate on</param>
-		/// <param name="hashes">Set of hashes to check</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>A set of the missing hashes</returns>
-		Task<HashSet<IoHash>> FindMissingBlobsAsync(NamespaceId namespaceId, HashSet<IoHash> hashes, CancellationToken cancellationToken = default);
+		/// <param name="prefix">Prefix for blob names. While the returned BlobId is guaranteed to be unique, this name can be used as a prefix to aid debugging.</param>
+		/// <returns>Unique identifier for the blob</returns>
+		Task<BlobLocator> WriteBlobAsync(Stream stream, Utf8String prefix = default, CancellationToken cancellationToken = default);
 
 		#endregion
+
+		#region Nodes
+
+		/// <summary>
+		/// Reads a node from a bundle
+		/// </summary>
+		/// <param name="locator">Locator for the node</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>Node data read from the given bundle</returns>
+		ValueTask<TNode> ReadNodeAsync<TNode>(NodeLocator locator, CancellationToken cancellationToken = default) where TNode : TreeNode;
+
+		/// <summary>
+		/// Reads data for a ref from the store, along with the node's contents.
+		/// </summary>
+		/// <param name="name">The ref name</param>
+		/// <param name="cacheTime">Minimum coherency for any cached value to be returned</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>Node for the given ref, or null if it does not exist</returns>
+		Task<TNode?> TryReadNodeAsync<TNode>(RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default) where TNode : TreeNode;
+
+		#endregion
+
 		#region Refs
 
 		/// <summary>
-		/// Gets the given reference
+		/// Reads data for a ref from the store
 		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refId">Name of the reference</param>
+		/// <param name="name">The ref name</param>
+		/// <param name="cacheTime">Minimum coherency for any cached value to be returned</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>The reference data if the ref exists</returns>
-		Task<IRef> GetRefAsync(NamespaceId namespaceId, BucketId bucketId, RefId refId, CancellationToken cancellationToken = default);
+		/// <returns>Node pointed to by the ref</returns>
+		Task<NodeLocator> TryReadRefTargetAsync(RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default);
 
 		/// <summary>
-		/// Checks if the given reference exists
+		/// Writes a new ref to the store which points to a new blob
 		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refId">Ref identifier</param>
+		/// <param name="name">Ref to write</param>
+		/// <param name="bundle">The bundle to write</param>
+		/// <param name="exportIdx">Index of the export in the bundle to be the root of the tree</param>
+		/// <param name="prefix">Prefix for blob names.</param>
+		/// <param name="options">Options for the new ref</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>True if the ref exists, false if it did not exist</returns>
-		Task<bool> HasRefAsync(NamespaceId namespaceId, BucketId bucketId, RefId refId, CancellationToken cancellationToken = default);
+		/// <returns>Unique identifier for the blob</returns>
+		Task<NodeLocator> WriteRefAsync(RefName name, Bundle bundle, int exportIdx, Utf8String prefix = default, RefOptions? options = null, CancellationToken cancellationToken = default);
 
 		/// <summary>
-		/// Determines which refs are missing
+		/// Writes a new ref to the store
 		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refIds">Names of the references</param>
+		/// <param name="name">Ref to write</param>
+		/// <param name="target">The target for the ref</param>
+		/// <param name="options">Options for the new ref</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>List of missing references</returns>
-		Task<List<RefId>> FindMissingRefsAsync(NamespaceId namespaceId, BucketId bucketId, List<RefId> refIds, CancellationToken cancellationToken = default);
+		/// <returns>Unique identifier for the blob</returns>
+		Task WriteRefTargetAsync(RefName name, NodeLocator target, RefOptions? options = null, CancellationToken cancellationToken = default);
 
 		/// <summary>
-		/// Attempts to sets the given reference, returning a list of missing objects on failure.
+		/// Reads data for a ref from the store
 		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refId">Ref identifier</param>
-		/// <param name="value">New value for the reference</param>
+		/// <param name="name">The ref identifier</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>List of missing references</returns>
-		Task<List<IoHash>> TrySetRefAsync(NamespaceId namespaceId, BucketId bucketId, RefId refId, CbObject value, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Attempts to finalize a reference, turning its references into hard references
-		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refId">Ref identifier</param>
-		/// <param name="hash">Hash of the referenced object</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns></returns>
-		Task<List<IoHash>> TryFinalizeRefAsync(NamespaceId namespaceId, BucketId bucketId, RefId refId, IoHash hash, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Removes the given reference
-		/// </summary>
-		/// <param name="namespaceId">Namespace identifier</param>
-		/// <param name="bucketId">Bucket identifier</param>
-		/// <param name="refId">Ref identifier</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>True if the ref was deleted, false if it did not exist</returns>
-		Task<bool> DeleteRefAsync(NamespaceId namespaceId, BucketId bucketId, RefId refId, CancellationToken cancellationToken = default);
+		Task DeleteRefAsync(RefName name, CancellationToken cancellationToken = default);
 
 		#endregion
+	}
+
+	/// <summary>
+	/// Typed implementation of <see cref="IStorageClient"/> for use with dependency injection
+	/// </summary>
+	public interface IStorageClient<T> : IStorageClient
+	{
 	}
 
 	/// <summary>
@@ -302,257 +219,230 @@ namespace EpicGames.Horde.Storage
 	/// </summary>
 	public static class StorageClientExtensions
 	{
-		const int DefaultMaxInMemoryBlobLength = 128 * 1024 * 1024;
+		class TypedStorageClient<T> : IStorageClient<T>
+		{
+			readonly IStorageClient _inner;
+
+			public TypedStorageClient(IStorageClient inner) => _inner = inner;
+
+			#region Blobs
+
+			/// <inheritdoc/>
+			public Task<Stream> ReadBlobAsync(BlobLocator locator, CancellationToken cancellationToken = default) => _inner.ReadBlobAsync(locator, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<Stream> ReadBlobRangeAsync(BlobLocator locator, int offset, int length, CancellationToken cancellationToken = default) => _inner.ReadBlobRangeAsync(locator, offset, length, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<BlobLocator> WriteBlobAsync(Stream stream, Utf8String prefix = default, CancellationToken cancellationToken = default) => _inner.WriteBlobAsync(stream, prefix, cancellationToken);
+
+			#endregion
+
+			#region Trees
+
+			/// <inheritdoc/>
+			public ValueTask<TNode> ReadNodeAsync<TNode>(NodeLocator locator, CancellationToken cancellationToken = default) where TNode : TreeNode => _inner.ReadNodeAsync<TNode>(locator, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<TNode?> TryReadNodeAsync<TNode>(RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default) where TNode : TreeNode => _inner.TryReadNodeAsync<TNode>(name, cacheTime, cancellationToken);
+
+			#endregion
+
+			#region Refs
+
+			/// <inheritdoc/>
+			public Task DeleteRefAsync(RefName name, CancellationToken cancellationToken = default) => _inner.DeleteRefAsync(name, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<NodeLocator> TryReadRefTargetAsync(RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default) => _inner.TryReadRefTargetAsync(name, cacheTime, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task<NodeLocator> WriteRefAsync(RefName name, Bundle bundle, int exportIdx = 0, Utf8String prefix = default, RefOptions? options = null, CancellationToken cancellationToken = default) => _inner.WriteRefAsync(name, bundle, exportIdx, prefix, options, cancellationToken);
+
+			/// <inheritdoc/>
+			public Task WriteRefTargetAsync(RefName name, NodeLocator target, RefOptions? options = null, CancellationToken cancellationToken = default) => _inner.WriteRefTargetAsync(name, target, options, cancellationToken);
+
+			#endregion
+		}
 
 		/// <summary>
-		/// Gets a blob as a byte array
+		/// Wraps a <see cref="IStorageClient"/> interface with a type argument
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="hash">Hash of the blob to read</param>
-		/// <param name="maxInMemoryBlobLength">Maximum allowed memory allocation to store the blob</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Data for the blob that was read. Throws an exception if the blob was not found.</returns>
-		public static Task<byte[]> ReadBlobToMemoryAsync(this IStorageClient storageClient, NamespaceId namespaceId, IoHash hash, int maxInMemoryBlobLength = DefaultMaxInMemoryBlobLength, CancellationToken cancellationToken = default)
-		{
-			return ReadBlobToMemoryAsync(storageClient, false, namespaceId, hash, maxInMemoryBlobLength, cancellationToken);
-		}
-		
-		/// <summary>
-		/// Gets a compressed blob as a byte array
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="hash">Hash of the blob to read</param>
-		/// <param name="maxInMemoryBlobLength">Maximum allowed memory allocation to store the blob</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Data for the blob that was read. Throws an exception if the blob was not found.</returns>
-		public static Task<byte[]> ReadCompressedBlobToMemoryAsync(this IStorageClient storageClient, NamespaceId namespaceId, IoHash hash, int maxInMemoryBlobLength = DefaultMaxInMemoryBlobLength, CancellationToken cancellationToken = default)
-		{
-			return ReadBlobToMemoryAsync(storageClient, true, namespaceId, hash, maxInMemoryBlobLength, cancellationToken);
-		}
-		
-		private static async Task<byte[]> ReadBlobToMemoryAsync(IStorageClient storageClient, bool isBlobCompressed, NamespaceId namespaceId, IoHash hash, int maxInMemoryBlobLength = DefaultMaxInMemoryBlobLength, CancellationToken cancellationToken = default)
-		{
-			using Stream stream = isBlobCompressed
-				? await storageClient.ReadCompressedBlobAsync(namespaceId, hash, cancellationToken)
-				: await storageClient.ReadBlobAsync(namespaceId, hash, cancellationToken);
+		/// <param name="blobStore">Regular blob store instance</param>
+		/// <returns></returns>
+		public static IStorageClient<T> ForType<T>(this IStorageClient blobStore) => new TypedStorageClient<T>(blobStore);
 
-			long length = stream.Length;
-			if (length > maxInMemoryBlobLength)
+		#region Bundles
+
+		/// <summary>
+		/// Reads a bundle from the given blob id, or retrieves it from the cache
+		/// </summary>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="locator"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<Bundle> ReadBundleAsync(this IStorageClient store, BlobLocator locator, CancellationToken cancellationToken = default)
+		{
+			using (Stream stream = await store.ReadBlobAsync(locator, cancellationToken))
 			{
-				throw new BlobException(namespaceId, hash, $"Blob {hash} is too large ({length} > {maxInMemoryBlobLength})");
+				return await Bundle.FromStreamAsync(stream, cancellationToken);
 			}
+		}
 
-			byte[] buffer = new byte[length];
-			for (int offset = 0; offset < length;)
+		/// <summary>
+		/// Writes a new bundle to the store
+		/// </summary>
+		/// <param name="store">The store instance to write to</param>
+		/// <param name="bundle">Bundle data</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <param name="prefix">Prefix for blob names. While the returned BlobId is guaranteed to be unique, this name can be used as a prefix to aid debugging.</param>
+		/// <returns>Unique identifier for the blob</returns>
+		public static async Task<BlobLocator> WriteBundleAsync(this IStorageClient store, Bundle bundle, Utf8String prefix = default, CancellationToken cancellationToken = default)
+		{
+			using ReadOnlySequenceStream stream = new ReadOnlySequenceStream(bundle.AsSequence());
+			return await store.WriteBlobAsync(stream, prefix, cancellationToken);
+		}
+
+		#endregion
+
+		#region Nodes
+
+		/// <summary>
+		/// Attempts to reads a ref from the store
+		/// </summary>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Name of the ref</param>
+		/// <param name="maxAge">Maximum age of any cached ref</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>The ref value</returns>
+		public static Task<TNode?> TryReadNodeAsync<TNode>(this IStorageClient store, RefName name, TimeSpan maxAge, CancellationToken cancellationToken = default) where TNode : TreeNode
+		{
+			return store.TryReadNodeAsync<TNode>(name, DateTime.UtcNow - maxAge, cancellationToken);
+		}
+
+		/// <summary>
+		/// Reads a ref from the store, throwing an exception if it does not exist
+		/// </summary>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Id for the ref</param>
+		/// <param name="cacheTime">Minimum coherency of any cached result</param>
+		/// <param name="cancellationToken">Cancellation token for the operation</param>
+		/// <returns>The blob instance</returns>
+		public static async Task<TNode> ReadNodeAsync<TNode>(this IStorageClient store, RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default) where TNode : TreeNode
+		{
+			TNode? refValue = await store.TryReadNodeAsync<TNode>(name, cacheTime, cancellationToken);
+			if (refValue == null)
 			{
-				int count = await stream.ReadAsync(buffer, offset, (int)length - offset, cancellationToken);
-				if (count == 0)
-				{
-					throw new BlobException(namespaceId, hash, $"Unexpected end of stream reading blob {hash}");
-				}
-				offset += count;
+				throw new RefNameNotFoundException(name);
 			}
-
-			return buffer;
+			return refValue;
 		}
 
 		/// <summary>
-		/// Writes a blob from memory to storage
+		/// Reads a ref from the store, throwing an exception if it does not exist
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="data">Data to write</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Id for the ref</param>
+		/// <param name="maxAge">Maximum age for any cached result</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns></returns>
-		public static async Task<IoHash> WriteBlobFromMemoryAsync(this IStorageClient storageClient, NamespaceId namespaceId, ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+		/// <returns>The ref value</returns>
+		public static Task<TNode> ReadNodeAsync<TNode>(this IStorageClient store, RefName name, TimeSpan maxAge, CancellationToken cancellationToken = default) where TNode : TreeNode
 		{
-			IoHash hash = IoHash.Compute(data.Span);
-			await WriteBlobFromMemoryAsync(storageClient, namespaceId, hash, data, cancellationToken);
-			return hash;
+			return ReadNodeAsync<TNode>(store, name, DateTime.UtcNow - maxAge, cancellationToken);
 		}
 
 		/// <summary>
-		/// Writes a blob from memory to storage
+		/// Writes a node to storage
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="hash">Hash of the data</param>
-		/// <param name="data">The data to be written</param>
+		/// <param name="store">Store instance to write to</param>
+		/// <param name="name">Name of the ref containing this node</param>
+		/// <param name="node">Node to be written</param>
+		/// <param name="options">Options for the node writer</param>
+		/// <param name="prefix">Prefix for uploaded blobs</param>
+		/// <param name="refOptions">Options for the ref</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns></returns>
-		public static async Task WriteBlobFromMemoryAsync(this IStorageClient storageClient, NamespaceId namespaceId, IoHash hash, ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+		/// <returns>Location of node targetted by the ref</returns>
+		public static async Task<NodeLocator> WriteNodeAsync(this IStorageClient store, RefName name, TreeNode node, TreeOptions? options = null, Utf8String prefix = default, RefOptions? refOptions = null, CancellationToken cancellationToken = default)
 		{
-			using ReadOnlyMemoryStream stream = new ReadOnlyMemoryStream(data);
-			await storageClient.WriteBlobAsync(namespaceId, hash, stream, cancellationToken);
+			TreeWriter writer = new TreeWriter(store, options, prefix.IsEmpty ? name.Text : prefix);
+			return await writer.WriteRefAsync(name, node, refOptions, cancellationToken);
 		}
 
-		/// <summary>
-		/// Reads a blob and deserializes it as the given compact-binary encoded type
-		/// </summary>
-		/// <typeparam name="T">Type of object to deserialize</typeparam>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="hash">Hash of the blob to read</param>
-		/// <param name="maxInMemoryBlobLength">Maximum allowed memory allocation to store the blob</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>The decoded object</returns>
-		public static async Task<T> ReadBlobAsync<T>(this IStorageClient storageClient, NamespaceId namespaceId, IoHash hash, int maxInMemoryBlobLength = DefaultMaxInMemoryBlobLength, CancellationToken cancellationToken = default)
-		{
-			ReadOnlyMemory<byte> data = await ReadBlobToMemoryAsync(storageClient, namespaceId, hash, maxInMemoryBlobLength, cancellationToken);
-			return CbSerializer.Deserialize<T>(data);
-		}
+		#endregion
+
+		#region Refs
 
 		/// <summary>
-		/// Serializes an object to compact binary format and writes it to storage
+		/// Checks if the given ref exists
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the blob</param>
-		/// <param name="blob">The object to be written</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns></returns>
-		public static async Task<IoHash> WriteBlobAsync<T>(this IStorageClient storageClient, NamespaceId namespaceId, T blob, CancellationToken cancellationToken = default)
-		{
-			CbWriter writer = new CbWriter();
-			CbSerializer.Serialize<T>(writer, blob);
-
-			IoHash hash = writer.ComputeHash();
-			await storageClient.WriteBlobAsync(namespaceId, hash, writer.AsStream(), cancellationToken);
-			return hash;
-		}
-
-		/// <summary>
-		/// Gets the given reference
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="qualifiedRefId">Name of the reference</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>The reference data if the ref exists</returns>
-		public static Task<IRef> GetRefAsync(this IStorageClient storageClient, QualifiedRefId qualifiedRefId, CancellationToken cancellationToken = default)
-		{
-			return storageClient.GetRefAsync(qualifiedRefId.NamespaceId, qualifiedRefId.BucketId, qualifiedRefId.RefId, cancellationToken);
-		}
-
-		/// <summary>
-		/// Checks if the given reference exists
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="qualifiedRefId">Name of the reference</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Name of the reference to look for</param>
+		/// <param name="cacheTime">Minimum coherency for any cached value to be returned</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
 		/// <returns>True if the ref exists, false if it did not exist</returns>
-		public static Task<bool> HasRefAsync(this IStorageClient storageClient, QualifiedRefId qualifiedRefId, CancellationToken cancellationToken = default)
+		public static async Task<bool> HasRefAsync(this IStorageClient store, RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default)
 		{
-			return storageClient.HasRefAsync(qualifiedRefId.NamespaceId, qualifiedRefId.BucketId, qualifiedRefId.RefId, cancellationToken);
+			NodeLocator locator = await store.TryReadRefTargetAsync(name, cacheTime, cancellationToken);
+			return locator.IsValid();
 		}
 
 		/// <summary>
-		/// Attempts to sets the given reference, returning a list of missing objects on failure.
+		/// Checks if the given ref exists
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="qualifiedRefId">Name of the reference</param>
-		/// <param name="value">New value for the reference</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Name of the reference to look for</param>
+		/// <param name="maxAge">Maximum age of any cached ref</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>List of missing references</returns>
-		public static Task<List<IoHash>> TrySetRefAsync(this IStorageClient storageClient, QualifiedRefId qualifiedRefId, CbObject value, CancellationToken cancellationToken = default)
+		/// <returns>True if the ref exists, false if it did not exist</returns>
+		public static Task<bool> HasRefAsync(this IStorageClient store, RefName name, TimeSpan maxAge, CancellationToken cancellationToken = default)
 		{
-			return storageClient.TrySetRefAsync(qualifiedRefId.NamespaceId, qualifiedRefId.BucketId, qualifiedRefId.RefId, value, cancellationToken);
+			return HasRefAsync(store, name, DateTime.UtcNow - maxAge, cancellationToken);
 		}
 
 		/// <summary>
-		/// Reads a reference as a specific type
+		/// Attempts to reads a ref from the store
 		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the ref</param>
-		/// <param name="bucketId">Bucket containing the ref</param>
-		/// <param name="refId">The ref id</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Id for the ref</param>
+		/// <param name="maxAge">Maximum age of any cached ref</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>Deserialized object for the given ref</returns>
-		public static async Task<T> GetRefAsync<T>(this IStorageClient storageClient, NamespaceId namespaceId, BucketId bucketId, RefId refId, CancellationToken cancellationToken = default)
+		/// <returns>The ref target</returns>
+		public static Task<NodeLocator> TryReadRefTargetAsync(this IStorageClient store, RefName name, TimeSpan maxAge, CancellationToken cancellationToken = default)
 		{
-			IRef item = await storageClient.GetRefAsync(namespaceId, bucketId, refId, cancellationToken);
-			return CbSerializer.Deserialize<T>(item.Value);
+			return store.TryReadRefTargetAsync(name, DateTime.UtcNow - maxAge, cancellationToken);
 		}
 
 		/// <summary>
-		/// Sets a ref to a particular value
+		/// Reads a ref from the store, throwing an exception if it does not exist
 		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the ref</param>
-		/// <param name="bucketId">Bucket containing the ref</param>
-		/// <param name="refId">The ref id</param>
-		/// <param name="value">The new object for the ref</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Id for the ref</param>
+		/// <param name="cacheTime">Minimum coherency of any cached result</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		public static Task SetRefAsync<T>(this IStorageClient storageClient, NamespaceId namespaceId, BucketId bucketId, RefId refId, T value, CancellationToken cancellationToken = default)
+		/// <returns>The ref target</returns>
+		public static async Task<NodeLocator> ReadRefTargetAsync(this IStorageClient store, RefName name, DateTime cacheTime = default, CancellationToken cancellationToken = default)
 		{
-			CbObject objectValue = CbSerializer.Serialize<T>(value);
-			return SetRefAsync(storageClient, namespaceId, bucketId, refId, objectValue, cancellationToken);
-		}
-
-		/// <summary>
-		/// Sets a ref to a particular value
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the ref</param>
-		/// <param name="bucketId">Bucket containing the ref</param>
-		/// <param name="refId">The ref id</param>
-		/// <param name="value">The new object for the ref</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		public static async Task SetRefAsync(this IStorageClient storageClient, NamespaceId namespaceId, BucketId bucketId, RefId refId, CbObject value, CancellationToken cancellationToken = default)
-		{
-			List<IoHash> missingHashes = await storageClient.TrySetRefAsync(namespaceId, bucketId, refId, value, cancellationToken);
-			if (missingHashes.Count > 0)
+			NodeLocator refTarget = await store.TryReadRefTargetAsync(name, cacheTime, cancellationToken);
+			if (!refTarget.IsValid())
 			{
-				throw new RefMissingBlobException(namespaceId, bucketId, refId, missingHashes);
+				throw new RefNameNotFoundException(name);
 			}
+			return refTarget;
 		}
 
 		/// <summary>
-		/// Attempts to set a ref to a particular value
+		/// Reads a ref from the store, throwing an exception if it does not exist
 		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the ref</param>
-		/// <param name="bucketId">Bucket containing the ref</param>
-		/// <param name="refId">The ref id</param>
-		/// <param name="value">The new object for the ref</param>
+		/// <param name="store">The store instance to read from</param>
+		/// <param name="name">Id for the ref</param>
+		/// <param name="maxAge">Maximum age for any cached result</param>
 		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>List of missing blob hashes</returns>
-		public static Task<List<IoHash>> TrySetRefAsync<T>(this IStorageClient storageClient, NamespaceId namespaceId, BucketId bucketId, RefId refId, T value, CancellationToken cancellationToken = default)
+		/// <returns>The blob instance</returns>
+		public static Task<NodeLocator> ReadRefTargetAsync(this IStorageClient store, RefName name, TimeSpan maxAge, CancellationToken cancellationToken = default)
 		{
-			CbObject objectValue = CbSerializer.Serialize<T>(value);
-			return storageClient.TrySetRefAsync(namespaceId, bucketId, refId, objectValue, cancellationToken);
+			return ReadRefTargetAsync(store, name, DateTime.UtcNow - maxAge, cancellationToken);
 		}
 
-		/// <summary>
-		/// Finalize a ref, throwing an exception if finalization fails
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="namespaceId">Namespace containing the ref</param>
-		/// <param name="bucketId">Bucket containing the ref</param>
-		/// <param name="refId">The ref id</param>
-		/// <param name="valueHash">Hash of the ref value</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		public static async Task FinalizeRefAsync(this IStorageClient storageClient, NamespaceId namespaceId, BucketId bucketId, RefId refId, IoHash valueHash, CancellationToken cancellationToken = default)
-		{
-			List<IoHash> missingHashes = await storageClient.TryFinalizeRefAsync(namespaceId, bucketId, refId, valueHash, cancellationToken);
-			if (missingHashes.Count > 0)
-			{
-				throw new RefMissingBlobException(namespaceId, bucketId, refId, missingHashes);
-			}
-		}
-
-		/// <summary>
-		/// Removes the given reference
-		/// </summary>
-		/// <param name="storageClient">The storage interface</param>
-		/// <param name="qualifiedRefId">Name of the reference</param>
-		/// <param name="cancellationToken">Cancellation token for the operation</param>
-		/// <returns>True if the ref was deleted, false if it did not exist</returns>
-		public static Task<bool> DeleteRefAsync(this IStorageClient storageClient, QualifiedRefId qualifiedRefId, CancellationToken cancellationToken = default)
-		{
-			return storageClient.DeleteRefAsync(qualifiedRefId.NamespaceId, qualifiedRefId.BucketId, qualifiedRefId.RefId, cancellationToken);
-		}
+		#endregion
 	}
 }

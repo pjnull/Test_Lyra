@@ -541,7 +541,7 @@ TSharedRef<SWidget> FObjectBindingModel::GetAddTrackMenuContent()
 			const FGuid Guid = ObjectBindingNode->GetObjectGuid();
 			for (auto RuntimeObject : Sequencer->FindBoundObjects(Guid, OwnerModel->GetSequenceID()))
 			{
-				if (RuntimeObject != nullptr)
+				if (RuntimeObject.Get() != nullptr)
 				{
 					ObjectBindings.AddUnique(Guid);
 					ObjectClasses.Add(RuntimeObject->GetClass());
@@ -1045,13 +1045,13 @@ void FObjectBindingModel::AddSpawnOwnershipMenu(FMenuBuilder& MenuBuilder)
 	);
 
 	MenuBuilder.AddMenuEntry(
-		LOCTEXT("MasterSequence_Label", "Master Sequence"),
-		LOCTEXT("MasterSequence_Tooltip", "Indicates that the outermost sequence will own the spawned object. The object will be destroyed when the outermost sequence stops playing."),
+		LOCTEXT("RootSequence_Label", "Root Sequence"),
+		LOCTEXT("RootSequence_Tooltip", "Indicates that the outermost sequence will own the spawned object. The object will be destroyed when the outermost sequence stops playing."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateLambda(Callback, ESpawnOwnership::MasterSequence),
+			FExecuteAction::CreateLambda(Callback, ESpawnOwnership::RootSequence),
 			FCanExecuteAction(),
-			FIsActionChecked::CreateLambda([=]{ return Spawnable->GetSpawnOwnership() == ESpawnOwnership::MasterSequence; })
+			FIsActionChecked::CreateLambda([=]{ return Spawnable->GetSpawnOwnership() == ESpawnOwnership::RootSequence; })
 		),
 		NAME_None,
 		EUserInterfaceActionType::ToggleButton

@@ -110,7 +110,7 @@ void UMaterialInstanceConstant::CopyMaterialUniformParametersEditorOnly(UMateria
 			FStaticParameterSet MyParamSet;
 			GetStaticParameterValues(MyParamSet);
 
-			MyParamSet.EditorOnly.StaticSwitchParameters = SourceParamSet.EditorOnly.StaticSwitchParameters;
+			MyParamSet.StaticSwitchParameters = SourceParamSet.StaticSwitchParameters;
 
 			UpdateStaticPermutation(MyParamSet);
 
@@ -147,6 +147,12 @@ void UMaterialInstanceConstant::SetRuntimeVirtualTextureParameterValueEditorOnly
 {
 	check(GIsEditor || IsRunningCommandlet());
 	SetRuntimeVirtualTextureParameterValueInternal(ParameterInfo, Value);
+}
+
+void UMaterialInstanceConstant::SetSparseVolumeTextureParameterValueEditorOnly(const FMaterialParameterInfo& ParameterInfo, USparseVolumeTexture* Value)
+{
+	check(GIsEditor || IsRunningCommandlet());
+	SetSparseVolumeTextureParameterValueInternal(ParameterInfo, Value);
 }
 
 void UMaterialInstanceConstant::SetFontParameterValueEditorOnly(const FMaterialParameterInfo& ParameterInfo,class UFont* FontValue,int32 FontPage)

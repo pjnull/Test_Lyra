@@ -20,17 +20,17 @@ namespace EpicGames.Perforce.Managed
 		public readonly ulong CacheId;
 		public readonly long Length;
 		public readonly long LastModifiedTicks;
-		public readonly bool BReadOnly;
+		public readonly bool ReadOnly;
 		public readonly uint SequenceNumber;
 
-		public CachedFileInfo(DirectoryReference cacheDir, FileContentId contentId, ulong cacheId, long length, long lastModifiedTicks, bool bReadOnly, uint sequenceNumber)
+		public CachedFileInfo(DirectoryReference cacheDir, FileContentId contentId, ulong cacheId, long length, long lastModifiedTicks, bool readOnly, uint sequenceNumber)
 		{
 			CacheDir = cacheDir;
 			ContentId = contentId;
 			CacheId = cacheId;
 			Length = length;
 			LastModifiedTicks = lastModifiedTicks;
-			BReadOnly = bReadOnly;
+			ReadOnly = readOnly;
 			SequenceNumber = sequenceNumber;
 		}
 
@@ -41,22 +41,22 @@ namespace EpicGames.Perforce.Managed
 			FileInfo info = new FileInfo(location.FullName);
 			if (!info.Exists)
 			{
-				logger.LogWarning("warning: {0} was missing from cache.", location);
+				logger.LogWarning("warning: {File} was missing from cache.", location);
 				return false;
 			}
 			if (info.Length != Length)
 			{
-				logger.LogWarning("warning: {0} was {1:n} bytes; expected {2:n} bytes", location, info.Length, Length);
+				logger.LogWarning("warning: {File} was {Size:n} bytes; expected {ExpectedSize:n} bytes", location, info.Length, Length);
 				return false;
 			}
 			if (info.LastWriteTimeUtc.Ticks != LastModifiedTicks)
 			{
-				logger.LogWarning("warning: {0} was last modified at {1}; expected {2}", location, info.LastWriteTimeUtc, new DateTime(LastModifiedTicks, DateTimeKind.Utc));
+				logger.LogWarning("warning: {File} was last modified at {Time}; expected {ExpectedTime}", location, info.LastWriteTimeUtc, new DateTime(LastModifiedTicks, DateTimeKind.Utc));
 				return false;
 			}
-			if (info.Attributes.HasFlag(FileAttributes.ReadOnly) != BReadOnly)
+			if (info.Attributes.HasFlag(FileAttributes.ReadOnly) != ReadOnly)
 			{
-				logger.LogWarning("warning: {0} readonly flag is {1}; expected {2}", info.Attributes.HasFlag(FileAttributes.ReadOnly), BReadOnly);
+				logger.LogWarning("warning: {File} readonly flag is {Flag}; expected {ExpectedFlag}", location, info.Attributes.HasFlag(FileAttributes.ReadOnly), ReadOnly);
 				return false;
 			}
 
@@ -86,9 +86,9 @@ namespace EpicGames.Perforce.Managed
 			ulong cacheId = reader.ReadUInt64();
 			long length = reader.ReadInt64();
 			long lastModifiedTicks = reader.ReadInt64();
-			bool bReadOnly = reader.ReadBoolean();
+			bool readOnly = reader.ReadBoolean();
 			uint sequenceNumber = reader.ReadUInt32();
-			return new CachedFileInfo(cacheDir, contentId, cacheId, length, lastModifiedTicks, bReadOnly, sequenceNumber);
+			return new CachedFileInfo(cacheDir, contentId, cacheId, length, lastModifiedTicks, readOnly, sequenceNumber);
 		}
 
 		public static void WriteCachedFileInfo(this MemoryWriter writer, CachedFileInfo fileInfo)
@@ -97,7 +97,7 @@ namespace EpicGames.Perforce.Managed
 			writer.WriteUInt64(fileInfo.CacheId);
 			writer.WriteInt64(fileInfo.Length);
 			writer.WriteInt64(fileInfo.LastModifiedTicks);
-			writer.WriteBoolean(fileInfo.BReadOnly);
+			writer.WriteBoolean(fileInfo.ReadOnly);
 			writer.WriteUInt32(fileInfo.SequenceNumber);
 		}
 

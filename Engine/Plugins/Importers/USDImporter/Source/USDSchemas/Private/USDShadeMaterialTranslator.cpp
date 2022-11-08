@@ -3,6 +3,7 @@
 #include "USDShadeMaterialTranslator.h"
 
 #include "Engine/Level.h"
+#include "MeshTranslationImpl.h"
 #include "USDAssetCache.h"
 #include "USDAssetImportData.h"
 #include "USDLog.h"
@@ -27,71 +28,6 @@
 
 namespace UE::UsdShadeTranslator::Private
 {
-	const static FString BaseMaterialPathTranslucentVT = TEXT( "/USDImporter/Materials/UsdPreviewSurfaceTranslucentVT.UsdPreviewSurfaceTranslucentVT" );
-	const static FString BaseMaterialPathTranslucent = TEXT( "/USDImporter/Materials/UsdPreviewSurfaceTranslucent.UsdPreviewSurfaceTranslucent" );
-	const static FString BaseMaterialPathVT = TEXT( "/USDImporter/Materials/UsdPreviewSurfaceVT.UsdPreviewSurfaceVT" );
-	const static FString BaseMaterialPath = TEXT( "/USDImporter/Materials/UsdPreviewSurface.UsdPreviewSurface" );
-
-	UMaterialInterface* GetBaseMaterial( bool bIsTranslucent, bool bIsVT )
-	{
-		const FString* TargetMaterialPath = nullptr;
-		if ( bIsTranslucent )
-		{
-			if ( bIsVT )
-			{
-				TargetMaterialPath = &BaseMaterialPathTranslucentVT;
-			}
-			else
-			{
-				TargetMaterialPath = &BaseMaterialPathTranslucent;
-			}
-		}
-		else
-		{
-			if ( bIsVT )
-			{
-				TargetMaterialPath = &BaseMaterialPathVT;
-			}
-			else
-			{
-				TargetMaterialPath = &BaseMaterialPath;
-			}
-		}
-
-		if ( !TargetMaterialPath )
-		{
-			return nullptr;
-		}
-
-		return Cast< UMaterialInterface >( FSoftObjectPath( *TargetMaterialPath ).TryLoad() );
-	}
-
-	UMaterialInterface* GetVTVersionOfBaseMaterial( UMaterialInterface* BaseMaterial )
-	{
-		if ( !BaseMaterial )
-		{
-			return nullptr;
-		}
-
-		const FString PathName = BaseMaterial->GetPathName();
-		if ( PathName == BaseMaterialPathTranslucentVT || PathName == BaseMaterialPathVT )
-		{
-			return BaseMaterial;
-		}
-		else if ( PathName == BaseMaterialPath )
-		{
-			return Cast< UMaterialInterface >( FSoftObjectPath{ BaseMaterialPathVT }.TryLoad() );
-		}
-		else if ( PathName == BaseMaterialPathTranslucent )
-		{
-			return Cast< UMaterialInterface >( FSoftObjectPath{ BaseMaterialPathTranslucentVT }.TryLoad() );
-		}
-
-		// We should only ever call this function with a BaseMaterial that matches one of the above paths
-		ensure( false );
-		return nullptr;
-	}
-
 	void RecursiveUpgradeMaterialsAndTexturesToVT(
 		const TSet<UTexture*>& TexturesToUpgrade,
 		const TSharedRef< FUsdSchemaTranslationContext >& Context,
@@ -132,7 +68,8 @@ namespace UE::UsdShadeTranslator::Private
 						// Important to not use GetBaseMaterial() here because if our parent is the translucent we'll
 						// get the base UsdPreviewSurface instead, as that is also *its* base
 						UMaterialInterface* BaseMaterial = MaterialInstance->Parent.Get();
-						UMaterialInterface* BaseMaterialVT = GetVTVersionOfBaseMaterial( BaseMaterial );
+						UMaterialInterface* BaseMaterialVT =
+							MeshTranslationImpl::GetVTVersionOfBasePreviewSurfaceMaterial( BaseMaterial );
 						if ( BaseMaterial == BaseMaterialVT )
 						{
 							// Material is already VT, we're good
@@ -356,11 +293,16 @@ void FUsdShadeMaterialTranslator::CreateAssets()
 					UE::UsdShadeTranslator::Private::UpgradeMaterialsAndTexturesToVT( NonVTTextures, Context );
 				}
 
-				const bool bNeedsVT = VTTextures.Num() > 0;
-				UMaterialInterface* BaseMaterial = UE::UsdShadeTranslator::Private::GetBaseMaterial(
-					bIsTranslucent,
-					bNeedsVT
-				);
+				MeshTranslationImpl::EUsdBaseMaterialProperties Properties = MeshTranslationImpl::EUsdBaseMaterialProperties::None;
+				if ( bIsTranslucent )
+				{
+					Properties |= MeshTranslationImpl::EUsdBaseMaterialProperties::Translucent;
+				}
+				if ( VTTextures.Num() > 0 )
+				{
+					Properties |= MeshTranslationImpl::EUsdBaseMaterialProperties::VT;
+				}
+				UMaterialInterface* BaseMaterial = MeshTranslationImpl::GetBasePreviewSurfaceMaterial( Properties );
 
 				if ( ensure( BaseMaterial ) )
 				{
@@ -396,11 +338,12 @@ void FUsdShadeMaterialTranslator::CreateAssets()
 			// using the VT base and copy the overrides. Not much else we can do as we need a base to call
 			// UMaterialInstanceDynamic::Create and get our instance, but we an instance to call UsdToUnreal::ConvertMaterial
 			// to create our textures and decide on our base.
-			const bool bNeedsVT = false;
-			UMaterialInterface* BaseMaterial = UE::UsdShadeTranslator::Private::GetBaseMaterial(
-				bIsTranslucent,
-				bNeedsVT
-			);
+			MeshTranslationImpl::EUsdBaseMaterialProperties Properties = MeshTranslationImpl::EUsdBaseMaterialProperties::None;
+			if ( bIsTranslucent )
+			{
+				Properties |= MeshTranslationImpl::EUsdBaseMaterialProperties::Translucent;
+			}
+			UMaterialInterface* BaseMaterial = MeshTranslationImpl::GetBasePreviewSurfaceMaterial( Properties );
 
 			if ( ensure( BaseMaterial ) )
 			{
@@ -466,6 +409,16 @@ void FUsdShadeMaterialTranslator::CreateAssets()
 	{
 		Context->AssetCache->CacheAsset( MaterialHashString, ConvertedMaterial, PrimPath.GetString() );
 	}
+}
+
+bool FUsdShadeMaterialTranslator::CollapsesChildren( ECollapsingType CollapsingType ) const
+{
+	return false;
+}
+
+bool FUsdShadeMaterialTranslator::CanBeCollapsed( ECollapsingType CollapsingType ) const
+{
+	return false;
 }
 
 #endif // #if USE_USD_SDK

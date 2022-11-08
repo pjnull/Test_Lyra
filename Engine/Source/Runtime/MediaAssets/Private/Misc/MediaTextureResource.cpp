@@ -26,6 +26,8 @@
 #include "ProfilingDebugging/CsvProfiler.h"
 #include "Async/Async.h"
 #include "RenderGraphUtils.h"
+#include "ColorSpace.h"
+#include "HDRHelper.h"
 
 #include "MediaTexture.h"
 
@@ -193,6 +195,12 @@ namespace MediaTextureResourceHelpers
 		case EMediaTextureSampleFormat::Y416:
 			return PF_A16B16G16R16;
 
+		case EMediaTextureSampleFormat::P010:
+			return PF_G16; // note: right now this case will be encountered only if CPU-side data in NV12/21 format is in sample -> in this case we cannot create a true P010 texture OR the platforms view it as U16s anyway 
+
+		case EMediaTextureSampleFormat::P010_RGB1010102:
+			return PF_A2B10G10R10;
+
 		default:
 			return PF_Unknown;
 		}
@@ -200,7 +208,7 @@ namespace MediaTextureResourceHelpers
 
 	bool SupportsComputeMipGen(EPixelFormat InFormat)
 	{
-		return RHIRequiresComputeGenerateMips() && RHIIsTypedUAVLoadSupported(InFormat);
+		return RHIRequiresComputeGenerateMips() && UE::PixelFormat::HasCapabilities(InFormat, EPixelFormatCapabilities::TypedUAVLoad);
 	}
 
 	EPixelFormat GetConvertedPixelFormat(const TSharedPtr<IMediaTextureSample, ESPMode::ThreadSafe>& Sample)
@@ -214,6 +222,9 @@ namespace MediaTextureResourceHelpers
 			// Float formats
 		case EMediaTextureSampleFormat::FloatRGB:
 		case EMediaTextureSampleFormat::FloatRGBA:
+		case EMediaTextureSampleFormat::Y416:
+		case EMediaTextureSampleFormat::P010:
+		case EMediaTextureSampleFormat::P010_RGB1010102:
 			return PF_FloatRGBA;
 			// Everything else maps to 8-bit RGB...
 		default:
@@ -398,7 +409,7 @@ void FMediaTextureResource::Render(const FRenderParams& Params)
 					if (Converter->GetConverterInfoFlags() & IMediaTextureSampleConverter::ConverterInfoFlags_PreprocessOnly)
 					{
 						// Preprocess...
-						FTexture2DRHIRef DummyTexture;
+						FTextureRHIRef DummyTexture;
 						if (Converter->Convert(DummyTexture, Hints))
 						{
 							// ...followed by the built in conversion code as needed...
@@ -416,7 +427,7 @@ void FMediaTextureResource::Render(const FRenderParams& Params)
 				else
 				{
 					// The converter will create its own output texture for us to use
-					FTexture2DRHIRef OutTexture;
+					FTextureRHIRef OutTexture;
 					if (Converter->Convert(OutTexture, Hints))
 					{
 						// As the converter created the texture, we might need to convert it even more to make it fit our needs. Check...
@@ -677,7 +688,7 @@ void FMediaTextureResource::ReleaseDynamicRHI()
 }
 
 
- bool FMediaTextureResource::RequiresConversion(const FTexture2DRHIRef& SampleTexture, const FIntPoint & OutputDim, uint8 InNumMips) const
+ bool FMediaTextureResource::RequiresConversion(const FTextureRHIRef& SampleTexture, const FIntPoint & OutputDim, uint8 InNumMips) const
  {
 	 if (Owner.NewStyleOutput)
 	 {
@@ -760,20 +771,19 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 	const uint8 SampleNumMips = Sample->GetNumMips();
 
 	// get input texture
-	FRHITexture2D* InputTexture = nullptr;
+	FRHITexture* InputTexture = nullptr;
 	{
 		// If the sample already provides a texture resource, we simply use that
 		// as the input texture. If the sample only provides raw data, then we
 		// create our own input render target and copy the data into it.
 
 		FRHITexture* SampleTexture = Sample->GetTexture();
-		FRHITexture2D* SampleTexture2D = (SampleTexture != nullptr) ? SampleTexture->GetTexture2D() : nullptr;
 
-		if (SampleTexture2D)
+		if (SampleTexture)
 		{
 			// Use the sample as source texture...
 
-			InputTexture = SampleTexture2D;
+			InputTexture = SampleTexture;
 			UpdateResourceSize();
 			InputTarget = nullptr;
 		}
@@ -823,7 +833,7 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 }
 
 
- void FMediaTextureResource::ConvertTextureToOutput(FRHITexture2D* InputTexture, const TSharedPtr<IMediaTextureSample, ESPMode::ThreadSafe>& Sample)
+ void FMediaTextureResource::ConvertTextureToOutput(FRHITexture* InputTexture, const TSharedPtr<IMediaTextureSample, ESPMode::ThreadSafe>& Sample)
  {
 	// perform the conversion
 	FRHICommandListImmediate& CommandList = FRHICommandListExecutor::GetImmediateCommandList();
@@ -848,7 +858,7 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 		CommandList.BeginRenderPass(RPInfo, TEXT("ConvertMedia"));
 		{
 			CommandList.ApplyCachedRenderTargets(GraphicsPSOInit);
-			CommandList.SetViewport(0, 0, 0.0f, OutputDim.X, OutputDim.Y, 1.0f);
+			CommandList.SetViewport(0, 0, 0.0f, (float)OutputDim.X, (float)OutputDim.Y, 1.0f);
 
 			GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
 			GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
@@ -863,11 +873,14 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 			GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
 
 			FMatrix YUVToRGBMatrix = Sample->GetYUVToRGBMatrix();
-			FVector YUVOffset(MediaShaders::YUVOffset8bits);
-
+			FVector YUVOffset;
 			if (Sample->GetFormat() == EMediaTextureSampleFormat::YUVv210)
 			{
-				YUVOffset = MediaShaders::YUVOffset10bits;
+				YUVOffset = Sample->GetFullRange() ? MediaShaders::YUVOffsetNoScale10bits : MediaShaders::YUVOffset10bits;
+			}
+			else
+			{
+				YUVOffset = Sample->GetFullRange() ? MediaShaders::YUVOffsetNoScale8bits : MediaShaders::YUVOffset8bits;
 			}
 
 			bool bIsSampleOutputSrgb = Sample->IsOutputSrgb();
@@ -905,7 +918,7 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 						GraphicsPSOInit.BoundShaderState.PixelShaderRHI = ConvertShader.GetPixelShader();
 						SetGraphicsPipelineState(CommandList, GraphicsPSOInit, 0);
 						FIntPoint TexDim = InputTexture->GetSizeXY();
-						TempSRV0 = RHICreateShaderResourceView(InputTexture, 0, 1, PF_G8);
+						TempSRV0 = RHICreateShaderResourceView(InputTexture, 0, 1, PF_G8); // note: the types of the views select the correct planes (offset) "magically"
 						TempSRV1 = RHICreateShaderResourceView(InputTexture, 0, 1, PF_R8G8);
 						ConvertShader->SetParameters(CommandList, TexDim, TempSRV0, TempSRV1, OutputDim, YUVToRGBMatrix, YUVOffset, bIsSampleOutputSrgb);
 					}
@@ -990,11 +1003,57 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 				}
 				break;
 
+				case EMediaTextureSampleFormat::P010:
+				{
+					/*
+					For now we assume this data in the P010 surface:
+
+					- PQ EOTF (which should be fine for all, but HLG10)
+
+					Output is assumed to be wanted in the "working colorspace" & linear
+
+					*** Output into a 3D scene without HDR output might result in incorrect color representation (sRGB is expected, we deliver scRGB) ***
+					*/
+
+					// Get the complete matrix to convert sample data to RGB
+					auto YUVMtx = Sample->GetSampleToRGBMatrix();
+
+					// Setup conversion from Rec2020 to current working color space
+					const UE::Color::FColorSpace& Working = UE::Color::FColorSpace::GetWorking();
+					FMatrix44f ColorSpaceMtx = UE::Color::Transpose<float>(Working.GetXYZToRgb()) * Sample->GetGamutToXYZMatrix();
+					if (1) //Working.IsSRGB()) // vvv seems UE does this for all colorspaces
+					{
+						// Add scale so we get a proper 1.0 at 80nits
+						ColorSpaceMtx = ColorSpaceMtx.ApplyScale(1.0f / 80.0f);
+					}
+
+					FIntPoint TexDim = InputTexture->GetSizeXY();
+					if (InputTexture->GetFormat() == PF_P010)
+					{
+						TShaderMapRef<FP010ConvertPS> ConvertShader(ShaderMap);
+						GraphicsPSOInit.BoundShaderState.PixelShaderRHI = ConvertShader.GetPixelShader();
+						SetGraphicsPipelineState(CommandList, GraphicsPSOInit, 0);
+
+						FShaderResourceViewRHIRef Y_SRV = RHICreateShaderResourceView(InputTexture, 0, 1, PF_G16);
+						FShaderResourceViewRHIRef UV_SRV = RHICreateShaderResourceView(InputTexture, 0, 1, PF_G16R16);
+						ConvertShader->SetParameters(CommandList, TexDim, Y_SRV, UV_SRV, OutputDim, YUVMtx, ColorSpaceMtx, Sample->GetEncodingType() == UE::Color::EEncoding::ST2084);
+					}
+					else
+					{
+						TShaderMapRef<FP010ConvertAsUINT16sPS> ConvertShader(ShaderMap);
+						GraphicsPSOInit.BoundShaderState.PixelShaderRHI = ConvertShader.GetPixelShader();
+						SetGraphicsPipelineState(CommandList, GraphicsPSOInit, 0);
+
+						ConvertShader->SetParameters(CommandList, TexDim, InputTexture, OutputDim, YUVMtx, ColorSpaceMtx, Sample->GetEncodingType() == UE::Color::EEncoding::ST2084);
+					}
+				}
+				break;
+
 				default:
 				{
 					// This should not happen in normal use: still - end the render pass to avoid any trouble with RHI
 					CommandList.EndRenderPass();
-					return; // unsupported format
+					return; // unsupported format (either illegal value or needing a custom converter)
 				}
 			}
 
@@ -1002,7 +1061,7 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 			FBufferRHIRef VertexBuffer = CreateTempMediaVertexBuffer();
 			CommandList.SetStreamSource(0, VertexBuffer, 0);
 			// set viewport to RT size
-			CommandList.SetViewport(0, 0, 0.0f, OutputDim.X, OutputDim.Y, 1.0f);
+			CommandList.SetViewport(0, 0, 0.0f, (float)OutputDim.X, (float)OutputDim.Y, 1.0f);
 
 			CommandList.DrawPrimitive(0, 2, 1);
 		}
@@ -1017,19 +1076,18 @@ void FMediaTextureResource::ConvertSample(const TSharedPtr<IMediaTextureSample, 
 void FMediaTextureResource::CopySample(const TSharedPtr<IMediaTextureSample, ESPMode::ThreadSafe>& Sample, const FLinearColor& ClearColor, uint8 InNumMips, const FGuid & TextureGUID)
 {
 	FRHITexture* SampleTexture = Sample->GetTexture();
-	FRHITexture2D* SampleTexture2D = (SampleTexture != nullptr) ? SampleTexture->GetTexture2D() : nullptr;
 	const uint8 SampleNumMips = Sample->GetNumMips();
 
 	// If the sample already provides a texture resource, we simply use that
 	// as the output render target. If the sample only provides raw data, then
 	// we create our own output render target and copy the data into it.
 
-	if (SampleTexture2D != nullptr)
+	if (SampleTexture != nullptr)
 	{
 		// Use sample's texture as the new render target - no copy
-		if (TextureRHI != SampleTexture2D)
+		if (TextureRHI != SampleTexture)
 		{
-			UpdateTextureReference(SampleTexture2D);
+			UpdateTextureReference(SampleTexture);
 
 			MipGenerationCache.SafeRelease();
 			OutputTarget.SafeRelease();
@@ -1042,7 +1100,7 @@ void FMediaTextureResource::CopySample(const TSharedPtr<IMediaTextureSample, ESP
 			CreateOutputRenderTarget(Sample->GetOutputDim(), MediaTextureResourceHelpers::GetPixelFormat(Sample), MediaTextureResourceHelpers::RequiresSrgbTexture(Sample), ClearColor, NumMips, bNeedsUAVTexture);
 
 			// Copy data into the output texture to able to add mips later on
-			FRHICommandListExecutor::GetImmediateCommandList().CopyTexture(SampleTexture2D, OutputTarget, FRHICopyTextureInfo());
+			FRHICommandListExecutor::GetImmediateCommandList().CopyTexture(SampleTexture, OutputTarget, FRHICopyTextureInfo());
 		}
 	}
 	else
@@ -1131,7 +1189,7 @@ void FMediaTextureResource::CopyFromExternalTexture(const TSharedPtr <IMediaText
 			const FIntPoint OutputDim = Sample->GetOutputDim();
 
 			CommandList.ApplyCachedRenderTargets(GraphicsPSOInit);
-			CommandList.SetViewport(0, 0, 0.0f, OutputDim.X, OutputDim.Y, 1.0f);
+			CommandList.SetViewport(0, 0, 0.0f, (float)OutputDim.X, (float)OutputDim.Y, 1.0f);
 			
 			GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
 			GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
@@ -1154,7 +1212,7 @@ void FMediaTextureResource::CopyFromExternalTexture(const TSharedPtr <IMediaText
 			FBufferRHIRef VertexBuffer = CreateTempMediaVertexBuffer();
 			CommandList.SetStreamSource(0, VertexBuffer, 0);
 			// set viewport to RT size
-			CommandList.SetViewport(0, 0, 0.0f, OutputDim.X, OutputDim.Y, 1.0f);
+			CommandList.SetViewport(0, 0, 0.0f, (float)OutputDim.X, (float)OutputDim.Y, 1.0f);
 
 			CommandList.DrawPrimitive(0, 2, 1);
 		}
@@ -1182,7 +1240,7 @@ void FMediaTextureResource::UpdateResourceSize()
 }
 
 
-void FMediaTextureResource::UpdateTextureReference(FRHITexture2D* NewTexture)
+void FMediaTextureResource::UpdateTextureReference(FRHITexture* NewTexture)
 {
 	TextureRHI = NewTexture;
 	RenderTargetTextureRHI = NewTexture;
@@ -1205,7 +1263,7 @@ void FMediaTextureResource::CreateOutputRenderTarget(const FIntPoint & InDim, EP
 {
 	// create output render target if necessary
 	ETextureCreateFlags OutputCreateFlags = TexCreate_Dynamic | (bInSRGB ? TexCreate_SRGB : TexCreate_None);
-	if (bNeedsUAVSupport && RHIIsTypedUAVLoadSupported(InPixelFormat))
+	if (bNeedsUAVSupport && UE::PixelFormat::HasCapabilities(InPixelFormat, EPixelFormatCapabilities::TypedUAVLoad))
 	{
 		OutputCreateFlags |= TexCreate_UAV;
 	}
@@ -1216,7 +1274,7 @@ void FMediaTextureResource::CreateOutputRenderTarget(const FIntPoint & InDim, EP
 		OutputCreateFlags |= TexCreate_GenerateMipCapable;
 
 		// Make sure we only set a number of mips that actually makes sense, given the sample size
-		uint8 MaxMips = FGenericPlatformMath::FloorToInt(FGenericPlatformMath::Log2(static_cast<float>(FGenericPlatformMath::Min(InDim.X, InDim.Y))));
+		uint8 MaxMips = (uint8)(FMath::Min(255, FGenericPlatformMath::FloorToInt(FGenericPlatformMath::Log2(static_cast<float>(FGenericPlatformMath::Min(InDim.X, InDim.Y))))));
 		InNumMips = FMath::Min(InNumMips, MaxMips);
 	}
 

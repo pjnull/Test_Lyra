@@ -416,7 +416,7 @@ void FBlendSampleDetails::GenerateBlendSampleWidget(TFunction<FDetailWidgetRow& 
 			{
 				if (BlendSpace)
 				{
-					return BlendSpace->IsValidBlendSampleIndex(SampleIndex) ? BlendSpace->GetBlendSample(SampleIndex).SampleValue[ParameterIndex] : 0.0f;
+					return BlendSpace->IsValidBlendSampleIndex(SampleIndex) ? static_cast<float>(BlendSpace->GetBlendSample(SampleIndex).SampleValue[ParameterIndex]) : 0.0f;
 				}
 
 				return 0.0f;
@@ -547,7 +547,7 @@ bool FBlendSampleDetails::ShouldFilterAssetStatic(const FAssetData& AssetData, c
 	if (AssetData.GetTagValue(SkeletonTagName, SkeletonName))
 	{
 		// Check whether or not the skeletons are compatible
-		if (BlendSpaceBase->GetSkeleton()->IsCompatibleSkeletonByAssetData(AssetData))
+		if (BlendSpaceBase->GetSkeleton()->IsCompatibleForEditor(AssetData))
 		{
 			// If so check if the additive animation type is compatible with the blend space
 			const FName AdditiveTypeTagName = GET_MEMBER_NAME_CHECKED(UAnimSequence, AdditiveAnimType);

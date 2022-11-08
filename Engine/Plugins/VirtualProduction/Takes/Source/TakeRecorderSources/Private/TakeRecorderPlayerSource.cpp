@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "TakeRecorderPlayerSource.h"
+#include "AssetRegistry/AssetData.h"
 #include "GameFramework/Pawn.h"
 #include "TakesUtils.h"
 
@@ -22,7 +23,7 @@ UTakeRecorderPlayerSource::UTakeRecorderPlayerSource(const FObjectInitializer& O
 }
 
 
-TArray<UTakeRecorderSource*> UTakeRecorderPlayerSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InMasterSequence, FManifestSerializer* InManifestSerializer)
+TArray<UTakeRecorderSource*> UTakeRecorderPlayerSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InRootSequence, FManifestSerializer* InManifestSerializer)
 {
 	TArray<UTakeRecorderSource*> NewSources;
 
@@ -72,7 +73,7 @@ TArray<UTakeRecorderSource*> UTakeRecorderPlayerSource::PreRecording(ULevelSeque
 	return NewSources;
 }
 
-TArray<UTakeRecorderSource*> UTakeRecorderPlayerSource::PostRecording(class ULevelSequence* InSequence, class ULevelSequence* InMasterSequence, const bool bCancelled)
+TArray<UTakeRecorderSource*> UTakeRecorderPlayerSource::PostRecording(class ULevelSequence* InSequence, class ULevelSequence* InRootSequence, const bool bCancelled)
 {
 	TArray<UTakeRecorderSource*> SourcesToRemove;
 

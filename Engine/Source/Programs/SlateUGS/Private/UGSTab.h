@@ -2,17 +2,18 @@
 
 #pragma once
 
+#include "FindStreamsTask.h"
 #include "Widgets/SEmptyTab.h"
 #include "Widgets/SGameSyncTab.h"
-#include "Widgets/SWorkspaceWindow.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #include "UGSCore/Workspace.h"
+#include "UGSCore/UserSettings.h"
 
 namespace UGSCore
 {
 	struct FUserWorkspaceSettings;
 	struct FUserProjectSettings;
-	struct FUserSettings;
 	class FDetectProjectSettingsTask;
 	class FPerforceMonitor;
 	class FEventMonitor;
@@ -61,17 +62,20 @@ public:
 	void OnBuildWorkspace();
 	void OnOpenExplorer();
 	void OnOpenEditor();
+	void OnCreateWorkspace(const FString& WorkspaceName, const FString& Stream, const FString& RootDirectory) const;
 
 	// Accessors
 	bool IsSyncing() const;
 	FString GetSyncProgress() const;
-	const TArray<FString>& GetSyncFilters() const;
 	const TArray<FString>& GetCombinedSyncFilter() const;
 	TArray<UGSCore::FWorkspaceSyncCategory> GetSyncCategories(SyncCategoryType CategoryType) const;
 	TArray<FString> GetSyncViews(SyncCategoryType CategoryType) const;
-	UGSTabManager* GetTabManager();
+	UGSTabManager* GetTabManager() const;
 	TSharedPtr<UGSCore::FUserSettings> GetUserSettings() const;
+	bool ShouldSyncPrecompiledEditor() const;
+	TArray<FString> GetAllStreamNames() const;
 
+	void UpdateGameTabBuildList();
 	void RefreshBuildList();
 	void CancelSync();
 
@@ -81,11 +85,14 @@ private:
 		UGSCore::EWorkspaceUpdateResult SyncResult,
 		const FString& StatusMessage);
 
+	TMap<FString, FString> GetWorkspaceVariables() const;
+	UGSCore::EBuildConfig GetEditorBuildConfig() const;
+	TMap<FGuid, UGSCore::FCustomConfigObject> GetDefaultBuildStepObjects(const FString& EditorTargetName);
+
 	// Allows the queuing of functions from threads to be run on the main thread
 	void QueueMessageForMainThread(TFunction<void()> Function);
 
 	bool ShouldIncludeInReviewedList(const TSet<int>& PromotedChangeNumbers, int ChangeNumber) const;
-	void UpdateGameTabBuildList();
 
 	// Core functions
 	bool SetupWorkspace();

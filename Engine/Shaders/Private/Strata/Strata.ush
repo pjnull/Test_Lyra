@@ -340,6 +340,16 @@ struct FStrataBSDF
 #define BSDF_BIT_OFFSET_HASTRANSABOVE			(BSDF_BIT_OFFSET_SHAREDLOCALBASESID	+ BSDF_BIT_COUNT_SHAREDLOCALBASESID)
 #define BSDF_BIT_OFFSET_WEIGHT10F				22
 
+// Special optmised modes for the single BSDF path.
+#define HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT	3
+#define HEADER_SINGLE_OPTLEGACYMODE_BIT_MASK	((1u<<HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)-1u)
+#define SINGLE_OPTLEGACYMODE_NONE				0
+#define SINGLE_OPTLEGACYMODE_CLEARCOAT			1
+#define SINGLE_OPTLEGACYMODE_CLOTH				2
+#define SINGLE_OPTLEGACYMODE_SSSWRAP			3
+#define SINGLE_OPTLEGACYMODE_SSSPROFILE			4
+// 5 more remains: Also how to deal with Aniso?
+
 // Layout 0 (Fast)
 #define BSDF_FASTENCODING_BIT_COUNT				(0u)
 #define BSDF_FASTENCODING_MASK					(0u)
@@ -764,14 +774,25 @@ void StrataSubSurfaceHeaderSetNonProfile(inout FStrataSubsurfaceHeader SSSHeader
 	SSSHeader.Bytes |= (Pack10F(MeanFreePath.x) << 22) | (Pack10F(MeanFreePath.y) << 12) | (Pack10F(MeanFreePath.z) << 2);
 }
 
-void StrataSubSurfaceHeaderSetWrap(inout FStrataSubsurfaceHeader SSSHeader, float3 MeanFreePath, float PhaseAnisotropy)
+float StrataSubSurfaceGetWrapOpacityFromAnisotropy(float PhaseAnisotropy)
 {
 	// Reinterpret the phase function anisotropy as 'opacity' value
 	// * Forward/Backward phase function == Thin surface (i.e., opacity => 0)
 	// * Isotropic phase function == Thick surface (i.e., opacity => 1)
-	const float Opacity = 1.f-abs(PhaseAnisotropy);
+	const float Opacity = 1.f - abs(PhaseAnisotropy);
+	return Opacity;
+}
+
+void StrataSubSurfaceHeaderSetWrapOpacity(inout FStrataSubsurfaceHeader SSSHeader, float Opacity)
+{
 	SSSHeader.Bytes &= SSSHEADER_TYPE_MASK;
 	SSSHeader.Bytes |= PackR8(Opacity) << 2;
+}
+
+void StrataSubSurfaceHeaderSetWrap(inout FStrataSubsurfaceHeader SSSHeader, float PhaseAnisotropy)
+{
+	const float Opacity = StrataSubSurfaceGetWrapOpacityFromAnisotropy(PhaseAnisotropy);
+	StrataSubSurfaceHeaderSetWrapOpacity(SSSHeader, Opacity);
 }
 
 bool StrataSubSurfaceHeaderGetIsValid(in FStrataSubsurfaceHeader SSSHeader)
@@ -1060,11 +1081,11 @@ void StrataPackOutStrataTree(
 	RWTexture2DArray<uint> ExtraMaterialDataUAV,
 	in uint RootOperatorIndex,
 	in FStrataTree StrataTree,
-	in int SliceStoringDebugStrataTree)
+	in int SliceStoringDebugStrataTreeData)
 {
-#define WRITE_INT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)] = asuint(Data);
-#define WRITE_UINT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)] = Data;
-#define WRITE_FLOAT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)] = asuint(Data);
+#define WRITE_INT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)] = asuint(Data);
+#define WRITE_UINT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)] = Data;
+#define WRITE_FLOAT(Data) ExtraMaterialDataUAV[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)] = asuint(Data);
 #define WRITE_FLOAT3(Data) WRITE_FLOAT(Data.x);WRITE_FLOAT(Data.y);WRITE_FLOAT(Data.z);
 #define WRITE_FLOAT4(Data) WRITE_FLOAT(Data.x);WRITE_FLOAT(Data.y);WRITE_FLOAT(Data.z);;WRITE_FLOAT(Data.w);
 
@@ -1153,16 +1174,16 @@ struct FStrataTreeHeader
 	uint RootOperatorIndex;
 };
 
-#define READ_INT(Data) Data = asint(StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)]);
-#define READ_UINT(Data) Data = StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)];
-#define READ_FLOAT(Data) Data = asfloat(StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTree)]);
+#define READ_INT(Data) Data = asint(StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)]);
+#define READ_UINT(Data) Data = StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)];
+#define READ_FLOAT(Data) Data = asfloat(StrataMaterialData[uint3(OutCoord++, OutCoordY, SliceStoringDebugStrataTreeData)]);
 #define READ_FLOAT3(Data) READ_FLOAT(Data.x);READ_FLOAT(Data.y);READ_FLOAT(Data.z);
 #define READ_FLOAT4(Data) READ_FLOAT(Data.x);READ_FLOAT(Data.y);READ_FLOAT(Data.z);READ_FLOAT(Data.w);
 
 void StrataUnpackInStrataTreeHeader(
 	Texture2DArray<uint> StrataMaterialData,
 	inout FStrataTreeHeader StrataTreeHeader,
-	in int SliceStoringDebugStrataTree)
+	in int SliceStoringDebugStrataTreeData)
 {
 	StrataTreeHeader = (FStrataTreeHeader)0;
 
@@ -1179,7 +1200,7 @@ FStrataBSDF StrataUnpackInStrataTreeBSDF(
 	uint BSDFIndex,
 	Texture2DArray<uint> StrataMaterialData,
 	inout FStrataTreeHeader StrataTreeHeader,
-	in int SliceStoringDebugStrataTree)
+	in int SliceStoringDebugStrataTreeData)
 {
 	int OutCoord = BSDFIndex * (STRATA_INLINE_SHADING ? 42 : 33);		// Skip BSDFs
 	int OutCoordY= 1;
@@ -1219,7 +1240,7 @@ FStrataOperator StrataUnpackInStrataTreeOperator(
 	uint OperatorIndex,
 	Texture2DArray<uint> StrataMaterialData,
 	inout FStrataTreeHeader StrataTreeHeader,
-	in int SliceStoringDebugStrataTree)
+	in int SliceStoringDebugStrataTreeData)
 {
 	int OutCoord = OperatorIndex * 8;	// Skip Operators
 	int OutCoordY = 2;
@@ -1325,7 +1346,7 @@ FStrataData GetStrataSlabBSDF(
 	FHaziness Haziness = InitialiseHaziness();
 
 	// Derive roughness and haziness from profile data
-	if (bSSSProfilePlugged)
+	if (!STRATA_FASTPATH && bSSSProfilePlugged)
 	{
 		// Average roughness for dual specular.
 		const uint SubsurfaceProfileUInt = StrataSubsurfaceProfileIdTo8bits(SSSProfileID);
@@ -1345,7 +1366,7 @@ FStrataData GetStrataSlabBSDF(
 	// If MFP is smaller than the pixel's footprint, remove SSS attributes
 	// The scaling factor 'SSSFootprintScale' is based on empiric tests
 	const float SSSFootprintScale = 3.f;
-	if (all(SSSMFP * SSSFootprintScale < InPixelFootprint.PixelRadiusInWorldSpace) && !bHasSSSWrap)
+	if (!STRATA_FASTPATH && all(SSSMFP * SSSFootprintScale < InPixelFootprint.PixelRadiusInWorldSpace) && !bHasSSSWrap)
 	{
 		bHasSSSProfile = false;
 		bHasSSS = false;
@@ -1356,7 +1377,7 @@ FStrataData GetStrataSlabBSDF(
 	#endif
 
 	// Convert MFP be expressed relative to simple volume thickness
-	if (bHasSSSWrap)
+	if (!STRATA_FASTPATH && bHasSSSWrap)
 	{
 		SSSMFP = RescaleMFPToComputationSpace(SSSMFP, Thickness, STRATA_SIMPLEVOLUME_THICKNESS_CM);
 		Thickness = STRATA_SIMPLEVOLUME_THICKNESS_CM;
@@ -1365,7 +1386,7 @@ FStrataData GetStrataSlabBSDF(
 	const uint bHasHaziness = ((Haziness.Roughness != Roughness  && Haziness.Weight > 0.0f) || Haziness.bSimpleClearCoat) ? 1 : 0;
 	const uint bHasAnisotropy = Anisotropy != 0 ? 1 : 0;
 	const uint bHasFuzz = FuzzAmount > 0.0f ? 1 : 0;
-	if (bHasAnisotropy)
+	if (!STRATA_FASTPATH && bHasAnisotropy)
 	{
 		StrataRequestSharedLocalBasisTangent(SharedLocalBasisTypes, SharedLocalBasisIndex);
 	}
@@ -1381,18 +1402,24 @@ FStrataData GetStrataSlabBSDF(
 	BSDF_SETTYPE			(StrataData.InlinedBSDF,		STRATA_BSDF_TYPE_SLAB);
 	BSDF_SETSHAREDLOCALBASISID(StrataData.InlinedBSDF,		SharedLocalBasisIndex);
 	BSDF_SETEMISSIVE		(StrataData.InlinedBSDF,		Emissive);
+
+#if !STRATA_FASTPATH
+	BSDF_SETSSSTYPE			(StrataData.InlinedBSDF,		bHasSSS ? (bHasSSSWrap ? SSS_TYPE_WRAP : (bHasSSSProfile ? SSS_TYPE_DIFFUSION_PROFILE : SSS_TYPE_DIFFUSION)) : SSS_TYPE_INVALID);
 	BSDF_SETHASANISOTROPY	(StrataData.InlinedBSDF,		bHasAnisotropy);
 	BSDF_SETISTOPLAYER		(StrataData.InlinedBSDF,		0);
-	BSDF_SETSSSTYPE			(StrataData.InlinedBSDF,		bHasSSS ? (bHasSSSWrap ? SSS_TYPE_WRAP : (bHasSSSProfile ? SSS_TYPE_DIFFUSION_PROFILE : SSS_TYPE_DIFFUSION)) : SSS_TYPE_INVALID);
 	BSDF_SETISTHIN			(StrataData.InlinedBSDF,		bIsThin ? 1 : 0);
 	BSDF_SETHASMFP			(StrataData.InlinedBSDF,		bMFPPlugged ? 1 : 0);
 	BSDF_SETHASHAZINESS		(StrataData.InlinedBSDF,		bHasHaziness);
-	BSDF_SETTHICKNESSCM		(StrataData.InlinedBSDF,		Thickness);
 	BSDF_SETHASFUZZ			(StrataData.InlinedBSDF,		bHasFuzz);
+	BSDF_SETTHICKNESSCM		(StrataData.InlinedBSDF,		Thickness);
+#endif
+
 
 	if (UseMetalness > 0.0f)
 	{
+#if !STRATA_FASTPATH
 		BSDF_SETHASF90(StrataData.InlinedBSDF, any(EdgeColor < 1.0f));
+#endif
 
 		const float SafeMetallic = saturate(Metallic);
 		SLAB_DIFFUSEALBEDO(StrataData.InlinedBSDF)			= ComputeDiffuseAlbedo(BaseColor, SafeMetallic);
@@ -1401,8 +1428,10 @@ FStrataData GetStrataSlabBSDF(
 	}
 	else
 	{
+#if !STRATA_FASTPATH
 		// See how UMaterialExpressionStrataSlabBSDF node interface is changed
 		BSDF_SETHASF90(StrataData.InlinedBSDF, any(F90 < 1.0f));
+#endif
 
 		SLAB_DIFFUSEALBEDO(StrataData.InlinedBSDF)			= DiffuseAlbedo;
 		SLAB_F0(StrataData.InlinedBSDF)						= F0;
@@ -1410,6 +1439,8 @@ FStrataData GetStrataSlabBSDF(
 	}
 
 	SLAB_ROUGHNESS			(StrataData.InlinedBSDF)		= Roughness;
+
+#if !STRATA_FASTPATH
 	SLAB_ANISOTROPY			(StrataData.InlinedBSDF)		= Anisotropy;
 
 	SLAB_HAZINESS(StrataData.InlinedBSDF)					= PackHaziness(Haziness);
@@ -1428,6 +1459,8 @@ FStrataData GetStrataSlabBSDF(
 
 	SLAB_FUZZ_AMOUNT		(StrataData.InlinedBSDF)		= FuzzAmount;
 	SLAB_FUZZ_COLOR			(StrataData.InlinedBSDF)		= FuzzColor;
+
+#endif // !STRATA_FASTPATH
 
 #if STRATA_INLINE_SHADING
 	// At this stage we do not know if this strata BSDF is going to be using simple volume lighting so always store the MFP on the side to not override SSSPROFILE data.
@@ -1668,7 +1701,8 @@ void StrataStoreUint1(inout FRWStrataMaterialContainer StrataBuffer, RWTexture2D
 	{
 		StrataBuffer.MaterialRenderTargets[0] = StrataAddressing.CurrentIndex == 0 ? Data : StrataBuffer.MaterialRenderTargets[0];
 		StrataBuffer.MaterialRenderTargets[1] = StrataAddressing.CurrentIndex == 1 ? Data : StrataBuffer.MaterialRenderTargets[1];
-		#if STRATA_BASE_PASS_MRT_OUTPUT_COUNT != 2
+		StrataBuffer.MaterialRenderTargets[2] = StrataAddressing.CurrentIndex == 2 ? Data : StrataBuffer.MaterialRenderTargets[2];
+		#if STRATA_BASE_PASS_MRT_OUTPUT_COUNT != 3
 		#error Strata STRATA_BASE_PASS_MRT_OUTPUT_COUNT has been update but not StrataStore function
 		#endif
 	}
@@ -1720,16 +1754,28 @@ void FinalizeWrites(inout FRWStrataMaterialContainer StrataBuffer, inout FStrata
 ///////////////////////////////////////////////////////////////////////////////
 // Material buffer read
 
+#ifndef STRATA_MATERIALCONTAINER_IS_WRITABLE 
+#define STRATA_MATERIALCONTAINER_IS_WRITABLE 0
+#endif
+
 #if STRATA_MATERIALCONTAINER_IS_VIEWRESOURCE
 
+#if STRATA_MATERIALCONTAINER_IS_WRITABLE
+#define FStrataMaterialContainer RWTexture2DArray<uint>
+#else
 #define FStrataMaterialContainer Texture2DArray<uint>
+#endif
 
 uint StrataLoadUint1(FStrataMaterialContainer StrataBuffer, inout FStrataAddressing StrataAddressing)
 {
 	uint Data = 0;
   #if !COMPILER_SWITCH
+	#if STRATA_MATERIALCONTAINER_IS_WRITABLE
+	Data = StrataBuffer[uint3(StrataAddressing.PixelCoords, StrataAddressing.CurrentIndex)];
+	#else
 	const uint MipLevel = 0;
 	Data = StrataBuffer.mips[MipLevel][uint3(StrataAddressing.PixelCoords, StrataAddressing.CurrentIndex)];
+	#endif
 	StrataAddressing.CurrentIndex++;
 	StrataAddressing.ReadBytes += 4;
   #endif
@@ -1740,17 +1786,29 @@ uint StrataLoadUint1AtIndexOffset(in FStrataMaterialContainer StrataBuffer, in F
 {
 	uint Data = 0;
   #if !COMPILER_SWITCH
+	#if STRATA_MATERIALCONTAINER_IS_WRITABLE
+	Data = StrataBuffer[uint3(StrataAddressing.PixelCoords, IndexOffset)];
+	#else
 	const uint MipLevel = 0;
 	Data = StrataBuffer.mips[MipLevel][uint3(StrataAddressing.PixelCoords, IndexOffset)];
+	#endif
   #endif
 	return Data;
 }
 
+#if STRATA_MATERIALCONTAINER_IS_WRITABLE
+#define FStrataTopLayerDataContainer RWTexture2D<uint>
+#else
 #define FStrataTopLayerDataContainer Texture2D<uint>
+#endif
 
 uint StrataLoadTopLayerData(FStrataTopLayerDataContainer InTopLayerContainer, inout FStrataAddressing StrataAddressing)
 {
+	#if STRATA_MATERIALCONTAINER_IS_WRITABLE
+	return InTopLayerContainer[StrataAddressing.PixelCoords];
+	#else
 	return InTopLayerContainer.Load(uint3(StrataAddressing.PixelCoords, 0));
+	#endif
 }
 
 #else // STRATA_MATERIALCONTAINER_IS_VIEWRESOURCE
@@ -2928,16 +2986,16 @@ float3 UnpackR11G11B10F(uint rgb)
 uint PackR10G10B10F(float3 rgb)
 {
 	uint r = (f32tof16(rgb.r) << 15) & 0x3FF00000;  // 0011 1111 1111 0000 0000 0000 0000 0000 
-	uint g = (f32tof16(rgb.g) << 5) & 0x000FFC00;  // 0000 0000 0000 1111 1111 1100 0000 0000 
-	uint b = (f32tof16(rgb.b) >> 5) & 0x000003FF;	// 0000 0000 0000 0000 0000 0011 1111 1111
+	uint g = (f32tof16(rgb.g) << 5)  & 0x000FFC00;  // 0000 0000 0000 1111 1111 1100 0000 0000 
+	uint b = (f32tof16(rgb.b) >> 5)  & 0x000003FF;	// 0000 0000 0000 0000 0000 0011 1111 1111
 	return r | g | b;
 }
 
 float3 UnpackR10G10B10F(uint rgb)
 {
 	float r = f16tof32((rgb >> 15) & 0x7FE0);
-	float g = f16tof32((rgb >> 5) & 0x7FE0);
-	float b = f16tof32((rgb << 5) & 0x7FE0);
+	float g = f16tof32((rgb >> 5)  & 0x7FE0);
+	float b = f16tof32((rgb << 5)  & 0x7FE0);
 	return float3(r, g, b);
 }
 
@@ -3109,19 +3167,9 @@ float2 SignNotZero(in float2 v)
 	return float2(SignNotZero(v.x), SignNotZero(v.y));
 }
 
-float2 StrataUnitVectorToOctahedron(float3 N)
-{
-	N.xy *= rcp(dot(1, abs(N)));
-	if (N.z <= 0)
-	{
-		N.xy = (1 - abs(N.yx)) * select(N.xy >= 0, float2(1, 1), float2(-1, -1));
-	}
-	return N.xy;
-}
-
 uint StrataPackNormal(in float3 Normal)
 {
-	return PackRG16(StrataUnitVectorToOctahedron(Normal));
+	return PackRG16(UnitVectorToOctahedron(Normal));
 }
 
 float3 StrataUnpackNormal(uint PackedNormal)
@@ -3131,7 +3179,7 @@ float3 StrataUnpackNormal(uint PackedNormal)
 
 uint StrataPackNormal24(in float3 Normal)
 {
-	const float2 Result = StrataUnitVectorToOctahedron(Normal);
+	const float2 Result = UnitVectorToOctahedron(Normal);
 	const uint2 PackedXY = uint2(clamp(Result * 2047.0f + 2048.0f, 0.0f, 4095.0f));
 	return PackedXY.x | (PackedXY.y << 12);
 }
@@ -3145,7 +3193,7 @@ float3 StrataUnpackNormal24(uint PackedNormal)
 
 uint StrataPackNormal22(in float3 Normal)
 {
-	const float2 Result = StrataUnitVectorToOctahedron(Normal);
+	const float2 Result = UnitVectorToOctahedron(Normal);
 	const uint2 PackedXY = uint2(clamp(Result * 1023.0f + 1024.0f, 0.0f, 2047.0f));
 	return PackedXY.x | (PackedXY.y << 11);
 }
@@ -3427,7 +3475,7 @@ struct FStrataIntegrationSettings
 	bool bRoughDiffuseEnabled;
 
 	// Embbeded debug settings
-	int  SliceStoringDebugStrataTree;
+	int  SliceStoringDebugStrataTreeData;
 	int  PeelLayersAboveDepth;
 };
 
@@ -3438,7 +3486,7 @@ FStrataIntegrationSettings InitStrataIntegrationSettings(bool bForceFullyRough, 
 	Out.bRoughDiffuseEnabled = bRoughDiffuseEnabled;
 
 	Out.PeelLayersAboveDepth = PeelLayersAboveDepth;
-	Out.SliceStoringDebugStrataTree = -1;
+	Out.SliceStoringDebugStrataTreeData = -1;
 	return Out;
 }
 
@@ -3726,13 +3774,182 @@ FStrataBSDF UnpackStrataBSDFIn(FStrataMaterialContainer StrataBuffer, inout FStr
 	#if STRATA_DEFERRED_SHADING
 		Data = StrataHeader.SharedLocalBasesTypes_PackedHeader;
 	#endif
-		OutBSDF.State = (Data>>HEADER_SINGLEENCODING_BIT_COUNT) & BSDF_SINGLEENCODING_MASK;
-		OutBSDF.LuminanceWeightV = 1.0f;
-		const uint BSDFType = StrataGetBSDFType(StrataHeader);
-		BSDF_SETTYPE(OutBSDF, BSDFType);
 
+		// Restore the BSDF common state
+		OutBSDF.State = (Data >> (HEADER_SINGLEENCODING_BIT_COUNT + HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)) & BSDF_SINGLEENCODING_MASK;
+
+		// STRATA_TODO anisotropy need to be integrated in the optimised legacy single path.
 		// For now, single encode doesn't support anisotropy, as the top layer data only contains the normal, not the full frame basis
 		BSDF_SETHASANISOTROPY(OutBSDF, 0);
+
+		uint OptimisedLegacyMode = (Data >> (HEADER_SINGLEENCODING_BIT_COUNT)) & HEADER_SINGLE_OPTLEGACYMODE_BIT_MASK;
+		if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_NONE)
+		{
+			// General single path
+			OutBSDF.LuminanceWeightV = 1.0f;
+			const uint BSDFType = StrataGetBSDFType(StrataHeader);
+			BSDF_SETTYPE(OutBSDF, BSDFType);
+		}
+		else
+		{
+			OutBSDF.State = 0;
+			OutBSDF.LuminanceWeightV = 1.0f;
+			OutBSDF.TransmittanceAboveAlongN = 1.0f;
+			SLAB_F90(OutBSDF) = 1.0f;
+
+			if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_CLEARCOAT)
+			{
+			#if STRATA_DEFERRED_SHADING
+				uint Data0 = StrataHeader.SharedLocalBasesTypes_PackedHeader;
+				uint Data1 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+				uint Data2 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+
+				const uint PackedDiffuse20Bits	= Data1 & 0x000FFFFF;
+				const uint PackedF024Bits		= Data2 & 0x00FFFFFF;
+				const uint PackedClearCoat16Bits= ((Data1 >> 12) & 0xFF00) | ((Data2 >> 24) & 0x00FF);
+				const uint PackedRoughness8Bits = (Data0 >> 24) & 0xFF;
+
+				SLAB_DIFFUSEALBEDO(OutBSDF)	= UnpackR7G7B6Gamma2(PackedDiffuse20Bits);
+				SLAB_F0(OutBSDF)			= UnpackRGBA8(PackedF024Bits).xyz;
+				SLAB_HAZINESS(OutBSDF)		= PackedClearCoat16Bits;
+				SLAB_ROUGHNESS(OutBSDF)		= UnpackR8(PackedRoughness8Bits);
+			#endif
+
+				// Force a BSDF state to be a single layer on top.
+				BSDF_SETTYPE(OutBSDF, STRATA_BSDF_TYPE_SLAB);
+				BSDF_SETHASGREYWEIGHT_V(OutBSDF, 1);
+				BSDF_SETHASF90(OutBSDF, 0);
+				BSDF_SETHASANISOTROPY(OutBSDF, 0);
+				BSDF_SETISTOPLAYER(OutBSDF, 1);
+				BSDF_SETSSSTYPE(OutBSDF, SSS_TYPE_INVALID);
+				BSDF_SETHASHAZINESS(OutBSDF, 1);
+				BSDF_SETISSIMPLEVOLUME(OutBSDF, 0);
+				BSDF_SETISTHIN(OutBSDF, 0);
+				BSDF_SETHASFUZZ(OutBSDF, 0);
+				BSDF_SETHASTRANSABOVE(OutBSDF, 0);
+			}
+			else if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_CLOTH)
+			{
+			#if STRATA_DEFERRED_SHADING
+				uint Data0 = StrataHeader.SharedLocalBasesTypes_PackedHeader;
+				uint Data1 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+				uint Data2 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+
+				const uint PackedDiffuse20Bits	= Data1 & 0x000FFFFF;
+				const uint PackedF020Bits		= Data2 & 0x000FFFFF;
+				const uint PackedFuzzColor20bits= ((Data1 >> 10) & 0xFFC00) | ((Data2 >> 20) & 0x03FF);
+				const uint PackedFuzzAmount8bits= (Data0 >> (HEADER_SINGLEENCODING_BIT_COUNT + HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)) & 0xFF;
+
+				SLAB_DIFFUSEALBEDO(OutBSDF)	= UnpackR7G7B6Gamma2(PackedDiffuse20Bits);
+				SLAB_F0(OutBSDF)			= UnpackR7G7B6Gamma2(PackedF020Bits);
+				SLAB_FUZZ_COLOR(OutBSDF)	= UnpackR7G7B6Gamma2(PackedFuzzColor20bits);
+				SLAB_FUZZ_AMOUNT(OutBSDF)	= UnpackR8(PackedFuzzAmount8bits);
+				SLAB_ROUGHNESS(OutBSDF)		= StrataUnpackTopLayerData(StrataHeader.PackedTopLayerData).Roughness;
+			#endif
+
+				// Force a BSDF state to be a single layer on top.
+				BSDF_SETTYPE(OutBSDF, STRATA_BSDF_TYPE_SLAB);
+				BSDF_SETHASGREYWEIGHT_V(OutBSDF, 1);
+				BSDF_SETHASF90(OutBSDF, 0);
+				BSDF_SETHASANISOTROPY(OutBSDF, 0);
+				BSDF_SETISTOPLAYER(OutBSDF, 1);
+				BSDF_SETSSSTYPE(OutBSDF, SSS_TYPE_INVALID);
+				BSDF_SETHASHAZINESS(OutBSDF, 0);
+				BSDF_SETISSIMPLEVOLUME(OutBSDF, 0);
+				BSDF_SETISTHIN(OutBSDF, 0);
+				BSDF_SETHASFUZZ(OutBSDF, 1);
+				BSDF_SETHASTRANSABOVE(OutBSDF, 0);
+			}
+			else if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_SSSWRAP)
+			{
+			#if STRATA_DEFERRED_SHADING
+				uint Data0 = StrataHeader.SharedLocalBasesTypes_PackedHeader;
+				uint Data1 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+				uint Data2 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+
+				const uint PackedDiffuse20Bits	= Data1 & 0x000FFFFF;
+				const uint PackedF020Bits		= Data2 & 0x000FFFFF;
+				
+				const uint PackedSSSMFP12BitsA = (Data1 >> 20) & 0xFFF;																				// 12 lower bits
+				const uint PackedSSSMFP12BitsB = (Data2 >> 20) & 0xFFF;																				// next 12 lower bits
+				const uint PackedSSSMFP6BitsC  = (Data0 >> (7 + HEADER_SINGLEENCODING_BIT_COUNT + HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)) & 0x03F;	// 6 higher bits
+				const uint PackedSSSMFP30bits  = PackedSSSMFP12BitsA | (PackedSSSMFP12BitsB << 12) | (PackedSSSMFP6BitsC << 24);
+
+				const uint PackedSSSWOpacity7bits = (Data0 >> (HEADER_SINGLEENCODING_BIT_COUNT + HEADER_SINGLE_OPTLEGACYMODE_BIT_COUNT)) & 0x7F;
+				const float Opacity = UnpackR7(PackedSSSWOpacity7bits);
+
+				SLAB_DIFFUSEALBEDO(OutBSDF)	= UnpackR7G7B6Gamma2(PackedDiffuse20Bits);
+				SLAB_F0(OutBSDF)			= UnpackR7G7B6Gamma2(PackedF020Bits);
+				SLAB_ROUGHNESS(OutBSDF)		= StrataUnpackTopLayerData(StrataHeader.PackedTopLayerData).Roughness;
+				SLAB_SSSMFP(OutBSDF)		= UnpackR10G10B10F(PackedSSSMFP30bits);
+				SLAB_SSSPHASEANISOTROPY(OutBSDF)= saturate(1.f - Opacity);
+			#endif
+
+				// Force a BSDF state to be a single layer on top.
+				BSDF_SETTYPE(OutBSDF, STRATA_BSDF_TYPE_SLAB);
+				BSDF_SETHASGREYWEIGHT_V(OutBSDF, 1);
+				BSDF_SETHASF90(OutBSDF, 0);
+				BSDF_SETHASANISOTROPY(OutBSDF, 0);
+				BSDF_SETISTOPLAYER(OutBSDF, 1);
+				BSDF_SETSSSTYPE(OutBSDF, SSS_TYPE_WRAP);
+				BSDF_SETHASMFP(OutBSDF, 1);
+				BSDF_SETHASHAZINESS(OutBSDF, 0);
+				BSDF_SETISSIMPLEVOLUME(OutBSDF, 0);
+				BSDF_SETISTHIN(OutBSDF, 0);
+				BSDF_SETHASFUZZ(OutBSDF, 0);
+				BSDF_SETHASTRANSABOVE(OutBSDF, 0);
+			}
+			else if (OptimisedLegacyMode == SINGLE_OPTLEGACYMODE_SSSPROFILE)
+			{
+			#if STRATA_DEFERRED_SHADING
+				uint Data0 = StrataHeader.SharedLocalBasesTypes_PackedHeader;
+				uint Data1 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+				uint Data2 = StrataLoadUint1(StrataBuffer, StrataAddressing);
+
+				const uint PackedDiffuse20Bits	= Data1 & 0x000FFFFF;
+				const uint PackedF020Bits		= Data2 & 0x000FFFFF;
+				
+				const float Roughness				= UnpackR8(Data0 >> 24);
+				const float SSSProfileRadiusScale	= UnpackR8(Data1 >> 24);
+				const float SSSProfileId			= UnpackR8(Data2 >> 24);
+
+				SLAB_DIFFUSEALBEDO(OutBSDF)			= UnpackR7G7B6Gamma2(PackedDiffuse20Bits);
+				SLAB_F0(OutBSDF)					= UnpackR7G7B6Gamma2(PackedF020Bits);
+				SLAB_ROUGHNESS(OutBSDF)				= Roughness;
+				SLAB_SSSPROFILEID(OutBSDF)			= SSSProfileId;
+				SLAB_SSSPROFILERADIUSSCALE(OutBSDF)	= SSSProfileRadiusScale;
+
+				// When loading Strata BSDF which have SSS enable, BaseColor and (optionally) Specular value can be overriden 
+				// based on the SSS method used (screen space SSS / checherboarded screen space SSS / ...)
+				#if STRATA_SSS_MATERIAL_OVERRIDE
+				{
+					const bool bChecker = CheckerFromPixelPos(StrataAddressing.PixelCoords);
+					float3 DiffuseAlbedo = SLAB_DIFFUSEALBEDO(OutBSDF);
+					float SpecularFactor = 1.0f;
+					AdjustBaseColorAndSpecularColorForSubsurfaceProfileLighting(DiffuseAlbedo, SpecularFactor, bChecker);
+					SLAB_DIFFUSEALBEDO(OutBSDF) = DiffuseAlbedo;
+					SLAB_F0(OutBSDF)  *= SpecularFactor;
+					SLAB_F90(OutBSDF) *= SpecularFactor;
+				}
+				#endif
+			#endif
+
+				// Force a BSDF state to be a single layer on top.
+				BSDF_SETTYPE(OutBSDF, STRATA_BSDF_TYPE_SLAB);
+				BSDF_SETHASGREYWEIGHT_V(OutBSDF, 1);
+				BSDF_SETHASF90(OutBSDF, 0);
+				BSDF_SETHASANISOTROPY(OutBSDF, 0);
+				BSDF_SETISTOPLAYER(OutBSDF, 1);
+				BSDF_SETSSSTYPE(OutBSDF, SSS_TYPE_DIFFUSION_PROFILE);
+				BSDF_SETHASMFP(OutBSDF, 1);
+				BSDF_SETHASHAZINESS(OutBSDF, 0);
+				BSDF_SETISSIMPLEVOLUME(OutBSDF, 0);
+				BSDF_SETISTHIN(OutBSDF, 0);
+				BSDF_SETHASFUZZ(OutBSDF, 0);
+				BSDF_SETHASTRANSABOVE(OutBSDF, 0);
+			}
+			return OutBSDF;
+		}
 	}
 	else if (IsEye(StrataHeader))
 	{

@@ -455,8 +455,8 @@ UCookOnTheFlyServer::~UCookOnTheFlyServer()
 {
 	ClearPackageStoreContexts();
 
-	FCoreDelegates::OnFConfigCreated.RemoveAll(this);
-	FCoreDelegates::OnFConfigDeleted.RemoveAll(this);
+	FCoreDelegates::TSOnFConfigCreated().RemoveAll(this);
+	FCoreDelegates::TSOnFConfigDeleted().RemoveAll(this);
 	FCoreUObjectDelegates::GetPreGarbageCollectDelegate().RemoveAll(this);
 	FCoreUObjectDelegates::GetPostGarbageCollect().RemoveAll(this);
 	GetTargetPlatformManager()->GetOnTargetPlatformsInvalidatedDelegate().RemoveAll(this);
@@ -1388,7 +1388,7 @@ void UCookOnTheFlyServer::TickCookStatus(UE::Cook::FTickStackData& StackData)
 	if (LastCookableObjectTickTime + TickCookableObjectsFrameTime <= CurrentTime)
 	{
 		UE_SCOPED_COOKTIMER(TickCookableObjects);
-		FTickableCookObject::TickObjects(CurrentTime - LastCookableObjectTickTime, false /* bTickComplete */);
+		FTickableCookObject::TickObjects(static_cast<float>(CurrentTime - LastCookableObjectTickTime), false /* bTickComplete */);
 		LastCookableObjectTickTime = CurrentTime;
 	}
 
@@ -1609,7 +1609,7 @@ void UCookOnTheFlyServer::UpdateDisplay(UE::Cook::FTickStackData& StackData, boo
 	using namespace UE::Cook;
 
 	const double CurrentTime = StackData.LoopStartTime;
-	const float DeltaProgressDisplayTime = CurrentTime - LastProgressDisplayTime;
+	const double DeltaProgressDisplayTime = CurrentTime - LastProgressDisplayTime;
 	if (!bForceDisplay && DeltaProgressDisplayTime < DisplayUpdatePeriodSeconds)
 	{
 		return;
@@ -1633,7 +1633,7 @@ void UCookOnTheFlyServer::UpdateDisplay(UE::Cook::FTickStackData& StackData, boo
 		LastCookPendingCount = CookPendingCount;
 		LastProgressDisplayTime = CurrentTime;
 	}
-	const float DeltaDiagnosticsDisplayTime = CurrentTime - LastDiagnosticsDisplayTime;
+	const double DeltaDiagnosticsDisplayTime = CurrentTime - LastDiagnosticsDisplayTime;
 	if (bForceDisplay || DeltaDiagnosticsDisplayTime > GCookProgressDiagnosticTime)
 	{
 		uint32 OpenFileHandles = 0;
@@ -1749,7 +1749,7 @@ void UCookOnTheFlyServer::FPollable::TriggerInternal(UCookOnTheFlyServer& COTFS)
 		LocalQueueKey.NextTimeSeconds = FMath::Min(CurrentTime, TimeAfterHeapTop);
 		this->NextTimeIdleSeconds = LocalQueueKey.NextTimeSeconds;
 
-		int32 Index = KeyInQueue - COTFS.Pollables.GetData();
+		int32 Index = UE_PTRDIFF_TO_INT32(KeyInQueue - COTFS.Pollables.GetData());
 		COTFS.Pollables.HeapRemoveAt(Index, false /* bAllowShrinking */);
 		COTFS.Pollables.HeapPush(MoveTemp(LocalQueueKey));
 		COTFS.PollNextTimeSeconds = 0;
@@ -1787,7 +1787,7 @@ void UCookOnTheFlyServer::FPollable::RunNowInternal(UCookOnTheFlyServer & COTFS,
 		LocalQueueKey.NextTimeSeconds = TimeLastRun + this->PeriodSeconds;
 		this->NextTimeIdleSeconds = TimeLastRun + this->PeriodIdleSeconds;
 
-		int32 Index = KeyInQueue - COTFS.Pollables.GetData();
+		int32 Index = UE_PTRDIFF_TO_INT32(KeyInQueue - COTFS.Pollables.GetData());
 		COTFS.PollNextTimeSeconds = FMath::Min(LocalQueueKey.NextTimeSeconds, COTFS.PollNextTimeSeconds);
 		COTFS.PollNextTimeIdleSeconds = FMath::Min(this->NextTimeIdleSeconds, COTFS.PollNextTimeIdleSeconds);
 		COTFS.Pollables.HeapRemoveAt(Index, false /* bAllowShrinking */);
@@ -2102,13 +2102,13 @@ void UCookOnTheFlyServer::WaitForAsync(UE::Cook::FTickStackData& StackData)
 	// Sleep until the next time that DecideNextCookAction will find work to do, up to a maximum of WaitForAsyncSleepSeconds
 	UE_SCOPED_COOKTIMER(WaitForAsync);
 	double CurrentTime = FPlatformTime::Seconds();
-	float SleepDuration = WaitForAsyncSleepSeconds;
+	double SleepDuration = WaitForAsyncSleepSeconds;
 	SleepDuration = FMath::Min(SleepDuration, StackData.Timer.GetEndTimeSeconds() - CurrentTime);
 	SleepDuration = FMath::Min(SleepDuration, PollNextTimeIdleSeconds - CurrentTime);
 	SleepDuration = FMath::Min(SleepDuration, SaveBusyRetryTimeSeconds - CurrentTime);
 	SleepDuration = FMath::Min(SleepDuration, LoadBusyRetryTimeSeconds - CurrentTime);
 	SleepDuration = FMath::Max(SleepDuration, 0);
-	FPlatformProcess::Sleep(SleepDuration);
+	FPlatformProcess::Sleep(static_cast<float>(SleepDuration));
 }
 
 UCookOnTheFlyServer::ECookAction UCookOnTheFlyServer::DecideNextCookAction(UE::Cook::FTickStackData& StackData)
@@ -4527,7 +4527,7 @@ void UCookOnTheFlyServer::EvaluateGarbageCollectionResults(int32 NumObjectsBefor
 	int64 VirtualMemAfterGC = MemStatsAfterGC.UsedVirtual;
 	int64 VirtualMemFreed = MemStatsBeforeGC.UsedVirtual - MemStatsAfterGC.UsedVirtual;
 
-	int64 ExpectedObjectsFreed = MemoryExpectedFreedToSpreadRatio * NumObjectsSpread;
+	int64 ExpectedObjectsFreed = static_cast<int64>(MemoryExpectedFreedToSpreadRatio * static_cast<float>(NumObjectsSpread));
 	double ExpectedMemFreed = MemoryExpectedFreedToSpreadRatio * VirtualMemSpread;
 	if ((NumObjectsFreed >= ExpectedObjectsFreed || NumObjectsBeforeGC - NumObjectsMin < ExpectedObjectsFreed) &&
 		(VirtualMemFreed >= ExpectedMemFreed || VirtualMemBeforeGC - VirtualMemMin <= ExpectedMemFreed))
@@ -5559,7 +5559,15 @@ void FSaveCookedPackageContext::FinishPlatform()
 		// Flush the AssetRegisty so any AssetData changes from the save are present
 		COTFS.AssetRegistry->WaitForCompletion();
 		IAssetRegistryReporter& Reporter = *(COTFS.PlatformManager->GetPlatformData(TargetPlatform)->RegistryReporter);
-		Reporter.UpdateAssetRegistryData(PackageData, *Package, SavePackageResult, MoveTemp(*ArchiveCookContext.GetCookTagList()));
+
+		// UpdateAssetRegistryData will pull data from the global asset registry
+		// For most types, our contract is that we use the data in the asset registry that was updated on load and is in
+		// the disk asset storage of the global asset registry. Most types do not take significant action during cooking
+		// so we do not need to allow them to update their tags after they finish loading.
+		// But generator packages do a lot of work during generation and may need to update their tags, so read the
+		// latest tags off of their asset by setting bIncludeOnlyDiskAssets=true.
+		const bool bIncludeOnlyDiskAssets = PackageData.GetGeneratorPackage() == nullptr;
+		Reporter.UpdateAssetRegistryData(PackageData, *Package, SavePackageResult, MoveTemp(*ArchiveCookContext.GetCookTagList()), bIncludeOnlyDiskAssets);
 	}
 
 	// If not retrying, mark the package as cooked, either successfully or with failure
@@ -5783,8 +5791,8 @@ void UCookOnTheFlyServer::Initialize( ECookMode::Type DesiredCookMode, ECookInit
 		FCoreDelegates::OnTargetPlatformChangedSupportedFormats.AddUObject(this, &UCookOnTheFlyServer::OnTargetPlatformChangedSupportedFormats);
 	}
 
-	FCoreDelegates::OnFConfigCreated.AddUObject(this, &UCookOnTheFlyServer::OnFConfigCreated);
-	FCoreDelegates::OnFConfigDeleted.AddUObject(this, &UCookOnTheFlyServer::OnFConfigDeleted);
+	FCoreDelegates::TSOnFConfigCreated().AddUObject(this, &UCookOnTheFlyServer::OnFConfigCreated);
+	FCoreDelegates::TSOnFConfigDeleted().AddUObject(this, &UCookOnTheFlyServer::OnFConfigDeleted);
 
 	GetTargetPlatformManager()->GetOnTargetPlatformsInvalidatedDelegate().AddUObject(this, &UCookOnTheFlyServer::OnTargetPlatformsInvalidated);
 
@@ -8239,7 +8247,7 @@ void UCookOnTheFlyServer::CookByTheBookFinished()
 	{
 		UE_SCOPED_COOKTIMER(TickCookableObjects);
 		const double CurrentTime = FPlatformTime::Seconds();
-		FTickableCookObject::TickObjects(CurrentTime - LastCookableObjectTickTime, true /* bTickComplete */);
+		FTickableCookObject::TickObjects(static_cast<float>(CurrentTime - LastCookableObjectTickTime), true /* bTickComplete */);
 		LastCookableObjectTickTime = CurrentTime;
 	}
 
@@ -10485,7 +10493,7 @@ uint32 UCookOnTheFlyServer::CookFullLoadAndSave()
 			if (LastCookableObjectTickTime + TickCookableObjectsFrameTime <= CurrentTime)
 			{
 				UE_SCOPED_COOKTIMER(TickCookableObjects);
-				FTickableCookObject::TickObjects(CurrentTime - LastCookableObjectTickTime, false /* bTickComplete */);
+				FTickableCookObject::TickObjects(static_cast<float>(CurrentTime - LastCookableObjectTickTime), false /* bTickComplete */);
 				LastCookableObjectTickTime = CurrentTime;
 			}
 

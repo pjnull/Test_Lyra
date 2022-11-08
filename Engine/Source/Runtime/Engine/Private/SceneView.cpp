@@ -19,6 +19,7 @@
 #include "BufferVisualizationData.h"
 #include "NaniteVisualizationData.h"
 #include "LumenVisualizationData.h"
+#include "StrataVisualizationData.h"
 #include "VirtualShadowMapVisualizationData.h"
 #include "Interfaces/Interface_PostProcessVolume.h"
 #include "Engine/TextureCube.h"
@@ -314,6 +315,14 @@ static TAutoConsoleVariable<int32> CVarAllowTranslucencyAfterDOF(
 	TEXT(" 0: off (translucency is affected by depth of field)\n")
 	TEXT(" 1: on costs GPU performance and memory but keeps translucency unaffected by Depth of Field. (default)"),
 	ECVF_Scalability | ECVF_RenderThreadSafe);
+
+static TAutoConsoleVariable<int32> CVarTranslucencyStandardSeparated(
+	TEXT("r.Translucency.StandardSeparated"),
+	0,
+	TEXT("Render translucent meshes in separate buffer from the scene color.\n")
+	TEXT("This prevent those meshes from self refracting and leaking scnee color behind over edges when it should be affect by colored transmittance.\n")
+	TEXT("Forced disabled when r.SeparateTranslucency is 0.\n"),
+	ECVF_RenderThreadSafe | ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarEnableTemporalUpsample(
 	TEXT("r.TemporalAA.Upsampling"),
@@ -786,9 +795,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	, AntiAliasingMethod(AAM_None)
 	, PrimaryScreenPercentageMethod(EPrimaryScreenPercentageMethod::SpatialUpscale)
 	, FeatureLevel(InitOptions.ViewFamily ? InitOptions.ViewFamily->GetFeatureLevel() : GMaxRHIFeatureLevel)
-#if RHI_RAYTRACING
-	, IESLightProfileResource(nullptr)
-#endif
 {
 	check(UnscaledViewRect.Min.X >= 0);
 	check(UnscaledViewRect.Min.Y >= 0);
@@ -2907,16 +2913,23 @@ FSceneViewFamily::FSceneViewFamily(const ConstructionValues& CVS)
 
 	// Check if the translucency are allowed to be rendered after DOF, if not, translucency after DOF will be rendered in standard translucency.
 	{
-		bAllowTranslucencyAfterDOF = CVarAllowTranslucencyAfterDOF.GetValueOnAnyThread() != 0
-			&& EngineShowFlags.PostProcessing // Used for reflection captures.
-			&& !UseDebugViewPS()
-			&& EngineShowFlags.SeparateTranslucency;
+		bool SeparateTranslucencyEnabled = EngineShowFlags.PostProcessing // Used for reflection captures.
+										&& !UseDebugViewPS()
+										&& EngineShowFlags.SeparateTranslucency;
 
-		if (GetFeatureLevel() == ERHIFeatureLevel::ES3_1)
+		const bool bIsMobile = GetFeatureLevel() == ERHIFeatureLevel::ES3_1;
+		if (bIsMobile)
 		{
 			const bool bMobileMSAA = GetDefaultMSAACount(ERHIFeatureLevel::ES3_1) > 1;
-			bAllowTranslucencyAfterDOF &= (IsMobileHDR() && !bMobileMSAA); // on <= ES3_1 separate translucency requires HDR on and MSAA off
+			SeparateTranslucencyEnabled &= (IsMobileHDR() && !bMobileMSAA); // on <= ES3_1 separate translucency requires HDR on and MSAA off
 		}
+
+		bAllowTranslucencyAfterDOF = SeparateTranslucencyEnabled && CVarAllowTranslucencyAfterDOF.GetValueOnAnyThread() != 0;
+
+		// We do not allow separated translucency on mobile
+		// When MSAA sample count is >1 it works, but hair has not been properly tested so far due to other issues, so MSAA cannot use separted standard translucent for now.
+		uint32 MSAASampleCount = GetDefaultMSAACount(GetFeatureLevel());
+		bAllowStandardTranslucencySeparated = SeparateTranslucencyEnabled && MSAASampleCount == 1 && !bIsMobile && CVarTranslucencyStandardSeparated.GetValueOnAnyThread() != 0;
 	}
 }
 

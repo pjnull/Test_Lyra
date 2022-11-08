@@ -923,7 +923,8 @@ void SDetailsView::PostSetObject(const TArray<FDetailsViewObjectRoot>& Roots)
 
 	// Are we editing PIE objects?  If the bShowHiddenPropertiesWhilePlaying setting is enabled, we may want to
 	// show all of the properties that would normally be hidden for objects that are part of the PIE world.
-	bool bAnyPIEObjects = false;
+	bool bShowHiddenPropertiesWhilePlaying = false;
+	if (IsShowHiddenPropertiesWhilePlayingChecked())
 	{
 		for( int32 RootNodeIndex = 0; RootNodeIndex < RootPropertyNodes.Num(); ++RootNodeIndex )
 		{
@@ -936,7 +937,7 @@ void SDetailsView::PostSetObject(const TArray<FDetailsViewObjectRoot>& Roots)
 					UObject* Object = RootPropertyNode->GetUObject( ObjectIndex );
 					if( Object->GetOutermost()->HasAnyPackageFlags( PKG_PlayInEditor ) )
 					{
-						bAnyPIEObjects = true;
+						bShowHiddenPropertiesWhilePlaying = true;
 						break;
 					}
 				}
@@ -952,7 +953,7 @@ void SDetailsView::PostSetObject(const TArray<FDetailsViewObjectRoot>& Roots)
 	InitParams.bAllowChildren = true;
 	InitParams.bForceHiddenPropertyVisibility = 
 		FPropertySettings::Get().ShowHiddenProperties() || 
-		( GetDefault<UEditorStyleSettings>()->bShowHiddenPropertiesWhilePlaying && bAnyPIEObjects ) ||
+		bShowHiddenPropertiesWhilePlaying ||
 		DetailsViewArgs.bForceHiddenPropertyVisibility;
 
 	switch ( DetailsViewArgs.DefaultsOnlyVisibility )
@@ -1026,7 +1027,7 @@ bool SDetailsView::IsShowHiddenPropertiesWhilePlayingChecked() const
 		return ViewConfig->bShowHiddenPropertiesWhilePlaying;
 	}
 
-	return false;
+	return GetDefault<UEditorStyleSettings>()->bShowHiddenPropertiesWhilePlaying;
 }
 
 void SDetailsView::OnShowHiddenPropertiesWhilePlayingClicked()

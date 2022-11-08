@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "Chooser.h"
-#include "DataInterfaceTypes.h"
-#include "DataInterface.h"
+#include "ChooserFunctionLibrary.h"
+#include "ChooserPropertyAccess.h"
 
 UChooserTable::UChooserTable(const FObjectInitializer& Initializer)
 	:Super(Initializer)
@@ -9,49 +9,11 @@ UChooserTable::UChooserTable(const FObjectInitializer& Initializer)
 
 }
 
-void UChooserColumnBool::Filter(const UE::DataInterface::FContext& Context, const TArray<uint32>& IndexListIn, TArray<uint32>& IndexListOut)
-{
-	bool Result = false;
-	if(UE::DataInterface::GetDataSafe(Value, Context, Result))
-	{
-		for(uint32 Index : IndexListIn)
-		{
-			if (RowValues.Num() > (int)Index)
-			{
-				if (Result == RowValues[Index])
-				{
-					IndexListOut.Push(Index);
-				}
-			}
-		}
-	}
-}
-
-void UChooserColumnFloatRange::Filter(const UE::DataInterface::FContext& Context, const TArray<uint32>& IndexListIn, TArray<uint32>& IndexListOut)
-{
-	float Result = 0.0f;
-	
-	if(UE::DataInterface::GetDataSafe(Value, Context, Result))
-	{
-		for(uint32 Index : IndexListIn)
-		{
-			if (RowValues.Num() > (int)Index)
-			{
-				const FChooserFloatRangeRowData& RowValue = RowValues[Index];
-				if (Result >= RowValue.Min && Result <= RowValue.Max)
-				{
-					IndexListOut.Push(Index);
-				}
-			}
-		}
-	}
-}
-
-bool UDataInterface_EvaluateChooser::GetDataImpl(const UE::DataInterface::FContext& DataContext) const
+static IObjectChooser::EIteratorStatus StaticEvaluateChooser(const UObject* ContextObject, const UChooserTable* Chooser, IObjectChooser::FObjectChooserIteratorCallback Callback)
 {
 	if (Chooser == nullptr)
 	{
-		return false;
+		return IObjectChooser::EIteratorStatus::Continue;
 	}
 
 	TArray<uint32> Indices1;
@@ -72,7 +34,7 @@ bool UDataInterface_EvaluateChooser::GetDataImpl(const UE::DataInterface::FConte
 		{
 			Swap(IndicesIn, IndicesOut);
 			IndicesOut->SetNum(0, false);
-			Column->Filter(DataContext, *IndicesIn, *IndicesOut);
+			Column->Filter(ContextObject, *IndicesIn, *IndicesOut);
 		}
 	}
 
@@ -81,15 +43,51 @@ bool UDataInterface_EvaluateChooser::GetDataImpl(const UE::DataInterface::FConte
 	{
 		if (Chooser->Results.Num() > (int32)SelectedIndex)
 		{
-			const TScriptInterface<IDataInterface>& SelectedResult = Chooser->Results[SelectedIndex];
-
-			// todo: GetResultRaw returns const, GetData requires non-const
-			if(UE::DataInterface::GetDataSafe(SelectedResult, DataContext, const_cast<UE::DataInterface::FParam&>(DataContext.GetResultRaw())))
+			if (const IObjectChooser* SelectedResult = Chooser->Results[SelectedIndex].GetInterface())
 			{
-				return true;
+				if (SelectedResult->ChooseMulti(ContextObject, Callback) == IObjectChooser::EIteratorStatus::Stop)
+				{
+					return IObjectChooser::EIteratorStatus::Stop;
+				}
 			}
 		}
 	}
+	
+	return IObjectChooser::EIteratorStatus::Continue;
+}
 
-	return false;
+UObject* UObjectChooser_EvaluateChooser::ChooseObject(const UObject* ContextObject) const
+{
+	UObject* Result = nullptr;
+	StaticEvaluateChooser(ContextObject, Chooser, FObjectChooserIteratorCallback::CreateLambda([&Result](UObject* InResult)
+	{
+		Result = InResult;
+		return IObjectChooser::EIteratorStatus::Stop;
+	}));
+
+	return Result;
+}
+
+IObjectChooser::EIteratorStatus UObjectChooser_EvaluateChooser::ChooseMulti(const UObject* ContextObject, FObjectChooserIteratorCallback Callback) const
+{
+	return StaticEvaluateChooser(ContextObject, Chooser, Callback);
+}
+
+UChooserFunctionLibrary::UChooserFunctionLibrary(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+}
+
+UObject* UChooserFunctionLibrary::EvaluateChooser(const UObject* ContextObject, const UChooserTable* Chooser)
+{
+	UObject* Result = nullptr;
+	StaticEvaluateChooser(ContextObject, Chooser, IObjectChooser::FObjectChooserIteratorCallback::CreateLambda([&Result](UObject* InResult)
+	{
+		Result = InResult;
+		return IObjectChooser::EIteratorStatus::Stop;
+	}));
+
+	return Result;
+
+	return Result;
 }

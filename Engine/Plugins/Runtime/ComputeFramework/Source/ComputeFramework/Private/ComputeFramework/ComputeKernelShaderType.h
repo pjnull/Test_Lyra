@@ -6,7 +6,9 @@
 #include "Engine/EngineTypes.h"
 #include "GlobalShader.h"
 #include "Shader.h"
+#if WITH_EDITOR
 #include "ShaderCompiler.h"
+#endif
 
 class FShaderCommonCompileJob;
 class FShaderCompileJob;
@@ -71,9 +73,12 @@ public:
 		int32 InTotalPermutationCount,
 		ConstructSerializedType InConstructSerializedRef,
 		ConstructCompiledType InConstructCompiledRef,
-		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ShouldCompilePermutationType InShouldCompilePermutationRef,
+		GetRayTracingPayloadTypeType InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+		ModifyCompilationEnvironmentType InModifyCompilationEnvironmentRef,
 		ValidateCompiledResultType InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 		uint32 InTypeSize,
 		const FShaderParametersMetadata* InRootParametersMetadata = nullptr
 		):
@@ -87,15 +92,19 @@ public:
 			InTotalPermutationCount,
 			InConstructSerializedRef,
 			InConstructCompiledRef,
-			InModifyCompilationEnvironmentRef,
 			InShouldCompilePermutationRef,
+			InGetRayTracingPayloadTypeRef,
+#if WITH_EDITOR
+			InModifyCompilationEnvironmentRef,
 			InValidateCompiledResultRef,
+#endif // WITH_EDITOR
 			InTypeSize,
 			InRootParametersMetadata
 			)
 	{
 	}
 
+#if WITH_EDITOR
 	void BeginCompileShader(
 		uint32 ShaderMapId,
 		int32 PermutationId,
@@ -114,6 +123,7 @@ public:
 		const FShaderCompileJob& CurrentJob,
 		const FString& InDebugDescription
 		) const;
+#endif // WITH_EDITOR
 
 	/**
 	 * Checks if the shader type should be cached.
@@ -124,7 +134,7 @@ public:
 		return ShouldCompilePermutation(FComputeKernelShaderPermutationParameters(InPlatform));
 	}
 
-
+#if WITH_EDITOR
 protected:
 	/**
 	 * Sets up the environment used to compile an instance of this shader type.
@@ -135,4 +145,5 @@ protected:
 	{
 		ModifyCompilationEnvironment(FComputeKernelShaderPermutationParameters(InPlatform), OutEnvironment);
 	}
+#endif // WITH_EDITOR
 };

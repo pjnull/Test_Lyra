@@ -504,6 +504,7 @@ void FRigUnit_HierarchyAddControlVector2D_Settings::Configure(FRigControlSetting
 	
 	OutSettings.ControlType = ERigControlType::Vector2D;
 	OutSettings.PrimaryAxis = PrimaryAxis;
+	OutSettings.FilteredChannels = FilteredChannels;
 
 	Proxy.Configure(OutSettings);
 	Limits.Configure(OutSettings);
@@ -553,6 +554,7 @@ void FRigUnit_HierarchyAddControlVector_Settings::Configure(FRigControlSettings&
 	Super::Configure(OutSettings);
 	
 	OutSettings.ControlType = bIsPosition ? ERigControlType::Position : ERigControlType::Scale;
+	OutSettings.FilteredChannels = FilteredChannels;
 
 	Proxy.Configure(OutSettings);
 	Limits.Configure(OutSettings);
@@ -602,6 +604,7 @@ void FRigUnit_HierarchyAddControlRotator_Settings::Configure(FRigControlSettings
 	Super::Configure(OutSettings);
 	
 	OutSettings.ControlType = ERigControlType::Rotator;
+	OutSettings.FilteredChannels = FilteredChannels;
 
 	Proxy.Configure(OutSettings);
 	Limits.Configure(OutSettings);
@@ -640,6 +643,7 @@ void FRigUnit_HierarchyAddControlTransform_Settings::Configure(FRigControlSettin
 	Super::Configure(OutSettings);
 	
 	OutSettings.ControlType = ERigControlType::EulerTransform;
+	OutSettings.FilteredChannels = FilteredChannels;
 
 	Proxy.Configure(OutSettings);
 	Shape.Configure(OutSettings);
@@ -907,3 +911,40 @@ FRigUnit_HierarchyAddAnimationChannelRotator_Execute()
 	}
 }
 
+FRigUnit_HierarchyGetShapeSettings_Execute()
+{
+	Settings = FRigUnit_HierarchyAddControl_ShapeSettings();
+
+	if(URigHierarchy* Hierarchy = Context.Hierarchy)
+	{
+		if(const FRigControlElement* ControlElement = Hierarchy->Find<FRigControlElement>(Item))
+		{
+			Settings.bVisible = ControlElement->Settings.bShapeVisible;
+			Settings.Color = ControlElement->Settings.ShapeColor;
+			Settings.Name = ControlElement->Settings.ShapeName;
+			Settings.Transform = Hierarchy->GetControlShapeTransform((FRigControlElement*)ControlElement, ERigTransformType::InitialLocal);
+		}
+		else
+		{
+			UE_CONTROLRIG_RIGUNIT_REPORT_ERROR(TEXT("Control '%s' does not exist."), *Item.ToString());
+		}
+	}
+}
+
+FRigUnit_HierarchySetShapeSettings_Execute()
+{
+	if(FRigControlElement* ControlElement = ExecuteContext.Hierarchy->Find<FRigControlElement>(Item))
+	{
+		ControlElement->Settings.bShapeVisible = Settings.bVisible;
+		ControlElement->Settings.ShapeColor = Settings.Color;
+		ControlElement->Settings.ShapeName = Settings.Name;
+		ExecuteContext.Hierarchy->Notify(ERigHierarchyNotification::ControlSettingChanged, ControlElement);
+		ExecuteContext.Hierarchy->SetControlShapeTransformByIndex(ControlElement->GetIndex(), Settings.Transform, true, false);
+		ExecuteContext.Hierarchy->SetControlShapeTransformByIndex(ControlElement->GetIndex(), Settings.Transform, false, false);
+	}
+	else
+	{
+		UE_CONTROLRIG_RIGUNIT_REPORT_ERROR(TEXT("Control '%s' does not exist."), *Item.ToString());
+	}
+
+}

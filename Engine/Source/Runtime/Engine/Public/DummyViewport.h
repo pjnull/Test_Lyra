@@ -27,6 +27,13 @@ public:
 		check( IsInRenderingThread() );
 	}
 
+	void SetupHDR(EDisplayColorGamut InDisplayColorGamut, EDisplayOutputFormat InDisplayOutputFormat, bool bInSceneHDREnabled)
+	{
+		DisplayColorGamut = InDisplayColorGamut;
+		DisplayOutputFormat = InDisplayOutputFormat;
+		bSceneHDREnabled = bInSceneHDREnabled;
+	}
+
 	virtual void*	GetWindow() override { return 0; }
 	virtual void	MoveWindow(int32 NewPosX, int32 NewPosY, int32 NewSizeX, int32 NewSizeY) override {}
 	virtual void	Destroy() override {}
@@ -43,6 +50,9 @@ public:
 	virtual void DeferInvalidateHitProxy() override { }
 	virtual FViewportFrame* GetViewportFrame() override { return 0; }
 	virtual FCanvas* GetDebugCanvas() override { return DebugCanvas; }
+	virtual EDisplayColorGamut GetDisplayColorGamut() const;
+	virtual EDisplayOutputFormat GetDisplayOutputFormat() const;
+	virtual bool GetSceneHDREnabled() const;
 	//~ End FViewport Interface
 
 	//~ Begin FRenderResource Interface
@@ -57,4 +67,7 @@ public:
 	//~ End FRenderResource Interface
 private:
 	FCanvas* DebugCanvas;
+	EDisplayColorGamut DisplayColorGamut = EDisplayColorGamut::sRGB_D65;
+	EDisplayOutputFormat DisplayOutputFormat = EDisplayOutputFormat::SDR_sRGB;
+	bool bSceneHDREnabled = false;
 };

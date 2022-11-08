@@ -5,25 +5,55 @@
 #include "CoreMinimal.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/Object.h"
+#include "UObject/GCObject.h"
 #include "Engine/EngineBaseTypes.h"
 #include "MassProcessingTypes.h"
+#include "MassProcessor.h"
+#include "MassProcessorDependencySolver.h"
 #include "MassProcessingPhaseManager.generated.h"
 
 
-class UMassProcessingPhaseManager;
+struct FMassProcessingPhaseManager;
 class UMassProcessor;
 class UMassCompositeProcessor;
 struct FMassEntityManager;
 struct FMassCommandBuffer;
+struct FMassProcessingPhaseConfig;
+
 
 USTRUCT()
-struct FMassProcessingPhase : public FTickFunction
+struct MASSENTITY_API FMassProcessingPhaseConfig
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, Category = Mass, config)
+	FName PhaseName;
+
+	UPROPERTY(EditAnywhere, Category = Mass, config, NoClear)
+	TSubclassOf<UMassCompositeProcessor> PhaseGroupClass = UMassCompositeProcessor::StaticClass();
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMassProcessor>> ProcessorCDOs;
+
+#if WITH_EDITORONLY_DATA
+	// this processor is available only in editor since it's used to present the user the order in which processors
+	// will be executed when given processing phase gets triggered
+	UPROPERTY(Transient)
+	TObjectPtr<UMassCompositeProcessor> PhaseProcessor = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = Mass, Transient)
+	FText Description;
+#endif //WITH_EDITORONLY_DATA
+};
+
+
+struct MASSENTITY_API FMassProcessingPhase : public FTickFunction
+{
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPhaseEvent, const float /*DeltaSeconds*/);
 
 	FMassProcessingPhase();
+	FMassProcessingPhase(const FMassProcessingPhase& Other) = delete;
+	FMassProcessingPhase& operator=(const FMassProcessingPhase& Other) = delete;
 
 protected:
 	// FTickFunction interface
@@ -39,47 +69,57 @@ protected:
 	void ConfigureForSingleThreadMode() { bRunInParallelMode = false; }
 
 public:
-	bool IsDuringMassProcessing() const { return bIsDuringMassProcessing; }
+	void Initialize(FMassProcessingPhaseManager& InPhaseManager, const EMassProcessingPhase InPhase, const ETickingGroup InTickGroup, UMassCompositeProcessor& InPhaseProcessor);
 
 protected:
-	friend UMassProcessingPhaseManager;
+	friend FMassProcessingPhaseManager;
 
-	UPROPERTY(EditAnywhere, Category=Mass)
-	TObjectPtr<UMassCompositeProcessor> PhaseProcessor = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UMassProcessingPhaseManager> PhaseManager = nullptr;
+	// composite processor representing work to be performed. GC-referenced via AddReferencedObjects
+	UMassCompositeProcessor* PhaseProcessor = nullptr;
 
 	EMassProcessingPhase Phase = EMassProcessingPhase::MAX;
 	FOnPhaseEvent OnPhaseStart;
 	FOnPhaseEvent OnPhaseEnd;
 
 private:
+	FMassProcessingPhaseManager* PhaseManager = nullptr;
 	bool bRunInParallelMode = false;
 	std::atomic<bool> bIsDuringMassProcessing = false;
 };
 
-// It is unsafe to copy FTickFunctions and any subclasses of FTickFunction should specify the type trait WithCopy = false
-template<>
-struct TStructOpsTypeTraits<FMassProcessingPhase> : public TStructOpsTypeTraitsBase2<FMassProcessingPhase>
+
+struct MASSENTITY_API FMassPhaseProcessorConfigurationHelper
 {
-	enum
+	FMassPhaseProcessorConfigurationHelper(UMassCompositeProcessor& InOutPhaseProcessor, const FMassProcessingPhaseConfig& InPhaseConfig, UObject& InProcessorOuter)
+		: PhaseProcessor(InOutPhaseProcessor), PhaseConfig(InPhaseConfig), ProcessorOuter(InProcessorOuter)
 	{
-		WithCopy = false
-	};
+	}
+
+	void Configure(const TSharedPtr<FMassEntityManager>& EntityManager = TSharedPtr<FMassEntityManager>(), FMassProcessorDependencySolver::FResult* OutOptionalResult = nullptr);
+
+	UMassCompositeProcessor& PhaseProcessor;
+	const FMassProcessingPhaseConfig& PhaseConfig;
+	UObject& ProcessorOuter;
+	bool bInitializeCreatedProcessors = true;
+	bool bIsGameRuntime = true;
 };
 
-/** MassProcessingPhaseManager owns separate FMassProcessingPhase instances for every ETickingGroup. When activated
- *  via Start function it registers and enables the FMassProcessingPhase instances which themselves are tick functions 
- *  that host UMassCompositeProcessor which they trigger as part of their Tick function. 
- *  MassProcessingPhaseManager serves as an interface to said FMassProcessingPhase instances and allows initialization
- *  with MassSchematics (via InitializePhases function) as well as registering arbitrary functions to be called 
- *  when a particular phase starts of ends (via GetOnPhaseStart and GetOnPhaseEnd functions). */
-UCLASS(Transient, HideCategories = (Tick))
-class MASSENTITY_API UMassProcessingPhaseManager : public UObject
+/** 
+ * MassProcessingPhaseManager owns separate FMassProcessingPhase instances for every ETickingGroup. When activated
+ * via Start function it registers and enables the FMassProcessingPhase instances which themselves are tick functions 
+ * that host UMassCompositeProcessor which they trigger as part of their Tick function. 
+ * MassProcessingPhaseManager serves as an interface to said FMassProcessingPhase instances and allows initialization
+ * with collections of processors (via Initialize function) as well as registering arbitrary functions to be called 
+ * when a particular phase starts or ends (via GetOnPhaseStart and GetOnPhaseEnd functions). 
+ */
+struct MASSENTITY_API FMassProcessingPhaseManager : public FGCObject
 {
-	GENERATED_BODY()
 public:
+	FMassProcessingPhaseManager() = default;
+	FMassProcessingPhaseManager(const FMassProcessingPhaseManager& Other) = delete;
+	FMassProcessingPhaseManager& operator=(const FMassProcessingPhaseManager& Other) = delete;
+
+	const TSharedPtr<FMassEntityManager>& GetEntityManager() { return EntityManager; }
 	FMassEntityManager& GetEntityManagerRef() { check(EntityManager); return *EntityManager.Get(); }
 
 	/** Retrieves OnPhaseStart multicast delegate's reference for a given Phase */
@@ -91,42 +131,38 @@ public:
 	 *  Populates hosted FMassProcessingPhase instances with Processors read from MassEntitySettings configuration.
 	 *  Calling this function overrides previous configuration of Phases.
 	 */
-	void InitializePhases(UObject& InProcessorOwner);
+	void Initialize(UObject& InOwner, TConstArrayView<FMassProcessingPhaseConfig> ProcessingPhasesConfig, const FString& DependencyGraphFileName = TEXT(""));
+
+	/** Needs to be called before destruction, ideally before owner's BeginDestroy (a FGCObject's limitation) */
+	void Deinitialize();
 
 	/** 
-	 *  Both flavors of Start function boil down to setting EntitySubsystem and Executor. If the callee has these 
-	 *  at hand it's suggested to use that Start version, otherwise call the World-using one. 
+	 *  Stores EntityManager associated with given world's MassEntitySubsystem and kicks off phase ticking.
 	 */
 	void Start(UWorld& World);
+	
+	/**
+	 *  Stores InEntityManager as the entity manager and kicks off phase ticking.
+	 */
 	void Start(const TSharedPtr<FMassEntityManager>& InEntityManager);
 	void Stop();
 	bool IsRunning() const { return EntityManager.IsValid(); }
 
-	/** 
-	 *  returns true when called while any of the ProcessingPhases is actively executing its processors. Used to 
-	 *  determine whether it's safe to do entity-related operations like adding fragments.
-	 *  Note that the function will return false while the OnPhaseStart or OnPhaseEnd are being broadcast,
-	 *  the value returned will be `true` only when the entity subsystem is actively engaged 
-	 */
-	bool IsDuringMassProcessing() const { return CurrentPhase != EMassProcessingPhase::MAX && ProcessingPhases[int(CurrentPhase)].IsDuringMassProcessing(); }
-
-	/**
-	 *  Sets the composite processor used for Phase processing phase. Using PhaseProcessor == nullptr results in
-	 *  clearing the Phase's processor out effectively making the Phase perform no calculations. 
-	 */
-	void SetPhaseProcessor(const EMassProcessingPhase Phase, UMassCompositeProcessor* PhaseProcessor);
+	FString GetName() const;
 
 protected:
-	virtual void PostInitProperties() override;
-	virtual void BeginDestroy() override;
+	// FGCObject interface
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("FMassProcessingPhaseManager");
+	}
+	// End of FGCObject interface
+
 	void EnableTickFunctions(const UWorld& World);
 
 	/** Creates phase processors instances for each declared phase name, based on MassEntitySettings */
-	virtual void CreatePhases();
-
-#if WITH_EDITOR
-	virtual void OnMassEntitySettingsChange(const FPropertyChangedEvent& PropertyChangedEvent);
-#endif // WITH_EDITOR
+	void CreatePhases();
 
 	friend FMassProcessingPhase;
 
@@ -142,15 +178,25 @@ protected:
 	 */
 	void OnPhaseEnd(FMassProcessingPhase& Phase);
 
+	void OnNewArchetype(const FMassArchetypeHandle& NewArchetype);
+
 protected:	
-	UPROPERTY(VisibleAnywhere, Category=Mass)
+	struct FPhaseGraphBuildState
+	{
+		FMassProcessorDependencySolver::FResult LastResult;
+		bool bNewArchetypes = true;
+		bool bInitialized = false;
+	};
+
 	FMassProcessingPhase ProcessingPhases[(uint8)EMassProcessingPhase::MAX];
+	FPhaseGraphBuildState ProcessingGraphBuildStates[(uint8)EMassProcessingPhase::MAX];
+	TArray<FMassProcessingPhaseConfig> ProcessingPhasesConfig;
 
 	TSharedPtr<FMassEntityManager> EntityManager;
 
 	EMassProcessingPhase CurrentPhase = EMassProcessingPhase::MAX;
 
-#if WITH_EDITOR
-	FDelegateHandle MassEntitySettingsChangeHandle;
-#endif // WITH_EDITOR
+	TWeakObjectPtr<UObject> Owner;
+
+	FDelegateHandle OnNewArchetypeHandle;
 };

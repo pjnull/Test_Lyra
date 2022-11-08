@@ -942,7 +942,10 @@ void FD3D12Adapter::InitializeDevices()
 			//     ResourceDescriptorHeap/SamplerDescriptorHeap must be supported on devices that support both D3D12_RESOURCE_BINDING_TIER_3 and D3D_SHADER_MODEL_6_6
 			if (GetHighestShaderModel() >= D3D_SHADER_MODEL_6_6 && GetResourceBindingTier() >= D3D12_RESOURCE_BINDING_TIER_3)
 			{
+				GRHIBindlessSupport = GMaxRHIFeatureLevel == ERHIFeatureLevel::SM5 ? ERHIBindlessSupport::RayTracingOnly : ERHIBindlessSupport::AllShaderTypes;
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 				GRHISupportsBindless = true;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				UE_LOG(LogD3D12RHI, Log, TEXT("Bindless resources are supported"));
 			}
 
@@ -971,7 +974,7 @@ void FD3D12Adapter::InitializeDevices()
 					&& !FParse::Param(FCommandLine::Get(), TEXT("noraytracing")))
 				{
 					if (D3D12Caps5.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1
-						&& GRHISupportsBindless
+						&& GRHIBindlessSupport != ERHIBindlessSupport::Unsupported
 						&& RootDevice7)
 					{
 						if (bRayTracingAllowedOnCurrentShaderPlatform)
@@ -989,7 +992,7 @@ void FD3D12Adapter::InitializeDevices()
  							UE_LOG(LogD3D12RHI, Log, TEXT("Ray tracing is disabled because SM6 shader platform is required (r.RayTracing.RequireSM6=1)."));
 						}
 					}
-					else if (!GRHISupportsBindless)
+					else if (GRHIBindlessSupport == ERHIBindlessSupport::Unsupported)
 					{
 						UE_LOG(LogD3D12RHI, Log, TEXT("Ray tracing is disabled because bindless resources are not supported (Shader Model 6.6 and Resource Binding Tier 3 are required)."));
 					}
@@ -1104,8 +1107,6 @@ void FD3D12Adapter::InitializeDevices()
 		bTrackAllAllocation = (GD3D12TrackAllAlocations || GPUCrashDebuggingModes == ED3D12GPUCrashDebuggingModes::All) && (GetResourceHeapTier() == D3D12_RESOURCE_HEAP_TIER_2);
 #endif 
 
-		CreateCommandSignatures();
-
 		// Context redirectors allow RHI commands to be executed on multiple GPUs at the
 		// same time in a multi-GPU system. Redirectors have a physical mask for the GPUs
 		// they can support and an active mask which restricts commands to operate on a
@@ -1192,6 +1193,9 @@ void FD3D12Adapter::InitializeDevices()
 		StaticRayTracingLocalRootSignature.InitStaticRayTracingLocalRootSignatureDesc();
 #endif
 #endif // USE_STATIC_ROOT_SIGNATURE
+
+		// Creating command signatures relies on static ray tracing root signatures.
+		CreateCommandSignatures();
 	}
 }
 
@@ -1399,16 +1403,12 @@ FD3D12Adapter::~FD3D12Adapter()
 #endif
 }
 
-void FD3D12Adapter::CreateDXGIFactory(bool bWithDebug)
+void FD3D12Adapter::CreateDXGIFactory(TRefCountPtr<IDXGIFactory2>& DxgiFactory2, bool bWithDebug, HMODULE DxgiDllHandle)
 {
 #if PLATFORM_WINDOWS || PLATFORM_HOLOLENS
 	typedef HRESULT(WINAPI FCreateDXGIFactory2)(UINT, REFIID, void**);
 
 #if PLATFORM_WINDOWS
-	// Dynamically load this otherwise Win7 fails to boot as it's missing on that DLL
-	DxgiDllHandle = (HMODULE)FPlatformProcess::GetDllHandle(TEXT("dxgi.dll"));
-	check(DxgiDllHandle);
-
 	FCreateDXGIFactory2* CreateDXGIFactory2FnPtr = (FCreateDXGIFactory2*)(void*)::GetProcAddress(DxgiDllHandle, "CreateDXGIFactory2");
 #else
 	FCreateDXGIFactory2* CreateDXGIFactory2FnPtr = &CreateDXGIFactory2;
@@ -1418,6 +1418,21 @@ void FD3D12Adapter::CreateDXGIFactory(bool bWithDebug)
 
 	const uint32 Flags = bWithDebug ? DXGI_CREATE_FACTORY_DEBUG : 0;
 	VERIFYD3D12RESULT(CreateDXGIFactory2FnPtr(Flags, IID_PPV_ARGS(DxgiFactory2.GetInitReference())));
+#endif // #if PLATFORM_WINDOWS || PLATFORM_HOLOLENS
+}
+
+void FD3D12Adapter::CreateDXGIFactory(bool bWithDebug)
+{
+#if PLATFORM_WINDOWS || PLATFORM_HOLOLENS
+	HMODULE UsedDxgiDllHandle = (HMODULE)0;
+#if PLATFORM_WINDOWS
+	// Dynamically load this otherwise Win7 fails to boot as it's missing on that DLL
+	DxgiDllHandle = (HMODULE)FPlatformProcess::GetDllHandle(TEXT("dxgi.dll"));
+	check(DxgiDllHandle);
+	UsedDxgiDllHandle = DxgiDllHandle;
+#endif
+
+	CreateDXGIFactory(DxgiFactory2, bWithDebug, UsedDxgiDllHandle);
 
 	InitDXGIFactoryVariants(DxgiFactory2);
 #endif // #if PLATFORM_WINDOWS || PLATFORM_HOLOLENS

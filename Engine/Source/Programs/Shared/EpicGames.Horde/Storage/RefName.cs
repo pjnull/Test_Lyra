@@ -36,8 +36,14 @@ namespace EpicGames.Horde.Storage
 		public RefName(Utf8String text)
 		{
 			Text = text;
-			ContentId.ValidateArgument(nameof(text), text);
+			BlobId.ValidateArgument(nameof(text), text);
 		}
+
+		/// <summary>
+		/// Sanitize the given name
+		/// </summary>
+		/// <param name="name">Name to sanitize</param>
+		public static Utf8String Sanitize(Utf8String name) => BlobId.Sanitize(name);
 
 		/// <inheritdoc/>
 		public override bool Equals(object? obj) => obj is RefName refId && Equals(refId);
@@ -72,6 +78,11 @@ namespace EpicGames.Horde.Storage
 		/// <inheritdoc/>
 		public static bool operator >=(RefName lhs, RefName rhs) => lhs.CompareTo(rhs) >= 0;
 
+		/// <summary>
+		/// Construct a ref from a string
+		/// </summary>
+		/// <param name="name">Name of the ref</param>
+		public static implicit operator RefName(string name) => new RefName(name);
 	}
 
 	/// <summary>

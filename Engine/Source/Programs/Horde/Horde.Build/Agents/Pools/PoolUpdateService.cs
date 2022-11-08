@@ -56,13 +56,13 @@ namespace Horde.Build.Agents.Pools
 			DateTime startTime = DateTime.UtcNow;
 
 			// Update the list
-			bool bRetryUpdate = true;
-			while (bRetryUpdate && !stoppingToken.IsCancellationRequested)
+			bool retryUpdate = true;
+			while (retryUpdate && !stoppingToken.IsCancellationRequested)
 			{
 				_logger.LogDebug("Updating pool->workspace map");
 
 				// Assume this will be the last iteration
-				bRetryUpdate = false;
+				retryUpdate = false;
 
 				// Capture the list of pools at the start of this update
 				List<IPool> currentPools = await _pools.GetAsync();
@@ -75,14 +75,14 @@ namespace Horde.Build.Agents.Pools
 				List<IStream> activeStreams = await _streams.FindAllAsync();
 				foreach (IStream activeStream in activeStreams)
 				{
-					foreach (KeyValuePair<string, AgentType> agentTypePair in activeStream.AgentTypes)
+					foreach (KeyValuePair<string, AgentConfig> agentTypePair in activeStream.Config.AgentTypes)
 					{
 						// Create the new agent workspace
 						(AgentWorkspace, bool)? result;
 						if (activeStream.TryGetAgentWorkspace(agentTypePair.Value, out result))
 						{
 							(AgentWorkspace agentWorkspace, bool useAutoSdk) = result.Value;
-							AgentType agentType = agentTypePair.Value;
+							AgentConfig agentType = agentTypePair.Value;
 
 							// Find or add a list of workspaces for this pool
 							List<AgentWorkspace>? agentWorkspaces;
@@ -125,7 +125,7 @@ namespace Horde.Build.Agents.Pools
 						if (result == null)
 						{
 							_logger.LogInformation("Pool modified; will retry");
-							bRetryUpdate = true;
+							retryUpdate = true;
 						}
 					}
 				}

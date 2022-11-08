@@ -16,10 +16,10 @@
 #include "DetailsCustomizations/MeshVertexSculptToolCustomizations.h"
 #include "DetailsCustomizations/BakeMeshAttributeToolCustomizations.h"
 #include "DetailsCustomizations/BakeTransformToolCustomizations.h"
-#include "DetailsCustomizations/PolygonSelectionMechanicCustomization.h"
+#include "DetailsCustomizations/MeshTopologySelectionMechanicCustomization.h"
 
 #include "PropertySets/AxisFilterPropertyType.h"
-#include "Selection/PolygonSelectionMechanic.h"
+#include "Selection/MeshTopologySelectionMechanic.h"
 #include "MeshVertexSculptTool.h"
 #include "BakeMeshAttributeMapsTool.h"
 #include "BakeMultiMeshAttributeMapsTool.h"
@@ -96,8 +96,8 @@ void FModelingToolsEditorModeModule::OnPostEngineInit()
 	PropertyModule.RegisterCustomClassLayout("BakeMeshAttributeVertexToolProperties", FOnGetDetailCustomizationInstance::CreateStatic(&FBakeMeshAttributeVertexToolDetails::MakeInstance));
 	ClassesToUnregisterOnShutdown.Add(UBakeMeshAttributeVertexToolProperties::StaticClass()->GetFName());
 	// PolyEd
-	PropertyModule.RegisterCustomClassLayout("PolygonSelectionMechanicProperties", FOnGetDetailCustomizationInstance::CreateStatic(&FPolygonSelectionMechanicPropertiesDetails::MakeInstance));
-	ClassesToUnregisterOnShutdown.Add(UPolygonSelectionMechanicProperties::StaticClass()->GetFName());
+	PropertyModule.RegisterCustomClassLayout("MeshTopologySelectionMechanicProperties", FOnGetDetailCustomizationInstance::CreateStatic(&FMeshTopologySelectionMechanicPropertiesDetails::MakeInstance));
+	ClassesToUnregisterOnShutdown.Add(UMeshTopologySelectionMechanicProperties::StaticClass()->GetFName());
 
 	PropertyModule.RegisterCustomClassLayout("BakeTransformToolProperties", FOnGetDetailCustomizationInstance::CreateStatic(&FBakeTransformToolDetails::MakeInstance));
 	ClassesToUnregisterOnShutdown.Add(UBakeTransformToolProperties::StaticClass()->GetFName());

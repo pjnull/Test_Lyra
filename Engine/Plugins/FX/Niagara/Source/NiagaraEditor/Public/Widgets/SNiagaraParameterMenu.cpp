@@ -742,7 +742,7 @@ void SNiagaraAddParameterFromPanelMenu::NewParameterSelected(FNiagaraTypeDefinit
 
 	const FString NewVariableDefaultName = TypeDisplayName.IsEmpty()
 		? TEXT("New Variable")
-		: TEXT("New ") + TypeDisplayName;
+		: TypeDisplayName;
 
 	TArray<FString> NameParts;
 

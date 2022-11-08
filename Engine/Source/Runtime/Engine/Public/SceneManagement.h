@@ -1182,7 +1182,8 @@ public:
 		const FSHVectorRGB3* InIrradianceEnvironmentMap, 
 		const FSHVectorRGB3* BlendDestinationIrradianceEnvironmentMap,
 		const float* InAverageBrightness,
-		const float* BlendDestinationAverageBrightness);
+		const float* BlendDestinationAverageBrightness,
+		const FLinearColor* InSpecifiedCubemapColorScale);
 
 	const USkyLightComponent* LightComponent;
 	FTexture* ProcessedTexture;
@@ -1218,6 +1219,7 @@ public:
 	uint32 CaptureCubeMapResolution;
 	FLinearColor LowerHemisphereColor;
 	bool bLowerHemisphereIsSolidColor;
+	FLinearColor SpecifiedCubemapColorScale;
 
 	bool IsMovable() { return bMovable; }
 
@@ -1324,6 +1326,9 @@ BEGIN_SHADER_PARAMETER_STRUCT(FLightShaderParameters, ENGINE_API)
 	SHADER_PARAMETER(FVector2f, RectLightAtlasUVScale)
 	SHADER_PARAMETER(float, RectLightAtlasMaxLevel)
 
+	// UES texture slice index
+	SHADER_PARAMETER(float, IESAtlasIndex)
+
 END_SHADER_PARAMETER_STRUCT()
 
 
@@ -1392,6 +1397,9 @@ struct FLightRenderParameters
 	FVector2f RectLightAtlasUVOffset;
 	FVector2f RectLightAtlasUVScale;
 	float RectLightAtlasMaxLevel;
+
+	// IES atlas slice index
+	float IESAtlasIndex;
 
 	float InverseExposureBlend;
 
@@ -1842,6 +1850,9 @@ protected:
 
 	/** Deep shadow layer distribution. */
 	float DeepShadowLayerDistribution;
+
+	/** IES texture atlas id. */
+	uint32 IESAtlasId;
 
 	/**
 	 * Updates the light proxy's cached transforms.
@@ -2619,6 +2630,18 @@ public:
 	}
 
 	TUniformBuffer<FPrimitiveUniformShaderParameters> UniformBuffer;
+
+	ENGINE_API void Set(
+		const FMatrix& LocalToWorld,
+		const FMatrix& PreviousLocalToWorld,
+		const FVector& ActorPositionWS, 
+		const FBoxSphereBounds& WorldBounds,
+		const FBoxSphereBounds& LocalBounds,
+		const FBoxSphereBounds& PreSkinnedLocalBounds,
+		bool bReceivesDecals,
+		bool bHasPrecomputedVolumetricLightmap,
+		bool bOutputVelocity,
+		const FCustomPrimitiveData* CustomPrimitiveData);
 
 	ENGINE_API void Set(
 		const FMatrix& LocalToWorld,

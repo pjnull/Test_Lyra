@@ -184,6 +184,19 @@ class FLumenScreenProbeGatherHardwareRayTracing : public FLumenHardwareRayTracin
 
 		return bSurfaceCacheLightingMode && bWriteFinalLighting;
 	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		FPermutationDomain PermutationVector(PermutationId);
+		if (PermutationVector.Get<FLightingModeDim>() == LumenHWRTPipeline::ELightingMode::SurfaceCache)
+		{
+			return ERayTracingPayloadType::LumenMinimal;
+		}
+		else
+		{
+			return ERayTracingPayloadType::RayTracingMaterial;
+		}
+	}
 };
 
 IMPLEMENT_LUMEN_RAYGEN_AND_COMPUTE_RAYTRACING_SHADERS(FLumenScreenProbeGatherHardwareRayTracing)

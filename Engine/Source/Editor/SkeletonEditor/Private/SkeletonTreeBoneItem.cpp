@@ -110,7 +110,7 @@ TSharedRef< SWidget > FSkeletonTreeBoneItem::GenerateWidgetForDataColumn(const F
 				SAssignNew(RetargetingComboButton, SComboButton)
             	.ComboButtonStyle( &FAppStyle::Get().GetWidgetStyle< FComboButtonStyle >("SkeletonTree.RetargetingComboButton"))
 				.ForegroundColor(this, &FSkeletonTreeBoneItem::GetBoneTextColor, InIsSelected)
-				.ContentPadding(0)
+				.ContentPadding(0.f)
 				.OnGetMenuContent(this, &FSkeletonTreeBoneItem::CreateBoneTranslationRetargetingModeMenu)
 				.ToolTip(IDocumentation::Get()->CreateToolTip(
 					LOCTEXT("RetargetingToolTip", "Set bone translation retargeting mode"),
@@ -411,7 +411,7 @@ void FSkeletonTreeBoneItem::OnBlendSliderCommitted(float NewValue, ETextCommit::
 
 	if (BlendProfile)
 	{
-		FScopedTransaction(LOCTEXT("SetBlendProfileValue", "Set Blend Profile Value"));
+		FScopedTransaction Transaction(LOCTEXT("SetBlendProfileValue", "Set Blend Profile Value"));
 		BlendProfile->SetFlags(RF_Transactional);
 		BlendProfile->Modify();
 
@@ -514,7 +514,7 @@ bool FSkeletonTreeBoneItem::IsBoneWeighted(int32 MeshBoneIndex, UDebugSkelMeshCo
 	FSkeletalMeshLODRenderData& LODData = PreviewComponent->GetSkeletalMeshAsset()->GetResourceForRendering()->LODRenderData[LODIndex];
 
 	//Check whether the bone is vertex weighted
-	int32 Index = LODData.ActiveBoneIndices.Find(MeshBoneIndex);
+	int32 Index = LODData.ActiveBoneIndices.Find(IntCastChecked<FBoneIndexType>(MeshBoneIndex));
 
 	return Index != INDEX_NONE;
 }
@@ -534,7 +534,7 @@ bool FSkeletonTreeBoneItem::IsBoneRequired(int32 MeshBoneIndex, UDebugSkelMeshCo
 	FSkeletalMeshLODRenderData& LODData = PreviewComponent->GetSkeletalMeshAsset()->GetResourceForRendering()->LODRenderData[LODIndex];
 
 	//Check whether the bone is vertex weighted
-	int32 Index = LODData.RequiredBones.Find(MeshBoneIndex);
+	int32 Index = LODData.RequiredBones.Find(IntCastChecked<FBoneIndexType>(MeshBoneIndex));
 
 	return Index != INDEX_NONE;
 }

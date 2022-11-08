@@ -7,7 +7,9 @@
 
 class USkeletalMeshComponent;
 class UClothingAssetCommon;
+class UPhysicsAsset;
 class FClothingSimulationContextCommon;
+struct FReferenceSkeleton;
 
 namespace Chaos
 {
@@ -18,7 +20,7 @@ namespace Chaos
 	class FLevelSet;
 
 	// Collider simulation node
-	class FClothingSimulationCollider final
+	class CHAOSCLOTH_API FClothingSimulationCollider final
 	{
 	public:
 		enum class ECollisionDataType : int32
@@ -28,14 +30,23 @@ namespace Chaos
 			LODs,  // LODIndex based start slot for LODs collisions
 		};
 
+		FClothingSimulationCollider(const UPhysicsAsset* InPhysicsAsset, const FReferenceSkeleton* InReferenceSkeleton);
+
+		UE_DEPRECATED(5.2, "Use FClothingSimulationCollider(const UPhysicsAsset* InPhysicsAsset, const FReferenceSkeleton* InReferenceSkeleton) instead.")
 		FClothingSimulationCollider(
 			const UClothingAssetCommon* InAsset,  // Cloth asset for collision data, can be nullptr
 			const USkeletalMeshComponent* InSkeletalMeshComponent,  // For asset LODs management, can be nullptr
 			bool bInUseLODIndexOverride,
 			int32 InLODIndexOverride);
+
 		~FClothingSimulationCollider();
 
-		int32 GetNumGeometries() const { int32 NumGeometries = 0; for (const FLODData& LODDatum : LODData) { NumGeometries += LODDatum.NumGeometries; } return NumGeometries; }
+		FClothingSimulationCollider(const FClothingSimulationCollider&) = delete;
+		FClothingSimulationCollider(FClothingSimulationCollider&&) = delete;
+		FClothingSimulationCollider& operator=(const FClothingSimulationCollider&) = delete;
+		FClothingSimulationCollider& operator=(FClothingSimulationCollider&&) = delete;
+
+		int32 GetNumGeometries() const;
 
 		// Return source (untransformed) collision data for LODless, external and active LODs.
 		FClothCollisionData GetCollisionData(const FClothingSimulationSolver* Solver, const FClothingSimulationCloth* Cloth) const;
@@ -72,7 +83,6 @@ namespace Chaos
 		// ---- End of the debugging and visualization functions ----
 
 	private:
-
 		struct FLevelSetCollisionData
 		{
 			const TSharedPtr<Chaos::FLevelSet, ESPMode::ThreadSafe> LevelSet;
@@ -93,47 +103,19 @@ namespace Chaos
 	private:
 		typedef TPair<const FClothingSimulationSolver*, const FClothingSimulationCloth*> FSolverClothPair;
 
-		struct FLODData
-		{
-			FClothCollisionData ClothCollisionData;
-			int32 NumGeometries;  // Number of collision bodies
-			TMap<FSolverClothPair, int32> Offsets;  // Solver particle offset
+		struct FLODData;
 
-			FLODData() : NumGeometries(0) {}
+		const UPhysicsAsset* PhysicsAsset = nullptr;
+		const FReferenceSkeleton* ReferenceSkeleton = nullptr;
+		const FClothCollisionData* CollisionData = nullptr;  // External collision data
 
-			void Add(
-				FClothingSimulationSolver* Solver,
-				FClothingSimulationCloth* Cloth,
-				const FClothCollisionData& InClothCollisionData,
-				const TArray<FLevelSetCollisionData>& InLevelSetCollisionData,
-				const FReal InScale = 1.f,
-				const TArray<int32>& UsedBoneIndices = TArray<int32>());
-			void Remove(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth);
-
-			void Update(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, const FClothingSimulationContextCommon* Context);
-
-			void Enable(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth, bool bEnable);
-
-			void ResetStartPose(FClothingSimulationSolver* Solver, FClothingSimulationCloth* Cloth);
-
-			FORCEINLINE static int32 GetMappedBoneIndex(const TArray<int32>& UsedBoneIndices, int32 BoneIndex)
-			{
-				return UsedBoneIndices.IsValidIndex(BoneIndex) ? UsedBoneIndices[BoneIndex] : INDEX_NONE;
-			}
-		};
-
-		const UClothingAssetCommon* Asset;
-		const USkeletalMeshComponent* SkeletalMeshComponent;
-		const FClothCollisionData* CollisionData;
-		bool bUseLODIndexOverride;
-		int32 LODIndexOverride;
-		bool bHasExternalCollisionChanged;
+		bool bHasExternalCollisionChanged = false;
 
 		// Collision primitives
-		TArray<FLODData> LODData;  // Actual LODs start at LODStart
+		TArray<TUniquePtr<FLODData>> LODData;  // Actual LODs start at ECollisionDataType::LODs
 		TMap<FSolverClothPair, int32> LODIndices;
 
 		// Initial scale
-		FReal Scale;
+		FReal Scale = 1.f;
 	};
 } // namespace Chaos

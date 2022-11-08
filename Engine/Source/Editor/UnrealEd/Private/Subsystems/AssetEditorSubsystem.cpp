@@ -607,8 +607,8 @@ void UAssetEditorSubsystem::OpenEditorForAsset(const FSoftObjectPath& AssetPath)
 void UAssetEditorSubsystem::OpenEditorForAsset(const FString& AssetPathName, const EAssetTypeActivationOpenedMethod OpenedMethod)
 {
 	// An asset needs loading
-	UPackage* Package = LoadPackage(NULL, *AssetPathName, LOAD_NoRedirects);
 
+	UPackage* Package = LoadPackage(NULL, *AssetPathName, LOAD_NoRedirects);
 	if (Package)
 	{
 		Package->FullyLoad();
@@ -616,9 +616,18 @@ void UAssetEditorSubsystem::OpenEditorForAsset(const FString& AssetPathName, con
 		FString AssetName = FPaths::GetBaseFilename(AssetPathName);
 		UObject* Object = FindObject<UObject>(Package, *AssetName);
 		
-		if (Object != NULL)
+		if (Object != nullptr)
 		{
 			OpenEditorForAsset(Object, EToolkitMode::Standalone, TSharedPtr<IToolkitHost>(), true, OpenedMethod);
+		}
+	}
+	else
+	{
+		// fallback for unsaved assets
+		UObject* Object = FindObject<UObject>(nullptr, *AssetPathName);
+		
+		if (Object != nullptr)
+		{
 		}
 	}
 }

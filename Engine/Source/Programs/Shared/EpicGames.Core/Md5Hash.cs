@@ -7,6 +7,8 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 
+#pragma warning disable CA5351 // Do Not Use Broken Cryptographic Algorithms
+
 namespace EpicGames.Core
 {
 	/// <summary>
@@ -194,13 +196,13 @@ namespace EpicGames.Core
 	sealed class Md5HashTypeConverter : TypeConverter
 	{
 		/// <inheritdoc/>
-		public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+		public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
 		{
 			return sourceType == typeof(string);
 		}
 
 		/// <inheritdoc/>
-		public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+		public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
 		{
 			return Md5Hash.Parse((string)value);
 		}

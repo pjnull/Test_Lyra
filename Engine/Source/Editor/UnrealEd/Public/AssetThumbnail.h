@@ -278,9 +278,9 @@ private:
 		/** Render target for slate */
 		FSlateTextureRenderTarget2DResource* ThumbnailRenderTarget;
 		/** The time since last access */
-		float LastAccessTime;
+		double LastAccessTime;
 		/** The time since last update */
-		float LastUpdateTime;
+		double LastUpdateTime;
 		/** Width of the thumbnail */
 		uint32 Width;
 		/** Height of the thumbnail */

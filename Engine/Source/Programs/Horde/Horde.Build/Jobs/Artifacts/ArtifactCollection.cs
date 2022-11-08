@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Horde.Build.Jobs;
 using Horde.Build.Server;
 using Horde.Build.Storage;
 using Horde.Build.Utilities;
@@ -200,7 +199,7 @@ namespace Horde.Build.Jobs.Artifacts
 		/// <returns>The chunk data</returns>
 		public async Task<System.IO.Stream> OpenArtifactReadStreamAsync(IArtifact artifact)
 		{
-			System.IO.Stream? stream = await _storageBackend.ReadAsync(GetPath(artifact.JobId, artifact.StepId, artifact.Name));
+			System.IO.Stream? stream = await _storageBackend.TryReadAsync(GetPath(artifact.JobId, artifact.StepId, artifact.Name));
 			if (stream == null)
 			{
 				throw new Exception($"Unable to get artifact {artifact.Id}");

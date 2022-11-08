@@ -4933,7 +4933,10 @@ void UClass::Serialize( FArchive& Ar )
 
 	// serialize the function map
 	//@TODO: UCREMOVAL: Should we just regenerate the FuncMap post load, instead of serializing it?
-	Ar << FuncMap;
+	{
+		FWriteScopeLock ScopeLock(FuncMapLock);
+		Ar << FuncMap;
+	}
 
 	// Class flags first.
 	if (Ar.IsSaving())
@@ -5351,7 +5354,10 @@ void UClass::PurgeClass(bool bRecompilingOnLoad)
 	ScriptAndPropertyObjectReferences.Empty();
 	DeleteUnresolvedScriptProperties();
 
-	FuncMap.Empty();
+	{
+		FWriteScopeLock ScopeLock(FuncMapLock);
+		FuncMap.Empty();
+	}
 	ClearFunctionMapsCaches();
 	PropertyLink = nullptr;
 
@@ -5918,14 +5924,20 @@ void UClass::CreateLinkAndAddChildFunctionsToMap(const FClassFunctionLinkInfo* F
 
 void UClass::ClearFunctionMapsCaches()
 {
-	FRWScopeLock ScopeLock(SuperFuncMapLock, FRWScopeLockType::SLT_Write);
+	FWriteScopeLock ScopeLock(SuperFuncMapLock);
 	SuperFuncMap.Empty();
 }
 
 UFunction* UClass::FindFunctionByName(FName InName, EIncludeSuperFlag::Type IncludeSuper) const
 {
 	LLM_SCOPE(ELLMTag::UObject);
-	UFunction* Result = FuncMap.FindRef(InName);
+
+	UFunction* Result = nullptr;
+	{
+		FReadScopeLock ScopeLock(FuncMapLock);
+		Result = FuncMap.FindRef(InName);
+	}
+
 	if (Result == nullptr && IncludeSuper == EIncludeSuperFlag::IncludeSuper)
 	{
 		UClass* SuperClass = GetSuperClass();
@@ -5933,7 +5945,7 @@ UFunction* UClass::FindFunctionByName(FName InName, EIncludeSuperFlag::Type Incl
 		{
 			bool bFoundInSuperFuncMap = false;
 			{
-				FRWScopeLock ScopeLock(SuperFuncMapLock, FRWScopeLockType::SLT_ReadOnly);
+				FReadScopeLock ScopeLock(SuperFuncMapLock);
 				if (UFunction** SuperResult = SuperFuncMap.Find(InName))
 				{
 					Result = *SuperResult;
@@ -5957,7 +5969,7 @@ UFunction* UClass::FindFunctionByName(FName InName, EIncludeSuperFlag::Type Incl
 					Result = SuperClass->FindFunctionByName(InName);
 				}
 
-				FRWScopeLock ScopeLock(SuperFuncMapLock, FRWScopeLockType::SLT_Write);
+				FWriteScopeLock ScopeLock(SuperFuncMapLock);
 				SuperFuncMap.Add(InName, Result);
 			}
 		}

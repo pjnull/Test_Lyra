@@ -8,10 +8,21 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RigUnit_MathVector)
 
+FRigUnit_MathVectorMake_Execute()
+{
+	Result = FVector(X, Y, Z);
+}
+
 FRigUnit_MathVectorFromFloat_Execute()
 {
     DECLARE_SCOPE_HIERARCHICAL_COUNTER_RIGUNIT()
 	Result = FVector(Value, Value, Value);
+}
+
+FRigUnit_MathVectorFromDouble_Execute()
+{
+	DECLARE_SCOPE_HIERARCHICAL_COUNTER_RIGUNIT()
+	Result = FVector((float)Value, (float)Value, (float)Value);
 }
 
 FRigUnit_MathVectorAdd_Execute()

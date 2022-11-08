@@ -9,7 +9,8 @@
 #include "Widgets/Views/SListView.h"
 #include "Widgets/Views/STableViewBase.h"
 #include "Chooser.h"
-#include "IDetailCustomization.h"
+#include "EditorUndoClient.h"
+#include "Misc/NotifyHook.h"
 #include "ChooserTableEditor.generated.h"
 
 class SComboButton;
@@ -29,7 +30,7 @@ public:
 
 namespace UE::ChooserEditor
 {
-	class FChooserTableEditor : public FAssetEditorToolkit
+	class FChooserTableEditor : public FAssetEditorToolkit, public FSelfRegisteringEditorUndoClient, public FNotifyHook
 	{
 	public:
 		/** Delegate that, given an array of assets, returns an array of objects to use in the details view of an FSimpleAssetEditor */
@@ -61,9 +62,14 @@ namespace UE::ChooserEditor
 		virtual FLinearColor GetWorldCentricTabColorScale() const override;
 		virtual bool IsPrimaryEditor() const override { return true; }
 		virtual bool IsSimpleAssetEditor() const override { return false; }
-
-		/** FAssetEditorToolkit interface */
-		virtual void PostRegenerateMenusAndToolbars() override;
+		
+		/** FEditorUndoClient Interface */
+		virtual void PostUndo(bool bSuccess) override;
+		virtual void PostRedo(bool bSuccess) override;
+		
+		/** Begin FNotifyHook Interface */
+		virtual void NotifyPreChange( FProperty* PropertyAboutToChange ) override;
+		virtual void NotifyPostChange( const FPropertyChangedEvent& PropertyChangedEvent, FProperty* PropertyThatChanged) override;
 
 		UChooserTable* GetChooser() { return Cast<UChooserTable>(EditingObjects[0]); }
 	
@@ -79,6 +85,8 @@ namespace UE::ChooserEditor
 		};
 
 		void UpdateTableRows();
+		void SelectColumn(int Index);
+		void DeleteColumn(int Index);
 	private:
 
 		FReply SelectRootProperties();
@@ -89,9 +97,6 @@ namespace UE::ChooserEditor
 		TSharedRef<SDockTab> SpawnTableTab( const FSpawnTabArgs& Args );
 	
 		TSharedRef<ITableRow> GenerateTableRow(TSharedPtr<FChooserTableRow> InItem, const TSharedRef<STableViewBase>& OwnerTable);
-
-		/** Handles when an asset is imported */
-		void HandleAssetPostImport(class UFactory* InFactory, UObject* InObject);
 
 		/** Called when objects need to be swapped out for new versions, like after a blueprint recompile. */
 		void OnObjectsReplaced(const TMap<UObject*, UObject*>& ReplacementMap);
@@ -115,14 +120,14 @@ namespace UE::ChooserEditor
 		TArray<TSharedPtr<FChooserTableRow>> TableRows;
 	
 		TSharedPtr<SComboButton> CreateColumnComboButton;
+		TSharedPtr<SComboButton> CreateRowComboButton;
+		
 		TSharedPtr<SHeaderRow> HeaderRow;
 		TSharedPtr<SListView<TSharedPtr<FChooserTableRow>>> TableView;
 
-		TArray<TSharedPtr<SEditableText>> ColumnText;
-
 		FName SelectedColumn;
-		bool EditColumnName = false;
 	public:
+		TSharedPtr<SComboButton>& GetCreateRowComboButton() { return CreateRowComboButton; };
 
 		static TMap<const UClass*, TFunction<TSharedRef<SWidget> (UObject* Column, int Row)>> ColumnWidgetCreators;
 	

@@ -53,6 +53,9 @@ public:
 	/** Called when animation list changes */
 	DECLARE_MULTICAST_DELEGATE(FOnWidgetAnimationsUpdated)
 
+	/** Called when animation selection changes */
+	DECLARE_MULTICAST_DELEGATE(FOnSelectedAnimationChanged)
+
 	DECLARE_EVENT(FWidgetBlueprintEditor, FOnEnterWidgetDesigner)
 
 public:
@@ -205,11 +208,23 @@ public:
 	/** Callback for when widget animation list has been updated */
 	void NotifyWidgetAnimListChanged();
 
-	/** Callback for anim drawer opening */
+	UE_DEPRECATED(5.2, "OnWidgetAnimSequencerOpened is deprecated, please use OnWidgetAnimDrawerSequencerOpened instead.")
 	void OnWidgetAnimSequencerOpened(FName StatusBarWithDrawerName);
 
-	/** Callback for anim drawer closing */
+	UE_DEPRECATED(5.2, "OnWidgetAnimSequencerDismissed is deprecated, please use OnWidgetAnimDrawerSequencerDismissed instead.")
 	void OnWidgetAnimSequencerDismissed(const TSharedPtr<SWidget>& NewlyFocusedWidget);
+
+	/** Callback for anim drawer opening */
+	void OnWidgetAnimDrawerSequencerOpened(FName StatusBarWithDrawerName);
+
+	/** Callback for anim drawer closing */
+	void OnWidgetAnimDrawerSequencerDismissed(const TSharedPtr<SWidget>& NewlyFocusedWidget);
+
+	/** Callback for anim tab closing */
+	void OnWidgetAnimTabSequencerClosed(TSharedRef<SDockTab> ClosedTab);
+
+	/** Callback for anim tab opening */
+	void OnWidgetAnimTabSequencerOpened();
 
 	/**
 	 * The widget we're now hovering over in any particular context, allows multiple views to 
@@ -254,6 +269,9 @@ public:
 
 	/** Fires whenever the selected set of widgets changes */
 	FOnSelectedWidgetsChanged OnSelectedWidgetsChanged;
+
+	/** Fires whenever the selected animation changes */
+	FOnSelectedAnimationChanged OnSelectedAnimationChanged;
 
 	/** Notification for when the preview widget has been updated */
 	FOnWidgetPreviewUpdated OnWidgetPreviewUpdated;

@@ -74,7 +74,7 @@ UMovieScene* FSequenceModel::GetMovieScene() const
 
 void FSequenceModel::SetSequence(UMovieSceneSequence* InSequence, FMovieSceneSequenceID InSequenceID)
 {
-	if (WeakSequence != InSequence || SequenceID != InSequenceID)
+	if (WeakSequence.Get() != InSequence || SequenceID != InSequenceID)
 	{
 		FViewModelHierarchyOperation HierarchyOperation(GetSharedData());
 
@@ -311,7 +311,7 @@ void FSequenceModel::PerformDrop(const FViewModelPtr& TargetModel, const FDragDr
 					{
 						OldFolder->SetFlags(RF_Transactional);
 						OldFolder->Modify();
-						OldFolder->RemoveChildMasterTrack(Track);
+						OldFolder->RemoveChildTrack(Track);
 					}
 
 					bSuccess = true;

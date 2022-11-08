@@ -1,24 +1,19 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-using System;
-using System.Buffers;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
 using EpicGames.Horde.Storage;
-using EpicGames.Horde.Storage.Bundles;
 using EpicGames.Horde.Storage.Git;
 using EpicGames.Horde.Storage.Nodes;
 using Horde.Build.Perforce;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+#if false
 namespace Horde.Build.Commands.Bundles
 {
 	[Command("bundle", "repo", "Synthesizes a Git repo from a bundle to the local hard drive")]
@@ -30,8 +25,8 @@ namespace Horde.Build.Commands.Bundles
 		[CommandLine("-OutputDir=", Required = true)]
 		public DirectoryReference OutputDir { get; set; } = null!;
 
-		protected readonly IConfiguration _configuration;
-		protected readonly ILoggerProvider _loggerProvider;
+		readonly IConfiguration _configuration;
+		readonly ILoggerProvider _loggerProvider;
 
 		public RepoCommand(IConfiguration configuration, ILoggerProvider loggerProvider)
 		{
@@ -43,9 +38,9 @@ namespace Horde.Build.Commands.Bundles
 		{
 			using ServiceProvider serviceProvider = Startup.CreateServiceProvider(_configuration, _loggerProvider);
 
-			ITreeStore store = serviceProvider.GetRequiredService<ITreeStore<ReplicationService>>();
+			IStorageClient store = serviceProvider.GetRequiredService<IStorageClient<ReplicationService>>();
 
-			ReplicationNode node = await store.ReadTreeAsync<ReplicationNode>(RefName);
+			ReplicationNode node = await store.ReadRefAsync<ReplicationNode>(RefName);
 			DirectoryNode root = await node.Contents.ExpandAsync();
 
 			Sha1Hash tree = await WriteTreeRecursiveAsync(root, CancellationToken.None);
@@ -139,3 +134,4 @@ namespace Horde.Build.Commands.Bundles
 		}
 	}
 }
+#endif

@@ -484,6 +484,15 @@ class ENGINE_API UKismetSystemLibrary : public UBlueprintFunctionLibrary
 	static void ExecuteConsoleCommand(const UObject* WorldContextObject, const FString& Command, class APlayerController* SpecificPlayer = NULL );
 
 	/**
+	 * Attempts to retrieve the value of the specified string console variable, if it exists.
+	 * 
+	 * @param	VariableName	Name of the console variable to find.
+	 * @return	The value if found, empty string otherwise.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Development")
+	static FString GetConsoleVariableStringValue(const FString& VariableName);
+
+	/**
 	 * Attempts to retrieve the value of the specified float console variable, if it exists.
 	 * 
 	 * @param	VariableName	Name of the console variable to find.
@@ -927,40 +936,17 @@ class ENGINE_API UKismetSystemLibrary : public UBlueprintFunctionLibrary
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", AutoCreateRefTerm = "Value"))
 	static void SetFieldPathPropertyByName(UObject* Object, FName PropertyName, const TFieldPath<FField>& Value);
 
-	DECLARE_FUNCTION(execSetCollisionProfileNameProperty)
-	{
-		P_GET_OBJECT(UObject, OwnerObject);
-		P_GET_PROPERTY(FNameProperty, StructPropertyName);
-
-		Stack.StepCompiledIn<FStructProperty>(NULL);
-		void* SrcStructAddr = Stack.MostRecentPropertyAddress;
-
-		P_FINISH;
-		P_NATIVE_BEGIN;
-		Generic_SetStructurePropertyByName(OwnerObject, StructPropertyName, SrcStructAddr);
-		P_NATIVE_END;
-	}
+	DECLARE_FUNCTION(execSetCollisionProfileNameProperty);
 
 	/** Set a custom structure property by name */
 	UFUNCTION(BlueprintCallable, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Value", AutoCreateRefTerm = "Value"))
 	static void SetStructurePropertyByName(UObject* Object, FName PropertyName, const FGenericStruct& Value);
 
+	UE_DEPRECATED(5.2, "Function has been deprecated.")
 	static void Generic_SetStructurePropertyByName(UObject* OwnerObject, FName StructPropertyName, const void* SrcStructAddr);
 
 	/** Based on UKismetArrayLibrary::execSetArrayPropertyByName */
-	DECLARE_FUNCTION(execSetStructurePropertyByName)
-	{
-		P_GET_OBJECT(UObject, OwnerObject);
-		P_GET_PROPERTY(FNameProperty, StructPropertyName);
-
-		Stack.StepCompiledIn<FStructProperty>(NULL);
-		void* SrcStructAddr = Stack.MostRecentPropertyAddress;
-
-		P_FINISH;
-		P_NATIVE_BEGIN;
-		Generic_SetStructurePropertyByName(OwnerObject, StructPropertyName, SrcStructAddr);
-		P_NATIVE_END;
-	}
+	DECLARE_FUNCTION(execSetStructurePropertyByName);
 
 	// --- Collision functions ------------------------------
 

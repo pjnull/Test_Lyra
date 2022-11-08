@@ -15,7 +15,9 @@
 #include "VulkanLLM.h"
 #include "VulkanTransientResourceAllocator.h"
 #include "VulkanExtensions.h"
+#include "VulkanRenderpass.h"
 #include "VulkanRayTracing.h"
+#include "VulkanDescriptorSets.h"
 
 TAutoConsoleVariable<int32> GRHIAllowAsyncComputeCvar(
 	TEXT("r.Vulkan.AllowAsyncCompute"),
@@ -56,6 +58,9 @@ void AftermathCrashDumpDescriptionCallback(PFN_GFSDK_Aftermath_AddGpuCrashDumpDe
 
 // Mirror GPixelFormats with format information for buffers
 VkFormat GVulkanBufferFormat[PF_MAX];
+
+// Mirror GPixelFormats with format information for buffers
+VkFormat GVulkanSRGBFormat[PF_MAX];
 
 EDelayAcquireImageType GVulkanDelayAcquireImage = EDelayAcquireImageType::DelayAcquire;
 
@@ -685,7 +690,78 @@ void FVulkanDevice::SetupFormats()
 		}
 	}
 
-#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+	// Verify the potential SRGB formats and fill GVulkanSRGBFormat
+	{
+		auto GetSRGBMapping = [this](const VkFormat InFormat)
+		{
+			VkFormat SRGBFormat = InFormat;
+			switch (InFormat)
+			{
+			case VK_FORMAT_B8G8R8A8_UNORM:				SRGBFormat = VK_FORMAT_B8G8R8A8_SRGB; break;
+			case VK_FORMAT_A8B8G8R8_UNORM_PACK32:		SRGBFormat = VK_FORMAT_A8B8G8R8_SRGB_PACK32; break;
+			case VK_FORMAT_R8_UNORM:					SRGBFormat = ((GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1) ? VK_FORMAT_R8_UNORM : VK_FORMAT_R8_SRGB); break;
+			case VK_FORMAT_R8G8_UNORM:					SRGBFormat = VK_FORMAT_R8G8_SRGB; break;
+			case VK_FORMAT_R8G8B8_UNORM:				SRGBFormat = VK_FORMAT_R8G8B8_SRGB; break;
+			case VK_FORMAT_R8G8B8A8_UNORM:				SRGBFormat = VK_FORMAT_R8G8B8A8_SRGB; break;
+			case VK_FORMAT_BC1_RGB_UNORM_BLOCK:			SRGBFormat = VK_FORMAT_BC1_RGB_SRGB_BLOCK; break;
+			case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_BC1_RGBA_SRGB_BLOCK; break;
+			case VK_FORMAT_BC2_UNORM_BLOCK:				SRGBFormat = VK_FORMAT_BC2_SRGB_BLOCK; break;
+			case VK_FORMAT_BC3_UNORM_BLOCK:				SRGBFormat = VK_FORMAT_BC3_SRGB_BLOCK; break;
+			case VK_FORMAT_BC7_UNORM_BLOCK:				SRGBFormat = VK_FORMAT_BC7_SRGB_BLOCK; break;
+			case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK; break;
+			case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK:	SRGBFormat = VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK; break;
+			case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK:	SRGBFormat = VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_4x4_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_4x4_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_5x4_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_5x4_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_5x5_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_5x5_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_6x5_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_6x5_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_6x6_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_6x6_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_8x5_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_8x5_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_8x6_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_8x6_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_8x8_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_8x8_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_10x5_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_10x5_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_10x6_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_10x6_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_10x8_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_10x8_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_10x10_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_10x10_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_12x10_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_12x10_SRGB_BLOCK; break;
+			case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:		SRGBFormat = VK_FORMAT_ASTC_12x12_SRGB_BLOCK; break;
+				//		case VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG:	Format = VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG; break;
+				//		case VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG:	Format = VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG; break;
+				//		case VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG:	Format = VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG; break;
+				//		case VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG:	Format = VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG; break;
+			default:	break;
+			}
+
+			// If we're introducing a new format, make sure it's supported
+			if (InFormat != SRGBFormat)
+			{
+				const VkFormatProperties& SRGBFormatProperties = GetFormatProperties(SRGBFormat);
+				if (!VKHasAnyFlags(SRGBFormatProperties.optimalTilingFeatures, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT))
+				{
+					// If we can't even sample from it, then reject the suggested SRGB format
+					SRGBFormat = InFormat;
+				}
+			}
+
+			return SRGBFormat;
+		};
+
+		for (int32 PixelFormatIndex = 0; PixelFormatIndex < PF_MAX; ++PixelFormatIndex)
+		{
+			const FPixelFormatInfo& PixelFormatInfo = GPixelFormats[PixelFormatIndex];
+			if (PixelFormatInfo.Supported)
+			{
+				const VkFormat OriginalFormat = (VkFormat)PixelFormatInfo.PlatformFormat;
+				GVulkanSRGBFormat[PixelFormatIndex] = GetSRGBMapping(OriginalFormat);
+			}
+			else
+			{
+				GVulkanSRGBFormat[PixelFormatIndex] = VK_FORMAT_UNDEFINED;
+			}
+		}
+	}
+
+#if UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT
 
 	// Print the resulting pixel format support
 	if (FParse::Param(FCommandLine::Get(), TEXT("PrintVulkanPixelFormatMappings")))
@@ -714,59 +790,49 @@ void FVulkanDevice::SetupFormats()
 		};
 
 		UE_LOG(LogVulkanRHI, Warning, TEXT("Pixel Format Mappings for Vulkan:"));
-		UE_LOG(LogVulkanRHI, Warning, TEXT("%24s | VulkanFormat | BlockBytes | Components | ComponentMapping | BufferFormat | Capabilities "), TEXT("PixelFormatName"));
+		UE_LOG(LogVulkanRHI, Warning, TEXT("%24s | %24s | BlockBytes | Components | ComponentMapping | BufferFormat | Capabilities | SRGBFormat"), 
+			TEXT("PixelFormatName"), TEXT("VulkanFormat"));
 		for (int32 PixelFormatIndex = 0; PixelFormatIndex < PF_MAX; ++PixelFormatIndex)
 		{
 			if (GPixelFormats[PixelFormatIndex].Supported)
 			{
 				const VkComponentMapping& ComponentMapping = PixelFormatComponentMapping[PixelFormatIndex];
 
-				FString CapabilitiesString = GetFormatCapabilities(GPixelFormats[PixelFormatIndex].Capabilities);
+				const VkFormat VulkanFormat = (VkFormat)GPixelFormats[PixelFormatIndex].PlatformFormat;
+				FString VulkanFormatStr(VK_TYPE_TO_STRING(VkFormat, VulkanFormat));
+				VulkanFormatStr.RightChopInline(10);  // Chop the VK_FORMAT_
 
-				UE_LOG(LogVulkanRHI, Warning, TEXT("%24s | %12d | %10d | %10d | %10d,%d,%d,%d | %12d | 0x%08X (%s)"),
+				FString SRGBFormat;
+				if (VulkanFormat != GVulkanSRGBFormat[PixelFormatIndex])
+				{
+					SRGBFormat = VK_TYPE_TO_STRING(VkFormat, GVulkanSRGBFormat[PixelFormatIndex]);
+					SRGBFormat.RightChopInline(10);  // Chop the VK_FORMAT_
+				}
+
+				UE_LOG(LogVulkanRHI, Warning, TEXT("%24s | %24s | %10d | %10d | %10d,%d,%d,%d | %12d |  0x%08X  | %s"),
 					GPixelFormats[PixelFormatIndex].Name,
-					GPixelFormats[PixelFormatIndex].PlatformFormat,
+					*VulkanFormatStr,
 					GPixelFormats[PixelFormatIndex].BlockBytes,
 					GPixelFormats[PixelFormatIndex].NumComponents,
 					ComponentMapping.r, ComponentMapping.g, ComponentMapping.b, ComponentMapping.a,
 					(int32)GVulkanBufferFormat[PixelFormatIndex],
 					(uint32)GPixelFormats[PixelFormatIndex].Capabilities,
-					*CapabilitiesString
+					*SRGBFormat
 					);
 			}
 		}
-
-#define VULKAN_CHECK_FORMAT_CAPABILITY(PF_Name) if (EnumHasAllFlags(GPixelFormats[PixelFormatIndex].Capabilities, EPixelFormatCapabilities::PF_Name)) { CapabilitiesString += TEXT(#PF_Name) TEXT(", ");}
 
 		UE_LOG(LogVulkanRHI, Warning, TEXT("Pixel Format Capabilities for Vulkan:"));
 		for (int32 PixelFormatIndex = 0; PixelFormatIndex < PF_MAX; ++PixelFormatIndex)
 		{
 			if (GPixelFormats[PixelFormatIndex].Supported)
 			{
-				FString CapabilitiesString;
-
-				VULKAN_CHECK_FORMAT_CAPABILITY(TextureSample);
-				VULKAN_CHECK_FORMAT_CAPABILITY(TextureCube);
-				VULKAN_CHECK_FORMAT_CAPABILITY(RenderTarget);
-				VULKAN_CHECK_FORMAT_CAPABILITY(DepthStencil);
-				VULKAN_CHECK_FORMAT_CAPABILITY(TextureBlendable);
-				VULKAN_CHECK_FORMAT_CAPABILITY(TextureAtomics);
-				
-				VULKAN_CHECK_FORMAT_CAPABILITY(Buffer);
-				VULKAN_CHECK_FORMAT_CAPABILITY(VertexBuffer);
-				VULKAN_CHECK_FORMAT_CAPABILITY(IndexBuffer);
-				VULKAN_CHECK_FORMAT_CAPABILITY(BufferAtomics);
-
-				VULKAN_CHECK_FORMAT_CAPABILITY(UAV);
-
+				const FString CapabilitiesString = GetFormatCapabilities(GPixelFormats[PixelFormatIndex].Capabilities);
 				UE_LOG(LogVulkanRHI, Warning, TEXT("%24s : %s"), GPixelFormats[PixelFormatIndex].Name, *CapabilitiesString);
 			}
 		}
-
-#undef VULKAN_CHECK_FORMAT_CAPABILITY
-
 	}
-#endif
+#endif  // UE_BUILD_DEBUG || UE_BUILD_DEVELOPMENT
 }
 
 const VkFormatProperties& FVulkanDevice::GetFormatProperties(VkFormat InFormat)
@@ -873,6 +939,7 @@ void FVulkanDevice::MapImageFormatSupport(FPixelFormatInfo& PixelFormatInfo, con
 		ConvertImageCap(LocalFormatProperties, EPixelFormatCapabilities::AllUAVFlags | EPixelFormatCapabilities::TextureStore, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT);
 
 		ConvertImageCap(LocalFormatProperties, EPixelFormatCapabilities::TextureAtomics, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT);
+		ConvertImageCap(LocalFormatProperties, EPixelFormatCapabilities::TextureFilterable, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
 
 		if (EnumHasAllFlags(Capabilities, EPixelFormatCapabilities::AnyTexture))
 		{
@@ -1070,6 +1137,8 @@ void FVulkanDevice::InitGPU()
 	}
 #endif
 
+	RenderPassManager = new FVulkanRenderPassManager(this);
+
 	if (UseVulkanDescriptorCache())
 	{
 		DescriptorSetCache = new FVulkanDescriptorSetCache(this);
@@ -1077,6 +1146,18 @@ void FVulkanDevice::InitGPU()
 	
 	DescriptorPoolsManager = new FVulkanDescriptorPoolsManager();
 	DescriptorPoolsManager->Init(this);
+
+	if (OptionalDeviceExtensions.HasEXTDescriptorIndexing && GpuProps.limits.maxBoundDescriptorSets >= VulkanBindless::MaxNumSets)
+	{
+		const bool bBindlessResources = RHIGetBindlessResourcesConfiguration(GMaxRHIShaderPlatform) != ERHIBindlessConfiguration::Disabled;
+		const bool bBindlessSamplers = RHIGetBindlessSamplersConfiguration(GMaxRHIShaderPlatform) != ERHIBindlessConfiguration::Disabled;
+
+		if (bBindlessResources || bBindlessSamplers)
+		{
+			BindlessDescriptorManager = new FVulkanBindlessDescriptorManager(this);
+			BindlessDescriptorManager->Init();
+		}
+	}
 
 	PipelineStateCache = new FVulkanPipelineStateCacheManager(this);
 
@@ -1186,6 +1267,12 @@ void FVulkanDevice::Destroy()
 	delete DescriptorPoolsManager;
 	DescriptorPoolsManager = nullptr;
 
+	if (BindlessDescriptorManager)
+	{
+		delete BindlessDescriptorManager;
+		BindlessDescriptorManager = nullptr;
+	}
+
 	// No need to delete as it's stored in SamplerMap
 	DefaultSampler = nullptr;
 
@@ -1206,6 +1293,9 @@ void FVulkanDevice::Destroy()
 
 	delete ImmediateContext;
 	ImmediateContext = nullptr;
+
+	delete RenderPassManager;
+	RenderPassManager = nullptr;
 
 	for (FVulkanOcclusionQueryPool* Pool : UsedOcclusionQueryPools)
 	{
@@ -1306,10 +1396,13 @@ void FVulkanDevice::NotifyDeletedImage(VkImage Image, bool bRenderTarget)
 {
 	if (bRenderTarget)
 	{
+		// Contexts first, as it may clear the current framebuffer
 		GetImmediateContext().NotifyDeletedRenderTarget(Image);
+		// Delete framebuffers using this image
+		GetRenderPassManager().NotifyDeletedRenderTarget(Image);
 	}
 
-	//#todo-rco: Loop through all contexts!
+	//#todo-jn: Loop through all contexts!  And all queues!
 	GetImmediateContext().NotifyDeletedImage(Image);
 }
 
@@ -1421,4 +1514,31 @@ FVulkanTransientHeapCache& FVulkanDevice::GetOrCreateTransientHeapCache()
 		TransientHeapCache = FVulkanTransientHeapCache::Create(this);
 	}
 	return *TransientHeapCache;
+}
+
+FGPUTimingCalibrationTimestamp FVulkanDevice::GetCalibrationTimestamp()
+{
+	auto ToMicroseconds = [](uint64_t Timestamp)
+	{
+		const double Frequency = double(FVulkanGPUTiming::GetTimingFrequency());
+		uint64 Microseconds = (uint64)((double(Timestamp) / Frequency) * 1000.0 * 1000.0);
+		return Microseconds;
+	};
+
+	FGPUTimingCalibrationTimestamp CalibrationTimestamp;
+	if (OptionalDeviceExtensions.HasEXTCalibratedTimestamps)
+	{
+		VkCalibratedTimestampInfoEXT TimestampInfo;
+		ZeroVulkanStruct(TimestampInfo, VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT);
+		TimestampInfo.timeDomain = VK_TIME_DOMAIN_DEVICE_EXT;
+
+		uint64_t GPUTimestamp = 0;
+		uint64_t MaxDeviation = 0;
+		VERIFYVULKANRESULT(VulkanRHI::vkGetCalibratedTimestampsEXT(Device, 1, &TimestampInfo, &GPUTimestamp, &MaxDeviation));
+		CalibrationTimestamp.GPUMicroseconds = ToMicroseconds(GPUTimestamp);
+
+		const uint64 CPUTimestamp = FPlatformTime::Cycles64();
+		CalibrationTimestamp.CPUMicroseconds = uint64(FPlatformTime::ToSeconds64(CPUTimestamp) * 1e6);
+	}
+	return CalibrationTimestamp;
 }

@@ -4,17 +4,21 @@
 
 #include "Styling/AppStyle.h"
 #include "DesktopPlatformModule.h"
+#include "Framework/Application/SlateApplication.h"
 
 #include "UGSTab.h"
 #include "SGameSyncTab.h"
+#include "SNewWorkspaceWindow.h"
 #include "SPopupTextWindow.h"
 #include "SPrimaryButton.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Layout/SSpacer.h"
 
 #define LOCTEXT_NAMESPACE "UGSWorkspaceWindow"
 
-void SWorkspaceWindow::Construct(const FArguments& InArgs)
+void SWorkspaceWindow::Construct(const FArguments& InArgs, UGSTab* InTab)
 {
-	Tab = InArgs._Tab;
+	Tab = InTab;
 
 	SWindow::Construct(SWindow::FArguments()
 	.Title(LOCTEXT("WindowTitle", "Open Project"))
@@ -64,7 +68,7 @@ void SWorkspaceWindow::Construct(const FArguments& InArgs)
 					.Padding(10.0f, 0.0f)
 					.FillWidth(7)
 					[
-						SAssignNew(LocalFileText, SEditableTextBox)
+						SAssignNew(LocalFileTextBox, SEditableTextBox)
 						.HintText(LOCTEXT("FilePathHint", "Path/To/ProjectFile.uproject")) // Todo: Make hint text use backslash for Windows, forward slash for Unix
 			 			.OnTextChanged_Lambda([this](const FText& InText)
 						{
@@ -94,7 +98,6 @@ void SWorkspaceWindow::Construct(const FArguments& InArgs)
 					.AutoWidth()
 					[
 						SNew(SCheckBox).Style(FAppStyle::Get(), "RadioButton")
-						.IsEnabled(false) // Todo: enable after adding this functionality
 						.IsChecked_Lambda([this] () { return bIsLocalFileSelected ? ECheckBoxState::Unchecked : ECheckBoxState::Checked; })
 						.OnCheckStateChanged_Lambda( [this] (ECheckBoxState InState) { bIsLocalFileSelected = (!bIsLocalFileSelected && InState == ECheckBoxState::Checked); } )
 					]
@@ -124,7 +127,7 @@ void SWorkspaceWindow::Construct(const FArguments& InArgs)
 						.Padding(10.0f, 0.0f)
 						.FillWidth(5)
 						[
-							SNew(SEditableTextBox)
+							SAssignNew(WorkspaceNameTextBox, SEditableTextBox)
 							.HintText(LOCTEXT("NameHint", "WorkspaceName"))
 						]
 						+SHorizontalBox::Slot()
@@ -133,6 +136,7 @@ void SWorkspaceWindow::Construct(const FArguments& InArgs)
 							SNew(SButton)
 							.HAlign(HAlign_Center)
 							.Text(LOCTEXT("NewText", "New..."))
+							.OnClicked(this, &SWorkspaceWindow::OnNewClicked)
 						]
 						+SHorizontalBox::Slot()
 						.Padding(10.0f, 0.0f, 0.0f, 0.0f)
@@ -205,6 +209,11 @@ void SWorkspaceWindow::Construct(const FArguments& InArgs)
 	]);
 }
 
+void SWorkspaceWindow::SetWorkspaceTextBox(FText Text) const
+{
+	WorkspaceNameTextBox->SetText(Text);
+}
+
 FReply SWorkspaceWindow::OnOkClicked()
 {
 	bool bIsWorkspaceValid = Tab->OnWorkspaceChosen(WorkspacePathText);
@@ -231,31 +240,29 @@ FReply SWorkspaceWindow::OnCancelClicked()
 
 FReply SWorkspaceWindow::OnBrowseClicked()
 {
-	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
 	TArray<FString> OutOpenFilenames;
-	if (DesktopPlatform)
+	FDesktopPlatformModule::Get()->OpenFileDialog(
+		FSlateApplication::Get().FindBestParentWindowHandleForDialogs(AsShared()),
+		LOCTEXT("OpenDialogTitle", "Open Unreal Project").ToString(),
+		PreviousProjectPath,
+		TEXT(""),
+		TEXT("Unreal Project Files (*.uproject)|*.uproject"),
+		EFileDialogFlags::None,
+		OutOpenFilenames
+	);
+
+	if (!OutOpenFilenames.IsEmpty())
 	{
-		DesktopPlatform->OpenFileDialog(
-			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(AsShared()),
-			LOCTEXT("OpenDialogTitle", "Open Unreal Project").ToString(),
-			TEXT(""), // Todo: maybe give a default path (such as previously selected path)
-			TEXT(""),
-			TEXT("Unreal Project Files (*.uproject)|*.uproject"),
-			EFileDialogFlags::None,
-			OutOpenFilenames
-		);
-
-		if (!OutOpenFilenames.IsEmpty())
-		{
-			FString Path = OutOpenFilenames[0];
-			if (FPaths::IsRelative(Path))
-			{
-				Path = FPaths::ConvertRelativePathToFull(Path);
-			}
-
-			LocalFileText->SetText(FText::FromString(Path));
-		}
+		PreviousProjectPath = OutOpenFilenames[0];
+		LocalFileTextBox->SetText(FText::FromString(FPaths::ConvertRelativePathToFull(PreviousProjectPath)));
 	}
+
+	return FReply::Handled();
+}
+
+FReply SWorkspaceWindow::OnNewClicked()
+{
+	FSlateApplication::Get().AddModalWindow(SNew(SNewWorkspaceWindow, SharedThis(this), Tab), SharedThis(this), false);
 
 	return FReply::Handled();
 }

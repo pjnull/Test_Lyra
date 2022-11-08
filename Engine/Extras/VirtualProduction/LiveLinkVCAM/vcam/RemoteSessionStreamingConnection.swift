@@ -53,7 +53,7 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
     
     override var name : String {
         get {
-            "RemoteSession"
+            StreamingConnectionType.remoteSession.rawValue
         }
     }
     
@@ -79,6 +79,15 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
         }
     }
     
+    override var relayTouchEvents : Bool {
+        didSet {
+            if !relayTouchEvents {
+                self.remoteSessionView?.endAllTouches()
+            }
+        }
+    }
+
+    
     required init(subjectName: String) {
         super.init(subjectName: subjectName)
 
@@ -91,6 +100,14 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
         
         restartLiveLink()
     }
+    
+    deinit {
+        Log.info("Destroyed RemoteSessionStreamingConnection")
+    }
+    
+    override func shutdown() {
+        disconnect()
+    }
 
     override func connect() throws {
         self.oscConnection = nil
@@ -101,8 +118,6 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
             if let conn = self.oscConnection {
                 if conn.isConnected {
                     conn.send(OSCAddressPattern.ping)
-                } else {
-                    conn.reconnect()
                 }
             }
             
@@ -133,7 +148,6 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
     }
     
     override func reconnect() {
-        
         oscConnection?.reconnect()
     }
     
@@ -148,6 +162,20 @@ class RemoteSessionStreamingConnection : StreamingConnection  {
     
     override func sendTransform(_ transform: simd_float4x4, atTime time: Double) {
         self._liveLink?.updateSubject(AppSettings.shared.liveLinkSubjectName, withTransform: transform, atTime: time)
+    }
+    
+    override func sendControllerAnalog(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8, value : Float) {
+        
+        Log.info("sendControllerAnalog \(type.rawValue) \(value)")
+        self.oscConnection?.send(.controllerAnalog, arguments: [ OSCArgument.blob(OSCUtility.ueControllerAnalogData(key: type.rawValue, controller: Int(controllerIndex), value: value)) ])
+    }
+    
+    override func sendControllerButtonPressed(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8, isRepeat : Bool) {
+        self.oscConnection?.send(.controllerButtonPressed, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: type.rawValue, controller: Int(controllerIndex), isRepeat: isRepeat)) ] )
+    }
+
+   override func sendControllerButtonReleased(_ type : StreamingConnectionControllerInputType, controllerIndex : UInt8) {
+       self.oscConnection?.send(.controllerButtonReleased, arguments: [ OSCArgument.blob(OSCUtility.ueControllerButtonData(key: type.rawValue, controller: Int(controllerIndex), isRepeat: false)) ] )
     }
     
     func restartLiveLink() {
@@ -203,6 +231,7 @@ extension RemoteSessionStreamingConnection : RemoteSessionViewDelegate {
     
     func remoteSessionView(_ view: RemoteSessionView?, touch type: StreamingConnectionTouchType, index: Int, at point: CGPoint, force: CGFloat) {
         
+        guard self.relayTouchEvents else { return }
         guard let rsv = remoteSessionView else { return }
         
         let normalizedPoint = CGPoint(x: point.x / rsv.frame.size.width, y: point.y / rsv.frame.size.height)

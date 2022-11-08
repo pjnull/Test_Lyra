@@ -6,7 +6,7 @@
 	"Description": "Live Link plugin for using XR tracked devices",
 	"Category": "Virtual Production",
 	"CreatedBy": "Epic Games, Inc.",
-	"CreatedByURL": "http://epicgames.com",
+	"CreatedByURL": "https://epicgames.com",
 	"DocsURL": "",
 	"MarketplaceURL": "",
 	"SupportURL": "",
@@ -15,9 +15,13 @@
 	"IsExperimentalVersion": false,
 	"Installed": false,
 	"EnabledByDefault": false,
+	"SupportedTargetPlatforms": [
+		"Win64",
+		"Linux"
+	],
 	"Plugins": [
 		{
-			"Name": "UdpMessaging",
+			"Name": "OpenXR",
 			"Enabled": true
 		}
 	],
@@ -26,6 +30,15 @@
 			"Name": "LiveLinkXR",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "LiveLinkXROpenXRExt",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit",
+			"PlatformAllowList": [
+				"Win64",
+				"Linux"
+			]
 		}
 	]
 }

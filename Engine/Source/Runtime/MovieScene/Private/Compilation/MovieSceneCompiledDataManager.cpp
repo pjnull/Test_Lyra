@@ -724,7 +724,7 @@ void UMovieSceneCompiledDataManager::Compile(FMovieSceneCompiledDataID DataID, U
 				CompileTrack(&Entry, nullptr, Track, Params, &GatheredSignatures, &GatheredData);
 			}
 
-			for (UMovieSceneTrack* Track : MovieScene->GetMasterTracks())
+			for (UMovieSceneTrack* Track : MovieScene->GetTracks())
 			{
 				CompileTrack(&Entry, nullptr, Track, Params, &GatheredSignatures, &GatheredData);
 			}
@@ -845,7 +845,7 @@ void UMovieSceneCompiledDataManager::Gather(const FMovieSceneCompiledDataEntry& 
 			GatherTrack(nullptr, Track, Params, TrackTemplate, OutCompilerData);
 		}
 
-		for (UMovieSceneTrack* Track : MovieScene->GetMasterTracks())
+		for (UMovieSceneTrack* Track : MovieScene->GetTracks())
 		{
 			GatherTrack(nullptr, Track, Params, TrackTemplate, OutCompilerData);
 		}
@@ -1386,7 +1386,7 @@ bool UMovieSceneCompiledDataManager::GenerateSubSequenceData(UMovieSceneSequence
 
 	bool bContainsSubSequences = false;
 
-	for (UMovieSceneTrack* Track : MovieScene->GetMasterTracks())
+	for (UMovieSceneTrack* Track : MovieScene->GetTracks())
 	{
 		if (UMovieSceneSubTrack* SubTrack = Cast<UMovieSceneSubTrack>(Track))
 		{
@@ -1489,7 +1489,7 @@ void UMovieSceneCompiledDataManager::PopulateSubSequenceTree(UMovieSceneSequence
 
 	check(RootPath && InOutHierarchy);
 
-	for (UMovieSceneTrack* Track : MovieScene->GetMasterTracks())
+	for (UMovieSceneTrack* Track : MovieScene->GetTracks())
 	{
 		if (UMovieSceneSubTrack* SubTrack = Cast<UMovieSceneSubTrack>(Track))
 		{

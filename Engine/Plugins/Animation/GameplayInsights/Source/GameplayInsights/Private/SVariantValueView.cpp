@@ -1,20 +1,17 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SVariantValueView.h"
-#include "AnimationProvider.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "TraceServices/Model/AnalysisSession.h"
-#include "Insights/ITimingViewSession.h"
 #include "GameplayProvider.h"
 #include "TraceServices/Model/Frames.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SBoxPanel.h"
 #include "Styling/CoreStyle.h"
 #include "GameplayInsightsStyle.h"
-#include "Widgets/Layout/SScrollBorder.h"
-#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SHyperlink.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Layout/SScrollBorder.h"
 #include "VariantTreeNode.h"
 #include "Misc/TextFilterExpressionEvaluator.h"
 #include "Framework/Commands/GenericCommands.h"
@@ -26,6 +23,10 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "SourceCodeNavigation.h"
 #include "Editor.h"
+#include "IAnimationEditor.h"
+#include "IPersonaToolkit.h"
+#include "Animation/DebugSkelMeshComponent.h"
+#include "AnimGraph/Public/AnimPreviewInstance.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "SVariantValueView"
@@ -160,9 +161,42 @@ static TSharedRef<SWidget> MakeVariantValueWidget(const TraceServices::IAnalysis
 				.Text(FText::FromString(ObjectInfo.Name))
 				.TextStyle(&FCoreStyle::Get().GetWidgetStyle<FTextBlockStyle>("SmallText"))
 				.ToolTipText(FText::Format(LOCTEXT("AssetHyperlinkTooltipFormat", "Open asset '{0}'"), FText::FromString(ObjectInfo.PathName)))
-				.OnNavigate_Lambda([ObjectInfo]()
+				.OnNavigate_Lambda([ObjectInfo, InValue]()
 				{
-					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ObjectInfo.PathName);
+					UObject* Asset = nullptr;
+						
+					UPackage* Package = LoadPackage(NULL, ObjectInfo.PathName, LOAD_NoRedirects);
+					if (Package)
+					{
+						Package->FullyLoad();
+                
+						FString AssetName = FPaths::GetBaseFilename(ObjectInfo.PathName);
+						Asset = FindObject<UObject>(Package, *AssetName);
+					}
+					else
+					{
+						// fallback for unsaved assets
+						Asset = FindObject<UObject>(nullptr, ObjectInfo.PathName);
+					}
+                    	
+					if (Asset != nullptr)
+					{
+						if (UAssetEditorSubsystem* AssetEditorSS = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+						{
+							AssetEditorSS->OpenEditorForAsset(Asset);
+							if (IAssetEditorInstance* Editor = AssetEditorSS->FindEditorForAsset(Asset, true))
+							{
+								if (Editor->GetEditorName()=="AnimationEditor")
+								{
+									IAnimationEditor* AnimationEditor = static_cast<IAnimationEditor*>(Editor);
+									UDebugSkelMeshComponent* PreviewComponent = AnimationEditor->GetPersonaToolkit()->GetPreviewMeshComponent();
+									PreviewComponent->PreviewInstance->SetPosition(InValue.Object.PlaybackTime);
+									PreviewComponent->PreviewInstance->SetPlaying(false);
+									PreviewComponent->PreviewInstance->SetBlendSpacePosition(FVector(InValue.Object.BlendX, InValue.Object.BlendY, 0.0f));
+								}
+							}
+						}
+					}
 				});
 #else
 			return 
@@ -192,17 +226,17 @@ static TSharedRef<SWidget> MakeVariantValueWidget(const TraceServices::IAnalysis
 				.ToolTipText(FText::Format(LOCTEXT("ClassHyperlinkTooltipFormat", "Open class '{0}'"), FText::FromString(ClassInfo.PathName)))
 				.OnNavigate_Lambda([ClassInfo]()
 				{
-					if (LoadPackage(NULL, ClassInfo.PathName, LOAD_NoRedirects)) // check if it's found as an asset
+					if (UClass* FoundClass = UClass::TryFindTypeSlow<UClass>(ClassInfo.Name))
 					{
-						GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ClassInfo.PathName);
-					}
-					else // it must be a native class
-					{
-						if (UClass* FoundClass = UClass::TryFindTypeSlow<UClass>(ClassInfo.Name))
+						if (FoundClass->IsNative())
 						{
+							// for native classes navigatte to source code
 							FSourceCodeNavigation::NavigateToClass(FoundClass);
 						}
 					}
+
+					// for non-native classes, try opening the asset
+					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(ClassInfo.PathName);
 				});
 #else
 			return 
@@ -227,7 +261,7 @@ public:
 	SLATE_BEGIN_ARGS(SVariantValueNode) {}
 
 	SLATE_ATTRIBUTE(FText, HighlightText)
-
+	SLATE_EVENT(FOnMouseButtonDownOnVariantValueNode, OnMouseButtonDownOnVariantValueNode)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwnerTable, TSharedRef<FVariantTreeNode> InNode, const TraceServices::IAnalysisSession& InAnalysisSession)
@@ -235,7 +269,8 @@ public:
 		Node = InNode;
 		AnalysisSession = &InAnalysisSession;
 		HighlightText = InArgs._HighlightText;
-
+		OnMouseButtonDownOnVariantValueNode = InArgs._OnMouseButtonDownOnVariantValueNode;
+		
 		SMultiColumnTableRow<TSharedRef<FVariantTreeNode>>::Construct(
 			FSuperRowType::FArguments()
 			.Padding(1.0f),
@@ -243,6 +278,14 @@ public:
 		);
 	}
 
+	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+	{
+		OnMouseButtonDownOnVariantValueNode.ExecuteIfBound(Node, MouseEvent);
+
+		/** We return a FReply::Unhandled to allow for event to bubble up in order for context menu to be built. */
+		return FReply::Unhandled();
+	}
+	
 	// SMultiColumnTableRow interface
 	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& InColumnName) override
 	{
@@ -296,12 +339,14 @@ public:
 	const TraceServices::IAnalysisSession* AnalysisSession;
 	TSharedPtr<FVariantTreeNode> Node;
 	TAttribute<FText> HighlightText;
+	FOnMouseButtonDownOnVariantValueNode OnMouseButtonDownOnVariantValueNode;
 };
 
 void SVariantValueView::Construct(const FArguments& InArgs, const TraceServices::IAnalysisSession& InAnalysisSession)
 {
 	OnGetVariantValues = InArgs._OnGetVariantValues;
-
+	OnMouseButtonDownOnVariantValue = InArgs._OnMouseButtonDownOnVariantValue;
+	
 	AnalysisSession = &InAnalysisSession;
 	bNeedsRefresh = false;
 	bRecordExpansion = true;
@@ -313,6 +358,7 @@ void SVariantValueView::Construct(const FArguments& InArgs, const TraceServices:
 		.OnGenerateRow(this, &SVariantValueView::HandleGeneratePropertyRow)
 		.OnGetChildren(this, &SVariantValueView::HandleGetPropertyChildren)
 		.OnExpansionChanged(this, &SVariantValueView::HandleExpansionChanged)
+		.OnContextMenuOpening(InArgs._OnContextMenuOpening)
 		.TreeItemsSource(&FilteredNodes)
 		.HeaderRow(
 			SNew(SHeaderRow)
@@ -322,7 +368,6 @@ void SVariantValueView::Construct(const FArguments& InArgs, const TraceServices:
 			+SHeaderRow::Column(VariantColumns::Value)
 			.DefaultLabel(LOCTEXT("ValueValueColumn", "Value"))
 		);
-
 	ChildSlot
 	[
 		SNew(SVerticalBox)
@@ -378,7 +423,11 @@ TSharedRef<ITableRow> SVariantValueView::HandleGeneratePropertyRow(TSharedRef<FV
 {
 	return 
 		SNew(SVariantValueNode, OwnerTable, Item, *AnalysisSession)
-		.HighlightText(MakeAttributeLambda([this](){ return FilterText; }));
+		.HighlightText(MakeAttributeLambda([this](){ return FilterText; }))
+		.OnMouseButtonDownOnVariantValueNode_Lambda([this](const TSharedPtr<FVariantTreeNode> & InVariantValueNode, const FPointerEvent & InPointerEvent)
+		{
+			OnMouseButtonDownOnVariantValue.ExecuteIfBound(InVariantValueNode, Frame, InPointerEvent);
+		});
 }
 
 void SVariantValueView::HandleGetPropertyChildren(TSharedRef<FVariantTreeNode> InItem, TArray<TSharedRef<FVariantTreeNode>>& OutChildren)

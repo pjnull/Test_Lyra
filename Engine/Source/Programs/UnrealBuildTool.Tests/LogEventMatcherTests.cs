@@ -20,6 +20,11 @@ namespace UnrealBuildToolTests
 
 		class LoggerCapture : ILogger
 		{
+			class Scope : IDisposable
+			{
+				public void Dispose() { }
+			}
+
 			int _logLineIndex;
 
 			public void Reset()
@@ -30,11 +35,11 @@ namespace UnrealBuildToolTests
 
 			public List<LogEvent> _events = new List<LogEvent>();
 
-			public IDisposable? BeginScope<TState>(TState state) => null;
+			public IDisposable BeginScope<TState>(TState state) => new Scope();
 
 			public bool IsEnabled(LogLevel logLevel) => true;
 
-			public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception?, string> formatter)
+			public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
 			{
 				LogEvent logEvent = LogEvent.Read(JsonLogEvent.FromLoggerState(logLevel, eventId, state, exception, formatter).Data.Span);
 				if (logEvent.Level != LogLevel.Information || logEvent.Id != default || logEvent.Properties != null)
@@ -906,6 +911,54 @@ namespace UnrealBuildToolTests
 			Assert.AreEqual(1, logEvents.Count);
 			CheckEventGroup(logEvents, 5, 1, LogLevel.Information, KnownLogEvents.Systemic_Xge_CacheLimit);
 		}
+
+		[TestMethod]
+		public void XoreaxErrorMatcher3()
+		{
+			string[] lines =
+			{
+				@"Module.ExternalSource.cpp (Agent '10-99-199-46 (Core #3)', 0:16.43 at +23:42)",
+				@"Default.rc2 (0:00.29 at +23:59)",
+				@"--------------------Build System Error-----------------------------------------",
+				@"Fatal error:",
+				@"    Task queue management failed.",
+				@"    Error starting Task 'clang-cl: Task: Env_0->Action1715_1 (Tool1715_1)' on machine 'Local CPU 8'",
+				@"    Failed to map view of file mapping 0x082C at position 0:0 (0 bytes): Not enough memory resources are available to process this command (8)",
+				@"-------------------------------------------------------------------------------",
+				@"",
+				@"--------------------Build Cache summary----------------------------------------",
+				@"Build Tasks: 15751",
+				@"Build Cache Efficiency: 0% (0 tasks)"
+			};
+
+			List<LogEvent> logEvents = Parse(lines);
+			Assert.AreEqual(6, logEvents.Count);
+			CheckEventGroup(logEvents, 2, 6, LogLevel.Error, KnownLogEvents.Systemic_Xge);
+		}
+
+		[TestMethod]
+		public void XoreaxErrorMatcher4()
+		{
+			string[] lines =
+			{
+				@"--------------------Build Cache summary----------------------------------------",
+				@"Build Tasks: 2007",
+				@"Build Cache Efficiency: 0% (0 tasks)",
+				@"New cache size: 24.9 GB",
+				@"Updated 1899 items (9.8 GB)",
+				@"WARNING: Several items removed from the cache due to reaching the cache size limit.",
+				@"WARNING: The Build Cache is close to full, limiting your ability to benefit from previously cached data to speed up your builds. It is recommended to increase the cache size to be larger than the sum of all build artifacts that are cached.",
+				@"1 build system warning(s):",
+				@"   - Build Cache performance hit",
+				@"Took 413.95489860000004s to run xgConsole.exe, ExitCode=0"
+			};
+
+			List<LogEvent> logEvents = Parse(lines);
+			Assert.AreEqual(2, logEvents.Count);
+			CheckEventGroup(logEvents.Slice(0, 1), 5, 1, LogLevel.Information, KnownLogEvents.Systemic_Xge_CacheLimit);
+			CheckEventGroup(logEvents.Slice(1, 1), 6, 1, LogLevel.Information, KnownLogEvents.Systemic_Xge_CacheLimit);
+		}
+
 
 		[TestMethod]
 		public void UhtErrorMatcher()

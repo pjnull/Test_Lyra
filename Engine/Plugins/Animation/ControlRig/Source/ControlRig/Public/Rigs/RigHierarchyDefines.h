@@ -88,6 +88,7 @@ enum class ERigHierarchyNotification : uint8
 	ParentWeightsChanged,
 	InteractionBracketOpened,
 	InteractionBracketClosed,
+	ElementReordered,
 
 	/** MAX - invalid */
 	Max UMETA(Hidden),
@@ -391,7 +392,9 @@ public:
 
 	FRigControlValue()
 		: FloatStorage()
+#if WITH_EDITORONLY_DATA
 		, Storage_DEPRECATED(FTransform::Identity)
+#endif
 	{
 	}
 
@@ -1132,8 +1135,10 @@ private:
 	UPROPERTY()
 	FRigControlValueStorage FloatStorage;
 	
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FTransform Storage_DEPRECATED;
+#endif
 
 	friend struct FRigControlHierarchy;
 	friend class UControlRigBlueprint;

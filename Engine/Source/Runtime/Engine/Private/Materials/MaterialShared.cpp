@@ -909,10 +909,13 @@ const FMaterialShaderMap* FMaterial::GetShaderMapToUse() const
 		// If we are accessing uniform texture expressions on the game thread, use results from a shader map whose compile is in flight that matches this material
 		// This allows querying what textures a material uses even when it is being asynchronously compiled
 		ShaderMapToUse = GameThreadShaderMap;
+
+#if WITH_EDITOR
 		if (!ShaderMapToUse && GameThreadCompilingShaderMapId != 0u)
 		{
 			ShaderMapToUse = FMaterialShaderMap::FindCompilingShaderMap(GameThreadCompilingShaderMapId);
 		}
+#endif // WITH_EDITOR
 
 		checkf(!ShaderMapToUse || ShaderMapToUse->GetNumRefs() > 0, TEXT("NumRefs %i, GameThreadShaderMap 0x%08x"), ShaderMapToUse->GetNumRefs(), GetGameThreadShaderMap());
 	}
@@ -1100,6 +1103,28 @@ bool FMaterial::MaterialUsesAnisotropy_RenderThread() const
 	return RenderingThreadShaderMap ? RenderingThreadShaderMap->UsesAnisotropy() : false;
 }
 
+uint8 FMaterial::MaterialGetStrataMaterialType_GameThread() const
+{
+	return GameThreadShaderMap ? GameThreadShaderMap->GetStrataMaterialType() : false;
+}
+
+uint8 FMaterial::MaterialGetStrataMaterialType_RenderThread() const
+{
+	check(IsInParallelRenderingThread());
+	return RenderingThreadShaderMap ? RenderingThreadShaderMap->GetStrataMaterialType() : false;
+}
+
+uint8 FMaterial::MaterialGetStrataBSDFCount_GameThread() const
+{
+	return GameThreadShaderMap ? GameThreadShaderMap->GetStrataBSDFCount() : false;
+}
+
+uint8 FMaterial::MaterialGetStrataBSDFCount_RenderThread() const
+{
+	check(IsInParallelRenderingThread());
+	return RenderingThreadShaderMap ? RenderingThreadShaderMap->GetStrataBSDFCount() : false;
+}
+
 void FMaterial::SetGameThreadShaderMap(FMaterialShaderMap* InMaterialShaderMap)
 {
 	checkSlow(IsInGameThread() || IsInAsyncLoadingThread());
@@ -1156,6 +1181,7 @@ void FMaterial::SetInlineShaderMap(FMaterialShaderMap* InMaterialShaderMap)
 	});
 }
 
+#if WITH_EDITOR
 void FMaterial::SetCompilingShaderMap(FMaterialShaderMap* InMaterialShaderMap)
 {
 	checkSlow(IsInGameThread());
@@ -1197,6 +1223,7 @@ bool FMaterial::ReleaseGameThreadCompilingShaderMap()
 	}
 	return bReleased;
 }
+#endif // WITH_EDITOR
 
 void FMaterial::ReleaseRenderThreadCompilingShaderMap()
 {
@@ -1601,6 +1628,11 @@ bool FMaterialResource::IsUsedWithAPEXCloth() const
 bool FMaterialResource::IsUsedWithNanite() const
 {
 	return Material->bUsedWithNanite;
+}
+
+bool FMaterialResource::IsUsedWithVolumetricCloud() const
+{
+	return Material->bUsedWithVolumetricCloud;
 }
 
 bool FMaterialResource::IsTranslucencyAfterDOFEnabled() const 
@@ -2110,9 +2142,9 @@ bool FMaterial::PrepareDestroy_GameThread()
 {
 	check(IsInGameThread());
 
+#if WITH_EDITOR
 	const bool bReleasedCompilingId = ReleaseGameThreadCompilingShaderMap();
 
-#if WITH_EDITOR
 	if (GIsEditor)
 	{
 		const FSetElementId FoundId = EditorLoadedMaterialResources.FindId(this);
@@ -2122,17 +2154,21 @@ bool FMaterial::PrepareDestroy_GameThread()
 			EditorLoadedMaterialResources.Remove(FoundId);
 		}
 	}
-#endif // WITH_EDITOR
 
 	return bReleasedCompilingId;
+#else
+	return false;
+#endif
 }
 
 void FMaterial::PrepareDestroy_RenderThread()
 {
 	check(IsInRenderingThread());
 
+#if WITH_EDITOR
 	RenderingThreadCompilingShaderMapId = 0u;
 	RenderingThreadPendingCompilerEnvironment.SafeRelease();
+#endif
 }
 
 void FMaterial::DeferredDelete(FMaterial* InMaterial)
@@ -2162,9 +2198,11 @@ void FMaterial::DeferredDelete(FMaterial* InMaterial)
  */
 FMaterial::~FMaterial()
 {
+#if WITH_EDITOR
 	check(GameThreadCompilingShaderMapId == 0u);
 	check(RenderingThreadCompilingShaderMapId == 0u);
 	check(!RenderingThreadPendingCompilerEnvironment.IsValid());
+#endif // WITH_EDITOR
 
 #if UE_CHECK_FMATERIAL_LIFETIME
 	const uint32 NumRemainingRefs = GetRefCount();
@@ -2175,6 +2213,8 @@ FMaterial::~FMaterial()
 	checkf(!EditorLoadedMaterialResources.Contains(this), TEXT("FMaterial is still in EditorLoadedMaterialResources when destroyed, should use FMaterial::DeferredDestroy to remove"));
 #endif // WITH_EDITOR
 }
+
+#if WITH_EDITOR
 
 /** Populates OutEnvironment with defines needed to compile shaders for this material. */
 void FMaterial::SetupMaterialEnvironment(
@@ -2383,6 +2423,7 @@ void FMaterial::SetupMaterialEnvironment(
 		}
 	}
 }
+#endif // WITH_EDITOR
 
 /**
  * Caches the material shaders for this material with no static parameters on the given platform.
@@ -2637,6 +2678,27 @@ bool FMaterial::CacheShaders(const FMaterialShaderMapId& ShaderMapId, EShaderPla
 }; // Close the lambda
 #endif
 }
+
+#if WITH_EDITOR
+FString FMaterial::GetUniqueAssetName(EShaderPlatform Platform) const
+{
+	// Temporary disabled due to UE-169098:
+	// This funciton may be called from worker threads, but GetStaticParameterSet() requires game thread.
+#if 0 
+	TArray<uint8> Buf;
+	FString PathStr = GetAssetPath().GetPlainNameString();
+	FMemoryWriter BufWriter(Buf);
+	BufWriter << PathStr;
+	FStaticParameterSet StaticParams;
+	GetStaticParameterSet(Platform, StaticParams);
+	FStaticParameterSet::StaticStruct()->SerializeBin(BufWriter, &StaticParams);
+	uint64 Hash = CityHash64((const char*)Buf.GetData(), Buf.Num());
+	return FString::Printf(TEXT("%s_%llu"), *GetAssetName(), Hash);
+#else
+	return GetAssetName();
+#endif
+}
+#endif // WITH_EDITOR
 
 /**
  * Helper task used to release the strong object reference to the material interface on the game thread
@@ -2920,7 +2982,6 @@ void FMaterial::CacheGivenTypes(EShaderPlatform Platform, const TArray<const FVe
 		GShaderCompilingManager->SubmitJobs(CompileJobs, GetBaseMaterialPathName(), GameThreadShaderMap->GetDebugDescription());
 	}
 }
-#endif // WITH_EDITOR
 
 bool FMaterial::Translate_Legacy(const FMaterialShaderMapId& ShaderMapId,
 	const FStaticParameterSet& InStaticParameters,
@@ -2929,7 +2990,6 @@ bool FMaterial::Translate_Legacy(const FMaterialShaderMapId& ShaderMapId,
 	FMaterialCompilationOutput& OutCompilationOutput,
 	TRefCountPtr<FSharedShaderCompilerEnvironment>& OutMaterialEnvironment)
 {
-#if WITH_EDITORONLY_DATA
 	FHLSLMaterialTranslator MaterialTranslator(this, OutCompilationOutput, InStaticParameters, InPlatform, GetQualityLevel(), ShaderMapId.FeatureLevel, InTargetPlatform);
 	const bool bSuccess = MaterialTranslator.Translate();
 	if (bSuccess)
@@ -2943,10 +3003,6 @@ bool FMaterial::Translate_Legacy(const FMaterialShaderMapId& ShaderMapId,
 		OutMaterialEnvironment->IncludeVirtualPathToContentsMap.Add(TEXT("/Engine/Generated/Material.ush"), MaterialShaderCode);
 	}
 	return bSuccess;
-#else
-	checkNoEntry();
-	return false;
-#endif
 }
 
 bool FMaterial::Translate_New(const FMaterialShaderMapId& ShaderMapId,
@@ -2956,13 +3012,8 @@ bool FMaterial::Translate_New(const FMaterialShaderMapId& ShaderMapId,
 	FMaterialCompilationOutput& OutCompilationOutput,
 	TRefCountPtr<FSharedShaderCompilerEnvironment>& OutMaterialEnvironment)
 {
-#if WITH_EDITOR
 	const FMaterialCompileTargetParameters TargetParams(InPlatform, ShaderMapId.FeatureLevel, InTargetPlatform);
 	return MaterialEmitHLSL(TargetParams, InStaticParameters, *this, OutCompilationOutput, OutMaterialEnvironment);
-#else
-	checkNoEntry();
-	return false;
-#endif
 }
 
 bool FMaterial::Translate(const FMaterialShaderMapId& InShaderMapId,
@@ -2972,7 +3023,6 @@ bool FMaterial::Translate(const FMaterialShaderMapId& InShaderMapId,
 	FMaterialCompilationOutput& OutCompilationOutput,
 	TRefCountPtr<FSharedShaderCompilerEnvironment>& OutMaterialEnvironment)
 {
-#if WITH_EDITOR
 	if (InShaderMapId.bUsingNewHLSLGenerator)
 	{
 		return Translate_New(InShaderMapId, InStaticParameters, InPlatform, InTargetPlatform, OutCompilationOutput, OutMaterialEnvironment);
@@ -2981,10 +3031,6 @@ bool FMaterial::Translate(const FMaterialShaderMapId& InShaderMapId,
 	{
 		return Translate_Legacy(InShaderMapId, InStaticParameters, InPlatform, InTargetPlatform, OutCompilationOutput, OutMaterialEnvironment);
 	}
-#else
-	checkNoEntry();
-	return false;
-#endif
 }
 
 /**
@@ -3002,7 +3048,6 @@ bool FMaterial::BeginCompileShaderMap(
 	EMaterialShaderPrecompileMode PrecompileMode,
 	const ITargetPlatform* TargetPlatform)
 {
-#if WITH_EDITORONLY_DATA
 	bool bSuccess = false;
 
 	STAT(double MaterialCompileTime = 0);
@@ -3011,9 +3056,7 @@ bool FMaterial::BeginCompileShaderMap(
 
 	SCOPE_SECONDS_COUNTER(MaterialCompileTime);
 
-#if WITH_EDITOR
 	NewShaderMap->AssociateWithAsset(GetAssetPath());
-#endif
 
 	// Generate the material shader code.
 	FMaterialCompilationOutput NewCompilationOutput;
@@ -3022,10 +3065,9 @@ bool FMaterial::BeginCompileShaderMap(
 
 	if(bSuccess)
 	{
-#if WITH_EDITOR
 		FShaderCompileUtilities::GenerateBrdfHeaders((EShaderPlatform)Platform);
 		FShaderCompileUtilities::ApplyDerivedDefines(*MaterialEnvironment, nullptr, (EShaderPlatform)Platform);
-#endif
+
 		{
 			FShaderParametersMetadata* UniformBufferStruct = NewCompilationOutput.UniformExpressionSet.CreateBufferStruct();
 			SetupMaterialEnvironment(Platform, *UniformBufferStruct, NewCompilationOutput.UniformExpressionSet, *MaterialEnvironment);
@@ -3098,11 +3140,9 @@ bool FMaterial::BeginCompileShaderMap(
 	INC_FLOAT_STAT_BY(STAT_ShaderCompiling_MaterialShaders,(float)MaterialCompileTime);
 
 	return bSuccess;
-#else
-	UE_LOG(LogMaterial, Fatal,TEXT("Not supported."));
-	return false;
-#endif
 }
+
+#endif // WITH_EDITOR
 
 /**
  * Should the shader for this material with the given platform, shader type and vertex 
@@ -3249,7 +3289,6 @@ bool FMaterial::TryGetShaders(const FMaterialShaderTypes& InTypes, const FVertex
 	const bool bIsInGameThread = IsInGameThread();
 	const FMaterialShaderMap* ShaderMap = bIsInGameThread ? GameThreadShaderMap : RenderingThreadShaderMap;
 	const bool bShaderMapComplete = bIsInGameThread ? IsGameThreadShaderMapComplete() : IsRenderingThreadShaderMapComplete();
-	const uint32 CompilingShaderMapId = bIsInGameThread ? GameThreadCompilingShaderMapId : RenderingThreadCompilingShaderMapId;
 
 	if (ShaderMap == nullptr)
 	{
@@ -3312,21 +3351,26 @@ bool FMaterial::TryGetShaders(const FMaterialShaderTypes& InTypes, const FVertex
 						GODSCManager->AddThreadedShaderPipelineRequest(ShaderPlatform, GetFeatureLevel(), GetQualityLevel(), MaterialName, VFTypeName, PipelineName, ShaderStageNamesToCompile);
 					}
 				}
-				else 
+				else
 #endif
-				if (CompilingShaderMapId != 0u)
 				{
-					if (!bShaderMapComplete)
+#if WITH_EDITOR
+					const uint32 CompilingShaderMapId = bIsInGameThread ? GameThreadCompilingShaderMapId : RenderingThreadCompilingShaderMapId;
+					if (CompilingShaderMapId != 0u)
 					{
-						if (InVertexFactoryType)
+						if (!bShaderMapComplete)
 						{
-							FMeshMaterialShaderType::BeginCompileShaderPipeline(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, kUniqueShaderPermutationId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InVertexFactoryType, InTypes.PipelineType, CompileJobs, nullptr, nullptr);
-						}
-						else
-						{
-							FMaterialShaderType::BeginCompileShaderPipeline(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InTypes.PipelineType, CompileJobs, nullptr, nullptr);
+							if (InVertexFactoryType)
+							{
+								FMeshMaterialShaderType::BeginCompileShaderPipeline(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, kUniqueShaderPermutationId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InVertexFactoryType, InTypes.PipelineType, CompileJobs, nullptr, nullptr);
+							}
+							else
+							{
+								FMaterialShaderType::BeginCompileShaderPipeline(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InTypes.PipelineType, CompileJobs, nullptr, nullptr);
+							}
 						}
 					}
+#endif // WITH_EDITOR
 				}
 			}
 		}
@@ -3364,19 +3408,24 @@ bool FMaterial::TryGetShaders(const FMaterialShaderTypes& InTypes, const FVertex
 					}
 					else
 #endif
-					if (CompilingShaderMapId != 0u)
 					{
-						if (!bShaderMapComplete)
+#if WITH_EDITOR
+						const uint32 CompilingShaderMapId = bIsInGameThread ? GameThreadCompilingShaderMapId : RenderingThreadCompilingShaderMapId;
+						if (CompilingShaderMapId != 0u)
 						{
-							if (InVertexFactoryType)
+							if (!bShaderMapComplete)
 							{
-								ShaderType->AsMeshMaterialShaderType()->BeginCompileShader(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, PermutationId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InVertexFactoryType, CompileJobs, nullptr, nullptr);
-							}
-							else
-							{
-								ShaderType->AsMaterialShaderType()->BeginCompileShader(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, PermutationId, this, RenderingThreadPendingCompilerEnvironment, ShaderPlatform, PermutationFlags, CompileJobs, nullptr, nullptr);
+								if (InVertexFactoryType)
+								{
+									ShaderType->AsMeshMaterialShaderType()->BeginCompileShader(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, PermutationId, ShaderPlatform, PermutationFlags, this, RenderingThreadPendingCompilerEnvironment, InVertexFactoryType, CompileJobs, nullptr, nullptr);
+								}
+								else
+								{
+									ShaderType->AsMaterialShaderType()->BeginCompileShader(EShaderCompileJobPriority::ForceLocal, CompilingShaderMapId, PermutationId, this, RenderingThreadPendingCompilerEnvironment, ShaderPlatform, PermutationFlags, CompileJobs, nullptr, nullptr);
+								}
 							}
 						}
+#endif // WITH_EDITOR
 					}
 				}
 			}
@@ -3646,6 +3695,17 @@ bool FMaterialRenderProxy::GetTextureValue(const FHashedMaterialParameterInfo& P
 	return false;
 }
 
+bool FMaterialRenderProxy::GetTextureValue(const FHashedMaterialParameterInfo& ParameterInfo, const USparseVolumeTexture** OutValue, const FMaterialRenderContext& Context) const
+{
+	FMaterialParameterValue Value;
+	if (GetParameterValue(EMaterialParameterType::SparseVolumeTexture, ParameterInfo, Value, Context))
+	{
+		*OutValue = Value.SparseVolumeTexture;
+		return true;
+	}
+	return false;
+}
+
 static void OnVirtualTextureDestroyedCB(const FVirtualTextureProducerHandle& InHandle, void* Baton)
 {
 	FMaterialRenderProxy* MaterialProxy = static_cast<FMaterialRenderProxy*>(Baton);
@@ -3854,6 +3914,7 @@ public:
 			TRACE_CPUPROFILER_EVENT_SCOPE(FUniformExpressionCacheAsyncUpdater::Update);
 			FTaskTagScope Scope(ETaskTag::EParallelRenderingThread);
 			FMemMark Mark(FMemStack::Get());
+			RHICmdList->SwitchPipeline(ERHIPipeline::Graphics);
 
 			for (const FItem& Item : Items)
 			{
@@ -4165,6 +4226,7 @@ void FMaterialRenderProxy::ReleaseResource()
 	}
 }
 
+#if WITH_EDITOR
 void FMaterial::SubmitCompileJobs_GameThread(EShaderCompileJobPriority Priority)
 {
 	check(IsInGameThread());
@@ -4201,6 +4263,7 @@ void FMaterial::SubmitCompileJobs_RenderThread(EShaderCompileJobPriority Priorit
 		}
 	}
 }
+#endif // WITH_EDITOR
 
 const FMaterial& FMaterialRenderProxy::GetMaterialWithFallback(ERHIFeatureLevel::Type InFeatureLevel, const FMaterialRenderProxy*& OutFallbackMaterialRenderProxy) const
 {
@@ -4218,10 +4281,12 @@ const FMaterial& FMaterialRenderProxy::GetMaterialWithFallback(ERHIFeatureLevel:
 		while (!Material || !Material->IsRenderingThreadShaderMapComplete());
 		OutFallbackMaterialRenderProxy = FallbackMaterialProxy;
 
+#if WITH_EDITOR
 		if (BaseMaterial)
 		{
 			BaseMaterial->SubmitCompileJobs_RenderThread(EShaderCompileJobPriority::Normal);
 		}
+#endif // WITH_EDITOR
 	}
 	return *Material;
 }
@@ -5862,6 +5927,7 @@ UE::Shader::FValue FMaterialParameterValue::AsShaderValue() const
 	case EMaterialParameterType::Texture:
 	case EMaterialParameterType::Font:
 	case EMaterialParameterType::RuntimeVirtualTexture:
+	case EMaterialParameterType::SparseVolumeTexture:
 		// Non-numeric types, can't represent as shader values
 		return UE::Shader::FValue();
 	default:
@@ -5877,6 +5943,7 @@ UObject* FMaterialParameterValue::AsTextureObject() const
 	{
 	case EMaterialParameterType::Texture: Result = Texture; break;
 	case EMaterialParameterType::RuntimeVirtualTexture: Result = RuntimeVirtualTexture; break;
+	case EMaterialParameterType::SparseVolumeTexture: Result = SparseVolumeTexture; break;
 	case EMaterialParameterType::Font:
 		if (Font.Value && Font.Value->Textures.IsValidIndex(Font.Page))
 		{
@@ -5902,6 +5969,7 @@ UE::Shader::FType GetShaderValueType(EMaterialParameterType Type)
 	case EMaterialParameterType::Font:
 		return FMaterialTextureValue::GetTypeName();
 	case EMaterialParameterType::RuntimeVirtualTexture:
+	case EMaterialParameterType::SparseVolumeTexture:
 		return UE::Shader::EValueType::Void; // TODO
 	default:
 		checkNoEntry();
@@ -6041,6 +6109,8 @@ FMaterialShaderParameters::FMaterialShaderParameters(const FMaterial* InMaterial
 	bIsTranslucencySurface = InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_Surface || InMaterial->GetTranslucencyLightingMode() == ETranslucencyLightingMode::TLM_SurfacePerPixelLighting;
 	bShouldDisableDepthTest = InMaterial->ShouldDisableDepthTest();
 	bHasRenderTracePhysicalMaterialOutput = InMaterial->HasRenderTracePhysicalMaterialOutputs();
+	bIsUsedWithVolumetricCloud = InMaterial->IsUsedWithVolumetricCloud();
+	bIsMobileSeparateTranslucencyEnabled = InMaterial->IsMobileSeparateTranslucencyEnabled();
 }
 
 #undef LOCTEXT_NAMESPACE

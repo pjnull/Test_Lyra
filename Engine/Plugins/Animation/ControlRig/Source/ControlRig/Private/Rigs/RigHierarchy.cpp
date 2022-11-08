@@ -2297,10 +2297,9 @@ URigHierarchyController* URigHierarchy::GetController(bool bCreateIfNeeded)
 		 if(ensure(!IsGarbageCollecting()))
 		 {
 			 HierarchyController = NewObject<URigHierarchyController>(this, TEXT("HierarchyController"), RF_Transient);
-			 if(!ensure(IsInGameThread()))
-			 {
-				 HierarchyController->ClearInternalFlags(EInternalObjectFlags::Async);
-			 }
+			 // In case we create this object from async loading thread
+			 HierarchyController->ClearInternalFlags(EInternalObjectFlags::Async);
+
 			 HierarchyController->SetHierarchy(this);
 			 return HierarchyController;
 		 }
@@ -3828,6 +3827,22 @@ bool URigHierarchy::IsDependentOn(FRigBaseElement* InDependent, FRigBaseElement*
 	}
 
 	return false;
+}
+
+int32 URigHierarchy::GetLocalIndex(const FRigBaseElement* InElement) const
+{
+	if(InElement == nullptr)
+	{
+		return INDEX_NONE;
+	}
+	
+	if(const FRigBaseElement* ParentElement = GetFirstParent(InElement))
+	{
+		const FRigBaseElementChildrenArray& Children = GetChildren(ParentElement);
+		return Children.Find((FRigBaseElement*)InElement);
+	}
+
+	return GetRootElements().Find((FRigBaseElement*)InElement);
 }
 
 bool URigHierarchy::IsTracingChanges() const

@@ -409,7 +409,7 @@ void FSystemTextures::InitializeFeatureLevelDependentTextures(FRHICommandListImm
 
 		EPixelFormat Format = PF_R8G8;
 		// for low roughness we would get banding with PF_R8G8 but for low spec it could be used, for now we don't do this optimization
-		if (GPixelFormats[PF_G16R16].Supported)
+		if (GPixelFormats[PF_G16R16].Supported && UE::PixelFormat::HasCapabilities(PF_G16R16, EPixelFormatCapabilities::TextureFilterable))
 		{
 			Format = PF_G16R16;
 		}
@@ -1183,7 +1183,7 @@ template<typename TInType>
 void InitializeData(const TInType& InData, EPixelFormat InFormat, uint8* OutData, uint32& OutByteCount)
 {
 	// If a new format is added insure that it is either supported here, or at least flagged as not supported
-	static_assert(PF_MAX == 86);
+	static_assert(PF_MAX == 87);
 
 	switch (InFormat)
 	{
@@ -1286,6 +1286,7 @@ void InitializeData(const TInType& InData, EPixelFormat InFormat, uint8* OutData
 		case PF_NV12:
 		case PF_ETC2_R11_EAC:
 		case PF_ETC2_RG11_EAC:
+		case PF_P010:
 		case PF_Unknown:
 		case PF_MAX:
 			OutByteCount = 0;

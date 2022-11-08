@@ -438,20 +438,26 @@ void SRetargetSourceWindow::OnAddRetargetSource()
 
 	const USkeleton& Skeleton = EditableSkeletonPtr.Pin()->GetSkeleton();
 
-	FString SkeletonString = FAssetData(&Skeleton).GetExportTextName();
-	AssetPickerConfig.Filter.TagsAndValues.Add(USkeletalMesh::GetSkeletonMemberName(), SkeletonString);
+	AssetPickerConfig.OnShouldFilterAsset = FOnShouldFilterAsset::CreateLambda([&Skeleton](const FAssetData& InAssetData)
+	{
+		if(Skeleton.IsCompatibleForEditor(InAssetData))
+		{
+			return false;
+		}
+		return true;
+	});
 
 	TSharedRef<SWidget> Widget = SNew(SBox)
-		.WidthOverride(384)
-		.HeightOverride(768)
+		.WidthOverride(384.f)
+		.HeightOverride(768.f)
 		[
 			SNew(SBorder)
 			.BorderBackgroundColor(FLinearColor(0.25f, 0.25f, 0.25f, 1.f))
-			.Padding( 2 )
+			.Padding( 2.f )
 			[
 				SNew(SBorder)
 				.BorderImage( FAppStyle::GetBrush("ToolPanel.GroupBorder") )
-				.Padding( 8 )
+				.Padding( 8.f )
 				[
 					ContentBrowserModule.Get().CreateAssetPicker(AssetPickerConfig)
 				]
@@ -680,16 +686,16 @@ FReply SCompatibleSkeletons::OnAddSkeletonClicked()
 	AssetPickerConfig.InitialAssetViewType = EAssetViewType::Tile;
 
 	const TSharedRef<SWidget> Widget = SNew(SBox)
-		.WidthOverride(384)
-		.HeightOverride(768)
+		.WidthOverride(384.f)
+		.HeightOverride(768.f)
 		[
 			SNew(SBorder)
 			.BorderBackgroundColor(FLinearColor(0.25f, 0.25f, 0.25f, 1.f))
-			.Padding( 2 )
+			.Padding( 2.f )
 			[
 				SNew(SBorder)
 				.BorderImage( FAppStyle::GetBrush("ToolPanel.GroupBorder") )
-				.Padding( 8 )
+				.Padding( 8.f )
 				[
 					ContentBrowserModule.Get().CreateAssetPicker(AssetPickerConfig)
 				]

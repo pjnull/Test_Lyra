@@ -2,6 +2,7 @@
 
 #include "TakeRecorderNearbySpawnedActorSource.h"
 
+#include "AssetRegistry/AssetData.h"
 #include "GameFramework/Pawn.h"
 #include "TakeRecorderSources.h"
 #include "TakeRecorderSource.h"
@@ -29,7 +30,7 @@ UTakeRecorderNearbySpawnedActorSource::UTakeRecorderNearbySpawnedActorSource(con
 	TrackTint = FColor(167, 167, 59);
 }
 
-TArray<UTakeRecorderSource*> UTakeRecorderNearbySpawnedActorSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InMasterSequence, FManifestSerializer* InManifestSerializer)
+TArray<UTakeRecorderSource*> UTakeRecorderNearbySpawnedActorSource::PreRecording(ULevelSequence* InSequence, FMovieSceneSequenceID InSequenceID, ULevelSequence* InRootSequence, FManifestSerializer* InManifestSerializer)
 {
 	// Get the sources, add callbacks for new spawned
 	UWorld* World = TakeRecorderSourcesUtils::GetSourceWorld(InSequence);
@@ -47,7 +48,7 @@ TArray<UTakeRecorderSource*> UTakeRecorderNearbySpawnedActorSource::PreRecording
 	return TArray<UTakeRecorderSource*>();
 }
 
-TArray<UTakeRecorderSource*> UTakeRecorderNearbySpawnedActorSource::PostRecording(class ULevelSequence* InSequence, class ULevelSequence* InMasterSequence, const bool bCancelled)
+TArray<UTakeRecorderSource*> UTakeRecorderNearbySpawnedActorSource::PostRecording(class ULevelSequence* InSequence, class ULevelSequence* InRootSequence, const bool bCancelled)
 {
 	// Remove spawn delegates
 	for (auto It = ActorSpawningDelegateHandles.CreateConstIterator(); It; ++It)

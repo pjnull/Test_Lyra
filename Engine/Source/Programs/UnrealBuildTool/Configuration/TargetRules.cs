@@ -782,7 +782,7 @@ namespace UnrealBuildTool
 		[RequiresUniqueBuildEnvironment]
 		[CommandLine("-NoUseIris", Value = "false")]
 		[CommandLine("-UseIris", Value = "true")]
-		public bool bUseIris = false;
+		public bool bUseIris = true;
 
 		/// <summary>
 		/// Whether we are compiling editor code or not. Prefer the more explicit bCompileAgainstEditor instead.
@@ -1584,6 +1584,21 @@ namespace UnrealBuildTool
 		public bool bPreferThinLTO = false;
 
 		/// <summary>
+		/// Directory where to put the ThinLTO cache on supported platforms.
+		/// </summary>
+		[CommandLine("-ThinLTOCacheDirectory")]
+		[XmlConfigFile(Category = "BuildConfiguration")]
+		public string? ThinLTOCacheDirectory = null;
+
+		/// <summary>
+		/// Arguments that will be applied to prune the ThinLTO cache on supported platforms.
+		/// Arguments will only be applied if ThinLTOCacheDirectory is set.
+		/// </summary>
+		[CommandLine("-ThinLTOCachePruningArguments")]
+		[XmlConfigFile(Category = "BuildConfiguration")]
+		public string? ThinLTOCachePruningArguments = null;
+
+		/// <summary>
 		/// Whether to enable Profile Guided Optimization (PGO) instrumentation in this build.
 		/// </summary>
 		[CommandLine("-PGOProfile", Value = "true")]
@@ -1633,6 +1648,12 @@ namespace UnrealBuildTool
 		/// </summary>
 		[XmlConfigFile(Category = "BuildConfiguration")]
 		public bool bUseMallocProfiler = false;
+
+		/// <summary>
+		/// If true, then enable Unreal Insights (utrace) profiling in the build for the Shader Compiler Worker (defines USE_SHADER_COMPILER_WORKER_TRACE=1).
+		/// </summary>
+		[XmlConfigFile(Category = "BuildConfiguration")]
+		public bool bShaderCompilerWorkerTrace = false;
 
 		/// <summary>
 		/// Enables "Shared PCHs", a feature which significantly speeds up compile times by attempting to
@@ -3291,6 +3312,11 @@ namespace UnrealBuildTool
 			get { return Inner.bUseMallocProfiler; }
 		}
 
+		public bool bShaderCompilerWorkerTrace
+        {
+			get { return Inner.bShaderCompilerWorkerTrace;  }
+        }
+
 		public bool bUseSharedPCHs
 		{
 			get { return Inner.bUseSharedPCHs; }
@@ -3339,6 +3365,16 @@ namespace UnrealBuildTool
 		public string? CrashDiagnosticDirectory
 		{
 			get { return Inner.CrashDiagnosticDirectory; }
+		}
+
+		public string? ThinLTOCacheDirectory
+		{
+			get { return Inner.ThinLTOCacheDirectory; }
+		}
+
+		public string? ThinLTOCachePruningArguments
+		{
+			get { return Inner.ThinLTOCachePruningArguments; }
 		}
 
 		public string? BundleVersion

@@ -703,6 +703,8 @@ FUObjectSerializeContext* FLinkerLoad::GetSerializeContext()
 
 FLinkerLoad::ELinkerStatus FLinkerLoad::ProcessPackageSummary(TMap<TPair<FName, FPackageIndex>, FPackageIndex>* ObjectNameWithOuterToExportMap)
 {
+	TRACE_LOADTIME_BEGIN_PROCESS_SUMMARY(this);
+
 	ELinkerStatus Status = LINKER_Loaded;
 	{
 		SCOPED_LOADTIMER(LinkerLoad_SerializePackageFileSummary);
@@ -814,6 +816,8 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::ProcessPackageSummary(TMap<TPair<FName, 
 		SCOPED_LOADTIMER(LinkerLoad_SerializePreloadDependencies);
 		Status = SerializePreloadDependencies();
 	}
+
+	TRACE_LOADTIME_END_PROCESS_SUMMARY;
 
 	// Finalize creation process.
 	if( Status == LINKER_Loaded )
@@ -972,10 +976,14 @@ FLinkerLoad::FLinkerLoad(UPackage* InParent, const FPackagePath& InPackagePath, 
 	{
 		InstancingContext.AddPackageMapping(PackageNameToLoad, LinkerRoot->GetFName());
 	}
+
+	TRACE_LOADTIME_NEW_LINKER(this);
 }
 
 FLinkerLoad::~FLinkerLoad()
 {
+	TRACE_LOADTIME_DESTROY_LINKER(this);
+
 #if !UE_BUILD_SHIPPING && !UE_BUILD_TEST
 	FLinkerManager::Get().RemoveLiveLinker(this);
 #endif
@@ -1481,14 +1489,27 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::UpdateFromPackageFileSummary()
 			else if (Diff.Type == ECustomVersionDifference::Invalid)
 			{
 				UE_ASSET_LOG(LogLinker, Error, PackagePath, TEXT("Package was saved with an invalid custom version. Tag %s  Version %d"), *Diff.Version->Key.ToString(), Diff.Version->Version);
+
+				FMessageLog("LoadErrors")
+					.SuppressLoggingToOutputLog(true)
+					.Error(FText::Format(NSLOCTEXT("Core", "LinkerLoad_InvalidCustomVersion", "Package {0} was saved with an invalid custom version and cannot be loaded, see output log for details"),
+						FText::FromString(GetDebugName())));
+
 				return LINKER_Failed;
 			}
 			else if (Diff.Type == ECustomVersionDifference::Newer)
 			{
 				FCustomVersion LatestVersion = FCurrentCustomVersions::Get(Diff.Version->Key).GetValue();
+				
 				// Loading a package with a newer custom version than the current one.
 				UE_ASSET_LOG(LogLinker, Error, PackagePath, TEXT("Package was saved with a newer custom version than the current. Tag %s Name '%s' PackageVersion %d  MaxExpected %d"),
 					*Diff.Version->Key.ToString(), *LatestVersion.GetFriendlyName().ToString(), Diff.Version->Version, LatestVersion.Version);
+
+				FMessageLog("LoadErrors")
+					.SuppressLoggingToOutputLog(true)
+					.Error(FText::Format(NSLOCTEXT("Core", "LinkerLoad_NewCustomVersion", "Package {0} was saved with a newer custom version than the current engine and cannot be loaded, see output log for details"),
+						FText::FromString(GetDebugName())));
+
 				return LINKER_Failed;
 			}
 		}
@@ -2546,6 +2567,11 @@ FLinkerLoad::ELinkerStatus FLinkerLoad::FinalizeCreation(TMap<TPair<FName, FPack
 			Verify();
 		}
 
+
+		if (LinkerRoot)
+		{
+			TRACE_LOADTIME_PACKAGE_SUMMARY(this, LinkerRoot->GetFName(), Summary.TotalHeaderSize, Summary.ImportCount, Summary.ExportCount);
+		}
 
 		// Avoid duplicate work in the case of async linker creation.
 		bHasFinishedInitialization = true;
@@ -4325,6 +4351,7 @@ void FLinkerLoad::Preload( UObject* Object )
 
 				{
 					SCOPE_CYCLE_COUNTER(STAT_LinkerSerialize);
+					TRACE_LOADTIME_SERIALIZE_EXPORT_SCOPE(Object, Export.SerialSize);
 #if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
 					// communicate with FLinkerPlaceholderBase, what object is currently serializing in
 					FScopedPlaceholderContainerTracker SerializingObjTracker(Object);
@@ -4662,6 +4689,7 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 	// Check whether we already loaded the object and if not whether the context flags allow loading it.
 	if( !Export.Object && !FilterExport(Export) ) // for some acceptable position, it was not "not for" 
 	{
+		TGuardValue<void*> GuardThreadContextAsyncPackage(FUObjectThreadContext::Get().AsyncPackage, AsyncRoot);
 		FUObjectSerializeContext* CurrentLoadContext = GetSerializeContext();
 		check(!GEventDrivenLoaderEnabled || !bLockoutLegacyOperations || !EVENT_DRIVEN_ASYNC_LOAD_ACTIVE_AT_RUNTIME);
 		check(Export.ObjectName!=NAME_None || !(Export.ObjectFlags&RF_Public));
@@ -5136,7 +5164,10 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 			Params.ExternalPackage->SetPackageFlags(ThisParent->GetPackage()->GetPackageFlags() & PKG_PlayInEditor);
 		}
 
-		Export.Object = StaticConstructObject_Internal(Params);
+		{
+			TRACE_LOADTIME_CREATE_EXPORT_SCOPE(this, &Export.Object);
+			Export.Object = StaticConstructObject_Internal(Params);
+		}
 
 		if (FPlatformProperties::RequiresCookedData())
 		{

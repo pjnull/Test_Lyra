@@ -27,6 +27,10 @@ namespace Chaos
 		FClothingSimulationSolver();
 		~FClothingSimulationSolver();
 		
+		FClothingSimulationSolver(const FClothingSimulationSolver&) = delete;
+		FClothingSimulationSolver(FClothingSimulationSolver&&) = delete;
+		FClothingSimulationSolver& operator=(const FClothingSimulationSolver&) = delete;
+		FClothingSimulationSolver& operator=(FClothingSimulationSolver&&) = delete;
 
 		// ---- Animatable property setters ----
 		void SetLocalSpaceLocation(const FVec3& InLocalSpaceLocation, bool bReset = false);
@@ -135,7 +139,7 @@ namespace Chaos
 		}
 
 		// Return the wind velocity and pressure field associated with a given group id.
-		const Softs::FVelocityAndPressureField& GetWindVelocityAndPressureField(uint32 GroupId);
+		const Softs::FVelocityAndPressureField& GetWindVelocityAndPressureField(uint32 GroupId) const;
 		UE_DEPRECATED(5.1, "Chaos::Softs::FVelocityField has been renamed FVelocityAndPressureField to match its new behavior.")
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		const Softs::FVelocityField& GetWindVelocityField(uint32 GroupId) { return GetWindVelocityAndPressureField(GroupId); }
@@ -148,9 +152,17 @@ namespace Chaos
 		Softs::FSolverVec3* GetOldAnimationPositions(int32 Offset) { return OldAnimationPositions.GetData() + Offset; }
 		const Softs::FSolverVec3* GetAnimationPositions(int32 Offset) const { return AnimationPositions.GetData() + Offset; }
 		Softs::FSolverVec3* GetAnimationPositions(int32 Offset) { return AnimationPositions.GetData() + Offset; }
+		const Softs::FSolverVec3* GetInterpolatedAnimationPositions(int32 Offset) const { return InterpolatedAnimationPositions.GetData() + Offset; }
+		Softs::FSolverVec3* GetInterpolatedAnimationPositions(int32 Offset) { return InterpolatedAnimationPositions.GetData() + Offset; }
+		const Softs::FSolverVec3* GetOldAnimationNormals(int32 Offset) const { return OldAnimationNormals.GetData() + Offset; }
+		Softs::FSolverVec3* GetOldAnimationNormals(int32 Offset) { return OldAnimationNormals.GetData() + Offset; }
 		const Softs::FSolverVec3* GetAnimationNormals(int32 Offset) const { return AnimationNormals.GetData() + Offset; }
 		Softs::FSolverVec3* GetAnimationNormals(int32 Offset) { return AnimationNormals.GetData() + Offset; }
+		const Softs::FSolverVec3* GetInterpolatedAnimationNormals(int32 Offset) const { return InterpolatedAnimationNormals.GetData() + Offset; }
+		Softs::FSolverVec3* GetInterpolatedAnimationNormals(int32 Offset) { return InterpolatedAnimationNormals.GetData() + Offset; }
 		const Softs::FSolverVec3* GetNormals(int32 Offset) const { return Normals.GetData() + Offset; }
+		const Softs::FSolverVec3* GetAnimationVelocities(int32 Offset) const { return AnimationVelocities.GetData() + Offset; }
+		Softs::FSolverVec3* GetAnimationVelocities(int32 Offset) { return AnimationVelocities.GetData() + Offset; }
 		Softs::FSolverVec3* GetNormals(int32 Offset) { return Normals.GetData() + Offset; }
 		const Softs::FPAndInvM* GetParticlePandInvMs(int32 Offset) const;
 		Softs::FPAndInvM* GetParticlePandInvMs(int32 Offset);
@@ -198,6 +210,7 @@ namespace Chaos
 		void ResetParticles();
 		void ResetCollisionParticles(int32 InCollisionParticlesOffset = 0);
 		void ApplyPreSimulationTransforms();
+		void PreSubstep(const Softs::FSolverReal InterpolationAlpha);
 		Softs::FSolverReal SetParticleMassPerArea(int32 Offset, int32 Size, const FTriangleMesh& Mesh);
 		void ParticleMassUpdateDensity(const FTriangleMesh& Mesh, Softs::FSolverReal Density);
 		void ParticleMassClampAndKinematicStateUpdate(int32 Offset, int32 Size, Softs::FSolverReal MinPerParticleMass, const TFunctionRef<bool(int32)>& KinematicPredicate);
@@ -214,12 +227,17 @@ namespace Chaos
 		// Simulation group attributes
 		TArrayCollectionArray<Softs::FSolverRigidTransform3> PreSimulationTransforms;  // Allow a different frame of reference for each cloth groups
 		TArrayCollectionArray<Softs::FSolverVec3> FictitiousAngularDisplacements;  // Relative angular displacement of the reference bone that depends on the fictitious angular scale factor
+		TArrayCollectionArray<Softs::FSolverVec3> ReferenceSpaceLocations;  // Center of rotations for fictitious forces in local coordinate to the simulation space location
 
 		// Particle attributes
 		TArrayCollectionArray<Softs::FSolverVec3> Normals;
 		TArrayCollectionArray<Softs::FSolverVec3> OldAnimationPositions;
 		TArrayCollectionArray<Softs::FSolverVec3> AnimationPositions;
+		TArrayCollectionArray<Softs::FSolverVec3> InterpolatedAnimationPositions;
+		TArrayCollectionArray<Softs::FSolverVec3> OldAnimationNormals;
 		TArrayCollectionArray<Softs::FSolverVec3> AnimationNormals;
+		TArrayCollectionArray<Softs::FSolverVec3> InterpolatedAnimationNormals;
+		TArrayCollectionArray<Softs::FSolverVec3> AnimationVelocities;
 
 		// Collision particle attributes
 		TArrayCollectionArray<int32> CollisionBoneIndices;
@@ -270,11 +288,17 @@ namespace Chaos
 #define CHAOS_PRE_SIMULATION_TRANSFORMS_ISPC_ENABLED_DEFAULT 1
 #endif
 
+#if !defined(CHAOS_PRE_SUBSTEP_INTERPOLATION_ISPC_ENABLED_DEFAULT)
+#define CHAOS_PRE_SUBSTEP_INTERPOLATION_ISPC_ENABLED_DEFAULT 1
+#endif
+
 // Support run-time toggling on supported platforms in non-shipping configurations
 #if !INTEL_ISPC || UE_BUILD_SHIPPING
 static constexpr bool bChaos_CalculateBounds_ISPC_Enabled = INTEL_ISPC && CHAOS_CALCULATE_BOUNDS_ISPC_ENABLED_DEFAULT;
 static constexpr bool bChaos_PreSimulationTransforms_ISPC_Enabled = INTEL_ISPC && CHAOS_PRE_SIMULATION_TRANSFORMS_ISPC_ENABLED_DEFAULT;
+static constexpr bool bChaos_PreSubstepInterpolation_ISPC_Enabled = INTEL_ISPC && CHAOS_PRE_SUBSTEP_INTERPOLATION_ISPC_ENABLED_DEFAULT;
 #else
 extern bool bChaos_PreSimulationTransforms_ISPC_Enabled;
 extern bool bChaos_CalculateBounds_ISPC_Enabled;
+extern bool bChaos_PreSubstepInterpolation_ISPC_Enabled;
 #endif

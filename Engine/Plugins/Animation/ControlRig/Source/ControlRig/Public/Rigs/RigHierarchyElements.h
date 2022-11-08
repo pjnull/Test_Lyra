@@ -1025,6 +1025,20 @@ struct FRigControlElementCustomization
 	TArray<FRigElementKey> RemovedSpaces;
 };
 
+UENUM(BlueprintType)
+enum class ERigControlTransformChannel : uint8
+{
+	TranslationX,
+	TranslationY,
+	TranslationZ,
+	Pitch,
+	Yaw,
+	Roll,
+	ScaleX,
+	ScaleY,
+	ScaleZ
+};
+
 USTRUCT(BlueprintType)
 struct CONTROLRIG_API FRigControlSettings
 {
@@ -1121,6 +1135,19 @@ struct CONTROLRIG_API FRigControlSettings
 	bool bGroupWithParentControl;
 
 	/**
+	 * Allow to space switch only to the available spaces
+	 */
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Animation)
+	bool bRestrictSpaceSwitching;
+
+	/**
+	 * Filtered Visible Transform channels. If this is empty everything is visible
+	 */
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Animation)
+	TArray<ERigControlTransformChannel> FilteredChannels;
+
+#if WITH_EDITORONLY_DATA
+	/**
 	 * Deprecated properties.
 	 */
 	UPROPERTY(meta=(DeprecatedProperty, DeprecationMessage = "Use animation_type instead."))
@@ -1128,6 +1155,7 @@ struct CONTROLRIG_API FRigControlSettings
 	
 	UPROPERTY(meta=(DeprecatedProperty, DeprecationMessage = "Use animation_type or shape_visible instead."))
 	bool bShapeEnabled_DEPRECATED = true;
+#endif
 	
 	/** Applies the limits expressed by these settings to a value */
 	FORCEINLINE void ApplyLimits(FRigControlValue& InOutValue) const
@@ -1259,6 +1287,8 @@ struct CONTROLRIG_API FRigControlElement : public FRigMultiParentElement
 	}
 
 	FORCEINLINE bool IsAnimationChannel() const { return Settings.AnimationType == ERigControlAnimationType::AnimationChannel; }
+
+	FORCEINLINE bool CanDriveControls() const { return Settings.AnimationType == ERigControlAnimationType::ProxyControl || Settings.AnimationType == ERigControlAnimationType::AnimationControl; }
 
 	virtual void Save(FArchive& A, URigHierarchy* Hierarchy, ESerializationPhase SerializationPhase) override;
 	virtual void Load(FArchive& Ar, URigHierarchy* Hierarchy, ESerializationPhase SerializationPhase) override;

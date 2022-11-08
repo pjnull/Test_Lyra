@@ -130,6 +130,7 @@ static void WriteBuildSettings(FCbWriter& Writer, const FTextureBuildSettings& B
 	}
 	WriteCbFieldWithDefault(Writer, "CompressionCacheId", BuildSettings.CompressionCacheId, DefaultSettings.CompressionCacheId);
 	WriteCbFieldWithDefault<bool>(Writer, "bUseNewMipFilter", BuildSettings.bUseNewMipFilter, DefaultSettings.bUseNewMipFilter);
+	WriteCbFieldWithDefault<bool>(Writer, "bNormalizeNormals", BuildSettings.bNormalizeNormals, DefaultSettings.bNormalizeNormals);
 	WriteCbFieldWithDefault(Writer, "MipSharpening", BuildSettings.MipSharpening, DefaultSettings.MipSharpening);
 	WriteCbFieldWithDefault(Writer, "DiffuseConvolveMipLevel", BuildSettings.DiffuseConvolveMipLevel, DefaultSettings.DiffuseConvolveMipLevel);
 	WriteCbFieldWithDefault(Writer, "SharpenMipKernelSize", BuildSettings.SharpenMipKernelSize, DefaultSettings.SharpenMipKernelSize);
@@ -167,9 +168,6 @@ static void WriteBuildSettings(FCbWriter& Writer, const FTextureBuildSettings& B
 	WriteCbFieldWithDefault(Writer, "CompositePower", BuildSettings.CompositePower, DefaultSettings.CompositePower);
 	WriteCbFieldWithDefault(Writer, "LODBias", BuildSettings.LODBias, DefaultSettings.LODBias);
 	WriteCbFieldWithDefault(Writer, "LODBiasWithCinematicMips", BuildSettings.LODBiasWithCinematicMips, DefaultSettings.LODBiasWithCinematicMips);
-	WriteCbFieldWithDefault(Writer, "TopMipSize", BuildSettings.TopMipSize, DefaultSettings.TopMipSize);
-	WriteCbFieldWithDefault(Writer, "VolumeSizeZ", BuildSettings.VolumeSizeZ, DefaultSettings.VolumeSizeZ);
-	WriteCbFieldWithDefault(Writer, "ArraySlices", BuildSettings.ArraySlices, DefaultSettings.ArraySlices);
 	WriteCbFieldWithDefault<bool>(Writer, "bStreamable", BuildSettings.bStreamable_Unused, DefaultSettings.bStreamable_Unused);
 	WriteCbFieldWithDefault<bool>(Writer, "bVirtualStreamable", BuildSettings.bVirtualStreamable, DefaultSettings.bVirtualStreamable);
 	WriteCbFieldWithDefault<bool>(Writer, "bChromaKeyTexture", BuildSettings.bChromaKeyTexture, DefaultSettings.bChromaKeyTexture);
@@ -192,7 +190,12 @@ static void WriteBuildSettings(FCbWriter& Writer, const FTextureBuildSettings& B
 	WriteCbFieldWithDefault<bool>(Writer, "bOodleUsesRDO", BuildSettings.bOodleUsesRDO, DefaultSettings.bOodleUsesRDO);
 	
 	WriteCbFieldWithDefault(Writer, "OodleTextureSdkVersion", BuildSettings.OodleTextureSdkVersion, DefaultSettings.OodleTextureSdkVersion);
-	
+
+	WriteCbFieldWithDefault(Writer, "TextureAddressModeX", BuildSettings.TextureAddressModeX, DefaultSettings.TextureAddressModeX);
+	WriteCbFieldWithDefault(Writer, "TextureAddressModeY", BuildSettings.TextureAddressModeY, DefaultSettings.TextureAddressModeY);
+	WriteCbFieldWithDefault(Writer, "TextureAddressModeZ", BuildSettings.TextureAddressModeZ, DefaultSettings.TextureAddressModeZ);
+
+	// @todo SerializeForKey : remove these when overall key changes
 	if ( BuildSettings.bVolume )
 	{
 		WriteCbField<bool>(Writer, "bVolume_ForceNewDDcKey", true); 
@@ -209,15 +212,11 @@ static void WriteSource(FCbWriter& Writer, const UTexture& Texture, int32 LayerI
 {
 	const FTextureSource& Source = Texture.Source;
 
-	FTextureFormatSettings TextureFormatSettings;
-	Texture.GetLayerFormatSettings(LayerIndex, TextureFormatSettings);
-	EGammaSpace GammaSpace = TextureFormatSettings.SRGB ? (Texture.bUseLegacyGamma ? EGammaSpace::Pow22 : EGammaSpace::sRGB) : EGammaSpace::Linear;
-
 	Writer.BeginObject();
 
 	Writer.AddInteger("CompressionFormat", Source.GetSourceCompression());
 	Writer.AddInteger("SourceFormat", Source.GetFormat(LayerIndex));
-	Writer.AddInteger("GammaSpace", static_cast<uint8>(GammaSpace));
+	Writer.AddInteger("GammaSpace", static_cast<uint8>(Source.GetGammaSpace(LayerIndex)));
 	Writer.AddInteger("NumSlices", (BuildSettings.bCubemap || BuildSettings.bTextureArray || BuildSettings.bVolume) ? Source.GetNumSlices() : 1);
 	Writer.AddInteger("SizeX", Source.GetSizeX());
 	Writer.AddInteger("SizeY", Source.GetSizeY());

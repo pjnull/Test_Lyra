@@ -26,7 +26,6 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Horde.Build.Agents
 {
-	using AgentSoftwareChannelName = StringId<AgentSoftwareChannels>;
 	using LeaseId = ObjectId<ILease>;
 	using LogId = ObjectId<ILogFile>;
 	using PoolId = StringId<IPool>;
@@ -66,7 +65,7 @@ namespace Horde.Build.Agents
 		/// <summary>
 		/// Whether to use an incremental workspace
 		/// </summary>
-		public bool BIncremental { get; set; }
+		public bool Incremental { get; set; }
 
 		/// <summary>
 		/// Constructor
@@ -76,8 +75,8 @@ namespace Horde.Build.Agents
 		/// <param name="identifier">Identifier to distinguish this workspace from other workspaces</param>
 		/// <param name="stream">The stream to sync</param>
 		/// <param name="view">Custom view for the workspace</param>
-		/// <param name="bIncremental">Whether to use an incremental workspace</param>
-		public AgentWorkspace(string? cluster, string? userName, string identifier, string stream, List<string>? view, bool bIncremental)
+		/// <param name="incremental">Whether to use an incremental workspace</param>
+		public AgentWorkspace(string? cluster, string? userName, string identifier, string stream, List<string>? view, bool incremental)
 		{
 			if (!String.IsNullOrEmpty(cluster))
 			{
@@ -90,7 +89,7 @@ namespace Horde.Build.Agents
 			Identifier = identifier;
 			Stream = stream;
 			View = view;
-			BIncremental = bIncremental;
+			Incremental = incremental;
 		}
 
 		/// <summary>
@@ -125,7 +124,7 @@ namespace Horde.Build.Agents
 			{
 				return false;
 			}
-			if (Cluster != other.Cluster || UserName != other.UserName || Identifier != other.Identifier || Stream != other.Stream || BIncremental != other.BIncremental)
+			if (Cluster != other.Cluster || UserName != other.UserName || Identifier != other.Identifier || Stream != other.Stream || Incremental != other.Incremental)
 			{
 				return false;
 			}
@@ -139,7 +138,7 @@ namespace Horde.Build.Agents
 		/// <inheritdoc/>
 		public override int GetHashCode()
 		{
-			return HashCode.Combine(Cluster, UserName, Identifier, Stream, BIncremental); // Ignore 'View' for now
+			return HashCode.Combine(Cluster, UserName, Identifier, Stream, Incremental); // Ignore 'View' for now
 		}
 
 		/// <summary>
@@ -175,7 +174,7 @@ namespace Horde.Build.Agents
 			{
 				result.View.AddRange(View);
 			}
-			result.Incremental = BIncremental;
+			result.Incremental = Incremental;
 			return result;
 		}
 	}
@@ -403,11 +402,6 @@ namespace Horde.Build.Agents
 		/// List of resources available to the agent
 		/// </summary>
 		public IReadOnlyDictionary<string, int> Resources { get; }
-
-		/// <summary>
-		/// Channel for the software running on this agent. Uses <see cref="AgentSoftwareService.DefaultChannelName"/> if not specified
-		/// </summary>
-		public AgentSoftwareChannelName? Channel { get; }
 
 		/// <summary>
 		/// Last upgrade that was attempted
@@ -663,12 +657,12 @@ namespace Horde.Build.Agents
 		/// <param name="globals"></param>
 		/// <param name="workspaces"></param>
 		/// <returns></returns>
-		public static HashSet<AgentWorkspace> GetAutoSdkWorkspaces(this IAgent agent, Globals globals, List<AgentWorkspace> workspaces)
+		public static HashSet<AgentWorkspace> GetAutoSdkWorkspaces(this IAgent agent, IGlobals globals, List<AgentWorkspace> workspaces)
 		{
 			HashSet<AgentWorkspace> autoSdkWorkspaces = new HashSet<AgentWorkspace>();
 			foreach (string? clusterName in workspaces.Select(x => x.Cluster).Distinct())
 			{
-				PerforceCluster? cluster = globals.FindPerforceCluster(clusterName);
+				PerforceCluster? cluster = globals.Config.FindPerforceCluster(clusterName);
 				if (cluster != null)
 				{
 					AgentWorkspace? autoSdkWorkspace = GetAutoSdkWorkspace(agent, cluster);
@@ -766,7 +760,7 @@ namespace Horde.Build.Agents
 			{
 				result.View.AddRange(workspace.View);
 			}
-			result.Incremental = workspace.BIncremental;
+			result.Incremental = workspace.Incremental;
 			workspaceMessages.Add(result);
 
 			return true;

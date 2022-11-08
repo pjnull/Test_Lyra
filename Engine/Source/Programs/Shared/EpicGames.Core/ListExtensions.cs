@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace EpicGames.Core
@@ -10,6 +11,33 @@ namespace EpicGames.Core
 	/// </summary>s
 	public static class ListExtensions
 	{
+		/// <summary>
+		/// Wrapper around a list to implement <see cref="IReadOnlyList{T}"/>
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		class ReadOnlyList<T> : IReadOnlyList<T>
+		{
+			readonly IList<T> _inner;
+
+			public ReadOnlyList(IList<T> inner) => _inner = inner;
+
+			public T this[int index] => _inner[index];
+
+			public int Count => _inner.Count;
+
+			public IEnumerator<T> GetEnumerator() => _inner.GetEnumerator();
+
+			IEnumerator IEnumerable.GetEnumerator() => _inner.GetEnumerator();
+		}
+
+		/// <summary>
+		/// Create a read-only wrapper around a list
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="list"></param>
+		/// <returns></returns>
+		public static IReadOnlyList<T> AsReadOnly<T>(this IList<T> list) => new ReadOnlyList<T>(list);
+
 		/// <summary>
 		/// Sorts a list by a particular field
 		/// </summary>

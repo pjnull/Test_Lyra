@@ -6,6 +6,10 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(RigUnit_MathInt)
 
+FRigUnit_MathIntMake_Execute()
+{
+}
+
 FRigUnit_MathIntAdd_Execute()
 {
     DECLARE_SCOPE_HIERARCHICAL_COUNTER_RIGUNIT()
@@ -82,6 +86,12 @@ FRigUnit_MathIntToFloat_Execute()
 {
     DECLARE_SCOPE_HIERARCHICAL_COUNTER_RIGUNIT()
 	Result = (float)Value;
+}
+
+FRigUnit_MathIntToDouble_Execute()
+{
+	DECLARE_SCOPE_HIERARCHICAL_COUNTER_RIGUNIT()
+	Result = (double)Value;
 }
 
 FRigUnit_MathIntSign_Execute()

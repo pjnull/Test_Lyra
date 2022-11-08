@@ -3,6 +3,9 @@
 #pragma once
 
 #include "Widgets/SCompoundWidget.h"
+#include "Widgets/Views/SListView.h"
+#include "Widgets/Views/STableRow.h"
+#include "Widgets/Text/STextBlock.h"
 #include "ChangeInfo.h"
 
 class UGSTab;
@@ -24,10 +27,9 @@ class SGameSyncTab final : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SGameSyncTab) {}
-		SLATE_ARGUMENT(UGSTab*, Tab)
 	SLATE_END_ARGS()
 
-	void Construct(const FArguments& InArgs);
+	void Construct(const FArguments& InArgs, UGSTab* InTab);
 
 	// We need access to the SyncLog when creating the Workspace
 	// TODO: think of a better way to do this
@@ -61,5 +63,5 @@ private:
 	static constexpr float HordeBuildRowVerticalPadding = 2.5f;
 	static constexpr float HordeBuildRowExtraIconPadding = 10.0f;
 
-	UGSTab* Tab;
+	UGSTab* Tab = nullptr;
 };

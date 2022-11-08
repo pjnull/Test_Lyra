@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Security;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -34,6 +35,8 @@ using StackExchange.Redis;
 
 namespace Horde.Build.Server
 {
+	using SingletonId = StringId<SingletonBase>;
+
 	/// <summary>
 	/// Constrained set of parameters for building a mongo index
 	/// </summary>
@@ -212,22 +215,17 @@ namespace Horde.Build.Server
 		/// <summary>
 		/// Collection of singleton documents
 		/// </summary>
-		public IMongoCollection<BsonDocument> Singletons { get; }
+		IMongoCollection<BsonDocument> SingletonsV1 { get; }
+
+		/// <summary>
+		/// Collection of singleton documents
+		/// </summary>
+		IMongoCollection<BsonDocument> SingletonsV2 { get; }
 
 		/// <summary>
 		/// Settings for the application
 		/// </summary>
 		ServerSettings Settings { get; }
-
-		/// <summary>
-		/// Name of the JWT issuer
-		/// </summary>
-		public string JwtIssuer { get; }
-
-		/// <summary>
-		/// The signing key for this instance
-		/// </summary>
-		public SymmetricSecurityKey JwtSigningKey { get; }
 
 		/// <summary>
 		/// Logger for this instance
@@ -337,27 +335,8 @@ namespace Horde.Build.Server
 				MongoClient client = new MongoClient(mongoSettings);
 				Database = client.GetDatabase(Settings.DatabaseName);
 
-				Singletons = GetCollection<BsonDocument>("Singletons");
-
-				Globals globals = GetGlobalsAsync().Result;
-				while (globals.JwtSigningKey == null)
-				{
-					globals.RotateSigningKey();
-					if (!TryUpdateSingletonAsync(globals).Result)
-					{
-						globals = GetGlobalsAsync().Result;
-					}
-				}
-
-				JwtIssuer = Settings.JwtIssuer ?? Dns.GetHostName();
-				if (String.IsNullOrEmpty(Settings.JwtSecret))
-				{
-					JwtSigningKey = new SymmetricSecurityKey(globals.JwtSigningKey);
-				}
-				else
-				{
-					JwtSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(Settings.JwtSecret));
-				}
+				SingletonsV1 = GetCollection<BsonDocument>("Singletons");
+				SingletonsV2 = GetCollection<BsonDocument>("SingletonsV2");
 
 				Credentials = GetCollection<Credential>("Credentials");
 			}
@@ -771,39 +750,43 @@ namespace Horde.Build.Server
 			}
 		}
 
-		/// <summary>
-		/// Gets a singleton document by id
-		/// </summary>
-		/// <returns>The globals document</returns>
-		public Task<Globals> GetGlobalsAsync()
+		class SingletonInfo<T> where T : SingletonBase
 		{
-			return GetSingletonAsync(Globals.StaticId, () => new Globals() { SchemaVersion = UpgradeService.LatestSchemaVersion });
+			public static readonly SingletonDocumentAttribute Attribute = GetAttribute();
+
+			static SingletonDocumentAttribute GetAttribute()
+			{
+				SingletonDocumentAttribute? attribute = typeof(T).GetCustomAttribute<SingletonDocumentAttribute>();
+				if (attribute == null)
+				{
+					throw new Exception($"Type {typeof(T).Name} is missing a {nameof(SingletonDocumentAttribute)} annotation");
+				}
+				return attribute;
+			}
 		}
 
 		/// <summary>
 		/// Gets a singleton document by id
 		/// </summary>
-		/// <param name="id">Id of the singleton document</param>
 		/// <returns>The document</returns>
-		public async Task<T> GetSingletonAsync<T>(ObjectId id) where T : SingletonBase, new()
+		public Task<T> GetSingletonAsync<T>() where T : SingletonBase, new()
 		{
-			T singleton = await GetSingletonAsync(id, () => new T());
-			singleton.PostLoad();
-			return singleton;
+			return GetSingletonAsync(() => new T());
 		}
 
 		/// <summary>
 		/// Gets a singleton document by id
 		/// </summary>
-		/// <param name="id">Id of the singleton document</param>
 		/// <param name="constructor">Method to use to construct a new object</param>
 		/// <returns>The document</returns>
-		public async Task<T> GetSingletonAsync<T>(ObjectId id, Func<T> constructor) where T : SingletonBase, new()
+		public async Task<T> GetSingletonAsync<T>(Func<T> constructor) where T : SingletonBase, new()
 		{
-			FilterDefinition<BsonDocument> filter = new BsonDocument(new BsonElement("_id", id));
+			SingletonDocumentAttribute Attribute = SingletonInfo<T>.Attribute;
+
+			FilterDefinition<BsonDocument> filter = new BsonDocument(new BsonElement("_id", Attribute.Id));
 			for (; ; )
 			{
-				BsonDocument? document = await Singletons.Find(filter).FirstOrDefaultAsync();
+				BsonDocument? document = await SingletonsV2.Find(filter).FirstOrDefaultAsync();
 				if (document != null)
 				{
 					T item = BsonSerializer.Deserialize<T>(document);
@@ -811,9 +794,21 @@ namespace Horde.Build.Server
 					return item;
 				}
 
-				T newItem = constructor();
-				newItem.Id = id;
-				await Singletons.InsertOneAsync(newItem.ToBsonDocument());
+				T? newItem = null;
+				if (Attribute.LegacyId != null)
+				{
+					BsonDocument? legacyDocument = await SingletonsV1.Find(new BsonDocument(new BsonElement("_id", ObjectId.Parse(Attribute.LegacyId)))).FirstOrDefaultAsync();
+					if (legacyDocument != null)
+					{
+						legacyDocument.Remove("_id");
+						newItem = BsonSerializer.Deserialize<T>(legacyDocument);
+						newItem.PostLoad();
+					}
+				}
+				newItem ??= constructor();
+
+				newItem.Id = new SingletonId(Attribute.Id);
+				await SingletonsV2.InsertOneIgnoreDuplicatesAsync(newItem.ToBsonDocument());
 			}
 		}
 
@@ -821,16 +816,33 @@ namespace Horde.Build.Server
 		/// Updates a singleton
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
-		/// <param name="id"></param>
 		/// <param name="updater"></param>
 		/// <returns></returns>
-		public async Task UpdateSingletonAsync<T>(ObjectId id, Action<T> updater) where T : SingletonBase, new()
+		public Task UpdateSingletonAsync<T>(Action<T> updater) where T : SingletonBase, new()
+		{
+			bool Update(T instance)
+			{
+				updater(instance);
+				return true;
+			}
+			return UpdateSingletonAsync<T>(Update);
+		}
+
+		/// <summary>
+		/// Updates a singleton
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="updater"></param>
+		/// <returns></returns>
+		public async Task UpdateSingletonAsync<T>(Func<T, bool> updater) where T : SingletonBase, new()
 		{
 			for (; ; )
 			{
-				T document = await GetSingletonAsync(id, () => new T());
-				updater(document);
-
+				T document = await GetSingletonAsync(() => new T());
+				if (!updater(document))
+				{
+					break;
+				}
 				if (await TryUpdateSingletonAsync(document))
 				{
 					break;
@@ -847,10 +859,10 @@ namespace Horde.Build.Server
 		{
 			int prevRevision = singletonObject.Revision++;
 
-			BsonDocument filter = new BsonDocument { new BsonElement("_id", singletonObject.Id), new BsonElement(nameof(SingletonBase.Revision), prevRevision) };
+			BsonDocument filter = new BsonDocument { new BsonElement("_id", singletonObject.Id.ToString()), new BsonElement(nameof(SingletonBase.Revision), prevRevision) };
 			try
 			{
-				ReplaceOneResult result = await Singletons.ReplaceOneAsync(filter, singletonObject.ToBsonDocument(), new ReplaceOptions { IsUpsert = true });
+				ReplaceOneResult result = await SingletonsV2.ReplaceOneAsync(filter, singletonObject.ToBsonDocument(), new ReplaceOptions { IsUpsert = true });
 				return result.MatchedCount > 0;
 			}
 			catch (MongoWriteException ex)
@@ -871,7 +883,7 @@ namespace Horde.Build.Server
 	/// <summary>
 	/// Stores the version number of the latest server instance to have upgraded the database schema
 	/// </summary>
-	[SingletonDocument("62470d8508d48eddfac7b55d")]
+	[SingletonDocument("mongo-schema", "62470d8508d48eddfac7b55d")]
 	public class MongoSchemaDocument : SingletonBase
 	{
 		/// <summary>

@@ -247,6 +247,7 @@ UnrealEngine.cpp: Implements the UEngine class and helpers.
 #include "Engine/CoreSettings.h"
 #include "IEyeTrackerModule.h"
 #include "Interfaces/IPluginManager.h"
+#include "Animation/SkeletonRemappingRegistry.h"
 
 #if !UE_BUILD_SHIPPING
 #include "GenericPlatform/GenericPlatformCrashContext.h"
@@ -332,6 +333,8 @@ void FEngineModule::StartupModule()
 #endif
 
 	FSkinWeightProfileManager::OnStartup();
+
+	UE::Anim::FSkeletonRemappingRegistry::Init();
 }
 
 void FEngineModule::ShutdownModule()
@@ -347,6 +350,8 @@ void FEngineModule::ShutdownModule()
 	FParticleSystemWorldManager::OnShutdown();
 
 	FSkinWeightProfileManager::OnShutdown();
+
+	UE::Anim::FSkeletonRemappingRegistry::Destroy();
 }
 
 /* Global variables
@@ -2109,6 +2114,10 @@ void UEngine::Init(IEngineLoop* InEngineLoop)
 		FModuleManager::Get().LoadModuleChecked("MovieScene");
 		FModuleManager::Get().LoadModuleChecked("MovieSceneTracks");
 		FModuleManager::Get().LoadModule("LevelSequence");
+#if WITH_EDITOR
+		// The SparseVolumeTexture module containing the importer is only loaded and used in the editor.
+		FModuleManager::Get().LoadModuleChecked("SparseVolumeTexture");
+#endif
 	}
 
 	// Record large world coordinate state
@@ -3177,7 +3186,10 @@ void UEngine::InitializeObjectReferences()
 	LoadEngineClass<AWorldSettings>(WorldSettingsClassName, WorldSettingsClass);
 	LoadEngineClass<UNavigationSystemBase>(NavigationSystemClassName, NavigationSystemClass);
 	LoadEngineClass<UNavigationSystemConfig>(NavigationSystemConfigClassName, NavigationSystemConfigClass);
-	LoadEngineClass<UAvoidanceManager>(AvoidanceManagerClassName, AvoidanceManagerClass);
+	if (AvoidanceManagerClassName.IsValid())
+	{
+		LoadEngineClass<UAvoidanceManager>(AvoidanceManagerClassName, AvoidanceManagerClass);
+	}
 	LoadEngineClass<UGameUserSettings>(GameUserSettingsClassName, GameUserSettingsClass);
 	LoadEngineClass<ALevelScriptActor>(LevelScriptActorClassName, LevelScriptActorClass);
 
@@ -5343,33 +5355,53 @@ static void DumpHelp(UWorld* InWorld)
 	UE_LOG(LogEngine, Display, TEXT("To browse console variables open this: '%s'"), *FilePath);
 	UE_LOG(LogEngine, Display, TEXT(" "));
 
-	ConsoleCommandLibrary_DumpLibraryHTML(InWorld, *GEngine, FilePath);
+	const bool bSuccess = ConsoleCommandLibrary_DumpLibraryHTML(InWorld, *GEngine, FilePath);
 
 	// Notification in editor
 #if WITH_EDITOR
+	if (bSuccess && FPaths::FileExists(FilePath))
 	{
-		const FText Message = NSLOCTEXT("UnrealEd", "ConsoleHelpExported", "ConsoleHelp.html was saved as");
+		const FText Message = NSLOCTEXT("UnrealEd", "ConsoleHelpExported", "Console help file saved at:");
 		FNotificationInfo Info(Message);
 		Info.bFireAndForget = true;
 		Info.ExpireDuration = 5.0f;
 		Info.bUseSuccessFailIcons = false;
 		Info.bUseLargeFont = false;
 
-		const FString HyperLinkText = FPaths::ConvertRelativePathToFull(FilePath);
-		Info.Hyperlink = FSimpleDelegate::CreateStatic([](FString SourceFilePath) 
+		const FString HyperLinkPath = FPaths::ConvertRelativePathToFull(FilePath);
+		Info.SubText = FText::FromString(HyperLinkPath);
+		Info.Hyperlink = FSimpleDelegate::CreateStatic([](FString SourceFilePath)
 		{
 			// open folder, you can choose the browser yourself
 			FPlatformProcess::ExploreFolder(*(FPaths::GetPath(SourceFilePath)));
-		}, HyperLinkText);
-		Info.HyperlinkText = FText::FromString(HyperLinkText);
+		}, HyperLinkPath);
+		Info.HyperlinkText = NSLOCTEXT("UnrealEd", "ConsoleHelpFolderLink", "Open file location...");
+		Info.WidthOverride = FOptionalSize();
 
 		FSlateNotificationManager::Get().AddNotification(Info);
 
 		// Always try to open the help file on Windows (including in -game, etc...)
 #if PLATFORM_WINDOWS
-		const FString LaunchableURL = FString(TEXT("file://")) + HyperLinkText;
+		const FString LaunchableURL = FString(TEXT("file://")) + HyperLinkPath;
 		FPlatformProcess::LaunchURL(*LaunchableURL, nullptr, nullptr);
 #endif
+	}
+	else
+	{
+		const FText Message = NSLOCTEXT("UnrealEd", "ConsoleHelpExportFailed", "Console help file generation failed.");
+		FNotificationInfo Info(Message);
+
+		const FString DocTemplateFile = FPaths::Combine(FPaths::EngineDir(), "Documentation/Extras/ConsoleHelpTemplate.html");
+		if (!FPaths::FileExists(DocTemplateFile))
+		{
+				Info.SubText = NSLOCTEXT("UnrealEd", "ConsoleHelpExportFailedTip", "The template HTML file could not be found in the Engine/Documentation/Extras folder.\n\nIf you use a version control system or Unreal Game Sync (UGS), check that this folder is not excluded by your sync settings.");
+		}
+		Info.bFireAndForget = true;
+		Info.ExpireDuration = 10.0f;
+		Info.bUseSuccessFailIcons = false;
+		Info.bUseLargeFont = false;
+
+		FSlateNotificationManager::Get().AddNotification(Info);
 	}
 #endif// WITH_EDITOR
 }
@@ -13186,6 +13218,15 @@ namespace UE::Private
 				});
 		}
 
+		// Only use Iris if the module is loaded (this happens automatically if the Iris plugin is enabled)
+		if (IrisConfig && IrisConfig->bEnableIris)
+		{
+			if (!ensureMsgf(FModuleManager::Get().IsModuleLoaded("IrisCore"), TEXT("%s is not using Iris because the IrisCore module isn't loaded. Check whether the Iris plugin is enabled."), *InNetDriverName.ToString()))
+			{
+				return false;
+			}
+		}
+
 		return IrisConfig ? IrisConfig->bEnableIris : false;
 #else
 		return false;
@@ -16882,9 +16923,11 @@ void UEngine::CopyPropertiesForUnrelatedObjects(UObject* OldObject, UObject* New
 		DumpObject(*FString::Printf(TEXT("CopyPropertiesForUnrelatedObjects: New (%s)"), *NewObject->GetFullName()), NewObject);
 	}
 
-	// Now notify any tools that aren't already updated via the FArchiveReplaceObjectRef path
-	if (Params.bNotifyObjectReplacement && GEngine != nullptr)
+	// Now notify any tools that aren't already updated via the FArchiveReplaceObjectRef path unless the OldObject is still being async loaded
+	if (Params.bNotifyObjectReplacement && GEngine != nullptr &&
+		!OldObject->HasAnyInternalFlags(EInternalObjectFlags::Async | EInternalObjectFlags::AsyncLoading))
 	{
+		check(IsInGameThread());
 		GEngine->NotifyToolsOfObjectReplacement(ReferenceReplacementMap);
 	}
 }

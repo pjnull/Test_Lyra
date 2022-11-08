@@ -5,8 +5,10 @@
 
 #if UE_WITH_IRIS
 
+#include "Engine/HitResult.h"
 #include "GameplayEffectTypes.h"
 #include "Net/Core/NetBitArray.h"
+#include "Net/Core/Trace/NetTrace.h"
 #include "Iris/Serialization/NetBitStreamReader.h"
 #include "Iris/Serialization/NetBitStreamWriter.h"
 #include "Iris/Serialization/NetSerializerDelegates.h"
@@ -20,7 +22,6 @@ uint16 FGameplayEffectContextAccessorForNetSerializer::PropertyToMemberIndex[FGa
 namespace UE::Net
 {
 
-// 
 struct FGameplayEffectContextNetSerializer
 {
 	// Version
@@ -29,6 +30,7 @@ struct FGameplayEffectContextNetSerializer
 	// Traits
 	static constexpr bool bIsForwardingSerializer = true; // Triggers asserts if a function is missing
 	static constexpr bool bHasCustomNetReference = true;
+	static constexpr bool bHasDynamicState = true;
 
 	// Types
 	enum EReplicationFlags : uint32
@@ -96,7 +98,8 @@ const FGameplayEffectContextNetSerializer::ConfigType FGameplayEffectContextNetS
 FGameplayEffectContextNetSerializer::FNetSerializerRegistryDelegates FGameplayEffectContextNetSerializer::NetSerializerRegistryDelegates;
 FStructNetSerializerConfig FGameplayEffectContextNetSerializer::StructNetSerializerConfigForGE;
 FStructNetSerializerConfig FGameplayEffectContextNetSerializer::StructNetSerializerConfigForHitResult;
-const FNetSerializer* FGameplayEffectContextNetSerializer::StructNetSerializer = &UE_NET_GET_SERIALIZER(FStructNetSerializer);
+ const FNetSerializer* FGameplayEffectContextNetSerializer::StructNetSerializer = &UE_NET_GET_SERIALIZER(FStructNetSerializer);
+
 EReplicationStateTraits FGameplayEffectContextNetSerializer::GEStateTraits;
 EReplicationStateTraits FGameplayEffectContextNetSerializer::HitResultStateTraits;
 
@@ -115,6 +118,7 @@ void FGameplayEffectContextNetSerializer::Serialize(FNetSerializationContext& Co
 		const FReplicationStateDescriptor* Descriptor = StructNetSerializerConfigForGE.StateDescriptor.GetReference();
 		const FReplicationStateMemberDescriptor* MemberDescriptors = Descriptor->MemberDescriptors;
 		const FReplicationStateMemberSerializerDescriptor* MemberSerializerDescriptors = Descriptor->MemberSerializerDescriptors;
+		const FReplicationStateMemberDebugDescriptor* MemberDebugDescriptors = Descriptor->MemberDebugDescriptors;
 		
 		uint32 MemberMaskStorage = ~0U;
 		FNetBitArrayView MemberMask(&MemberMaskStorage, FGameplayEffectContextAccessorForNetSerializer::EPropertyName::PropertyName_ReplicatedPropertyCount, FNetBitArrayView::NoResetNoValidate);
@@ -130,6 +134,9 @@ void FGameplayEffectContextNetSerializer::Serialize(FNetSerializationContext& Co
 			const uint32 MemberIndex = FGameplayEffectContextAccessorForNetSerializer::PropertyToMemberIndex[PropertyIt];
 			const FReplicationStateMemberDescriptor& MemberDescriptor = MemberDescriptors[MemberIndex];
 			const FReplicationStateMemberSerializerDescriptor& MemberSerializerDescriptor = MemberSerializerDescriptors[MemberIndex];
+
+			UE_NET_TRACE_DYNAMIC_NAME_SCOPE(MemberDebugDescriptors[MemberIndex].DebugName, *Context.GetBitStreamWriter(), Context.GetTraceCollector(), ENetTraceVerbosity::Verbose);
+			UE_NET_TRACE_DYNAMIC_NAME_SCOPE(MemberSerializerDescriptor.Serializer->Name, *Context.GetBitStreamWriter(), Context.GetTraceCollector(), ENetTraceVerbosity::VeryVerbose);
 
 			FNetSerializeArgs MemberSerializeArgs;
 			MemberSerializeArgs.NetSerializerConfig = MemberSerializerDescriptor.SerializerConfig;
@@ -162,6 +169,7 @@ void FGameplayEffectContextNetSerializer::Deserialize(FNetSerializationContext& 
 		const FReplicationStateDescriptor* Descriptor = StructNetSerializerConfigForGE.StateDescriptor.GetReference();
 		const FReplicationStateMemberDescriptor* MemberDescriptors = Descriptor->MemberDescriptors;
 		const FReplicationStateMemberSerializerDescriptor* MemberSerializerDescriptors = Descriptor->MemberSerializerDescriptors;
+		const FReplicationStateMemberDebugDescriptor* MemberDebugDescriptors = Descriptor->MemberDebugDescriptors;
 		
 		uint32 MemberMaskStorage = ~0U;
 		FNetBitArrayView MemberMask(&MemberMaskStorage, FGameplayEffectContextAccessorForNetSerializer::EPropertyName::PropertyName_ReplicatedPropertyCount, FNetBitArrayView::NoResetNoValidate);
@@ -177,6 +185,9 @@ void FGameplayEffectContextNetSerializer::Deserialize(FNetSerializationContext& 
 			const uint32 MemberIndex = FGameplayEffectContextAccessorForNetSerializer::PropertyToMemberIndex[PropertyIt];
 			const FReplicationStateMemberDescriptor& MemberDescriptor = MemberDescriptors[MemberIndex];
 			const FReplicationStateMemberSerializerDescriptor& MemberSerializerDescriptor = MemberSerializerDescriptors[MemberIndex];
+
+			UE_NET_TRACE_DYNAMIC_NAME_SCOPE(MemberDebugDescriptors[MemberIndex].DebugName, *Context.GetBitStreamReader(), Context.GetTraceCollector(), ENetTraceVerbosity::Verbose);
+			UE_NET_TRACE_DYNAMIC_NAME_SCOPE(MemberSerializerDescriptor.Serializer->Name, *Context.GetBitStreamReader(), Context.GetTraceCollector(), ENetTraceVerbosity::VeryVerbose);
 
 			FNetDeserializeArgs MemberDeserializeArgs;
 			MemberDeserializeArgs.NetSerializerConfig = MemberSerializerDescriptor.SerializerConfig;
@@ -291,10 +302,11 @@ bool FGameplayEffectContextNetSerializer::IsEqual(FNetSerializationContext& Cont
 		}
 
 		{
-			FNetIsEqualArgs GEIsEqualArgs = {};
+			FNetIsEqualArgs GEIsEqualArgs = Args;
 			GEIsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForGE;
 			GEIsEqualArgs.Source0 = NetSerializerValuePointer(&Value0.EffectContext);
 			GEIsEqualArgs.Source1 = NetSerializerValuePointer(&Value1.EffectContext);
+
 			if (!StructNetSerializer->IsEqual(Context, GEIsEqualArgs))
 			{
 				return false;
@@ -303,10 +315,11 @@ bool FGameplayEffectContextNetSerializer::IsEqual(FNetSerializationContext& Cont
 
 		if (Value0.ReplicationFlags & EReplicationFlags::ReplicateHitResult)
 		{
-			FNetIsEqualArgs HitResultIsEqualArgs = {};
+			FNetIsEqualArgs HitResultIsEqualArgs = Args;
 			HitResultIsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForHitResult;
 			HitResultIsEqualArgs.Source0 = NetSerializerValuePointer(&Value0.HitResult);
 			HitResultIsEqualArgs.Source1 = NetSerializerValuePointer(&Value1.HitResult);
+
 			if (!StructNetSerializer->IsEqual(Context, HitResultIsEqualArgs))
 			{
 				return false;
@@ -332,10 +345,11 @@ bool FGameplayEffectContextNetSerializer::IsEqual(FNetSerializationContext& Cont
 		const FHitResult* HitResult1 = SourceValue1.GetHitResult();
 		if ((HitResult0 != nullptr) && (HitResult1 != nullptr))
 		{
-			FNetIsEqualArgs HitEffectIsEqualArgs ={};
+			FNetIsEqualArgs HitEffectIsEqualArgs = Args;
 			HitEffectIsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForHitResult;
 			HitEffectIsEqualArgs.Source0 = NetSerializerValuePointer(HitResult0);
 			HitEffectIsEqualArgs.Source1 = NetSerializerValuePointer(HitResult1);
+
 			if (!StructNetSerializer->IsEqual(Context, HitEffectIsEqualArgs))
 			{
 				return false;
@@ -355,10 +369,11 @@ bool FGameplayEffectContextNetSerializer::IsEqual(FNetSerializationContext& Cont
 			TempGE0.CopyReplicatedFieldsFrom(SourceValue0);
 			TempGE1.CopyReplicatedFieldsFrom(SourceValue1);
 
-			FNetIsEqualArgs GEIsEqualArgs ={};
+			FNetIsEqualArgs GEIsEqualArgs = Args;
 			GEIsEqualArgs.NetSerializerConfig = &StructNetSerializerConfigForGE;
 			GEIsEqualArgs.Source0 = NetSerializerValuePointer(&TempGE0);
 			GEIsEqualArgs.Source1 = NetSerializerValuePointer(&TempGE1);
+
 			if (!StructNetSerializer->IsEqual(Context, GEIsEqualArgs))
 			{
 				return false;
@@ -555,6 +570,9 @@ void FGameplayEffectContextNetSerializer::FNetSerializerRegistryDelegates::OnPos
 			LowLevelFatalError(TEXT("FQuantizedType::HitResult has size %u but requires size %u and alignment %u."), uint32(sizeof(FQuantizedType::HitResult)), uint32(Descriptor->InternalSize), uint32(Descriptor->InternalAlignment));
 		}
 	}
+
+	// Verify traits
+	ValidateForwardingNetSerializerTraits(&UE_NET_GET_SERIALIZER(FGameplayEffectContextNetSerializer), GEStateTraits | HitResultStateTraits);
 }
 
 }

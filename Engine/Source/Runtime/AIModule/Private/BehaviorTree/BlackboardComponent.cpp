@@ -155,7 +155,10 @@ bool UBlackboardComponent::InitializeBlackboard(UBlackboardData& NewAsset)
 					KeyType->PreInitialize(*this);
 
 					const uint16 KeyMemory = KeyType->GetValueSize() + (KeyType->HasInstance() ? sizeof(FBlackboardInstancedKeyMemory) : 0);
-					InitList.Add(FBlackboardInitializationData(KeyIndex + (int32)It->GetFirstKeyID(), KeyMemory));
+					const int32 OffsetKey = KeyIndex + (int32)It->GetFirstKeyID();
+					check(OffsetKey != FBlackboard::InvalidKey);
+
+					InitList.Add(FBlackboardInitializationData(IntCastChecked<FBlackboard::FKey>(OffsetKey), KeyMemory));
 				}
 			}
 		}
@@ -208,8 +211,10 @@ void UBlackboardComponent::DestroyValues()
 			UBlackboardKeyType* KeyType = It->Keys[KeyIndex].KeyType;
 			if (KeyType)
 			{
-				const int32 UseIdx = KeyIndex + (int32)It->GetFirstKeyID();
-				uint8* KeyMemory = GetKeyRawData(UseIdx);
+				const int32 OffsetKey = KeyIndex + (int32)It->GetFirstKeyID();
+				check(OffsetKey != FBlackboard::InvalidKey);
+
+				uint8* KeyMemory = GetKeyRawData(IntCastChecked<FBlackboard::FKey>(OffsetKey));
 				KeyType->WrappedFree(*this, KeyMemory);
 			}
 		}
@@ -247,7 +252,7 @@ void UBlackboardComponent::PopulateSynchronizedKeys()
 						const bool bKeyHasInstance = Key.KeyType->HasInstance();
 						const uint16 DataOffset = bKeyHasInstance ? sizeof(FBlackboardInstancedKeyMemory) : 0;
 
-						const int32 KeyID = BlackboardAsset->GetKeyID(Key.EntryName);
+						const FBlackboard::FKey KeyID = BlackboardAsset->GetKeyID(Key.EntryName);
 						uint8* RawData = GetKeyRawData(KeyID) + DataOffset;
 						uint8* RawSource = OtherBlackboard->GetKeyRawData(OtherKeyID) + DataOffset;
 
@@ -514,12 +519,15 @@ FString UBlackboardComponent::GetDebugInfoString(EBlackboardDescription::Type Mo
 	FString DebugString = FString::Printf(TEXT("Blackboard (asset: %s)\n"), *GetNameSafe(BlackboardAsset));
 
 	TArray<FString> KeyDesc;
-	uint8 Offset = 0;
+	int32 Offset = 0;
 	for (UBlackboardData* It = BlackboardAsset; It; It = It->Parent)
 	{
 		for (int32 KeyIndex = 0; KeyIndex < It->Keys.Num(); KeyIndex++)
 		{
-			KeyDesc.Add(DescribeKeyValue(KeyIndex + Offset, Mode));
+			const int32 OffsetKey = KeyIndex + Offset;
+			check(OffsetKey != FBlackboard::InvalidKey);
+
+			KeyDesc.Add(DescribeKeyValue(IntCastChecked<FBlackboard::FKey>(OffsetKey), Mode));
 		}
 		Offset += It->Keys.Num();
 	}
@@ -608,7 +616,10 @@ void UBlackboardComponent::DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const
 			{
 				const FBlackboardEntry& Key = It->Keys[KeyIndex];
 
-				const uint8* ValueData = GetKeyRawData((int32)It->GetFirstKeyID() + KeyIndex);
+				const int32 OffsetKey = (int32)It->GetFirstKeyID() + KeyIndex;
+				check(OffsetKey != FBlackboard::InvalidKey);
+
+				const uint8* ValueData = GetKeyRawData(IntCastChecked<FBlackboard::FKey>(OffsetKey));
 				FString ValueDesc = Key.KeyType ? *(Key.KeyType->WrappedDescribeValue(*this, ValueData)) : TEXT("empty");
 
 				Category.Add(Key.EntryName.ToString(), ValueDesc);

@@ -333,7 +333,7 @@ void FWorldPartitionActorDesc::Serialize(FArchive& Ar)
 			FName BaseClassPathName;
 			Ar << BaseClassPathName;
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-			BaseClass = FAssetData::TryConvertShortClassNameToPathName(BaseClassPathName);
+			BaseClass = FAssetData::TryConvertShortClassNameToPathName(BaseClassPathName, ELogVerbosity::NoLogging);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		else
@@ -347,7 +347,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		FName NativeClassPathName;
 		Ar << NativeClassPathName;
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-		NativeClass = FAssetData::TryConvertShortClassNameToPathName(NativeClassPathName);
+		NativeClass = FAssetData::TryConvertShortClassNameToPathName(NativeClassPathName, ELogVerbosity::NoLogging);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 	else

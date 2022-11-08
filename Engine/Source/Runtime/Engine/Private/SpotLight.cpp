@@ -49,7 +49,7 @@ void ASpotLight::PostLoad()
 
 	if (GetLightComponent()->Mobility == EComponentMobility::Static)
 	{
-		GetLightComponent()->LightFunctionMaterial = NULL;
+		GetLightComponent()->ClearLightFunctionMaterial();
 	}
 
 #if WITH_EDITORONLY_DATA

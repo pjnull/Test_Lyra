@@ -3605,7 +3605,7 @@ bool ALandscapeProxy::ExportToRawMesh(
 					FVector Position = CDI.GetWorldVertex(VertexX, VertexY);
 
 					// If at least one vertex is within the given bounds we should process the quad  
-					new(VertIndexAndZ)FIndexAndZ(CurrentIndex, Position);
+					new(VertIndexAndZ)FIndexAndZ(CurrentIndex, (FVector3f)Position);
 					IndexToPosition.Add(CurrentIndex, Position);
 					CurrentIndex++;
 				}
@@ -3617,7 +3617,7 @@ bool ALandscapeProxy::ExportToRawMesh(
 		auto FindPreviousIndex = [&VertIndexAndZ, &IndexToPosition](int32 Index)->int32
 		{
 			const FVector& PositionA = IndexToPosition[Index];
-			FIndexAndZ CompressPosition(0, PositionA);
+			FIndexAndZ CompressPosition(0, (FVector3f)PositionA);
 			// Search for lowest index duplicates
 			int32 BestIndex = MAX_int32;
 			for (int32 i = 0; i < IndexToPosition.Num(); i++)
@@ -3628,7 +3628,7 @@ bool ALandscapeProxy::ExportToRawMesh(
 					break;
 				}
 				const FVector& PositionB = IndexToPosition[VertIndexAndZ[i].Index];
-				if (PointsEqual(PositionA, PositionB, SMALL_NUMBER))
+				if (PointsEqual((FVector3f)PositionA, (FVector3f)PositionB, SMALL_NUMBER))
 				{
 					if (VertIndexAndZ[i].Index < BestIndex)
 					{
@@ -4327,7 +4327,7 @@ void ALandscape::PostActorCreated()
 	bIncludeGridSizeInNameForLandscapeActors = true;
 }
 
-bool ALandscape::ShouldImport(FString* ActorPropString, bool IsMovingLevel)
+bool ALandscape::ShouldImport(FStringView ActorPropString, bool IsMovingLevel)
 {
 	return GetWorld() != nullptr && !GetWorld()->IsGameWorld();
 }
@@ -6663,14 +6663,14 @@ bool ALandscapeProxy::ShouldExport()
 	return true;
 }
 
-bool ALandscapeProxy::ShouldImport(FString* ActorPropString, bool IsMovingToLevel)
+bool ALandscapeProxy::ShouldImport(FStringView ActorPropString, bool IsMovingToLevel)
 {
 	bIsMovingToLevel = IsMovingToLevel;
-	if (!bIsMovingToLevel && ActorPropString && ActorPropString->Len() > MAX_LANDSCAPE_PROP_TEXT_LENGTH)
+	if (!bIsMovingToLevel && ActorPropString.Len() > MAX_LANDSCAPE_PROP_TEXT_LENGTH)
 	{
 		// Prompt to save startup packages
 		if (EAppReturnType::Yes == FMessageDialog::Open(EAppMsgType::YesNo, FText::Format(
-			NSLOCTEXT("UnrealEd", "LandscapeImport_Warning", "Landscape is about to import large amount memory ({0}MB) from the clipboard, which will take some time. Do you want to proceed?"), FText::AsNumber(ActorPropString->Len() >> 20))))
+			NSLOCTEXT("UnrealEd", "LandscapeImport_Warning", "Landscape is about to import large amount memory ({0}MB) from the clipboard, which will take some time. Do you want to proceed?"), FText::AsNumber(ActorPropString.Len() >> 20))))
 		{
 			return true;
 		}

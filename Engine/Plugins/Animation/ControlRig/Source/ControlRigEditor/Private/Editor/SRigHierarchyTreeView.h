@@ -212,13 +212,16 @@ private:
  	FRigTreeDelegates Delegates;
 
 	FText GetName() const;
+
+	friend class SRigHierarchyTreeView; 
 };
 
 class SRigHierarchyTreeView : public STreeView<TSharedPtr<FRigTreeElement>>
 {
 public:
 
-	SLATE_BEGIN_ARGS(SRigHierarchyTreeView) {}
+	SLATE_BEGIN_ARGS(SRigHierarchyTreeView)
+	{}
 		SLATE_ARGUMENT(FRigTreeDelegates, RigTreeDelegates)
 	SLATE_END_ARGS()
 

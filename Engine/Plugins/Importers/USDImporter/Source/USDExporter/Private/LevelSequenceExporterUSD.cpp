@@ -200,13 +200,6 @@ namespace UE
 
 						if ( AActor* SpawnedActor = Cast<AActor>( Object ) )
 						{
-							// HACK: Remove the SequencerActor tag from the spawned actor because the USD level exporter
-							// uses these as an indicator that it shouldn't export a given actor, because the transient actors spawned by the
-							// sequencer and the AUsdStageActor contain them.
-							// We will manually delete all of those actors with our spawn register later and never actually use them
-							// for anything else though, so this should be fine
-							SpawnedActor->Tags.Remove( TEXT( "SequencerActor" ) );
-
 							// Rename the spawn to a unique name or else in case of name collisions they will overwrite each other when writing animation data.
 							// The level exporter will rename actors to unique prims by itself though.
 							FString NewLabel = UsdUtils::GetUniqueName( SpawnedActor->GetActorLabel(), UsedActorLabels );
@@ -792,7 +785,7 @@ namespace UE
 				// Also note that we can't share these bakers with our parent movie scenes in case we're a subsequence, unfortunately, because our
 				// bakers will contain lambdas that write directly to a given prim, and those prims are specific to each layer that we're exporting
 				// (e.g. our parent level sequence will export to different prims than this movie scene will)
-				for ( const UMovieSceneTrack* Track : MovieScene->GetMasterTracks() )
+				for ( const UMovieSceneTrack* Track : MovieScene->GetTracks() )
 				{
 					const UMovieSceneSubTrack* SubTrack = Cast<const UMovieSceneSubTrack>( Track );
 					if ( !SubTrack )
@@ -930,7 +923,7 @@ namespace UE
 						FString Extension;
 						FPaths::Split( UniqueFilePath, Directory, FileName, Extension );
 
-						for ( const UMovieSceneTrack* Track : MovieScene->GetMasterTracks() )
+						for ( const UMovieSceneTrack* Track : MovieScene->GetTracks() )
 						{
 							const UMovieSceneSubTrack* SubTrack = Cast<const UMovieSceneSubTrack>( Track );
 							if ( !SubTrack )

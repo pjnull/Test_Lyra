@@ -59,10 +59,8 @@ void UMassActorSpawnerSubsystem::DestroyActor(AActor* Actor, bool bImmediate /*=
 	// We need to unregister immediately MassAgentComponent as it will become out of sync with mass
 	if (UMassAgentComponent* AgentComp = Actor->FindComponentByClass<UMassAgentComponent>())
 	{
-		if (AgentComp->IsRegistered())
-		{
-			AgentComp->UnregisterComponent();
-		}
+		// All we want here it to unregister with the subsysem, not unregister the component as we want to keep it for futher usage if we put the actor in the pool.
+		AgentComp->UnregisterWithAgentSubsystem();
 	}
 
 	if(bImmediate)
@@ -361,7 +359,7 @@ void UMassActorSpawnerSubsystem::Deinitialize()
 
 	if (const UWorld* World = GetWorld())
 	{
-		if (const UMassSimulationSubsystem* SimSystem = UWorld::GetSubsystem<UMassSimulationSubsystem>(World))
+		if (UMassSimulationSubsystem* SimSystem = UWorld::GetSubsystem<UMassSimulationSubsystem>(World))
 		{
 			SimSystem->GetOnProcessingPhaseStarted(EMassProcessingPhase::PrePhysics).RemoveAll(this);
 			SimSystem->GetOnProcessingPhaseFinished(EMassProcessingPhase::PrePhysics).RemoveAll(this);

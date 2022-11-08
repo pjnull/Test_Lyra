@@ -16,11 +16,13 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "Framework/Application/SlateApplication.h"
+#include "EditorActorFolders.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "IPlacementModeModule.h"
 #include "Kismet2/SClassPickerDialog.h"
 #include "SPositiveActionButton.h"
 #include "Styling/StyleColors.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
@@ -82,6 +84,21 @@ void SObjectMixerEditorMainPanel::Construct(
 	SetSingleCollectionSelection();
 }
 
+FReply SObjectMixerEditorMainPanel::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	// Check to see if any actions can be processed
+	// If we are in debug mode do not process commands
+	if (FSlateApplication::Get().IsNormalExecution())
+	{
+		if (GetMainPanelModel().Pin()->ObjectMixerElementEditCommands->ProcessCommandBindings(InKeyEvent))
+		{
+			return FReply::Handled();
+		}
+	}
+	
+	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
+}
+
 TSharedRef<SWidget> SObjectMixerEditorMainPanel::GenerateToolbar()
 {
 	TSharedRef<SHorizontalBox> ToolbarBox = SNew(SHorizontalBox);
@@ -140,6 +157,34 @@ TSharedRef<SWidget> SObjectMixerEditorMainPanel::GenerateToolbar()
 			SNew(SImage)
 			.ColorAndOpacity(FSlateColor::UseForeground())
 			.Image( FAppStyle::Get().GetBrush("FoliageEditMode.SelectAll") )
+		]
+	];
+
+	// Create Folder
+	ToolbarBox->AddSlot()
+	.HAlign(HAlign_Right)
+	.VAlign(VAlign_Center)
+	.AutoWidth()
+	.Padding(8.f, 1.f, 0.f, 1.f)
+	[
+		SNew(SButton)
+		.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+		.ToolTipText(LOCTEXT("CreateFolderToolTip", "Create a new folder containing the current selection"))
+		.OnClicked_Lambda([this] ()
+		{
+			if (TSharedPtr<FObjectMixerEditorList> PinnedList = GetMainPanelModel().Pin()->GetEditorListModel().Pin())
+			{
+				PinnedList->OnRequestNewFolder();
+
+				return FReply::Handled();
+			}
+
+			return FReply::Unhandled();
+		})
+		[
+			SNew(SImage)
+			.ColorAndOpacity(FSlateColor::UseForeground())
+			.Image(FAppStyle::Get().GetBrush("SceneOutliner.NewFolderIcon"))
 		]
 	];
 
@@ -407,6 +452,22 @@ TSharedRef<SWidget> SObjectMixerEditorMainPanel::BuildShowOptionsMenu()
 				  FGlobalTabmanager::Get()->TryInvokeTab(FObjectMixerEditorModule::Get().GetTabSpawnerId());
 			  })));
 		}
+
+		ShowOptionsMenuBuilder.AddMenuEntry(
+			LOCTEXT("ClearSoloStatesMenuOption","Clear Solo States"), 
+			LOCTEXT("ClearSoloStatesMenuOptionTooltip","Remove the solo state from all rows in this list."),
+			FSlateIcon(),
+			FUIAction(FExecuteAction::CreateLambda(
+				[this]()
+				{
+					if (const TSharedPtr<FObjectMixerEditorList> ListModel = MainPanelModel.Pin()->GetEditorListModel().Pin())
+					{
+						ListModel->ClearSoloRows();
+						ListModel->EvaluateAndSetEditorVisibilityPerRow();
+					}
+				})
+			)
+		);
 
 		ShowOptionsMenuBuilder.AddMenuEntry(
 			LOCTEXT("RebuildListMenuOption","Rebuild List"), 

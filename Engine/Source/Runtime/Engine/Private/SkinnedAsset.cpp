@@ -284,7 +284,7 @@ static bool IsISPCEnabled()
 	return bAnim_SkinnedAsset_ISPC_Enabled;
 }
 
-uint32 USkinnedAsset::GetVertexBufferFlags() const
+ESkeletalMeshVertexFlags USkinnedAsset::GetVertexBufferFlags() const
 {
 	return GetHasVertexColors() ? ESkeletalMeshVertexFlags::HasVertexColors : ESkeletalMeshVertexFlags::None;
 }

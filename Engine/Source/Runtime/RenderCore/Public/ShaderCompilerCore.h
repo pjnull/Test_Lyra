@@ -7,6 +7,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "HAL/FileManager.h"
 #include "Stats/Stats.h"
 #include "Templates/RefCounting.h"
 #include "Misc/SecureHash.h"
@@ -45,11 +46,6 @@ extern RENDERCORE_API bool ShouldEnableExtraShaderData(FName ShaderFormat);
 
 extern RENDERCORE_API bool ShouldOptimizeShaders(FName ShaderFormat);
 
-UE_DEPRECATED(5.0, "ShouldGenerateShaderSymbols should be called to determine if symbols (debug data) should be generated")
-bool ShouldKeepShaderDebugInfo(EShaderPlatform Platform);
-UE_DEPRECATED(5.0, "ShouldWriteShaderSymbols should be called to determine if symbols (debug data) should be written")
-bool ShouldExportShaderDebugInfo(EShaderPlatform Platform);
-
 /** Returns true is shader compiling is allowed */
 extern RENDERCORE_API bool AllowShaderCompiling();
 
@@ -70,7 +66,6 @@ enum ECompilerFlags
 	CFLAG_ForceOptimization,
 	// Shader should generate symbols for debugging.
 	CFLAG_GenerateSymbols,
-	CFLAG_KeepDebugInfo UE_DEPRECATED(5.0, "CFLAG_GenerateSymbols should be used to signal if debug data needs to be generated") = CFLAG_GenerateSymbols,
 	// Shader should insert debug/name info at the risk of generating non-deterministic libraries
 	CFLAG_ExtraShaderData,
 	// Allows the (external) symbols to be specific to each shader rather than trying to deduplicate.
@@ -125,6 +120,8 @@ enum ECompilerFlags
 	CFLAG_BindlessSamplers,
 	// EXPERIMENTAL: Run the shader re-writer that removes any unused functions/resources/types from source code before compilation.
 	CFLAG_RemoveDeadCode,
+	// EXPERIMENTAL: Use the DXC preprocessor (instead of the legacy MCPP)
+	CFLAG_PreprocessWithDXC,
 
 	CFLAG_Max,
 };
@@ -188,7 +185,6 @@ struct FShaderCompilerInput
 	FName CompressionFormat;
 	FName ShaderPlatformName;
 	
-	FString SourceFilePrefix;
 	FString VirtualSourceFilePath;
 	FString EntryPointName;
 	FString ShaderName;
@@ -241,6 +237,11 @@ struct FShaderCompilerInput
 		bCompilingForShaderPipeline(false),
 		bIncludeUsedOutputs(false)
 	{
+	}
+
+	bool DumpDebugInfoEnabled() const 
+	{
+		return DumpDebugInfoPath != TEXT("") && IFileManager::Get().DirectoryExists(*DumpDebugInfoPath);
 	}
 
 	// generate human readable name for debugging
@@ -512,7 +513,7 @@ enum class ESCWErrorCode
 	BadInputFile
 };
 
-
+UE_DEPRECATED(5.2, "Functionality has moved to UE::ShaderCompilerCommon::ShouldUseStableConstantBuffer")
 inline bool ShouldUseStableConstantBuffer(const FShaderCompilerInput& Input)
 {
 	// stable constant buffer is for the FShaderParameterBindings::BindForLegacyShaderParameters() code path.

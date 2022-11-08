@@ -1,29 +1,20 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
-using System.Buffers;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EpicGames.Core;
 using EpicGames.Horde.Storage;
-using EpicGames.Horde.Storage.Bundles;
 using EpicGames.Horde.Storage.Nodes;
-using Horde.Build.Agents.Leases;
-using Horde.Build.Configuration;
-using Horde.Build.Jobs.Templates;
 using Horde.Build.Perforce;
-using Horde.Build.Server;
+using Horde.Build.Storage;
 using Horde.Build.Streams;
 using Horde.Build.Utilities;
-using HordeCommon;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Horde.Build.Commands.Bundles
 {
@@ -59,8 +50,8 @@ namespace Horde.Build.Commands.Bundles
 		[CommandLine]
 		public DirectoryReference? OutputDir { get; set; }
 
-		protected readonly IConfiguration _configuration;
-		protected readonly ILoggerProvider _loggerProvider;
+		readonly IConfiguration _configuration;
+		readonly ILoggerProvider _loggerProvider;
 
 		public PerforceCommand(IConfiguration configuration, ILoggerProvider loggerProvider)
 		{
@@ -72,11 +63,12 @@ namespace Horde.Build.Commands.Bundles
 		{
 			using ServiceProvider serviceProvider = Startup.CreateServiceProvider(_configuration, _loggerProvider);
 
-			CommitService commitService = serviceProvider.GetRequiredService<CommitService>();
+			ICommitService commitService = serviceProvider.GetRequiredService<ICommitService>();
 			ReplicationService replicationService = serviceProvider.GetRequiredService<ReplicationService>();
-			ICommitCollection commitCollection = serviceProvider.GetRequiredService<ICommitCollection>();
 			IStreamCollection streamCollection = serviceProvider.GetRequiredService<IStreamCollection>();
-			IStorageClient storageClient = serviceProvider.GetRequiredService<IStorageClient>();
+			StorageService storageService = serviceProvider.GetRequiredService<StorageService>();
+
+			IStorageClient storage = await storageService.GetClientAsync(Namespace.Perforce, CancellationToken.None);
 
 			IStream? stream = await streamCollection.GetAsync(new StreamId(StreamId));
 			if (stream == null)
@@ -90,24 +82,24 @@ namespace Horde.Build.Commands.Bundles
 			ReplicationNode baseContents;
 			if (BaseChange == 0)
 			{
-				baseContents = new ReplicationNode(new DirectoryNode(DirectoryFlags.WithGitHashes));
+				baseContents = new ReplicationNode(new DirectoryNode());
 			}
 			else
 			{
-				baseContents = await replicationService.ReadCommitTreeAsync(stream, BaseChange, Filter, RevisionsOnly, CancellationToken.None);
+				baseContents = await ReplicationService.ReadCommitTreeAsync(storage, stream, BaseChange, Filter, RevisionsOnly, CancellationToken.None);
 			}
 
-			await foreach (NewCommit newCommit in commitService.FindCommitsForClusterAsync(stream.ClusterName, streamToFirstChange).Take(Count))
+			await foreach (ICommit commit in commitService.GetCollection(stream).FindAsync(Change, null, Count))
 			{
-				string briefSummary = newCommit.Description.Replace('\n', ' ');
+				string briefSummary = commit.Description.Replace('\n', ' ');
 				logger.LogInformation("");
-				logger.LogInformation("Commit {Change} by {AuthorId}: {Summary}", newCommit.Change, newCommit.AuthorId, briefSummary.Substring(0, Math.Min(50, briefSummary.Length)));
-				logger.LogInformation("Base path: {BasePath}", newCommit.BasePath);
+				logger.LogInformation("Commit {Change} by {AuthorId}: {Summary}", commit.Number, commit.AuthorId, briefSummary.Substring(0, Math.Min(50, briefSummary.Length)));
+				logger.LogInformation("Base path: {BasePath}", commit.BasePath);
 
 				if (Content)
 				{
-					baseContents = await replicationService.WriteCommitTreeAsync(stream, newCommit.Change, BaseChange, baseContents, Filter, RevisionsOnly, CancellationToken.None);
-					BaseChange = newCommit.Change;
+					baseContents = await replicationService.WriteCommitTreeAsync(storage, stream, commit.Number, BaseChange, baseContents, Filter, RevisionsOnly, CancellationToken.None);
+					BaseChange = commit.Number;
 				}
 			}
 

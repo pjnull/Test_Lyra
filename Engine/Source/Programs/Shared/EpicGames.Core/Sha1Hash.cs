@@ -8,6 +8,8 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#pragma warning disable CA5350 // Do Not Use Weak Cryptographic Algorithms
+
 namespace EpicGames.Core
 {
 	/// <summary>
@@ -229,13 +231,13 @@ namespace EpicGames.Core
 	sealed class Sha1HashTypeConverter : TypeConverter
 	{
 		/// <inheritdoc/>
-		public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+		public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
 		{
 			return sourceType == typeof(string);
 		}
 
 		/// <inheritdoc/>
-		public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+		public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
 		{
 			return Sha1Hash.Parse((string)value);
 		}

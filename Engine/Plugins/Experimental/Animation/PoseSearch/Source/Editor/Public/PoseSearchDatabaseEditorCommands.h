@@ -28,11 +28,13 @@ namespace UE::PoseSearch
 
 		TSharedPtr<FUICommandInfo> ShowPoseFeaturesNone;
 		TSharedPtr<FUICommandInfo> ShowPoseFeaturesAll;
+		TSharedPtr<FUICommandInfo> ShowPoseFeaturesDetailed;
 
 		TSharedPtr<FUICommandInfo> ShowAnimationNone;
 		TSharedPtr<FUICommandInfo> ShowAnimationOriginalOnly;
 		TSharedPtr<FUICommandInfo> ShowAnimationOriginalAndMirrored;
-
+		
+		TSharedPtr<FUICommandInfo> ShowDisplayRootMotionSpeed;
 	};
 }
 

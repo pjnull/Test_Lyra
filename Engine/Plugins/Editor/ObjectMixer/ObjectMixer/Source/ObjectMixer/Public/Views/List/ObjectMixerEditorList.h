@@ -9,6 +9,8 @@
 
 class SObjectMixerEditorList;
 
+struct FFolder;
+
 class OBJECTMIXEREDITOR_API FObjectMixerEditorList : public TSharedFromThis<FObjectMixerEditorList>
 {
 public:
@@ -37,20 +39,32 @@ public:
 	 */
 	void RefreshList() const;
 
+	/** Called when the Rename command is executed from the UI or hotkey. */
+	void OnRenameCommand();
+
 	void RequestSyncEditorSelectionToListSelection() const;
+
+	void OnRequestNewFolder(TOptional<FFolder> ExplicitParentFolder = TOptional<FFolder>());
+
+	void OnRequestMoveFolder(const FFolder& FolderToMove, const FFolder& TargetNewParentFolder);
 
 	void ExecuteListViewSearchOnAllRows(const FString& SearchString, const bool bShouldRefreshAfterward = true);
 
 	void EvaluateIfRowsPassFilters(const bool bShouldRefreshAfterward = true) const;
 
-	TWeakPtr<FObjectMixerEditorMainPanel> GetMainPanelModel();
-
-	TSet<TWeakPtr<FObjectMixerEditorListRow>> GetSoloRows();
-
-	void AddSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow);
-	void RemoveSoloRow(TSharedRef<FObjectMixerEditorListRow> InRow);
-
+	TSet<TWeakPtr<FObjectMixerEditorListRow>> GetSoloRows() const;
 	void ClearSoloRows();
+
+	/** Returns true if at least one row is set to Solo. */
+	bool IsListInSoloState() const;
+
+	/**
+	 * Determines whether rows' objects should be temporarily hidden in editor based on each row's visibility rules,
+	 * then sets each object's visibility in editor.
+	 */
+	void EvaluateAndSetEditorVisibilityPerRow();
+
+	TWeakPtr<FObjectMixerEditorMainPanel> GetMainPanelModel();
 
 private:
 

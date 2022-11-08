@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Horde.Build.Agents.Pools;
 using Horde.Build.Jobs;
@@ -10,6 +12,9 @@ using Horde.Build.Jobs.Graphs;
 using Horde.Build.Streams;
 using Horde.Build.Utilities;
 using HordeCommon;
+using Microsoft.Extensions.Caching.Memory;
+using OpenTracing;
+using OpenTracing.Util;
 
 namespace Horde.Build.Agents.Fleet
 {
@@ -36,6 +41,27 @@ namespace Horde.Build.Agents.Fleet
 		public double ScaleInFactor { get; set; } = 0.9;
 
 		/// <summary>
+		/// How far back in time to look for job batches (that potentially are in the queue)
+		/// </summary>
+		public int SamplePeriodMin { get; set; } = 60 * 24 * 5; // 5 days
+
+		/// <summary>
+		/// Time spent in ready state before considered truly waiting for an agent
+		///
+		/// A job batch can be in ready state before getting picked up and executed.
+		/// This threshold will help ensure only batches that have been waiting longer than this value will be considered.
+		/// </summary>
+		public int ReadyTimeThresholdSec { get; set; } = 45;
+
+		/// <summary>
+		/// Constructor used for JSON serialization
+		/// </summary>
+		[JsonConstructor]
+		public JobQueueSettings()
+		{
+		}
+		
+		/// <summary>
 		/// Constructor
 		/// </summary>
 		/// <param name="scaleOutFactor"></param>
@@ -44,6 +70,17 @@ namespace Horde.Build.Agents.Fleet
 		{
 			ScaleOutFactor = scaleOutFactor.GetValueOrDefault(ScaleOutFactor);
 			ScaleInFactor = scaleInFactor.GetValueOrDefault(ScaleInFactor);
+		}
+		
+		/// <inheritdoc />
+		public override string ToString()
+		{
+			StringBuilder sb = new (50);
+			sb.AppendFormat("{0}={1} ", nameof(ScaleOutFactor), ScaleOutFactor);
+			sb.AppendFormat("{0}={1} ", nameof(ScaleInFactor), ScaleInFactor);
+			sb.AppendFormat("{0}={1} ", nameof(SamplePeriodMin), SamplePeriodMin);
+			sb.AppendFormat("{0}={1} ", nameof(ReadyTimeThresholdSec), ReadyTimeThresholdSec);
+			return sb.ToString();
 		}
 	}
 	
@@ -55,26 +92,15 @@ namespace Horde.Build.Agents.Fleet
 	/// </summary>
 	public class JobQueueStrategy : IPoolSizeStrategy
 	{
+		private const string CacheKey = nameof(JobQueueStrategy);
+		internal JobQueueSettings Settings { get; }
+		
 		private readonly IJobCollection _jobs;
 		private readonly IGraphCollection _graphs;
 		private readonly StreamService _streamService;
 		private readonly IClock _clock;
+		private readonly IMemoryCache _cache;
 		
-		/// <summary>
-		/// How far back in time to look for job batches (that potentially are in the queue)
-		/// </summary>
-		private readonly TimeSpan _samplePeriod = TimeSpan.FromDays(5);
-		
-		/// <summary>
-		/// Time spent in ready state before considered truly waiting for an agent
-		///
-		/// A job batch can be in ready state before getting picked up and executed.
-		/// This threshold will help ensure only batches that have been waiting longer than this value will be considered.
-		/// </summary>
-		internal readonly TimeSpan ReadyTimeThreshold = TimeSpan.FromSeconds(45.0);
-
-		private readonly JobQueueSettings _defaultPoolSettings = new();
-
 		/// <summary>
 		/// Constructor
 		/// </summary>
@@ -82,14 +108,16 @@ namespace Horde.Build.Agents.Fleet
 		/// <param name="graphs"></param>
 		/// <param name="streamService"></param>
 		/// <param name="clock"></param>
-		/// <param name="samplePeriod">Time period for each sample</param>
-		public JobQueueStrategy(IJobCollection jobs, IGraphCollection graphs, StreamService streamService, IClock clock, TimeSpan? samplePeriod = null)
+		/// <param name="cache"></param>
+		/// <param name="settings"></param>
+		public JobQueueStrategy(IJobCollection jobs, IGraphCollection graphs, StreamService streamService, IClock clock, IMemoryCache cache, JobQueueSettings? settings = null)
 		{
 			_jobs = jobs;
 			_graphs = graphs;
 			_streamService = streamService;
 			_clock = clock;
-			_samplePeriod = samplePeriod ?? _samplePeriod;
+			_cache = cache;
+			Settings = settings ?? new JobQueueSettings();
 		}
 
 		/// <inheritdoc/>
@@ -118,7 +146,7 @@ namespace Horde.Build.Agents.Fleet
 				{
 					continue;
 				}
-				if (waitTime.Value < ReadyTimeThreshold)
+				if (waitTime.Value < TimeSpan.FromSeconds(Settings.ReadyTimeThresholdSec))
 				{
 					continue;
 				}
@@ -129,7 +157,7 @@ namespace Horde.Build.Agents.Fleet
 				}
 
 				string batchAgentType = graph.Groups[batch.GroupIdx].AgentType;
-				if (!stream.AgentTypes.TryGetValue(batchAgentType, out AgentType? agentType))
+				if (!stream.Config.AgentTypes.TryGetValue(batchAgentType, out AgentConfig? agentType))
 				{
 					continue;
 				}
@@ -142,6 +170,8 @@ namespace Horde.Build.Agents.Fleet
 
 		internal async Task<Dictionary<PoolId, int>> GetPoolQueueSizesAsync(DateTimeOffset jobsCreatedAfter)
 		{
+			using IScope scope = GlobalTracer.Instance.BuildSpan("JobQueueStrategy.GetPoolQueueSizes").StartActive();
+			
 			List<IStream> streamsList = await _streamService.GetStreamsAsync();
 			Dictionary<StreamId, IStream> streams = streamsList.ToDictionary(x => x.Id, x => x);
 			List<IJob> recentJobs = await _jobs.FindAsync(minCreateTime: jobsCreatedAfter);
@@ -153,31 +183,53 @@ namespace Horde.Build.Agents.Fleet
 			}
 
 			List<(PoolId PoolId, int QueueSize)> poolsWithQueueSize = jobBatches.GroupBy(t => t.PoolId).Select(t => (t.Key, t.Count())).ToList();
+
+			scope.Span.SetTag("NumPools", poolsWithQueueSize.Count);
 			return poolsWithQueueSize.ToDictionary(x => x.PoolId, x => x.QueueSize);
 		}
 
 		/// <inheritdoc/>
-		public async Task<List<PoolSizeData>> CalcDesiredPoolSizesAsync(List<PoolSizeData> pools)
+		public async Task<PoolSizeResult> CalculatePoolSizeAsync(IPool pool, List<IAgent> agents)
 		{
-			DateTimeOffset minCreateTime = _clock.UtcNow - _samplePeriod;
-			Dictionary<PoolId, int> poolQueueSizes = await GetPoolQueueSizesAsync(minCreateTime);
+			using IScope scope = GlobalTracer.Instance
+				.BuildSpan("JobQueueStrategy.CalculatePoolSize")
+				.WithTag(Datadog.Trace.OpenTracing.DatadogTags.ResourceName, pool.Id.ToString())
+				.WithTag("CurrentAgentCount", agents.Count)
+				.StartActive();
+			
+			DateTimeOffset minCreateTime = _clock.UtcNow - TimeSpan.FromMinutes(Settings.SamplePeriodMin);
 
-			return pools.Select(current =>
+			// Cache pool queue sizes for a short while for faster runs when many pools are scaled
+			if (!_cache.TryGetValue(CacheKey, out Dictionary<PoolId, int> poolQueueSizes))
 			{
-				JobQueueSettings settings = current.Pool.JobQueueSettings ?? _defaultPoolSettings;
-				poolQueueSizes.TryGetValue(current.Pool.Id, out int queueSize);
-				if (queueSize > 0)
-				{
-					int additionalAgentCount = (int)Math.Ceiling(queueSize * settings.ScaleOutFactor);
-					int desiredAgentCount = current.Agents.Count + additionalAgentCount;
-					return new PoolSizeData(current.Pool, current.Agents, desiredAgentCount, $"QueueSize={queueSize}");
-				}
-				else
-				{
-					int desiredAgentCount = (int)(current.Agents.Count * settings.ScaleInFactor);
-					return new PoolSizeData(current.Pool, current.Agents, desiredAgentCount, "Empty job queue");
-				}
-			}).ToList();
+				// Pool sizes haven't been cached, update them (might happen from multiple tasks but that is fine)
+				poolQueueSizes = await GetPoolQueueSizesAsync(minCreateTime);
+				_cache.Set(CacheKey, poolQueueSizes, TimeSpan.FromSeconds(60));
+			}
+
+			poolQueueSizes.TryGetValue(pool.Id, out int queueSize);
+			
+			Dictionary<string, object> status = new()
+			{
+				["Name"] = GetType().Name,
+				["QueueSize"] = queueSize,
+				["ScaleOutFactor"] = Settings.ScaleOutFactor,
+				["ScaleInFactor"] = Settings.ScaleInFactor,
+				["SamplePeriodMin"] = Settings.SamplePeriodMin,
+				["ReadyTimeThresholdSec"] = Settings.ReadyTimeThresholdSec,
+			};
+			
+			if (queueSize > 0)
+			{
+				int additionalAgentCount = (int)Math.Ceiling(queueSize * Settings.ScaleOutFactor);
+				int desiredAgentCount = agents.Count + additionalAgentCount;
+				return new PoolSizeResult(pool, agents, desiredAgentCount, status);
+			}
+			else
+			{
+				int desiredAgentCount = (int)(agents.Count * Settings.ScaleInFactor);
+				return new PoolSizeResult(pool, agents, desiredAgentCount, status);
+			}
 		}
 	}
 }

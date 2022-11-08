@@ -54,6 +54,15 @@ enum class ERHIFeatureSupport : uint8
 	NumBits = 2,
 };
 
+enum class ERHIBindlessSupport : uint8
+{
+	Unsupported,
+	RayTracingOnly,
+	AllShaderTypes,
+
+	NumBits = 2
+};
+
 enum EShaderFrequency : uint8
 {
 	SF_Vertex			= 0,
@@ -89,14 +98,11 @@ enum EShaderPlatform
 	SP_OPENGL_PCES3_1				= 15,
 	SP_METAL_SM5					= 16,
 	SP_VULKAN_PCES3_1				= 17,
-	SP_METAL_SM5_NOTESS_REMOVED		UE_DEPRECATED(5.0, "ShaderPlatform is removed; please don't use.") = 18,
 	SP_VULKAN_SM5					= 20,
 	SP_VULKAN_ES3_1_ANDROID			= 21,
 	SP_METAL_MACES3_1 				= 22,
 	SP_OPENGL_ES3_1_ANDROID			= 24,
 	SP_METAL_MRT_MAC				= 27,
-	SP_VULKAN_SM5_LUMIN_REMOVED		UE_DEPRECATED(5.0, "ShaderPlatform is removed; please don't use.") = 28,
-	SP_VULKAN_ES3_1_LUMIN_REMOVED	UE_DEPRECATED(5.0, "ShaderPlatform is removed; please don't use.") = 29,
 	SP_METAL_TVOS					= 30,
 	SP_METAL_MRT_TVOS				= 31,
 	/**********************************************************************************/
@@ -423,7 +429,7 @@ class RHI_API FGenericDataDrivenShaderPlatformInfo
 	uint32 bSupportsInlineRayTracing : 1;
 	uint32 bSupportsRayTracingShaders : 1;
 	uint32 bSupportsVertexShaderLayer : 1;
-	uint32 bSupportsBindless : 1;
+	uint32 BindlessSupport : int32(ERHIBindlessSupport::NumBits);
 	uint32 bSupportsVolumeTextureAtomics : 1;
 	uint32 bSupportsROV : 1;
 	uint32 bSupportsOIT : 1;
@@ -1015,9 +1021,16 @@ public:
 		return Infos[Platform].bSupportsVertexShaderLayer;
 	}
 
+	static FORCEINLINE_DEBUGGABLE const ERHIBindlessSupport GetBindlessSupport(const FStaticShaderPlatform Platform)
+	{
+		check(IsValid(Platform));
+		return static_cast<ERHIBindlessSupport>(Infos[Platform].BindlessSupport);
+	}
+
+	UE_DEPRECATED(5.2, "You must use GetBindlessSupport instead.")
 	static FORCEINLINE_DEBUGGABLE const bool GetSupportsBindless(const FStaticShaderPlatform Platform)
 	{
-		return Infos[Platform].bSupportsBindless;
+		return GetBindlessSupport(Platform) == ERHIBindlessSupport::AllShaderTypes;
 	}
 
 	static FORCEINLINE_DEBUGGABLE const bool GetSupportsVolumeTextureAtomics(const FStaticShaderPlatform Platform)
@@ -1611,41 +1624,8 @@ enum EPrimitiveType
 	// Supported only if GRHISupportsRectTopology == true.
 	PT_RectList,
 
-	// Tesselation patch list. Supported only if tesselation is supported.
-	PT_1_ControlPointPatchList,
-	PT_2_ControlPointPatchList,
-	PT_3_ControlPointPatchList,
-	PT_4_ControlPointPatchList,
-	PT_5_ControlPointPatchList,
-	PT_6_ControlPointPatchList,
-	PT_7_ControlPointPatchList,
-	PT_8_ControlPointPatchList,
-	PT_9_ControlPointPatchList,
-	PT_10_ControlPointPatchList,
-	PT_11_ControlPointPatchList,
-	PT_12_ControlPointPatchList,
-	PT_13_ControlPointPatchList,
-	PT_14_ControlPointPatchList,
-	PT_15_ControlPointPatchList,
-	PT_16_ControlPointPatchList,
-	PT_17_ControlPointPatchList,
-	PT_18_ControlPointPatchList,
-	PT_19_ControlPointPatchList,
-	PT_20_ControlPointPatchList,
-	PT_21_ControlPointPatchList,
-	PT_22_ControlPointPatchList,
-	PT_23_ControlPointPatchList,
-	PT_24_ControlPointPatchList,
-	PT_25_ControlPointPatchList,
-	PT_26_ControlPointPatchList,
-	PT_27_ControlPointPatchList,
-	PT_28_ControlPointPatchList,
-	PT_29_ControlPointPatchList,
-	PT_30_ControlPointPatchList,
-	PT_31_ControlPointPatchList,
-	PT_32_ControlPointPatchList,
 	PT_Num,
-	PT_NumBits = 6
+	PT_NumBits = 3
 };
 static_assert(PT_Num <= (1 << 8), "EPrimitiveType doesn't fit in a byte");
 static_assert(PT_Num <= (1 << PT_NumBits), "PT_NumBits is too small");
@@ -1726,9 +1706,6 @@ enum class EBufferUsageFlags : uint32
 
 	/** Buffer should go in fast vram (hint only). Requires BUF_Transient */
 	FastVRAM                = 1 << 10,
-
-	/** Buffer should be allocated from transient memory. */
-	Transient UE_DEPRECATED(5.0, "EBufferUsageFlags::Transient flag is no longer used.") = None,
 
 	/** Create a buffer that can be shared with an external RHI or process. */
 	Shared                  = 1 << 12,
@@ -1941,8 +1918,6 @@ enum class ETextureCreateFlags : uint64
     AFRManual                         = 1ull << 30,
     // Workaround for 128^3 volume textures getting bloated 4x due to tiling mode on some platforms.
     ReduceMemoryWithTilingMode        = 1ull << 31,
-    /** Texture should be allocated from transient memory. */
-    Transient UE_DEPRECATED(5.0, "ETextureCreateFlags::Transient flag is no longer used.") = None,
     /** Texture needs to support atomic operations */
     AtomicCompatible                  = 1ull << 33,
 	/** Texture should be allocated for external access. Vulkan only */

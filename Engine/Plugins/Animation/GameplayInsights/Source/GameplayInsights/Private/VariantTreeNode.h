@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "IAnimationProvider.h"
+#include "IGameplayProvider.h"
 
 namespace TraceServices { class IAnalysisSession; }
 
@@ -20,9 +21,17 @@ struct FVariantTreeNode : TSharedFromThis<FVariantTreeNode>
 	FVariantTreeNode(const FText& InName, const FVariantValue& InValue, uint64 InId = INDEX_NONE)
 		: Name(InName)
 		, Value(InValue)
+		, PropertyNameId(0)
 		, Id(InId)
 	{}
 
+	FVariantTreeNode(const FText& InName, const FVariantValue& InValue, uint32 InPropertyNamedId = 0, uint64 InId = INDEX_NONE)
+		: Name(InName)
+		, Value(InValue)
+		, PropertyNameId(InPropertyNamedId)
+		, Id(InId)
+	{}
+	
 	const TSharedRef<FVariantTreeNode>& AddChild(const TSharedRef<FVariantTreeNode>& InChild)
 	{
 		check(!InChild->Parent.IsValid());
@@ -42,6 +51,10 @@ struct FVariantTreeNode : TSharedFromThis<FVariantTreeNode>
 
 	uint64 GetId() const { return Id; }
 
+	uint32 GetPropertyNamedId() const { return PropertyNameId; }
+	
+	void SetPropertyNameId(uint32 InPropertyNameId) { PropertyNameId = InPropertyNameId; }
+	
 	void SetFilterState(EVariantTreeNodeFilterState InFilterState) { FilterState = InFilterState; }
 
 	EVariantTreeNodeFilterState GetFilterState() const { return FilterState; }
@@ -112,11 +125,14 @@ struct FVariantTreeNode : TSharedFromThis<FVariantTreeNode>
 		return MakeShared<FVariantTreeNode>(InName, Value, InId);
 	}
 
-	static TSharedRef<FVariantTreeNode> MakeObject(const FText& InName, uint64 InValue, uint64 InId = INDEX_NONE)
+	static TSharedRef<FVariantTreeNode> MakeObject(const FText& InName, uint64 InValue, uint64 InId = INDEX_NONE, float PlaybackTime = 0.0f, float BlendX = 0.0f, float BlendY = 0.0f)
 	{
 		FVariantValue Value;
 		Value.Type = EAnimNodeValueType::Object;
 		Value.Object.Value = InValue;
+		Value.Object.PlaybackTime = PlaybackTime;
+		Value.Object.BlendX = BlendX;
+		Value.Object.BlendY = BlendY;
 
 		return MakeShared<FVariantTreeNode>(InName, Value, InId);
 	}
@@ -135,7 +151,8 @@ private:
 	FVariantValue Value;
 	TWeakPtr<FVariantTreeNode> Parent;
 	TArray<TSharedRef<FVariantTreeNode>> Children;
-
+	uint32 PropertyNameId;
+	
 	// Unique ID used to record expansion state
 	uint64 Id;
 

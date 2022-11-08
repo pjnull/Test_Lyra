@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Horde.Build.Acls;
 using Horde.Build.Auditing;
@@ -180,7 +181,6 @@ namespace Horde.Build.Issues
 							quarantinedBy = await _userCollection.GetCachedUserAsync(issue.QuarantinedByUserId.Value);
 						}
 
-
 						FindIssueResponse response = new FindIssueResponse(issue, owner, nominatedBy, resolvedBy, quarantinedBy, streamSeverity, spanResponses, openWorkflowIds.ToList());
 						responses.Add(PropertyFilter.Apply(response, filter));
 					}
@@ -264,8 +264,8 @@ namespace Horde.Build.Issues
 				IIssueDetails details = await _issueService.GetIssueDetailsAsync(issue);
 				if (await AuthorizeIssue(details, permissionsCache))
 				{
-					bool bShowDesktopAlerts = _issueService.ShowDesktopAlertsForIssue(issue, details.Spans);
-					GetIssueResponse response = await CreateIssueResponseAsync(details, bShowDesktopAlerts);
+					bool showDesktopAlerts = _issueService.ShowDesktopAlertsForIssue(issue, details.Spans);
+					GetIssueResponse response = await CreateIssueResponseAsync(details, showDesktopAlerts);
 					responses.Add(PropertyFilter.Apply(response, filter));
 				}
 			}
@@ -293,8 +293,8 @@ namespace Horde.Build.Issues
 				return Forbid();
 			}
 
-			bool bShowDesktopAlerts = _issueService.ShowDesktopAlertsForIssue(details.Issue, details.Spans);
-			return PropertyFilter.Apply(await CreateIssueResponseAsync(details, bShowDesktopAlerts), filter);
+			bool showDesktopAlerts = _issueService.ShowDesktopAlertsForIssue(details.Issue, details.Spans);
+			return PropertyFilter.Apply(await CreateIssueResponseAsync(details, showDesktopAlerts), filter);
 		}
 
 		/// <summary>
@@ -317,33 +317,6 @@ namespace Horde.Build.Issues
 		}
 
 		/// <summary>
-		/// Hook to allow a Perforce trigger to mark an issue as fixed, via a tag in the changelist description.
-		/// </summary>
-		/// <param name="issueId">Id of the agent to get information about</param>
-		/// <param name="request">Request body</param>
-		/// <returns>Information about the requested agent</returns>
-		[HttpPost]
-		[Route("/api/v1/issues/{issueId}/p4fix")]
-		public async Task<ActionResult> MarkIssueAsFixedViaPerforceAsync(int issueId, [FromBody] MarkFixedViaPerforceRequest request)
-		{
-			if (!await _aclService.AuthorizeAsync(AclAction.IssueFixViaPerforce, User))
-			{
-				return Forbid();
-			}
-
-			IIssueDetails? issue = await _issueService.GetIssueDetailsAsync(issueId);
-			if (issue == null)
-			{
-				return NotFound();
-			}
-
-			IUser user = await _userCollection.FindOrAddUserByLoginAsync(request.UserName);
-			await _issueService.UpdateIssueAsync(issueId, fixChange: request.FixChange, resolvedById: user.Id);
-
-			return Ok();
-		}
-
-		/// <summary>
 		/// Create an issue response object
 		/// </summary>
 		/// <param name="details"></param>
@@ -359,9 +332,9 @@ namespace Horde.Build.Issues
 					IStream? stream = await _streamService.GetCachedStream(streamSpans.Key);
 					affectedStreams.Add(new GetIssueAffectedStreamResponse(details, stream, streamSpans));
 				}
-				catch 
+				catch (Exception ex)
 				{
-					_logger.LogError("Unable to get {StreamId} for span key", streamSpans.Key);
+					_logger.LogError(ex, "Unable to get {StreamId} for span key on issue {IssueId}", streamSpans.Key, details.Issue.Id);
 				}
 			}
 			return new GetIssueResponse(details, affectedStreams, showDesktopAlerts);
@@ -461,11 +434,22 @@ namespace Horde.Build.Issues
 		/// <param name="index">Index of the first event</param>
 		/// <param name="count">Number of events to return</param>
 		/// <param name="filter">Filter for the properties to return</param>
+		/// <param name="cancellationToken">Cancellation token for the request</param>
 		/// <returns>List of matching agents</returns>
 		[HttpGet]
 		[Route("/api/v1/issues/{issueId}/events")]
 		[ProducesResponseType(typeof(List<GetLogEventResponse>), 200)]
-		public async Task<ActionResult<List<object>>> GetIssueEventsAsync(int issueId, [FromQuery] JobId? jobId = null, [FromQuery] string? batchId = null, [FromQuery] string? stepId = null, [FromQuery(Name = "label")] int? labelIdx = null, [FromQuery] string[]? logIds = null, [FromQuery] int index = 0, [FromQuery] int count = 10, [FromQuery] PropertyFilter? filter = null)
+		public async Task<ActionResult<List<object>>> GetIssueEventsAsync(
+			int issueId,
+			[FromQuery] JobId? jobId = null,
+			[FromQuery] string? batchId = null,
+			[FromQuery] string? stepId = null,
+			[FromQuery(Name = "label")] int? labelIdx = null,
+			[FromQuery] string[]? logIds = null,
+			[FromQuery] int index = 0, 
+			[FromQuery] int count = 10,
+			[FromQuery] PropertyFilter? filter = null,
+			CancellationToken cancellationToken = default)
 		{
 			HashSet<LogId> logIdValues = new HashSet<LogId>();
 			if(jobId != null)
@@ -521,7 +505,7 @@ namespace Horde.Build.Issues
 			}
 
 			List<IIssueSpan> spans = await _issueCollection.FindSpansAsync(issueId);
-			List<ILogEvent> events = await _logFileService.FindEventsForSpansAsync(spans.Select(x => x.Id), logIdValues.ToArray(), index, count);
+			List<ILogEvent> events = await _logFileService.FindEventsForSpansAsync(spans.Select(x => x.Id), logIdValues.ToArray(), index, count, cancellationToken);
 
 			JobPermissionsCache permissionsCache = new JobPermissionsCache();
 			Dictionary<LogId, ILogFile?> logFiles = new Dictionary<LogId, ILogFile?>();
@@ -532,12 +516,12 @@ namespace Horde.Build.Issues
 				ILogFile? logFile;
 				if (!logFiles.TryGetValue(logEvent.LogId, out logFile))
 				{
-					logFile = await _logFileService.GetLogFileAsync(logEvent.LogId);
+					logFile = await _logFileService.GetLogFileAsync(logEvent.LogId, cancellationToken);
 					logFiles[logEvent.LogId] = logFile;
 				}
 				if (logFile != null && await _jobService.AuthorizeAsync(logFile.JobId, AclAction.ViewLog, User, permissionsCache))
 				{
-					ILogEventData data = await _logFileService.GetEventDataAsync(logFile, logEvent.LineIndex, logEvent.LineCount);
+					ILogEventData data = await _logFileService.GetEventDataAsync(logFile, logEvent.LineIndex, logEvent.LineCount, cancellationToken);
 					GetLogEventResponse response = new GetLogEventResponse(logEvent, data, issueId);
 					responses.Add(PropertyFilter.Apply(response, filter));
 				}
@@ -607,6 +591,12 @@ namespace Horde.Build.Issues
 				newQuarantinedById = request.QuarantinedById.Length > 0 ? new UserId(request.QuarantinedById) : UserId.Empty;
 			}
 
+			UserId? newForceClosedById = null;
+			if (request.ForceClosedById != null)
+			{
+				newForceClosedById = request.ForceClosedById.Length > 0 ? new UserId(request.ForceClosedById) : UserId.Empty;
+			}
+
 
 			List<ObjectId>? addSpans = null;
 			if (request.AddSpans != null && request.AddSpans.Count > 0)
@@ -620,12 +610,9 @@ namespace Horde.Build.Issues
 				removeSpans = request.RemoveSpans.ConvertAll(x => ObjectId.Parse(x));
 			}
 
-			using (IDisposable scope = _issueCollection.GetLogger(issueId).BeginScope("User {UserId}", User.GetUserId() ?? UserId.Empty))
+			if (!await _issueService.UpdateIssueAsync(issueId, request.Summary, request.Description, request.Promoted, newOwnerId, newNominatedById, request.Acknowledged, newDeclinedById, request.FixChange, newResolvedById, addSpans, removeSpans, request.ExternalIssueKey, newQuarantinedById, newForceClosedById, initiatedById: User.GetUserId()))
 			{
-				if (!await _issueService.UpdateIssueAsync(issueId, request.Summary, request.Description, request.Promoted, newOwnerId, newNominatedById, request.Acknowledged, newDeclinedById, request.FixChange, newResolvedById, addSpans, removeSpans, request.ExternalIssueKey, newQuarantinedById))
-				{
-					return NotFound();
-				}
+				return NotFound();
 			}
 			return Ok();
 		}
@@ -741,7 +728,5 @@ namespace Horde.Build.Issues
 
 			return response;
 		}
-
-
 	}
 }

@@ -481,6 +481,7 @@ namespace UnrealBuildTool
 
 				// Change the working directory to be the Engine/Source folder. We are likely running from Engine/Binaries/DotNET
 				// This is critical to be done early so any code that relies on the current directory being Engine/Source will work.
+				DirectoryReference.CreateDirectory(Unreal.EngineSourceDirectory);
 				DirectoryReference.SetCurrentDirectory(Unreal.EngineSourceDirectory);
 
 				// Register encodings from Net FW as this is required when using Ionic as we do in multiple toolchains
@@ -610,6 +611,13 @@ namespace UnrealBuildTool
 				// Used to return a propagate a specific exit code after an error has occurred. Does not log any message.
 				Logger.LogDebug(Ex, "{Ex}", ExceptionUtils.FormatExceptionDetails(Ex));
 				return (int)Ex.Result;
+			}
+			catch (BuildLogEventException Ex)
+			{
+				// BuildExceptions should have nicely formatted messages. We can log these directly.
+				Logger.Log(Ex.Event.Level, Ex.Event.Id, Ex.Event, Ex, (s, e) => s.ToString());
+				Logger.LogDebug(Ex, "{Ex}", ExceptionUtils.FormatExceptionDetails(Ex));
+				return (int)CompilationResult.OtherCompilationError;
 			}
 			catch (BuildException Ex)
 			{

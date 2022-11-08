@@ -2291,6 +2291,7 @@ bool GenerateGlslShader(std::string& OutString, GLSLCompileParameters& GLSLCompi
 	}
 
 	// If we are rendering deferred, then we only need SceneDepthAux on devices that don't support framebuffer fetch depth
+	/*
 	if (bIsDeferred)
 	{
 		std::string SceneDepthAux = "layout(location = 4) out highp float out_var_SV_Target4;";
@@ -2317,6 +2318,7 @@ bool GenerateGlslShader(std::string& OutString, GLSLCompileParameters& GLSLCompi
 			}
 		}
 	}
+	*/
 
 	// Fixup packed globals
 	{
@@ -2996,21 +2998,9 @@ static bool CompileToGlslWithShaderConductor(
 	FShaderCompilerDefinitions AdditionalDefines;
 	AdditionalDefines.SetDefine(TEXT("TextureExternal"), TEXT("Texture2D"));
 
-	if (bDumpDebugInfo)
-	{
-		FString DirectCompileLine = CrossCompiler::CreateResourceTableFromEnvironment(Input.Environment);
-
-		DirectCompileLine += TEXT("#if 0 /*DIRECT COMPILE*/\n");
-		DirectCompileLine += CreateShaderCompilerWorkerDirectCommandLine(Input, CCFlags);
-		DirectCompileLine += TEXT("\n#endif /*DIRECT COMPILE*/\n");
-
-		DumpDebugUSF(Input, (PreprocessedShader + DirectCompileLine), CCFlags);
-
-		if (Input.bGenerateDirectCompileFile)
-		{
-			FFileHelper::SaveStringToFile(CreateShaderCompilerWorkerDirectCommandLine(Input), *(Input.DumpDebugInfoPath / TEXT("DirectCompile.txt")));
-		}
-	}
+	UE::ShaderCompilerCommon::FDebugShaderDataOptions DebugDataOptions;
+	DebugDataOptions.HlslCCFlags = CCFlags;
+	UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShader, DebugDataOptions);
 
 	uint32_t BlendFlags = GetDecalBlendFlags(SourceData);
 
@@ -3336,7 +3326,7 @@ void FOpenGLFrontend::CompileShader(const FShaderCompilerInput& Input, FShaderCo
 	}
 
 	FShaderParameterParser ShaderParameterParser;
-	if (!ShaderParameterParser.ParseAndModify(Input, Output, PreprocessedShader, /* ConstantBufferType = */ nullptr))
+	if (!ShaderParameterParser.ParseAndModify(Input, Output, PreprocessedShader))
 	{
 		// The FShaderParameterParser will add any relevant errors.
 		return;
@@ -3363,17 +3353,10 @@ void FOpenGLFrontend::CompileShader(const FShaderCompilerInput& Input, FShaderCo
 	else
 #endif // DXC_SUPPORTED
 	{
-		// Write out the preprocessed file and a batch file to compile it if requested (DumpDebugInfoPath is valid)
-		if (bDumpDebugInfo)
-		{
-			DumpDebugUSF(Input, PreprocessedShader, CCFlags);
-
-			if (Input.bGenerateDirectCompileFile)
-			{
-				FFileHelper::SaveStringToFile(CreateShaderCompilerWorkerDirectCommandLine(Input), *(Input.DumpDebugInfoPath / TEXT("DirectCompile.txt")));
-			}
-		}
-
+		UE::ShaderCompilerCommon::FDebugShaderDataOptions DebugDataOptions;
+		DebugDataOptions.HlslCCFlags = CCFlags;
+		UE::ShaderCompilerCommon::DumpDebugShaderData(Input, PreprocessedShader, DebugDataOptions);
+		
 		CCFlags |= HLSLCC_NoValidation;
 		FGlslCodeBackend* BackEnd = CreateBackend(Version, CCFlags, HlslCompilerTarget);
 

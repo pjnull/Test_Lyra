@@ -1027,10 +1027,10 @@ const TCHAR* FMacPlatformProcess::BaseDir()
 			else
 			{
 				// Get executable path
-				NSString* ExecutablePath = [[NSBundle mainBundle]executablePath];
+				NSString* ExecutablePath = [[NSBundle mainBundle] executablePath];
 
 				// When building an extra console app i.e. a commandlet, the Mac executable can  be placed in a distinct folder, usually 3 directories up compared to the packaged app
-				if ([[ExecutablePath lowercaseString]hasSuffix:@"-cmd"] )
+				if ([[ExecutablePath lowercaseString] hasSuffix : @"-cmd"] )
 				{
 #ifdef UE_CMDLET_RELATIVE_BASE_DIR
 					BasePath = [BasePath stringByAppendingPathComponent : @UE_CMDLET_RELATIVE_BASE_DIR];
@@ -1316,8 +1316,8 @@ bool FMacPlatformProcess::CreatePipe( void*& ReadPipe, void*& WritePipe, bool bW
 	int pipefd[2];
 	pipe(pipefd);
 
+	// The read pipe should be non-blocking, but the write pipe SHOULD block
 	fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
-	fcntl(pipefd[1], F_SETFL, O_NONBLOCK);
 
 	// create an NSFileHandle from the descriptor
 	ReadPipe = [[NSFileHandle alloc] initWithFileDescriptor: pipefd[0]];

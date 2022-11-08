@@ -7,7 +7,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EntitySystem/MovieSceneEntitySystemTask.h"
-#include "EntitySystem/MovieSceneMasterInstantiatorSystem.h"
+#include "EntitySystem/MovieSceneRootInstantiatorSystem.h"
 #include "Evaluation/MovieSceneEvaluationTemplateInstance.h"
 #include "GameDelegates.h"
 #include "GameFramework/GameState.h"
@@ -74,7 +74,7 @@ UMovieSceneReplaySystem::UMovieSceneReplaySystem(const FObjectInitializer& ObjIn
 
 	if (HasAnyFlags(RF_ClassDefaultObject))
 	{
-		DefineImplicitPrerequisite(UMovieSceneMasterInstantiatorSystem::StaticClass(), GetClass());
+		DefineImplicitPrerequisite(UMovieSceneRootInstantiatorSystem::StaticClass(), GetClass());
 	}
 }
 

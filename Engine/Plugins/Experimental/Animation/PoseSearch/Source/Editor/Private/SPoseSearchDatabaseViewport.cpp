@@ -62,6 +62,18 @@ namespace UE::PoseSearch
 				EFeaturesDrawMode::All));
 
 		CommandList->MapAction(
+			Commands.ShowPoseFeaturesDetailed,
+			FExecuteAction::CreateSP(
+				ViewModelRef,
+				&FDatabaseViewModel::OnSetPoseFeaturesDrawMode,
+				EFeaturesDrawMode::Detailed),
+			FCanExecuteAction(),
+			FIsActionChecked::CreateSP(
+				ViewModelRef,
+				&FDatabaseViewModel::IsPoseFeaturesDrawMode,
+				EFeaturesDrawMode::Detailed));
+
+		CommandList->MapAction(
 			Commands.ShowAnimationNone,
 			FExecuteAction::CreateSP(
 				ViewModelRef,
@@ -96,6 +108,12 @@ namespace UE::PoseSearch
 				ViewModelRef,
 				&FDatabaseViewModel::IsAnimationPreviewMode,
 				EAnimationPreviewMode::OriginalAndMirrored));
+
+		CommandList->MapAction(
+			Commands.ShowDisplayRootMotionSpeed,
+			FExecuteAction::CreateSP(ViewModelRef, &FDatabaseViewModel::OnToggleDisplayRootMotionSpeed),
+			FCanExecuteAction::CreateSP(ViewModelRef, &FDatabaseViewModel::CanDisplayRootMotionSpeed),
+			FIsActionChecked::CreateSP(ViewModelRef, &FDatabaseViewModel::IsDisplayRootMotionSpeedChecked));
 	}
 
 	TSharedRef<FEditorViewportClient> SDatabaseViewport::MakeEditorViewportClient()

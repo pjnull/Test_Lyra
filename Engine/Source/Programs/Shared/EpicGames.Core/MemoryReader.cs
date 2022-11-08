@@ -2,6 +2,7 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 
 namespace EpicGames.Core
 {
@@ -15,7 +16,7 @@ namespace EpicGames.Core
 		/// </summary>
 		/// <param name="minSize">Minimum size of the returned data</param>
 		/// <returns>Memory of at least the given size</returns>
-		ReadOnlyMemory<byte> GetMemory(int minSize);
+		ReadOnlyMemory<byte> GetMemory(int minSize = 1);
 
 		/// <summary>
 		/// Updates the current position within the input buffer
@@ -32,7 +33,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// The memory to read from
 		/// </summary>
-		public ReadOnlyMemory<byte> Memory
+		public ReadOnlyMemory<byte> RemainingMemory
 		{
 			get; private set;
 		}
@@ -40,7 +41,7 @@ namespace EpicGames.Core
 		/// <summary>
 		/// Returns the memory at the current offset
 		/// </summary>
-		public ReadOnlySpan<byte> Span => Memory.Span;
+		public ReadOnlySpan<byte> RemainingSpan => RemainingMemory.Span;
 
 		/// <summary>
 		/// Constructor
@@ -48,7 +49,7 @@ namespace EpicGames.Core
 		/// <param name="memory">The memory to read from</param>
 		public MemoryReader(ReadOnlyMemory<byte> memory)
 		{
-			Memory = memory;
+			RemainingMemory = memory;
 		}
 
 		/// <summary>
@@ -56,17 +57,17 @@ namespace EpicGames.Core
 		/// </summary>
 		public void CheckEmpty()
 		{
-			if (Memory.Length > 0)
+			if (RemainingMemory.Length > 0)
 			{
-				throw new Exception($"Serialization is not at expected offset within the input buffer ({Memory.Length} bytes unused)");
+				throw new Exception($"Serialization is not at expected offset within the input buffer ({RemainingMemory.Length} bytes unused)");
 			}
 		}
 
 		/// <inheritdoc/>
-		public ReadOnlyMemory<byte> GetMemory(int minSize) => Memory;
+		public ReadOnlyMemory<byte> GetMemory(int minSize) => RemainingMemory;
 
 		/// <inheritdoc/>
-		public void Advance(int length) => Memory = Memory.Slice(length);
+		public void Advance(int length) => RemainingMemory = RemainingMemory.Slice(length);
 	}
 
 	/// <summary>
@@ -199,6 +200,17 @@ namespace EpicGames.Core
 		}
 
 		/// <summary>
+		/// Reads a GUID from the memory buffer
+		/// </summary>
+		/// <param name="reader">Reader to deserialize from</param>
+		public static Guid ReadGuid(this IMemoryReader reader)
+		{
+			Guid guid = new Guid(reader.GetMemory(16).Slice(0, 16).Span);
+			reader.Advance(16);
+			return guid;
+		}
+
+		/// <summary>
 		/// Reads a sequence of bytes from the buffer
 		/// </summary>
 		/// <param name="reader">Reader to deserialize from</param>
@@ -230,6 +242,24 @@ namespace EpicGames.Core
 			ReadOnlyMemory<byte> bytes = reader.GetMemory(length).Slice(0, length);
 			reader.Advance(length);
 			return bytes;
+		}
+
+		/// <summary>
+		/// Reads a variable length list
+		/// </summary>
+		/// <param name="reader">Reader to deserialize from</param>
+		/// <param name="readItem">Delegate to write an individual item</param>
+		public static List<T> ReadList<T>(this IMemoryReader reader, Func<T> readItem)
+		{
+			int length = (int)reader.ReadUnsignedVarInt();
+
+			List<T> list = new List<T>(length);
+			for (int idx = 0; idx < length; idx++)
+			{
+				list.Add(readItem());
+			}
+
+			return list;
 		}
 
 		/// <summary>
@@ -269,6 +299,40 @@ namespace EpicGames.Core
 				array[idx] = readItem();
 			}
 			return array;
+		}
+
+		/// <summary>
+		/// Reads a dictionary from the writer
+		/// </summary>
+		/// <param name="reader">Reader to serialize from</param>
+		/// <param name="dictionary">The dictionary to read</param>
+		/// <param name="readKey">Delegate to write an individual key</param>
+		/// <param name="readValue">Delegate to write an individual value</param>
+		public static void ReadDictionary<TKey, TValue>(this IMemoryReader reader, Dictionary<TKey, TValue> dictionary, Func<TKey> readKey, Func<TValue> readValue) where TKey : notnull
+		{
+			int count = (int)reader.ReadUnsignedVarInt();
+			dictionary.EnsureCapacity(count);
+
+			for (int idx = 0; idx < count; idx++)
+			{
+				TKey key = readKey();
+				TValue value = readValue();
+				dictionary.Add(key, value);
+			}
+		}
+
+		/// <summary>
+		/// Reads a dictionary from the writer
+		/// </summary>
+		/// <param name="reader">Reader to serialize from</param>
+		/// <param name="readKey">Delegate to write an individual key</param>
+		/// <param name="readValue">Delegate to write an individual value</param>
+		/// <param name="comparer">Comparer for the new dictionary</param>
+		public static Dictionary<TKey, TValue> ReadDictionary<TKey, TValue>(this IMemoryReader reader, Func<TKey> readKey, Func<TValue> readValue, IEqualityComparer<TKey>? comparer = null) where TKey : notnull
+		{
+			Dictionary<TKey, TValue> dictionary = new Dictionary<TKey, TValue>(comparer);
+			ReadDictionary(reader, dictionary, readKey, readValue);
+			return dictionary;
 		}
 	}
 }

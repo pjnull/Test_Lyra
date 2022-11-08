@@ -19,7 +19,7 @@ namespace Horde.Build.Issues
 	using JobId = ObjectId<IJob>;
 	using LogId = ObjectId<ILogFile>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 	using UserId = ObjectId<IUser>;
 
 	/// <summary>
@@ -191,7 +191,7 @@ namespace Horde.Build.Issues
 		public string StreamName { get; set; }
 
 		/// <inheritdoc cref="IIssueSpan.TemplateRefId"/>
-		public TemplateRefId TemplateRefId { get; set; }
+		public TemplateId TemplateRefId { get; set; }
 
 		/// <inheritdoc cref="IIssueSpan.NodeName"/>
 		public string NodeName { get; set; }
@@ -214,7 +214,7 @@ namespace Horde.Build.Issues
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public NewIssueSpanData(StreamId streamId, string streamName, TemplateRefId templateRefId, string nodeName, NewIssueFingerprint fingerprint, NewIssueStepData firstFailure)
+		public NewIssueSpanData(StreamId streamId, string streamName, TemplateId templateRefId, string nodeName, NewIssueFingerprint fingerprint, NewIssueStepData firstFailure)
 		{
 			StreamId = streamId;
 			StreamName = streamName;
@@ -450,6 +450,7 @@ namespace Horde.Build.Issues
 		/// Try to update the state of an issue
 		/// </summary>
 		/// <param name="issue">The issue to update</param>
+		/// <param name="initiatedByUserId">User that is making the change</param>
 		/// <param name="newSeverity">New severity for the issue</param>
 		/// <param name="newSummary">New summary for the issue</param>
 		/// <param name="newUserSummary">New user summary for the issue</param>
@@ -465,8 +466,9 @@ namespace Horde.Build.Issues
 		/// <param name="newLastSeenAt"></param>
 		/// <param name="newExternalIssueKey">Issue key for external issue tracking</param>
 		/// <param name="newQuarantinedById">The user that quarantined the issue</param>
+		/// <param name="newForceClosedById">The user that force closed the issue</param>
 		/// <returns>True if the issue was updated</returns>
-		Task<IIssue?> TryUpdateIssueAsync(IIssue issue, IssueSeverity? newSeverity = null, string? newSummary = null, string? newUserSummary = null, string? newDescription = null, bool? newPromoted = null, UserId? newOwnerId = null, UserId? newNominatedById = null, bool? newAcknowledged = null, UserId? newDeclinedById = null, int? newFixChange = null, UserId? newResolvedById = null, List<ObjectId>? newExcludeSpanIds = null, DateTime? newLastSeenAt = null, string? newExternalIssueKey = null, UserId? newQuarantinedById = null);
+		Task<IIssue?> TryUpdateIssueAsync(IIssue issue, UserId? initiatedByUserId, IssueSeverity? newSeverity = null, string? newSummary = null, string? newUserSummary = null, string? newDescription = null, bool? newPromoted = null, UserId? newOwnerId = null, UserId? newNominatedById = null, bool? newAcknowledged = null, UserId? newDeclinedById = null, int? newFixChange = null, UserId? newResolvedById = null, List<ObjectId>? newExcludeSpanIds = null, DateTime? newLastSeenAt = null, string? newExternalIssueKey = null, UserId? newQuarantinedById = null, UserId? newForceClosedById = null);
 
 		/// <summary>
 		/// Updates derived data for an issue (ie. data computed from the spans attached to it). Also clears the issue's 'modified' state.
@@ -536,7 +538,7 @@ namespace Horde.Build.Issues
 		/// <param name="name">Name of the node</param>
 		/// <param name="change">Changelist number to query</param>
 		/// <returns>List of open issues</returns>
-		Task<List<IIssueSpan>> FindOpenSpansAsync(StreamId streamId, TemplateRefId templateId, string name, int change);
+		Task<List<IIssueSpan>> FindOpenSpansAsync(StreamId streamId, TemplateId templateId, string name, int change);
 
 		/// <summary>
 		/// Searches for open issues

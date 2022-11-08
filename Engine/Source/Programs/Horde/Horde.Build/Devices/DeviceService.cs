@@ -18,10 +18,10 @@ using Horde.Build.Utilities;
 using HordeCommon;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using OpenTracing;
 using OpenTracing.Util;
-
 
 namespace Horde.Build.Devices
 {
@@ -69,7 +69,7 @@ namespace Horde.Build.Devices
 	/// <summary>
 	/// Platform map required by V1 API
 	/// </summary>
-	[SingletonDocument("6165a2e26fd5f104e31e6862")]
+	[SingletonDocument("device-platform-map", "6165a2e26fd5f104e31e6862")]
 	public class DevicePlatformMapV1 : SingletonBase
 	{
 		/// <summary>
@@ -78,15 +78,10 @@ namespace Horde.Build.Devices
 		public Dictionary<string, DevicePlatformId> PlatformMap { get; set; } = new Dictionary<string, DevicePlatformId>();
 
 		/// <summary>
-		/// Platform Id => Platform V1
-		/// </summary>
-		public Dictionary<DevicePlatformId, string> PlatformReverseMap { get; set; } = new Dictionary<DevicePlatformId, string>();
-
-		/// <summary>
 		/// Perfspec V1 => Model
 		/// </summary>
 		public Dictionary<DevicePlatformId, string> PerfSpecHighMap { get; set; } = new Dictionary<DevicePlatformId, string>();
-
+		
 	}
 
 	/// <summary>
@@ -94,59 +89,38 @@ namespace Horde.Build.Devices
 	/// </summary>
 	public sealed class DeviceService : IHostedService, IDisposable
 	{
-		/// <summary>
-		/// The ACL service instance
-		/// </summary>
+		readonly GlobalsService _globalsService;
 		readonly AclService _aclService;
-
-		/// <summary>
-		/// Instance of the notification service
-		/// </summary>
 		readonly INotificationService _notificationService;
-
-		/// <summary>
-		/// Singleton instance of the job service
-		/// </summary>
 		readonly JobService _jobService;
-
-		/// <summary>
-		/// Singleton instance of the stream service
-		/// </summary>
 		readonly StreamService _streamService;
-
-		/// <summary>
-		/// Singleton instance of the project service
-		/// </summary>
 		readonly ProjectService _projectService;
-
-		/// <summary>
-		/// The user collection instance
-		/// </summary>
 		IUserCollection UserCollection { get; set; }
-
-		/// <summary>
-		/// Log output writer
-		/// </summary>
 		readonly ILogger<DeviceService> _logger;
-
-		/// <summary>
-		/// Device collection
-		/// </summary>
 		readonly IDeviceCollection _devices;
 		readonly ITicker _ticker;
 		readonly ITicker _telemetryTicker;
+		readonly IOptionsMonitor<ServerSettings> _settings;
 
 		/// <summary>
 		/// Platform map V1 singleton
 		/// </summary>
 		readonly ISingletonDocument<DevicePlatformMapV1> _platformMapSingleton;
 
+		bool runUpgrade = true;
+
+		/// <summary>
+		/// The number of days shared device sheckouts are held
+		/// </summary>
+		public int sharedDeviceCheckoutDays => _settings.CurrentValue.SharedDeviceCheckoutDays;
+
 		/// <summary>
 		/// Device service constructor
 		/// </summary>
-		public DeviceService(IDeviceCollection devices, ISingletonDocument<DevicePlatformMapV1> platformMapSingleton, IUserCollection userCollection, JobService jobService, ProjectService projectService, StreamService streamService, AclService aclService, INotificationService notificationService, IClock clock, ILogger<DeviceService> logger)
+		public DeviceService(GlobalsService globalsService, IDeviceCollection devices, ISingletonDocument<DevicePlatformMapV1> platformMapSingleton, IUserCollection userCollection, JobService jobService, ProjectService projectService, StreamService streamService, AclService aclService, IOptionsMonitor<ServerSettings> settings, INotificationService notificationService, IClock clock, ILogger<DeviceService> logger)
 		{
 			UserCollection = userCollection;
+			_globalsService = globalsService;
 			_devices = devices;
 			_jobService = jobService;
 			_projectService = projectService;
@@ -156,7 +130,7 @@ namespace Horde.Build.Devices
 			_ticker = clock.AddSharedTicker<DeviceService>(TimeSpan.FromMinutes(1.0), TickAsync, logger);
 			_telemetryTicker = clock.AddSharedTicker("DeviceService.Telemetry", TimeSpan.FromMinutes(10.0), TickTelemetryAsync, logger);
 			_logger = logger;
-
+			_settings = settings;
 			_platformMapSingleton = platformMapSingleton;
 
 		}
@@ -167,7 +141,6 @@ namespace Horde.Build.Devices
 			await _ticker.StartAsync();
 			await _telemetryTicker.StartAsync();
 		}
-		
 
 		/// <inheritdoc/>
 		public async Task StopAsync(CancellationToken cancellationToken)
@@ -188,6 +161,38 @@ namespace Horde.Build.Devices
 		/// </summary>
 		async ValueTask TickTelemetryAsync(CancellationToken stoppingToken)
 		{
+			try
+			{
+				IGlobals globals = await _globalsService.GetAsync();
+
+				if (globals.Config.Devices != null)
+				{
+					await _platformMapSingleton.UpdateAsync(platformMap => {
+
+						platformMap.PlatformMap.Clear();
+						platformMap.PerfSpecHighMap.Clear();
+
+						foreach (DevicePlatformConfig platform in globals.Config.Devices.Platforms)
+						{
+							DevicePlatformId id = new DevicePlatformId(platform.Id);
+							foreach (string name in platform.Names)
+							{
+								platformMap.PlatformMap[name] = id;
+							}
+
+							if (platform.LegacyPerfSpecHighModel != null)
+							{
+								platformMap.PerfSpecHighMap[id] = platform.LegacyPerfSpecHighModel;
+							}
+						}
+					} );
+				}				
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "Exception while updating platform map: {Message}", ex.Message);
+			}
+
 			if (!stoppingToken.IsCancellationRequested)
 			{
 				using IScope scope = GlobalTracer.Instance.BuildSpan("DeviceService.TickTelemetryAsync").StartActive();
@@ -206,6 +211,20 @@ namespace Horde.Build.Devices
 			{
 				using IScope scope = GlobalTracer.Instance.BuildSpan("DeviceService.TickAsync").StartActive();
 
+				if (runUpgrade)
+				{
+					try
+					{
+						await _devices.UpgradeAsync();
+						runUpgrade = false;
+					}
+					catch (Exception ex)
+					{
+						_logger.LogError(ex, "Exception while upgrading device collection: {Message}", ex.Message);
+					}
+
+				}
+
 				try
 				{
 					_logger.LogInformation("Expiring reservations");
@@ -216,13 +235,12 @@ namespace Horde.Build.Devices
 					_logger.LogError(ex, "Exception while expiring reservations: {Message}", ex.Message);
 				}
 
-
 				// expire shared devices and notifications
 				try
 				{
 
 					_logger.LogInformation("Sending shared device notifications");
-					List<(UserId, IDevice)>? expireNotifications = await _devices.ExpireNotificatonsAsync();
+					List<(UserId, IDevice)>? expireNotifications = await _devices.ExpireNotificatonsAsync(_settings.CurrentValue.SharedDeviceCheckoutDays);
 					if (expireNotifications != null && expireNotifications.Count > 0)
 					{
 						foreach ((UserId, IDevice) expiredDevice in expireNotifications)
@@ -232,7 +250,7 @@ namespace Horde.Build.Devices
 					}
 
 					_logger.LogInformation("Expiring shared device checkouts");
-					List<(UserId, IDevice)>? expireCheckouts = await _devices.ExpireCheckedOutAsync();
+					List<(UserId, IDevice)>? expireCheckouts = await _devices.ExpireCheckedOutAsync(_settings.CurrentValue.SharedDeviceCheckoutDays);
 					if (expireCheckouts != null && expireCheckouts.Count > 0)
 					{
 						foreach ((UserId, IDevice) expiredDevice in expireCheckouts)
@@ -253,7 +271,6 @@ namespace Horde.Build.Devices
 			await TickAsync(CancellationToken.None);
 			await TickTelemetryAsync(CancellationToken.None);
 		}
-
 
 		/// <summary>
 		/// Create a new device platform
@@ -342,7 +359,6 @@ namespace Horde.Build.Devices
 		{
 			return _devices.FindPoolTelemetryAsync(minCreateTime, maxCreateTime, index, count);
 		}
-
 
 		/// <summary>
 		/// Get a specific device
@@ -685,67 +701,6 @@ namespace Horde.Build.Devices
 		public async Task<DevicePlatformMapV1> GetPlatformMapV1()
 		{
 			return await _platformMapSingleton.GetAsync();
-		}
-
-		/// <summary>
-		/// Updates the platform mapping information required for the V1 api
-		/// </summary>				
-		public async Task<bool> UpdatePlatformMapAsync(UpdatePlatformMapRequest request)
-		{
-
-			List<IDevicePlatform> platforms = await GetPlatformsAsync();
-
-			// Update the platform map
-			for (int i = 0; i < 10; i++)
-			{
-				DevicePlatformMapV1 instance = await _platformMapSingleton.GetAsync();
-
-				instance.PlatformMap = new Dictionary<string, DevicePlatformId>();
-				instance.PlatformReverseMap = new Dictionary<DevicePlatformId, string>();
-				instance.PerfSpecHighMap = new Dictionary<DevicePlatformId, string>();
-
-				foreach(KeyValuePair<string, string> entry in request.PlatformMap)
-				{
-					IDevicePlatform? platform = platforms.FirstOrDefault(p => p.Id == new DevicePlatformId(entry.Value));
-					if (platform == null)
-					{
-						throw new Exception($"Unknowm platform in map {entry.Key} : {entry.Value}");
-					}
-
-					instance.PlatformMap.Add(entry.Key, platform.Id);
-				}
-
-				foreach (KeyValuePair<string, string> entry in request.PlatformReverseMap)
-				{
-					IDevicePlatform? platform = platforms.FirstOrDefault(p => p.Id == new DevicePlatformId(entry.Key));
-					if (platform == null)
-					{
-						throw new Exception($"Unknowm platform in reverse map {entry.Key} : {entry.Value}");
-					}
-
-					instance.PlatformReverseMap.Add(platform.Id, entry.Value);
-				}
-
-				foreach (KeyValuePair<string, string> entry in request.PerfSpecHighMap)
-				{
-					IDevicePlatform? platform = platforms.FirstOrDefault(p => p.Id == new DevicePlatformId(entry.Key));
-					if (platform == null)
-					{
-						throw new Exception($"Unknowm platform in spec map {entry.Key} : {entry.Value}");
-					}
-
-					instance.PerfSpecHighMap.Add(platform.Id, entry.Value);
-				}
-
-				if (await _platformMapSingleton.TryUpdateAsync(instance))
-				{
-					return true;
-				}
-
-				Thread.Sleep(1000);
-			}
-
-			return false;
 		}
 	}
 }

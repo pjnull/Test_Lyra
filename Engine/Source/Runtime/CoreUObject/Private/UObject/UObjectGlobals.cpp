@@ -68,6 +68,7 @@
 #include "UObject/PropertyWithSetterAndGetter.h"
 #include "UObject/AnyPackagePrivate.h"
 #include "UObject/UObjectGlobalsInternal.h"
+#include "Serialization/AsyncPackageLoader.h"
 #include "Containers/VersePath.h"
 
 #if UE_USE_VERSE_PATHS
@@ -1594,6 +1595,8 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
 		FCoreDelegates::OnSyncLoadPackage.Broadcast(PackagePath.GetPackageNameOrFallback());
 	}
 	
+	TRACE_LOADTIME_POSTLOAD_SCOPE;
+
 	// Set up a load context
 	TRefCountPtr<FUObjectSerializeContext> LoadContext = FUObjectThreadContext::Get().GetSerializeContext();
 
@@ -1601,6 +1604,18 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
 
 	// Try to load.
 	BeginLoad(LoadContext, *PackagePath.GetDebugName());
+
+	if (!ImportLinker)
+	{
+		TRACE_LOADTIME_BEGIN_REQUEST(0);
+	}
+	ON_SCOPE_EXIT
+	{
+		if (!ImportLinker)
+		{
+			TRACE_LOADTIME_END_REQUEST(0);
+		}
+	};
 
 	bool bFullyLoadSkipped = false;
 
@@ -1633,6 +1648,14 @@ UPackage* LoadPackageInternal(UPackage* InOuter, const FPackagePath& PackagePath
 		{
 			FUObjectSerializeContext* InOutLoadContext = LoadContext;
 			Linker = GetPackageLinker(InOuter, PackagePath, LoadFlags, nullptr, InReaderOverride, &InOutLoadContext, ImportLinker, InstancingContext);
+			if (ImportLinker)
+			{
+				TRACE_LOADTIME_ASYNC_PACKAGE_IMPORT_DEPENDENCY(ImportLinker, Linker);
+			}
+			else
+			{
+				TRACE_LOADTIME_ASYNC_PACKAGE_REQUEST_ASSOCIATION(Linker, 0);
+			}
 			if (InOutLoadContext != LoadContext && InOutLoadContext)
 			{
 				// The linker already existed and was associated with another context
@@ -1912,6 +1935,7 @@ UPackage* LoadPackage(UPackage* InOuter, const FPackagePath& PackagePath, uint32
 											FDynamicStats::CreateMemoryStatId<FStatGroup_STATGROUP_LLMAssets>(FName(*(FString(TEXT("Package ")) + PackagePath.GetPackageNameOrFallback()))).GetName() :
 											NAME_None,
 										 ELLMTagSet::Assets, ELLMTracker::Default);
+	TRACE_LOADTIME_REQUEST_GROUP_SCOPE(TEXT("SyncLoad - %s"), *PackagePath.GetDebugName());
 	return LoadPackageInternal(InOuter, PackagePath, LoadFlags, /*ImportLinker =*/ nullptr, InReaderOverride, InstancingContext, DiffPackagePath);
 }
 
@@ -2973,10 +2997,21 @@ UObject* StaticDuplicateObjectEx( FObjectDuplicationParameters& Parameters )
 				DuplicatedObject->PostDuplicate(Parameters.DuplicateMode);
 				if (!Parameters.bSkipPostLoad && !DuplicatedObject->IsTemplate())
 				{
-					// Don't want to call PostLoad on class duplicated CDOs
-					TGuardValue<bool> GuardIsRoutingPostLoad(FUObjectThreadContext::Get().IsRoutingPostLoad, true);
-					DuplicatedObject->ConditionalPostLoad();
+					// We skip post-loading during async loading if on the loader thread as we're going to handle it deferred on GT instead.
+					if (IsInGameThread())
+					{
+						// Don't want to call PostLoad on class duplicated CDOs
+						TGuardValue<bool> GuardIsRoutingPostLoad(FUObjectThreadContext::Get().IsRoutingPostLoad, true);
+						DuplicatedObject->ConditionalPostLoad();
+					}
+					else
+					{
+						// The only other thread that we allow to go through here is ALT because we know
+						// it is going to call post-load on new objects.
+						check(IsInAsyncLoadingThread());
+					}
 				}
+
 				DuplicatedObject->CheckDefaultSubobjects();
 			}
 		}
@@ -3023,6 +3058,8 @@ bool SaveToTransactionBuffer(UObject* Object, bool bMarkDirty)
 
 	if ( GUndo && bIsTransactional && bIsNotScriptPackage)
 	{
+		check(IsInGameThread());
+
 		// Mark the package dirty, if requested
 		if ( bMarkDirty )
 		{
@@ -3133,11 +3170,6 @@ bool StaticAllocateObjectErrorTests( const UClass* InClass, UObject* InOuter, FN
 }
 
 /**
-* Call back into the async loading code to inform of the creation of a new object
-*/
-void NotifyConstructedDuringAsyncLoading(UObject* Object, bool bSubObject);
-
-/**
 * For object overwrites, the class may want to persist some info over the re-initialize
 * this is only used for classes in the script compiler
 **/
@@ -3215,8 +3247,7 @@ UObject* StaticAllocateObject
 		// See if object already exists.
 		Obj = StaticFindObjectFastInternal( /*Class=*/ NULL, InOuter, InName, true );
 
-		// Temporary: If the object we found is of a different class, allow the object to be allocated.
-		// This breaks new UObject assumptions and these need to be fixed.
+		// It is an error if we are trying to replace an object of a different class
 		if (Obj && !Obj->GetClass()->IsChildOf(InClass))
 		{
 			const TCHAR* ErrorPrefix = TEXT("");
@@ -3245,6 +3276,8 @@ UObject* StaticAllocateObject
 	int32 TotalSize = InClass->GetPropertiesSize();
 	checkSlow(TotalSize);
 
+	int32 OldIndex = -1;
+
 	if( Obj == nullptr )
 	{	
 		int32 Alignment	= FMath::Max( 4, InClass->GetMinAlignment() );
@@ -3261,7 +3294,7 @@ UObject* StaticAllocateObject
 		// Remember linker, flags, index, and native class info.
 		Linker		= Obj->GetLinker();
 		LinkerIndex = Obj->GetLinkerIndex();
-		InternalSetFlags |= (Obj->GetInternalFlags() & (EInternalObjectFlags::Native | EInternalObjectFlags::RootSet));
+		InternalSetFlags |= (Obj->GetInternalFlags() & (EInternalObjectFlags::Native | EInternalObjectFlags::RootSet | EInternalObjectFlags::LoaderImport));
 
 		if ( bCreatingCDO )
 		{
@@ -3300,6 +3333,8 @@ UObject* StaticAllocateObject
 		// Subobjects are always created in the constructor, no need to re-create them here unless their archetype != CDO or they're blueprint generated.	
 		if (!bCreatingCDO && (!bCanRecycleSubobjects || !Obj->IsDefaultSubobject()))
 		{
+			OldIndex = GUObjectArray.ObjectToIndex(Obj);
+
 			// Destroy the object.
 			SCOPE_CYCLE_COUNTER(STAT_DestroyObject);
 			// Check that the object hasn't been destroyed yet.
@@ -3343,6 +3378,7 @@ UObject* StaticAllocateObject
 				Obj->ConditionalFinishDestroy();
 			}
 			GUObjectArray.LockInternalArray();
+			TGuardValue<bool> _(GUObjectArray.bShouldRecycleObjectIndices, false);
 			Obj->~UObject();
 			GUObjectArray.UnlockInternalArray();
 			bWasConstructedOnOldObject	= true;
@@ -3362,7 +3398,7 @@ UObject* StaticAllocateObject
 	if (!bSubObject)
 	{
 		FMemory::Memzero((void *)Obj, TotalSize);
-		new ((void *)Obj) UObjectBase(const_cast<UClass*>(InClass), InFlags|RF_NeedInitialization, InternalSetFlags, InOuter, InName);
+		new ((void *)Obj) UObjectBase(const_cast<UClass*>(InClass), InFlags|RF_NeedInitialization, InternalSetFlags, InOuter, InName, OldIndex);
 	}
 	else
 	{
@@ -3390,7 +3426,12 @@ UObject* StaticAllocateObject
 
 	if (IsInAsyncLoadingThread())
 	{
-		NotifyConstructedDuringAsyncLoading(Obj, bSubObject);
+		FUObjectThreadContext& ThreadContext = FUObjectThreadContext::Get();
+		if (ThreadContext.AsyncPackageLoader)
+		{
+			LLM_SCOPE(ELLMTag::AsyncLoading);
+			ThreadContext.AsyncPackageLoader->NotifyConstructedDuringAsyncLoading(Obj, bSubObject);
+		}
 	}
 	else
 	{

@@ -16,6 +16,9 @@ namespace UE::PoseSearch
 		UI_COMMAND(
 			ShowPoseFeaturesAll, "All Features", "Show all features",
 			EUserInterfaceActionType::RadioButton, FInputChord());
+		UI_COMMAND(
+			ShowPoseFeaturesDetailed, "Detailed Features", "Show all features with mode details",
+			EUserInterfaceActionType::RadioButton, FInputChord());
 
 		UI_COMMAND(
 			ShowAnimationNone, "None", "Don't show animations",
@@ -27,6 +30,7 @@ namespace UE::PoseSearch
 			ShowAnimationOriginalAndMirrored, "Original and mirrored", "Show original and mirrored animations",
 			EUserInterfaceActionType::RadioButton, FInputChord());
 
+		UI_COMMAND(ShowDisplayRootMotionSpeed, "Display Root Motion Speed", "Show root motion speed for the selected item", EUserInterfaceActionType::ToggleButton, FInputChord());
 	}
 }
 

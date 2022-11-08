@@ -69,6 +69,10 @@ export class Slack {
 	constructor(private channel: SlackChannel, private domain: string) {
 	}
 
+	async addUserToChannel(user: string, channel: string) {
+		return this.post('conversations.invite', {channel: channel, users:user,}, true)
+	}
+
 	async postMessage(message: SlackMessage) {
 		return (await this.post('chat.postMessage', this.makeArgs(message))).ts
 	}
@@ -98,8 +102,9 @@ export class Slack {
 		return this.get('groups.history', args)
 	}
 
-	async lookupUserIdByEmail(email: string) : Promise<string> {
-		return (await this.get('users.lookupByEmail', {token: this.channel.botToken, email})).user.id
+	async lookupUserIdByEmail(email: string) {
+		const userLookupResult = await this.get('users.lookupByEmail', {email}, true)
+		return userLookupResult.ok ? userLookupResult.user.id : null
 	}
 
 	async openDMConversation(users: string | string[]) : Promise<string> {
@@ -109,7 +114,7 @@ export class Slack {
 		return (await this.post('conversations.open', {token: this.channel.botToken, users})).channel.id
 	}
 
-	/*private*/ async post(command: string, args: any) {
+	/*private*/ async post(command: string, args: any, canFail? : boolean) {
 		const resultJson = await request.post({
 			url: this.domain + '/api/' + command,
 			body: JSON.stringify(args),
@@ -118,7 +123,7 @@ export class Slack {
 		})
 		try {
 			const result = JSON.parse(resultJson)
-			if (result.ok) {
+			if (result.ok || canFail) {
 				return result
 			}
 		}
@@ -128,7 +133,7 @@ export class Slack {
 		throw new Error(`${command} generated:\n\t${resultJson}`)
 	}
 
-	/*private*/ async get(command: string, args: any) {
+	/*private*/ async get(command: string, args: any, canFail? : boolean) {
 
 		// erg: why am I always passing a channel?
 		if (this.channel.id && !args.channel) {
@@ -146,11 +151,16 @@ export class Slack {
 			headers: {Authorization: 'Bearer ' + this.channel.botToken}
 		})
 
-		const result = JSON.parse(rawResult)
-		if (!result.ok) {
-			throw new Error(rawResult)
+		try {
+			const result = JSON.parse(rawResult)
+			if (result.ok || canFail) {
+				return result
+			}
 		}
-		return result
+		catch {
+		}
+		
+		throw new Error(`url: '${url}' error: '${rawResult}'`)
 	}
 
 	async* getPages(command: string, limit?: number, inArgs?: any) {

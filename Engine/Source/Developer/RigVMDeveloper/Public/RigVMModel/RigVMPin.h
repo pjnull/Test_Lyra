@@ -35,8 +35,10 @@ public:
 		bInjectedAsInput = true;
 	}
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	TObjectPtr<URigVMUnitNode> UnitNode_DEPRECATED;
+#endif
 
 	UPROPERTY()
 	TObjectPtr<URigVMNode> Node;
@@ -388,7 +390,7 @@ public:
 
 	// Returns true is the two provided source and target Pins
 	// can be linked to one another.
-	static bool CanLink(URigVMPin* InSourcePin, URigVMPin* InTargetPin, FString* OutFailureReason, const FRigVMByteCode* InByteCode, ERigVMPinDirection InUserLinkDirection = ERigVMPinDirection::IO, bool bInAllowWildcard = false);
+	static bool CanLink(URigVMPin* InSourcePin, URigVMPin* InTargetPin, FString* OutFailureReason, const FRigVMByteCode* InByteCode, ERigVMPinDirection InUserLinkDirection = ERigVMPinDirection::IO, bool bInAllowWildcard = false, bool bEnableTypeCasting = true);
 
 	// Returns true if this pin has injected nodes
 	bool HasInjectedNodes() const { return InjectionInfos.Num() > 0; }
@@ -513,8 +515,10 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<URigVMInjectionInfo>> InjectionInfos;
 
+#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	FString BoundVariablePath_DEPRECATED;
+#endif
 
 	mutable FString LastKnownCPPType;
 	mutable TRigVMTypeIndex LastKnownTypeIndex;

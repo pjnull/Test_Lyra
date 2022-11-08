@@ -4936,8 +4936,8 @@ int32 Describe(
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(GenerateReport);
 		TGuardValue<ELogTimes::Type> GuardPrintLogTimes(GPrintLogTimes, ELogTimes::None);
-		TGuardValue<bool> GuardPrintLogCategory(GPrintLogCategory, false);
-		TGuardValue<bool> GuardPrintLogVerbosity(GPrintLogVerbosity, false);
+		TGuardValue GuardPrintLogCategory(GPrintLogCategory, false);
+		TGuardValue GuardPrintLogVerbosity(GPrintLogVerbosity, false);
 
 		auto PackageObjectIndexToString = [&ScriptObjectByGlobalIdMap, &ExportByKeyMap](const FPackageDesc* Package, const FPackageObjectIndex& PackageObjectIndex, bool bIncludeName) -> FString
 		{
@@ -6644,6 +6644,7 @@ int32 CreateIoStoreContainerFiles(const TCHAR* CmdLine)
 		else
 		{
 			UE_LOG(LogIoStore, Error, TEXT("Invalid WriteBackMetdataToAssetRegistry value: %s - check setting in ProjectSettings -> Packaging"), *WriteBackMetadataToAssetRegistry);
+			UE_LOG(LogIoStore, Error, TEXT("Valid options are: AdjacentFile, OriginalFile, Disabled."), *WriteBackMetadataToAssetRegistry);
 			return -1;
 		}
 	}

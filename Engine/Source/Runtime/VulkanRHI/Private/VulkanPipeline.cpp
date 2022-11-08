@@ -918,6 +918,23 @@ FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets::FAttachme
 	return Ar;
 }
 
+void FGfxPipelineDesc::FRenderTargets::FStencilAttachmentRef::ReadFrom(const VkAttachmentReferenceStencilLayout& InState)
+{
+	Layout = (uint64)InState.stencilLayout;
+}
+
+void FGfxPipelineDesc::FRenderTargets::FStencilAttachmentRef::WriteInto(VkAttachmentReferenceStencilLayout& Out) const
+{
+	Out.stencilLayout = (VkImageLayout)Layout;
+}
+
+FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets::FStencilAttachmentRef& AttachmentRef)
+{
+	// Modify VERSION if serialization changes
+	Ar << AttachmentRef.Layout;
+	return Ar;
+}
+
 void FGfxPipelineDesc::FRenderTargets::FAttachmentDesc::ReadFrom(const VkAttachmentDescription &InState)
 {
 	Format =			(uint32)InState.format;
@@ -960,6 +977,27 @@ FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets::FAttachme
 	return Ar;
 }
 
+void FGfxPipelineDesc::FRenderTargets::FStencilAttachmentDesc::ReadFrom(const VkAttachmentDescriptionStencilLayout& InState)
+{
+	InitialLayout = (uint64)InState.stencilInitialLayout;
+	FinalLayout = (uint64)InState.stencilFinalLayout;
+}
+
+void FGfxPipelineDesc::FRenderTargets::FStencilAttachmentDesc::WriteInto(VkAttachmentDescriptionStencilLayout& Out) const
+{
+	Out.stencilInitialLayout = (VkImageLayout)InitialLayout;
+	Out.stencilFinalLayout = (VkImageLayout)FinalLayout;
+}
+
+FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets::FStencilAttachmentDesc& StencilAttachmentDesc)
+{
+	// Modify VERSION if serialization changes
+	Ar << StencilAttachmentDesc.InitialLayout;
+	Ar << StencilAttachmentDesc.FinalLayout;
+
+	return Ar;
+}
+
 void FGfxPipelineDesc::FRenderTargets::ReadFrom(const FVulkanRenderTargetLayout& RTLayout)
 {
 	NumAttachments =			RTLayout.NumAttachmentDescriptions;
@@ -986,7 +1024,8 @@ void FGfxPipelineDesc::FRenderTargets::ReadFrom(const FVulkanRenderTargetLayout&
 	};
 	CopyAttachmentRefs(ColorAttachments, RTLayout.ColorReferences, UE_ARRAY_COUNT(RTLayout.ColorReferences));
 	CopyAttachmentRefs(ResolveAttachments, RTLayout.ResolveReferences, UE_ARRAY_COUNT(RTLayout.ResolveReferences));
-	DepthStencil.ReadFrom(RTLayout.DepthStencilReference);
+	Depth.ReadFrom(RTLayout.DepthReference);
+	Stencil.ReadFrom(RTLayout.StencilReference);
 	FragmentDensity.ReadFrom(RTLayout.FragmentDensityReference);
 
 	Descriptions.AddZeroed(UE_ARRAY_COUNT(RTLayout.Desc));
@@ -994,6 +1033,7 @@ void FGfxPipelineDesc::FRenderTargets::ReadFrom(const FVulkanRenderTargetLayout&
 	{
 		Descriptions[Index].ReadFrom(RTLayout.Desc[Index]);
 	}
+	StencilDescription.ReadFrom(RTLayout.StencilDesc);
 }
 
 void FGfxPipelineDesc::FRenderTargets::WriteInto(FVulkanRenderTargetLayout& Out) const
@@ -1022,7 +1062,8 @@ void FGfxPipelineDesc::FRenderTargets::WriteInto(FVulkanRenderTargetLayout& Out)
 	};
 	CopyAttachmentRefs(ColorAttachments, Out.ColorReferences, UE_ARRAY_COUNT(Out.ColorReferences));
 	CopyAttachmentRefs(ResolveAttachments, Out.ResolveReferences, UE_ARRAY_COUNT(Out.ResolveReferences));
-	DepthStencil.WriteInto(Out.DepthStencilReference);
+	Depth.WriteInto(Out.DepthReference);
+	Stencil.WriteInto(Out.StencilReference);
 	FragmentDensity.WriteInto(Out.FragmentDensityReference);
 
 
@@ -1030,6 +1071,7 @@ void FGfxPipelineDesc::FRenderTargets::WriteInto(FVulkanRenderTargetLayout& Out)
 	{
 		Descriptions[Index].WriteInto(Out.Desc[Index]);
 	}
+	StencilDescription.WriteInto(Out.StencilDesc);
 }
 
 FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets& RTs)
@@ -1040,10 +1082,12 @@ FArchive& operator << (FArchive& Ar, FGfxPipelineDesc::FRenderTargets& RTs)
 	Ar << RTs.NumUsedClearValues;
 	Ar << RTs.ColorAttachments;
 	Ar << RTs.ResolveAttachments;
-	Ar << RTs.DepthStencil;
+	Ar << RTs.Depth;
+	Ar << RTs.Stencil;
 	Ar << RTs.FragmentDensity;
 
 	Ar << RTs.Descriptions;
+	Ar << RTs.StencilDescription;
 
 	Ar << RTs.bHasDepthStencil;
 	Ar << RTs.bHasResolveAttachments;
@@ -1217,6 +1261,7 @@ bool FVulkanPipelineStateCacheManager::CreateGfxPipelineFromEntry(FVulkanRHIGrap
 	PipelineInfo.pStages = ShaderStages;
 	// main_00000000_00000000
 	ANSICHAR EntryPoints[ShaderStage::NumStages][24];
+	VkPipelineShaderStageRequiredSubgroupSizeCreateInfo RequiredSubgroupSizeCreateInfo[ShaderStage::NumStages];
 	for (int32 ShaderStage = 0; ShaderStage < ShaderStage::NumStages; ++ShaderStage)
 	{
 		if (!ShaderModules[ShaderStage].IsValid())
@@ -1231,6 +1276,16 @@ bool FVulkanPipelineStateCacheManager::CreateGfxPipelineFromEntry(FVulkanRHIGrap
 		ShaderStages[PipelineInfo.stageCount].module = ShaderModules[CurrStage]->GetVkShaderModule();
 		Shaders[ShaderStage]->GetEntryPoint(EntryPoints[PipelineInfo.stageCount], 24);
 		ShaderStages[PipelineInfo.stageCount].pName = EntryPoints[PipelineInfo.stageCount];
+
+		const FVulkanShaderHeader& ShaderHeader = Shaders[CurrStage]->GetCodeHeader();
+		if ((ShaderHeader.WaveSize > 0) && Device->GetOptionalExtensions().HasEXTSubgroupSizeControl)
+		{
+			check((ShaderHeader.WaveSize >= GRHIMinimumWaveSize) && (ShaderHeader.WaveSize <= GRHIMaximumWaveSize));
+			ZeroVulkanStruct(RequiredSubgroupSizeCreateInfo[PipelineInfo.stageCount], VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO);
+			RequiredSubgroupSizeCreateInfo[PipelineInfo.stageCount].requiredSubgroupSize = ShaderHeader.WaveSize;
+			ShaderStages[PipelineInfo.stageCount].pNext = &RequiredSubgroupSizeCreateInfo[PipelineInfo.stageCount];
+		}
+
 		PipelineInfo.stageCount++;
 	}
 
@@ -1582,39 +1637,6 @@ static inline VkPrimitiveTopology UEToVulkanTopologyType(const FVulkanDevice* In
 		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	case PT_TriangleStrip:
 		return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	case PT_1_ControlPointPatchList:
-	case PT_2_ControlPointPatchList:
-	case PT_3_ControlPointPatchList:
-	case PT_4_ControlPointPatchList:
-	case PT_5_ControlPointPatchList:
-	case PT_6_ControlPointPatchList:
-	case PT_7_ControlPointPatchList:
-	case PT_8_ControlPointPatchList:
-	case PT_9_ControlPointPatchList:
-	case PT_10_ControlPointPatchList:
-	case PT_12_ControlPointPatchList:
-	case PT_13_ControlPointPatchList:
-	case PT_14_ControlPointPatchList:
-	case PT_15_ControlPointPatchList:
-	case PT_16_ControlPointPatchList:
-	case PT_17_ControlPointPatchList:
-	case PT_18_ControlPointPatchList:
-	case PT_19_ControlPointPatchList:
-	case PT_20_ControlPointPatchList:
-	case PT_22_ControlPointPatchList:
-	case PT_23_ControlPointPatchList:
-	case PT_24_ControlPointPatchList:
-	case PT_25_ControlPointPatchList:
-	case PT_26_ControlPointPatchList:
-	case PT_27_ControlPointPatchList:
-	case PT_28_ControlPointPatchList:
-	case PT_29_ControlPointPatchList:
-	case PT_30_ControlPointPatchList:
-	case PT_31_ControlPointPatchList:
-	case PT_32_ControlPointPatchList:
-		OutControlPoints = (PrimitiveType - PT_1_ControlPointPatchList + 1);
-		checkf(false, TEXT("Missing tessellation shaders, however tried to use EPrimitiveType %d (%d control points)"), (uint32)PrimitiveType, OutControlPoints);
-		break;
 	default:
 		checkf(false, TEXT("Unsupported EPrimitiveType %d"), (uint32)PrimitiveType);
 		break;
@@ -2127,6 +2149,16 @@ FVulkanComputePipeline* FVulkanPipelineStateCacheManager::CreateComputePipelineF
 	Shader->GetEntryPoint(EntryPoint, 24);
 	PipelineInfo.stage.pName = EntryPoint;
 	PipelineInfo.layout = ComputeLayout->GetPipelineLayout();
+
+	VkPipelineShaderStageRequiredSubgroupSizeCreateInfo RequiredSubgroupSizeCreateInfo;
+	if ((CSHeader.WaveSize > 0) && Device->GetOptionalExtensions().HasEXTSubgroupSizeControl)
+	{
+		check((CSHeader.WaveSize >= GRHIMinimumWaveSize) && (CSHeader.WaveSize <= GRHIMaximumWaveSize));
+		ZeroVulkanStruct(RequiredSubgroupSizeCreateInfo, VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO);
+		RequiredSubgroupSizeCreateInfo.requiredSubgroupSize = CSHeader.WaveSize;
+		PipelineInfo.stage.pNext = &RequiredSubgroupSizeCreateInfo;
+	}
+
 	VkResult Result;
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_VulkanComputePSOCreate);
@@ -2137,7 +2169,7 @@ FVulkanComputePipeline* FVulkanPipelineStateCacheManager::CreateComputePipelineF
 	if (Result != VK_SUCCESS)
 	{
 		FString ComputeHash = Shader->GetHash().ToString();
-		UE_LOG(LogVulkanRHI, Warning, TEXT("Failed to create graphics pipeline.\nShaders in pipeline: CS: %s"), *ComputeHash);
+		UE_LOG(LogVulkanRHI, Error, TEXT("Failed to create compute pipeline.\nShaders in pipeline: CS: %s"), *ComputeHash);
 	}
 
 	Pipeline->Layout = ComputeLayout;

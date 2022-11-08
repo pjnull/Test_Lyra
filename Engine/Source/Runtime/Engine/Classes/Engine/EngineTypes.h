@@ -866,7 +866,7 @@ enum { NumExtraFilterBits = 6 };
 // Otherwise it will mess up collision profile loading
 // If you change this, please also change FCollisionResponseContainers
 //
-// If you add any more TraceQuery="1", you also should change UCollsionProfile::LoadProfileConfig
+// If you add any more TraceQuery="1", you also should change UCollisionProfile::LoadProfileConfig
 // Metadata doesn't work outside of editor, so you'll need to add manually
 
 // @NOTE : when you add more here for predefined engine channel
@@ -2606,6 +2606,10 @@ struct FSkeletalMeshBuildSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BuildSettings)
 	uint8 bUseHighPrecisionTangentBasis:1;
 
+	/** Use 16-bit precision for rendering skin weights, instead of 8-bit precision. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BuildSettings)
+	uint8 bUseHighPrecisionSkinWeights:1;
+
 	/** If true, UVs will be stored at full floating point precision. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=BuildSettings)
 	uint8 bUseFullPrecisionUVs:1;
@@ -2638,11 +2642,12 @@ struct FSkeletalMeshBuildSettings
 		, bComputeWeightedNormals(false)
 		, bRemoveDegenerates(true)
 		, bUseHighPrecisionTangentBasis(false)
+		, bUseHighPrecisionSkinWeights(false)
 		, bUseFullPrecisionUVs(false)
 		, bUseBackwardsCompatibleF16TruncUVs(false)
-		, ThresholdPosition(0.00002)
-		, ThresholdTangentNormal(0.00002)
-		, ThresholdUV(0.0009765625)
+		, ThresholdPosition(0.00002f)
+		, ThresholdTangentNormal(0.00002f)
+		, ThresholdUV(0.0009765625f)
 		, MorphThresholdPosition(0.015f)
 	{}
 
@@ -2655,6 +2660,7 @@ struct FSkeletalMeshBuildSettings
 			&& bComputeWeightedNormals == Other.bComputeWeightedNormals
 			&& bRemoveDegenerates == Other.bRemoveDegenerates
 			&& bUseHighPrecisionTangentBasis == Other.bUseHighPrecisionTangentBasis
+			&& bUseHighPrecisionSkinWeights == Other.bUseHighPrecisionSkinWeights
 			&& bUseFullPrecisionUVs == Other.bUseFullPrecisionUVs
 			&& bUseBackwardsCompatibleF16TruncUVs == Other.bUseBackwardsCompatibleF16TruncUVs
 			&& ThresholdPosition == Other.ThresholdPosition

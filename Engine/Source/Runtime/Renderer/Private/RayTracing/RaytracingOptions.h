@@ -7,6 +7,7 @@
 #pragma once
 
 #include "RHIDefinitions.h"
+#include "RayTracingPayloadType.h"
 
 class FSkyLightSceneProxy;
 class FViewInfo;
@@ -76,6 +77,7 @@ extern float GetRaytracingMaxNormalBias();
 extern int32 GetRayTracingCulling();
 extern float GetRayTracingCullingRadius();
 extern bool IsRayTracingInstanceDebugDataEnabled(const FViewInfo& View);
+extern bool IsRayTracingInstanceOverlapEnabled(const FViewInfo& View);
 
 extern bool CanUseRayTracingAMDHitToken();
 
@@ -156,7 +158,12 @@ FORCEINLINE bool CanUseRayTracingAMDHitToken()
 	return false;
 }
 
-FORCEINLINE bool IsRayTracingInstanceDebugDataEnabled()
+FORCEINLINE bool IsRayTracingInstanceDebugDataEnabled(const FViewInfo& View)
+{
+	return false;
+}
+
+FORCEINLINE bool IsRayTracingInstanceOverlapEnabled(const FViewInfo& View)
 {
 	return false;
 }

@@ -160,6 +160,10 @@ void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 					SNew(SImage)
 					.Image(FAppStyle::GetBrush(TEXT("Icons.PlusCircle")))
 				]
+				.Visibility_Lambda([this]()
+				{
+					return IsRestricted() ? EVisibility::Collapsed : EVisibility::Visible;
+				})
 			];
 		}
 
@@ -189,7 +193,6 @@ void SRigSpacePickerWidget::Construct(const FArguments& InArgs)
 
 	SetControls(InArgs._Hierarchy, InArgs._Controls);
 	SetCanTick(true);
-	
 }
 
 SRigSpacePickerWidget::~SRigSpacePickerWidget()
@@ -472,12 +475,18 @@ void SRigSpacePickerWidget::AddSpacePickerRow(
 
 	if(!IsDefaultSpace(InKey))
 	{
+		const TAttribute<EVisibility> RestrictedVisibility = TAttribute<EVisibility>::CreateLambda([this]
+		{
+			return IsRestricted() ? EVisibility::Collapsed : EVisibility::Visible;
+		});
+		
 		if(bAllowDelete || bAllowReorder)
 		{
 			RowBox->AddSlot()
 			.FillWidth(1.f)
 			[
 				SNew(SSpacer)
+				.Visibility(RestrictedVisibility)
 			];
 		}
 		
@@ -500,6 +509,7 @@ void SRigSpacePickerWidget::AddSpacePickerRow(
 					.Image(FAppStyle::GetBrush("Icons.ChevronUp"))
 					.ColorAndOpacity(FSlateColor::UseForeground())
 				]
+				.Visibility(RestrictedVisibility)
 			];
 
 			RowBox->AddSlot()
@@ -519,18 +529,22 @@ void SRigSpacePickerWidget::AddSpacePickerRow(
 					.Image(FAppStyle::GetBrush("Icons.ChevronDown"))
 					.ColorAndOpacity(FSlateColor::UseForeground())
 				]
+				.Visibility(RestrictedVisibility)
 			];
 		}
 
 		if(bAllowDelete)
 		{
+			const TSharedRef<SWidget> ClearButton = PropertyCustomizationHelpers::MakeClearButton(FSimpleDelegate::CreateSP(this, &SRigSpacePickerWidget::HandleSpaceDelete, InKey), LOCTEXT("DeleteSpace", "Remove this space."), true);
+			ClearButton->SetVisibility(RestrictedVisibility);
+
 			RowBox->AddSlot()
 			.AutoWidth()
 			.VAlign(VAlign_Center)
 			.HAlign(HAlign_Left)
 			.Padding(0)
 			[
-				PropertyCustomizationHelpers::MakeClearButton(FSimpleDelegate::CreateSP(this, &SRigSpacePickerWidget::HandleSpaceDelete, InKey), LOCTEXT("DeleteSpace", "Remove this space."), true)
+				ClearButton
 			];
 		}
 	}
@@ -754,6 +768,24 @@ FReply SRigSpacePickerWidget::HandleAddElementClicked()
 	});
 
 	return FReply::Handled().SetUserFocus(SearchableTreeView->GetSearchBox(), EFocusCause::SetDirectly);
+}
+
+bool SRigSpacePickerWidget::IsRestricted() const
+{
+	if(URigHierarchy* CurrentHierarchy = GetHierarchy())
+	{
+		for(const FRigElementKey& Control : GetControls())
+		{
+			if(const FRigControlElement* ControlElement = CurrentHierarchy->Find<FRigControlElement>(Control))
+			{
+				if(ControlElement->Settings.bRestrictSpaceSwitching)
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
 }
 
 bool SRigSpacePickerWidget::IsSpaceMoveUpEnabled(FRigElementKey InKey) const

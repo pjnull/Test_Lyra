@@ -17,6 +17,7 @@
 #include "USDTypesConversion.h"
 
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/LightComponentBase.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -412,12 +413,6 @@ USceneComponent* FUsdGeomXformableTranslator::CreateComponentsEx( TOptional< TSu
 			}
 #endif // WITH_EDITOR
 
-			// Hack to show transient actors in world outliner
-			if (SpawnedActor->HasAnyFlags(EObjectFlags::RF_Transient))
-			{
-				SpawnedActor->Tags.AddUnique( TEXT("SequencerActor") );
-			}
-
 			SceneComponent = SpawnedActor->GetRootComponent();
 
 			ComponentOuter = SpawnedActor;
@@ -462,9 +457,14 @@ USceneComponent* FUsdGeomXformableTranslator::CreateComponentsEx( TOptional< TSu
 				}
 				// If this is a component for a point instancer that just collapsed itself into a static mesh, just make
 				// a static mesh component that can receive it
-				else if ( Context->bCollapseTopLevelPointInstancers && pxr::UsdPrim{ Prim }.IsA<pxr::UsdGeomPointInstancer>() )
+				else if ( pxr::UsdPrim{ Prim }.IsA<pxr::UsdGeomPointInstancer>() )
 				{
-					ComponentType = UStaticMeshComponent::StaticClass();
+					static IConsoleVariable* CollapseCvar =
+						IConsoleManager::Get().FindConsoleVariable( TEXT( "USD.CollapseTopLevelPointInstancers" ) );
+					if ( CollapseCvar && CollapseCvar->GetBool() )
+					{
+						ComponentType = UStaticMeshComponent::StaticClass();
+					}
 				}
 			}
 		}
@@ -513,7 +513,11 @@ USceneComponent* FUsdGeomXformableTranslator::CreateComponentsEx( TOptional< TSu
 		}
 		else
 		{
-			SceneComponent->Mobility = UsdUtils::IsAnimated( Prim ) ? EComponentMobility::Movable : EComponentMobility::Static;
+			SceneComponent->Mobility = UsdUtils::IsAnimated( Prim )
+				? EComponentMobility::Movable
+				: SceneComponent->IsA<ULightComponentBase>()	// Lights need to be stationary by default
+					? EComponentMobility::Stationary
+					: EComponentMobility::Static;
 		}
 
 		// Attach to parent

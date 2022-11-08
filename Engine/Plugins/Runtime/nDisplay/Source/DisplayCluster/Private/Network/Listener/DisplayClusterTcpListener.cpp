@@ -38,7 +38,6 @@ FDisplayClusterTcpListener::~FDisplayClusterTcpListener()
 	ThreadObj.Reset();
 }
 
-
 bool FDisplayClusterTcpListener::StartListening(const FString& InAddr, const uint16 InPort)
 {
 	FScopeLock Lock(&InternalsCS);

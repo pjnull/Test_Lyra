@@ -17,12 +17,13 @@ class FScene;
 class FRDGBuilder;
 struct FMinimalSceneTextures;
 struct FScreenPassTexture;
+struct FDBufferTextures;
 
 BEGIN_SHADER_PARAMETER_STRUCT(FStrataBasePassUniformParameters, )
 	SHADER_PARAMETER(uint32, MaxBytesPerPixel)
 	SHADER_PARAMETER(uint32, bRoughDiffuse)
 	SHADER_PARAMETER(uint32, PeelLayersAboveDepth)
-	SHADER_PARAMETER(int32,  SliceStoringDebugStrataTree)
+	SHADER_PARAMETER(int32, SliceStoringDebugStrataTreeDataWithoutMRT)
 	SHADER_PARAMETER(int32, FirstSliceStoringStrataSSSDataWithoutMRT)
 	SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2DArray<uint>, MaterialTextureArrayUAVWithoutRTs)
 	SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float3>, OpaqueRoughRefractionTextureUAV)
@@ -47,7 +48,7 @@ BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(FStrataGlobalUniformParameters, RENDERER_AP
 	SHADER_PARAMETER(uint32, MaxBytesPerPixel)
 	SHADER_PARAMETER(uint32, bRoughDiffuse)
 	SHADER_PARAMETER(uint32, PeelLayersAboveDepth)
-	SHADER_PARAMETER(int32,  SliceStoringDebugStrataTree)
+	SHADER_PARAMETER(int32,  SliceStoringDebugStrataTreeData)
 	SHADER_PARAMETER(int32,  FirstSliceStoringStrataSSSData)
 	SHADER_PARAMETER(uint32, TileSize)
 	SHADER_PARAMETER(uint32, TileSizeLog2)
@@ -66,11 +67,14 @@ END_GLOBAL_SHADER_PARAMETER_STRUCT()
 // This must map to the STRATA_TILE_TYPE defines.
 enum EStrataTileType : uint32
 {
-	ESimple  = STRATA_TILE_TYPE_SIMPLE,
-	ESingle = STRATA_TILE_TYPE_SINGLE,
-	EComplex = STRATA_TILE_TYPE_COMPLEX,
-	EOpaqueRoughRefraction = STRATA_TILE_TYPE_ROUGH_REFRACT,
-	ESSSWithoutOpaqueRoughRefraction = STRATA_TILE_TYPE_SSS_WITHOUT_ROUGH_REFRACT,
+	ESimple								= STRATA_TILE_TYPE_SIMPLE,
+	ESingle								= STRATA_TILE_TYPE_SINGLE,
+	EComplex							= STRATA_TILE_TYPE_COMPLEX,
+	EOpaqueRoughRefraction				= STRATA_TILE_TYPE_ROUGH_REFRACT,
+	EOpaqueRoughRefractionSSSWithout	= STRATA_TILE_TYPE_ROUGH_REFRACT_SSS_WITHOUT,
+	EDecalSimple						= STRATA_TILE_TYPE_DECAL_SIMPLE,
+	EDecalSingle						= STRATA_TILE_TYPE_DECAL_SINGLE,
+	EDecalComplex						= STRATA_TILE_TYPE_DECAL_COMPLEX,
 	ECount
 };
 
@@ -82,7 +86,8 @@ struct FStrataSceneData
 	bool bRoughDiffuse;
 	int32 PeelLayersAboveDepth;
 
-	int32 SliceStoringDebugStrataTree;
+	int32 SliceStoringDebugStrataTreeDataWithoutMRT;
+	int32 SliceStoringDebugStrataTreeData;
 	int32 FirstSliceStoringStrataSSSDataWithoutMRT;
 	int32 FirstSliceStoringStrataSSSData;
 
@@ -110,6 +115,9 @@ struct FStrataSceneData
 
 struct FStrataViewData
 {
+	// Max BSDF count among all visible materials
+	uint32 MaxBSDFCount = 0;
+
 	FIntPoint TileCount  = FIntPoint(0, 0);
 	FIntPoint TileOffset = FIntPoint(0, 0);
 	FIntPoint OverflowTileCount = FIntPoint(0, 0);
@@ -144,8 +152,9 @@ constexpr uint32 StencilBit_Single = 0x10; // In sync with SceneRenderTargets.h 
 constexpr uint32 StencilBit_Complex= 0x20; // In sync with SceneRenderTargets.h - GET_STENCIL_BIT_MASK(STENCIL_STRATA_COMPLEX)
 
 bool IsStrataEnabled();
+bool IsStrataDbufferPassEnabled(const EShaderPlatform Platform);
 
-FIntPoint GetStrataTextureResolution(const FIntPoint& InResolution);
+FIntPoint GetStrataTextureResolution(const FViewInfo& View, const FIntPoint& InResolution);
 
 void InitialiseStrataFrameSceneData(FRDGBuilder& GraphBuilder, FSceneRenderer& SceneRenderer);
 
@@ -157,7 +166,8 @@ void AppendStrataMRTs(const FSceneRenderer& SceneRenderer, uint32& BasePassTextu
 void SetBasePassRenderTargetOutputFormat(const EShaderPlatform Platform, const FMaterialShaderParameters& MaterialParameters, FShaderCompilerEnvironment& OutEnvironment, EGBufferLayout GBufferLayout);
 
 
-void AddStrataMaterialClassificationPass(FRDGBuilder& GraphBuilder, const FMinimalSceneTextures& SceneTextures, const TArray<FViewInfo>& Views);
+void AddStrataMaterialClassificationPass(FRDGBuilder& GraphBuilder, const FMinimalSceneTextures& SceneTextures, const FDBufferTextures& DBufferTextures, const TArray<FViewInfo>& Views);
+void AddStrataDBufferPass(FRDGBuilder& GraphBuilder, const FMinimalSceneTextures& SceneTextures, const FDBufferTextures& DBufferTextures, const TArray<FViewInfo>& Views);
 
 void AddStrataStencilPass(FRDGBuilder& GraphBuilder, const TArray<FViewInfo>& Views, const FMinimalSceneTextures& SceneTextures);
 
@@ -208,8 +218,4 @@ FStrataTilePassVS::FParameters SetTileParameters(FRDGBuilder& GraphBuilder, cons
 FStrataTilePassVS::FParameters SetTileParameters(const FViewInfo& View, const EStrataTileType Type, EPrimitiveType& PrimitiveType);
 uint32 TileTypeDrawIndirectArgOffset(const EStrataTileType Type);
 uint32 TileTypeDispatchIndirectArgOffset(const EStrataTileType Type);
-
-bool ShouldRenderStrataRoughRefractionRnD();
-void StrataRoughRefractionRnD(FRDGBuilder& GraphBuilder, const FViewInfo& View, FScreenPassTexture& ScreenPassSceneColor);
-
 };

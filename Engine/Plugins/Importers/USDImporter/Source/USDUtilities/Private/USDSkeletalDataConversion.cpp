@@ -25,6 +25,7 @@
 #include "Animation/AnimCurveTypes.h"
 #include "AnimationRuntime.h"
 #include "AnimEncoding.h"
+#include "BoneWeights.h"
 #include "ControlRig.h"
 #include "Evaluation/MovieSceneSequenceTransform.h"
 #include "IMovieScenePlayer.h"
@@ -435,11 +436,11 @@ namespace SkelDataConversionImpl
 		Skeleton->AddSmartNameAndModify( USkeleton::AnimCurveMappingName, CurveName, NewName );
 
 		const bool bShouldTransact = false;
-		const UAnimDataModel* DataModel = Sequence->GetDataModel();
+		const IAnimationDataModel* DataModel = Sequence->GetDataModel();
 		IAnimationDataController& Controller = Sequence->GetController();
 
-		FAnimationCurveIdentifier CurveId( NewName, ERawCurveTrackTypes::RCT_Float );
-		const FFloatCurve* Curve = DataModel->FindFloatCurve( CurveId );
+		FAnimationCurveIdentifier CurveId(NewName, ERawCurveTrackTypes::RCT_Float);
+		const FFloatCurve* Curve = DataModel->FindFloatCurve(CurveId);
 		if ( !Curve )
 		{
 			// If curve doesn't exist, add one
@@ -853,7 +854,7 @@ namespace UnrealToUsdImpl
 								int32 BoneIndex = Section.BoneMap[ Vertex.InfluenceBones[ InfluenceIndex ] ];
 
 								JointIndices.push_back( BoneIndex );
-								JointWeights.push_back( Vertex.InfluenceWeights[ InfluenceIndex ] / 255.0f );
+								JointWeights.push_back( Vertex.InfluenceWeights[ InfluenceIndex ] / UE::AnimationCore::MaxRawBoneWeightFloat );
 							}
 						}
 					}
@@ -1397,27 +1398,54 @@ bool UsdToUnreal::ConvertSkinnedMesh(
 	// We want to combine identical slots for skeletal meshes, which is different to static meshes, where each section gets a slot
 	// Note: This is a different index remapping to the one that happens for LODs, using LODMaterialMap! Here we're combining meshes of the same LOD
 	TMap<UsdUtils::FUsdPrimMaterialSlot, int32> SlotToCombinedMaterialIndex;
-	TMap<int32, int32> LocalToCombinedMaterialIndex;
+
+	// Position 3 in this has the value 6 --> Local material slot #3 is actually the combined material slot #6
+	TArray<int32> LocalToCombinedMaterialIndex;
+	LocalToCombinedMaterialIndex.SetNumZeroed( LocalInfo.Slots.Num() );
+
 	for (int32 Index = 0; Index < MaterialAssignments.Num(); ++Index)
 	{
-		SlotToCombinedMaterialIndex.Add( MaterialAssignments[ Index ], Index );
-	}
-	for (int32 LocalIndex = 0; LocalIndex < LocalInfo.Slots.Num(); ++LocalIndex)
-	{
-		UsdUtils::FUsdPrimMaterialSlot& LocalSlot = LocalInfo.Slots[LocalIndex];
+		const UsdUtils::FUsdPrimMaterialSlot& Slot = MaterialAssignments[ Index ];
 
-		int32 CombinedMaterialIndex = INDEX_NONE;
-		if ( int32* FoundCombinedMaterialIndex = SlotToCombinedMaterialIndex.Find( LocalSlot ) )
+		// Combine entries in this way so that we can append PrimPaths
+		TMap< UsdUtils::FUsdPrimMaterialSlot, int32 >::TKeyIterator KeyIt = SlotToCombinedMaterialIndex.CreateKeyIterator( Slot );
+		if ( KeyIt )
 		{
-			CombinedMaterialIndex = *FoundCombinedMaterialIndex;
+			KeyIt.Key().PrimPaths.Append( Slot.PrimPaths );
+			KeyIt.Value() = Index;
 		}
 		else
 		{
-			CombinedMaterialIndex = MaterialAssignments.Add( LocalSlot );
-			SlotToCombinedMaterialIndex.Add( LocalSlot, CombinedMaterialIndex );
+			SlotToCombinedMaterialIndex.Add( Slot, Index );
 		}
+	}
+	for (int32 LocalIndex = 0; LocalIndex < LocalInfo.Slots.Num(); ++LocalIndex)
+	{
+		const UsdUtils::FUsdPrimMaterialSlot& LocalSlot = LocalInfo.Slots[ LocalIndex ];
 
-		LocalToCombinedMaterialIndex.Add( LocalIndex, CombinedMaterialIndex );
+		// Combine entries in this way so that we can append PrimPaths
+		TMap< UsdUtils::FUsdPrimMaterialSlot, int32 >::TKeyIterator KeyIt = SlotToCombinedMaterialIndex.CreateKeyIterator( LocalSlot );
+		if ( KeyIt )
+		{
+			KeyIt.Key().PrimPaths.Append( LocalSlot.PrimPaths );
+
+			const int32 ExistingCombinedIndex = KeyIt.Value();
+			LocalToCombinedMaterialIndex[ LocalIndex ] = ExistingCombinedIndex;
+		}
+		else
+		{
+			int32 NewIndex = MaterialAssignments.Add( LocalSlot );
+			SlotToCombinedMaterialIndex.Add( LocalSlot, NewIndex );
+			LocalToCombinedMaterialIndex[ LocalIndex ] = NewIndex;
+		}
+	}
+	// Now that we merged all prim paths into they keys of CombinedMaterialSlotsToIndex, let's copy them back into
+	// our output
+	for ( UsdUtils::FUsdPrimMaterialSlot& Slot : MaterialAssignments )
+	{
+		TMap< UsdUtils::FUsdPrimMaterialSlot, int32 >::TKeyIterator KeyIt = SlotToCombinedMaterialIndex.CreateKeyIterator( Slot );
+		ensure( KeyIt );
+		Slot.PrimPaths = KeyIt.Key().PrimPaths;
 	}
 
 	// Retrieve vertex colors
@@ -1638,10 +1666,10 @@ bool UsdToUnreal::ConvertSkinnedMesh(
 
 		// Manage materials
 		int32 LocalMaterialIndex = 0;
-		if ( FaceMaterialIndices.IsValidIndex( PolygonIndex ) )
+		if ( FaceMaterialIndices.IsValidIndex( LocalIndex ) )
 		{
-			LocalMaterialIndex = FaceMaterialIndices[ PolygonIndex ];
-			if ( !LocalMaterialSlots.IsValidIndex(LocalMaterialIndex) )
+			LocalMaterialIndex = FaceMaterialIndices[ LocalIndex ];
+			if ( !LocalMaterialSlots.IsValidIndex( LocalMaterialIndex ) )
 			{
 				LocalMaterialIndex = 0;
 			}
@@ -1762,13 +1790,15 @@ bool UsdToUnreal::ConvertSkinnedMesh(
 	VtArray<float> JointWeights;
 	SkinningQuery.ComputeVaryingJointInfluences(NumPoints, &JointIndices, &JointWeights);
 
-	// Recompute the joint influences if it's above the limit
+	// Recompute the joint influences if we need to
 	uint32 NumInfluencesPerComponent = SkinningQuery.GetNumInfluencesPerComponent();
-	if (NumInfluencesPerComponent > MAX_INFLUENCES_PER_STREAM)
+	const uint32 MaxAllowedInfluences = EXTRA_BONE_INFLUENCES;
+	const bool bUseUnlimitedBoneInfluences = FGPUBaseSkinVertexFactory::UseUnlimitedBoneInfluences( NumInfluencesPerComponent );
+	if ( NumInfluencesPerComponent > MaxAllowedInfluences && !bUseUnlimitedBoneInfluences )
 	{
-		UsdSkelResizeInfluences(&JointIndices, NumInfluencesPerComponent, MAX_INFLUENCES_PER_STREAM);
-		UsdSkelResizeInfluences(&JointWeights, NumInfluencesPerComponent, MAX_INFLUENCES_PER_STREAM);
-		NumInfluencesPerComponent = MAX_INFLUENCES_PER_STREAM;
+		UsdSkelResizeInfluences( &JointIndices, NumInfluencesPerComponent, MaxAllowedInfluences );
+		UsdSkelResizeInfluences( &JointWeights, NumInfluencesPerComponent, MaxAllowedInfluences );
+		NumInfluencesPerComponent = MaxAllowedInfluences;
 	}
 
 	// We keep track of which influences we added because we combine many Mesh prim (each with potentially a different
@@ -2086,6 +2116,7 @@ bool UsdToUnreal::ConvertSkelAnim(
 	// it will also create a transaction when importing into UE assets, and the level sequence assets can emit some warnings about it
 	const bool bShouldTransact = false;
 	Controller.OpenBracket( LOCTEXT( "ImportUSDAnimData_Bracket", "Importing USD Animation Data" ), bShouldTransact );
+	Controller.InitializeModel();
 	Controller.ResetModel( bShouldTransact );
 
 	// Bake the animation for each frame.
@@ -2341,8 +2372,11 @@ bool UsdToUnreal::ConvertSkelAnim(
 	OutSkeletalAnimationAsset->ImportFileFramerate = LayerTimeCodesPerSecond;
 	OutSkeletalAnimationAsset->ImportResampleFramerate = LayerTimeCodesPerSecond;
 
-	Controller.SetPlayLength( LayerSequenceLengthSeconds, bShouldTransact );
-	Controller.SetFrameRate( FFrameRate( LayerTimeCodesPerSecond, 1 ), bShouldTransact );
+
+	const FFrameRate FrameRate(LayerTimeCodesPerSecond, 1);
+	Controller.SetFrameRate(FrameRate, bShouldTransact);
+	const FFrameNumber FrameNumber = FrameRate.AsFrameNumber(LayerSequenceLengthSeconds);
+	Controller.SetNumberOfFrames(FrameNumber, bShouldTransact);
 	Controller.NotifyPopulated(); // This call is important to get the controller to not use the sampling frequency as framerate
 	Controller.CloseBracket( bShouldTransact );
 
@@ -2881,6 +2915,15 @@ bool UnrealToUsd::ConvertSkeleton( const FReferenceSkeleton& ReferenceSkeleton, 
 	{
 		pxr::UsdAttribute BindTransformsAttr = UsdSkeleton.CreateBindTransformsAttr();
 		BindTransformsAttr.Set( WorldSpaceJointTransforms );
+	}
+
+	// Use Guide purpose on skeletons by default, unless it has some specific purpose set already
+	if ( pxr::UsdAttribute PurposeAttr = UsdSkeleton.GetPurposeAttr() )
+	{
+		if ( !PurposeAttr.HasAuthoredValue() )
+		{
+			PurposeAttr.Set( pxr::UsdGeomTokens->guide );
+		}
 	}
 
 	return true;

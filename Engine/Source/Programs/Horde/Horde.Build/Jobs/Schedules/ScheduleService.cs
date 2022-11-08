@@ -31,7 +31,7 @@ namespace Horde.Build.Jobs.Schedules
 {
 	using JobId = ObjectId<IJob>;
 	using StreamId = StringId<IStream>;
-	using TemplateRefId = StringId<TemplateRef>;
+	using TemplateId = StringId<ITemplateRef>;
 
 	/// <summary>
 	/// Manipulates schedule instances
@@ -45,13 +45,13 @@ namespace Horde.Build.Jobs.Schedules
 			public StreamId StreamId { get; set; }
 
 			[CbField("tid")]
-			public TemplateRefId TemplateId { get; set; }
+			public TemplateId TemplateId { get; set; }
 
 			public QueueItem()
 			{
 			}
 
-			public QueueItem(StreamId streamId, TemplateRefId templateId)
+			public QueueItem(StreamId streamId, TemplateId templateId)
 			{
 				StreamId = streamId;
 				TemplateId = templateId;
@@ -61,83 +61,8 @@ namespace Horde.Build.Jobs.Schedules
 			public static double GetScoreFromTime(DateTime time) => (time.ToUniversalTime() - DateTime.UnixEpoch).TotalSeconds;
 		}
 
-		class PerforceHistory
-		{
-			readonly IPerforceService _perforce;
-			readonly string _clusterName;
-			readonly string _streamName;
-			int _maxResults;
-			readonly List<ChangeDetails> _changes = new List<ChangeDetails>();
-			int _nextIndex;
-
-			public PerforceHistory(IPerforceService perforce, string clusterName, string streamName)
-			{
-				_perforce = perforce;
-				_clusterName = clusterName;
-				_streamName = streamName;
-				_maxResults = 10;
-			}
-
-			async ValueTask<ChangeDetails?> GetChangeAtIndexAsync(int index)
-			{
-				while (index >= _changes.Count)
-				{
-					List<ChangeSummary> newChanges = await _perforce.GetChangesAsync(_clusterName, _streamName, null, null, _maxResults, null);
-
-					int numResults = newChanges.Count;
-					if (_changes.Count > 0)
-					{
-						newChanges.RemoveAll(x => x.Number >= _changes[^1].Number);
-					}
-					if (newChanges.Count == 0 && numResults < _maxResults)
-					{
-						return null;
-					}
-					if(newChanges.Count > 0)
-					{
-						_changes.AddRange((await _perforce.GetChangeDetailsAsync(_clusterName, _streamName, newChanges.ConvertAll(x => x.Number), null)).OrderByDescending(x => x.Number));
-					}
-					_maxResults += 10;
-				}
-				return _changes[index];
-			}
-
-			public async ValueTask<ChangeDetails?> GetNextChangeAsync()
-			{
-				ChangeDetails? details = await GetChangeAtIndexAsync(_nextIndex);
-				if (details != null)
-				{
-					_nextIndex++;
-				}
-				return details;
-			}
-
-			public async ValueTask<int> GetCodeChange(int change)
-			{
-				int index = _changes.BinarySearch(x => -x.Number, -change);
-				if (index < 0)
-				{
-					index = ~index;
-				}
-
-				for (; ; )
-				{
-					ChangeDetails? details = await GetChangeAtIndexAsync(index);
-					if (details == null)
-					{
-						return 0;
-					}
-					if ((details.GetContentFlags() & ChangeContentFlags.ContainsCode) != 0)
-					{
-						return details.Number;
-					}
-					index++;
-				}
-			}
-		}
-
 		readonly IGraphCollection _graphs;
-		readonly IPerforceService _perforce;
+		readonly ICommitService _commitService;
 		readonly IJobCollection _jobCollection;
 		readonly JobService _jobService;
 		readonly StreamService _streamService;
@@ -154,10 +79,10 @@ namespace Horde.Build.Jobs.Schedules
 		/// <summary>
 		/// Constructor
 		/// </summary>
-		public ScheduleService(RedisService redis, IGraphCollection graphs, IPerforceService perforce, IJobCollection jobCollection, JobService jobService, StreamService streamService, ITemplateCollection templateCollection, MongoService mongoService, IClock clock, IOptionsMonitor<ServerSettings> settings, ILogger<ScheduleService> logger)
+		public ScheduleService(RedisService redis, IGraphCollection graphs, ICommitService commitService, IJobCollection jobCollection, JobService jobService, StreamService streamService, ITemplateCollection templateCollection, MongoService mongoService, IClock clock, IOptionsMonitor<ServerSettings> settings, ILogger<ScheduleService> logger)
 		{
 			_graphs = graphs;
-			_perforce = perforce;
+			_commitService = commitService;
 			_jobCollection = jobCollection;
 			_jobService = jobService;
 			_streamService = streamService;
@@ -285,7 +210,7 @@ namespace Horde.Build.Jobs.Schedules
 			List<IStream> streams = await _streamService.GetStreamsAsync();
 			foreach (IStream stream in streams)
 			{
-				foreach ((TemplateRefId templateId, TemplateRef templateRef) in stream.Templates)
+				foreach ((TemplateId templateId, ITemplateRef templateRef) in stream.Templates)
 				{
 					if (templateRef.Schedule != null)
 					{
@@ -315,15 +240,15 @@ namespace Horde.Build.Jobs.Schedules
 		/// <param name="utcNow"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns>Async task</returns>
-		internal async Task<bool> TriggerAsync(StreamId streamId, TemplateRefId templateId, DateTime utcNow, CancellationToken cancellationToken)
+		internal async Task<bool> TriggerAsync(StreamId streamId, TemplateId templateId, DateTime utcNow, CancellationToken cancellationToken)
 		{
 			IStream? stream = await _streamService.GetStreamAsync(streamId);
-			if (stream == null || !stream.Templates.TryGetValue(templateId, out TemplateRef? templateRef))
+			if (stream == null || !stream.Templates.TryGetValue(templateId, out ITemplateRef? templateRef))
 			{
 				return false;
 			}
 
-			Schedule? schedule = templateRef.Schedule;
+			ITemplateSchedule? schedule = templateRef.Schedule;
 			if (schedule == null)
 			{
 				return false;
@@ -383,12 +308,12 @@ namespace Horde.Build.Jobs.Schedules
 		/// <param name="utcNow">The current time</param>
 		/// <param name="cancellationToken"></param>
 		/// <returns>Async task</returns>
-		private async Task TriggerAsync(IStream stream, TemplateRefId templateId, TemplateRef templateRef, Schedule schedule, int numActiveJobs, DateTime utcNow, CancellationToken cancellationToken)
+		private async Task TriggerAsync(IStream stream, TemplateId templateId, ITemplateRef templateRef, ITemplateSchedule schedule, int numActiveJobs, DateTime utcNow, CancellationToken cancellationToken)
 		{
 			// Check we're not already at the maximum number of allowed jobs
-			if (schedule.MaxActive != 0 && numActiveJobs >= schedule.MaxActive)
+			if (schedule.Config.MaxActive != 0 && numActiveJobs >= schedule.Config.MaxActive)
 			{
-				_logger.LogInformation("Skipping trigger of {StreamId} template {TemplateId} - already have maximum number of jobs running ({NumJobs})", stream.Id, templateId, schedule.MaxActive);
+				_logger.LogInformation("Skipping trigger of {StreamId} template {TemplateId} - already have maximum number of jobs running ({NumJobs})", stream.Id, templateId, schedule.Config.MaxActive);
 				foreach (JobId jobId in schedule.ActiveJobs)
 				{
 					_logger.LogInformation("Active job for {StreamId} template {TemplateId}: {JobId}", stream.Id, templateId, jobId);
@@ -398,7 +323,7 @@ namespace Horde.Build.Jobs.Schedules
 
 			// Minimum changelist number, inclusive
 			int minChangeNumber = schedule.LastTriggerChange;
-			if (minChangeNumber > 0 && !schedule.RequireSubmittedChange)
+			if (minChangeNumber > 0 && !schedule.Config.RequireSubmittedChange)
 			{
 				minChangeNumber--;
 			}
@@ -408,29 +333,30 @@ namespace Horde.Build.Jobs.Schedules
 
 			// Get the maximum number of changes to trigger
 			int maxNewChanges = 1;
-			if (schedule.MaxChanges != 0)
+			if (schedule.Config.MaxChanges != 0)
 			{
-				maxNewChanges = schedule.MaxChanges;
+				maxNewChanges = schedule.Config.MaxChanges;
 			}
-			if (schedule.MaxActive != 0)
+			if (schedule.Config.MaxActive != 0)
 			{
-				maxNewChanges = Math.Min(maxNewChanges, schedule.MaxActive - numActiveJobs);
+				maxNewChanges = Math.Min(maxNewChanges, schedule.Config.MaxActive - numActiveJobs);
 			}
 
 			// Create a timer to limit the amount we look back through P4 history
 			Stopwatch timer = Stopwatch.StartNew();
-			ChangeContentFlags? filterFlags = schedule.GetFilterFlags();
 
 			// Create a file filter
 			FileFilter? fileFilter = null;
-			if (schedule.Files != null)
+			if (schedule.Config.Files != null)
 			{
-				fileFilter = new FileFilter(schedule.Files);
+				fileFilter = new FileFilter(schedule.Config.Files);
 			}
 
 			// Cache the Perforce history as we're iterating through changes to improve query performance
-			PerforceHistory history = new PerforceHistory(_perforce, stream.ClusterName, stream.Name);
-			
+			ICommitCollection commits = _commitService.GetCollection(stream);
+			IAsyncEnumerable<ICommit> commitEnumerable = commits.FindAsync(minChangeNumber, null, null, schedule.Config.Commits, cancellationToken);
+			await using IAsyncEnumerator<ICommit> commitEnumerator = commitEnumerable.GetAsyncEnumerator(cancellationToken);
+
 			// Start as many jobs as possible
 			List<(int Change, int CodeChange)> triggerChanges = new List<(int, int)>();
 			while (triggerChanges.Count < maxNewChanges)
@@ -438,40 +364,54 @@ namespace Horde.Build.Jobs.Schedules
 				cancellationToken.ThrowIfCancellationRequested();
 
 				// Get the next valid change
-				ChangeDetails? changeDetails = null;
-				if (schedule.Gate != null)
+				int change;
+				ICommit? commit;
+
+				if (schedule.Config.Gate != null)
 				{
-					changeDetails = await GetNextChangeForGateAsync(stream, templateId, schedule.Gate, minChangeNumber, maxChangeNumber, cancellationToken);
+					change = await GetNextChangeForGateAsync(stream, templateId, schedule.Config.Gate, minChangeNumber, maxChangeNumber, cancellationToken);
+					commit = await commits.FindAsync(change, change, 1, null, cancellationToken).FirstOrDefaultAsync(cancellationToken); // May be a change in a different stream
+				}
+				else if (await commitEnumerator.MoveNextAsync(cancellationToken))
+				{
+					commit = commitEnumerator.Current;
+					change = commit.Number;
 				}
 				else
 				{
-					changeDetails = await history.GetNextChangeAsync();
+					commit = null;
+					change = 0;
 				}
 
 				// Quit if we didn't find anything
-				if (changeDetails == null)
+				if (change <= 0)
 				{
 					break;
 				}
-				if (changeDetails.Number < minChangeNumber)
+				if (change < minChangeNumber)
 				{
 					break;
 				}
-				if (changeDetails.Number == minChangeNumber && (schedule.RequireSubmittedChange || triggerChanges.Count > 0))
+				if (change == minChangeNumber && (schedule.Config.RequireSubmittedChange || triggerChanges.Count > 0))
 				{
 					break;
 				}
 
 				// Adjust the changelist for the desired filter
-				int change = changeDetails.Number;
-				if (ShouldBuildChange(changeDetails, filterFlags, fileFilter))
+				if (commit == null || await ShouldBuildChangeAsync(commit, schedule.Config.Commits, fileFilter))
 				{
-					int codeChange = await history.GetCodeChange(change);
-					if (codeChange == -1)
+					int codeChange = change;
+
+					ICommit? lastCodeCommit = await commits.GetLastCodeChange(change, cancellationToken);
+					if (lastCodeCommit != null)
+					{
+						codeChange = lastCodeCommit.Number;
+					}
+					else
 					{
 						_logger.LogWarning("Unable to find code change for CL {Change}", change);
-						codeChange = change;
 					}
+
 					triggerChanges.Add((change, codeChange));
 				}
 
@@ -511,9 +451,9 @@ namespace Horde.Build.Jobs.Schedules
 			// We may need to submit a new change for any new jobs. This only makes sense if there's one change.
 			if (template.SubmitNewChange != null)
 			{
-				int newChange = await _perforce.CreateNewChangeForTemplateAsync(stream, template);
-				int newCodeChange = await _perforce.GetCodeChangeAsync(stream.ClusterName, stream.Name, newChange);
-				triggerChanges = new List<(int, int)> { (newChange, newCodeChange) };
+				int newChange = await commits.CreateNewAsync(template, cancellationToken);
+				ICommit? newCodeChange = await commits.GetLastCodeChange(newChange, cancellationToken);
+				triggerChanges = new List<(int, int)> { (newChange, newCodeChange?.Number ?? newChange) };
 			}
 
 			// Try to start all the new jobs
@@ -522,7 +462,12 @@ namespace Horde.Build.Jobs.Schedules
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				List<string> defaultArguments = template.GetDefaultArguments();
-				IJob newJob = await _jobService.CreateJobAsync(null, stream, templateId, template.Id, graph, template.Name, change, codeChange, null, null, null, null, template.Priority, null, null, template.PromoteIssuesByDefault, templateRef.ChainedJobs, templateRef.ShowUgsBadges, templateRef.ShowUgsAlerts, templateRef.NotificationChannel, templateRef.NotificationChannelFilter, defaultArguments);
+
+				CreateJobOptions options = new CreateJobOptions(templateRef.Config);
+				options.Priority = template.Priority;
+				options.Arguments.AddRange(template.GetDefaultArguments());
+
+				IJob newJob = await _jobService.CreateJobAsync(null, stream, templateId, template.Id, graph, template.Name, change, codeChange, options);
 				_logger.LogInformation("Started new job for {StreamId} template {TemplateId} at CL {Change} (Code CL {CodeChange}): {JobId}", stream.Id, templateId, change, codeChange, newJob.Id);
 				await _streamService.UpdateScheduleTriggerAsync(stream, templateId, utcNow, change, new List<JobId> { newJob.Id }, new List<JobId>());
 			}
@@ -532,26 +477,28 @@ namespace Horde.Build.Jobs.Schedules
 		/// Tests whether a schedule should build a particular change, based on its requested change filters
 		/// </summary>
 		/// <param name="details">The change details</param>
-		/// <param name="filterFlags"></param>
+		/// <param name="filterTags"></param>
 		/// <param name="fileFilter">Filter for the files to trigger a build</param>
 		/// <returns></returns>
-		private bool ShouldBuildChange(ChangeDetails details, ChangeContentFlags? filterFlags, FileFilter? fileFilter)
+		private async ValueTask<bool> ShouldBuildChangeAsync(ICommit details, List<CommitTag>? filterTags, FileFilter? fileFilter)
 		{
 			if (Regex.IsMatch(details.Description, @"^\s*#\s*skipci", RegexOptions.Multiline))
 			{
 				return false;
 			}
-			if (filterFlags != null && filterFlags.Value != 0)
+			if (filterTags != null && filterTags.Count > 0)
 			{
-				if ((details.GetContentFlags() & filterFlags.Value) == 0)
+				IReadOnlyList<CommitTag> commitTags = await details.GetTagsAsync(CancellationToken.None);
+				if (!commitTags.Any(x => filterTags.Contains(x)))
 				{
-					_logger.LogDebug("Not building change {Change} ({ChangeFlags}) due to filter flags ({FilterFlags})", details.Number, details.GetContentFlags().ToString(), filterFlags.Value.ToString());
+					_logger.LogDebug("Not building change {Change} ({ChangeTags}) due to filter tags ({FilterTags})", details.Number, String.Join(", ", commitTags.Select(x => x.ToString())), String.Join(", ", filterTags.Select(x => x.ToString())));
 					return false;
 				}
 			}
 			if (fileFilter != null)
 			{
-				if (!details.Files.Any(x => fileFilter.Matches(x.Path)))
+				IReadOnlyList<string> files = await details.GetFilesAsync(CancellationToken.None);
+				if (!files.Any(x => fileFilter.Matches(x)))
 				{
 					_logger.LogDebug("Not building change {Change} due to file filter", details.Number);
 					return false;
@@ -564,16 +511,16 @@ namespace Horde.Build.Jobs.Schedules
 		/// Gets the next change to build for a schedule on a gate
 		/// </summary>
 		/// <returns></returns>
-		private async Task<ChangeDetails?> GetNextChangeForGateAsync(IStream stream, TemplateRefId templateRefId, ScheduleGate gate, int? minChange, int? maxChange, CancellationToken cancellationToken)
+		private async Task<int> GetNextChangeForGateAsync(IStream stream, TemplateId templateRefId, ScheduleGateConfig gate, int? minChange, int? maxChange, CancellationToken cancellationToken)
 		{
 			for (; ; )
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 
-				List<IJob> jobs = await _jobCollection.FindAsync(streamId: stream.Id, templates: new[] { gate.TemplateRefId }, minChange: minChange, maxChange: maxChange, count: 1);
+				List<IJob> jobs = await _jobCollection.FindAsync(streamId: stream.Id, templates: new[] { gate.TemplateId }, minChange: minChange, maxChange: maxChange, count: 1);
 				if (jobs.Count == 0)
 				{
-					return null;
+					return 0;
 				}
 
 				IJob job = jobs[0];
@@ -587,9 +534,9 @@ namespace Horde.Build.Jobs.Schedules
 						JobStepOutcome outcome = state.Value.Item2;
 						if (outcome == JobStepOutcome.Success || outcome == JobStepOutcome.Warnings)
 						{
-							return await _perforce.GetChangeDetailsAsync(stream.ClusterName, stream.Name, job.Change);
+							return job.Change;
 						}
-						_logger.LogInformation("Skipping trigger of {StreamName} template {TemplateId} - last {OtherTemplateRefId} job ({JobId}) ended with errors", stream.Id, templateRefId, gate.TemplateRefId, job.Id);
+						_logger.LogInformation("Skipping trigger of {StreamName} template {TemplateId} - last {OtherTemplateRefId} job ({JobId}) ended with errors", stream.Id, templateRefId, gate.TemplateId, job.Id);
 					}
 				}
 

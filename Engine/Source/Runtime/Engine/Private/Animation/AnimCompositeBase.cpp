@@ -18,7 +18,7 @@
 // FAnimSegment
 ///////////////////////////////////////////////////////
 
-UAnimSequenceBase * FAnimSegment::GetAnimationData(float PositionInTrack, float& PositionInAnim) const
+UAnimSequenceBase* FAnimSegment::GetAnimationData(float PositionInTrack, float& PositionInAnim) const
 {
 	if( bValid && IsInRange(PositionInTrack) )
 	{
@@ -102,14 +102,10 @@ void FAnimSegment::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackP
 
 void FAnimSegment::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackPosition, const float& CurrentTrackPosition, FAnimNotifyContext& NotifyContext) const
 {
-	if( PreviousTrackPosition == CurrentTrackPosition )
-	{
-		return;
-	}
-
 	const bool bTrackPlayingBackwards = (PreviousTrackPosition > CurrentTrackPosition);
 	const float SegmentStartPos = StartPos;
 	const float SegmentEndPos = StartPos + GetLength();
+	const bool bZeroTrackPositionDelta = CurrentTrackPosition == PreviousTrackPosition;
 
 	// if track range overlaps segment
 	if( bTrackPlayingBackwards 
@@ -139,12 +135,13 @@ void FAnimSegment::GetAnimNotifiesFromTrackPositions(const float& PreviousTrackP
 			// Abstract out end point since animation can be playing forward or backward.
 			const float AnimEndPoint = bAnimPlayingBackwards ? AnimStartTime : AnimEndTime;
 
-			for(int32 IterationsLeft=FMath::Max(LoopingCount, 1); ((IterationsLeft > 0) && (TrackTimeToGo > 0.f)); --IterationsLeft)
+			for(int32 IterationsLeft=FMath::Max(LoopingCount, 1); ((IterationsLeft > 0) && (TrackTimeToGo > 0.f || bZeroTrackPositionDelta)); --IterationsLeft)
 			{
 				// Track time left to reach end point of animation.
 				const float TrackTimeToAnimEndPoint = (AnimEndPoint - AnimStartPosition) / AbsValidPlayRate;
 
 				// If our time left is shorter than time to end point, no problem. End there.
+				// This will also run if we arrive with bZeroTrackPositionDelta == true, as TrackTimeToGo == 0.f
 				if( FMath::Abs(TrackTimeToGo) < FMath::Abs(TrackTimeToAnimEndPoint) )
 				{
 					const float PlayRate = ValidPlayRate * (bTrackPlayingBackwards ? -1.f : 1.f);
@@ -571,9 +568,11 @@ void FAnimTrack::GetAnimationPose(FAnimationPoseData& OutAnimationPoseData, cons
 		if (AnimSegment->bValid)
 		{
 			// Copy passed in Extraction Context, but override position and root motion parameters.
-			FAnimExtractContext SequenceExtractionContext(ExtractionContext);
-			if (const UAnimSequenceBase* const AnimRef = AnimSegment->GetAnimationData(ClampedTime, SequenceExtractionContext.CurrentTime))
+			float PositionInAnim = 0.f;
+			if (const UAnimSequenceBase* const AnimRef = AnimSegment->GetAnimationData(ClampedTime, PositionInAnim))
 			{
+				FAnimExtractContext SequenceExtractionContext(ExtractionContext);
+				SequenceExtractionContext.CurrentTime = static_cast<double>(PositionInAnim);
 				SequenceExtractionContext.DeltaTimeRecord.SetPrevious(
 					SequenceExtractionContext.CurrentTime - SequenceExtractionContext.DeltaTimeRecord.Delta);
 				SequenceExtractionContext.bExtractRootMotion &= AnimRef->HasRootMotion();
@@ -768,6 +767,13 @@ void UAnimCompositeBase::ExtractRootMotionFromTrack(const FAnimTrack &SlotAnimTr
 	}
 }
 
+FFrameRate UAnimCompositeBase::GetSamplingFrameRate() const
+{
+	// Allowing for 0.00001s precision in composite/montage length
+	static const FFrameRate CompositeFrameRate(100000, 1);
+	return CompositeFrameRate;
+}
+
 void UAnimCompositeBase::PostLoad()
 {
 	Super::PostLoad();
@@ -819,11 +825,17 @@ void FAnimSegment::UpdateCachedPlayLength()
 {
 	CachedPlayLength = 0.f;
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	const UAnimDataModel* DataModel = AnimReference ? AnimReference->GetDataModel() : nullptr;	
+	const IAnimationDataModel* DataModel = AnimReference ? AnimReference->GetDataModel() : nullptr;	
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	if(DataModel)
 	{
 		CachedPlayLength = DataModel->GetPlayLength();
 	}
+}
+
+void UAnimCompositeBase::PopulateWithExistingModel(TScriptInterface<IAnimationDataModel> ExistingDataModel)
+{
+	Super::PopulateWithExistingModel(ExistingDataModel);
+	Controller->SetFrameRate(GetSamplingFrameRate());
 }
 #endif // WITH_EDITOR

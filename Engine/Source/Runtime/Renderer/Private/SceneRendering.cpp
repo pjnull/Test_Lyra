@@ -76,6 +76,7 @@
 #include "Rendering/NaniteCoarseMeshStreamingManager.h"
 #include "Rendering/NaniteStreamingManager.h"
 #include "RectLightTextureManager.h"
+#include "IESTextureManager.h"
 #include "DynamicResolutionState.h"
 #include "NaniteVisualizationData.h"
 #include "Shadows/ShadowSceneRenderer.h"
@@ -633,6 +634,12 @@ void FFastVramConfig::Update()
 	bDirty |= UpdateBufferFlagFromCVar(CVarFastVRam_DistanceFieldAOScreenGridResources, DistanceFieldAOScreenGridResources);
 	bDirty |= UpdateBufferFlagFromCVar(CVarFastVRam_ForwardLightingCullingResources, ForwardLightingCullingResources);
 	bDirty |= UpdateBufferFlagFromCVar(CVarFastVRam_GlobalDistanceFieldCullGridBuffers, GlobalDistanceFieldCullGridBuffers);
+
+	// When strata is enable, remove Scene color from fast VRAM to leave space for material buffer which has more impact on performance
+	if (Strata::IsStrataEnabled() && !IsForwardShadingEnabled(GMaxRHIShaderPlatform))
+	{
+		SceneColor = SceneColor & (~(TexCreate_FastVRAM | TexCreate_FastVRAMPartialAlloc));
+	}
 }
 
 bool FFastVramConfig::UpdateTextureFlagFromCVar(TAutoConsoleVariable<int32>& CVar, ETextureCreateFlags& InOutValue)
@@ -830,6 +837,7 @@ void FViewInfo::Init()
 	bSceneHasSkyMaterial = 0;
 	bHasSingleLayerWaterMaterial = 0;
 	bHasTranslucencySeparateModulation = 0;
+	bHasStandardTranslucencyModulation = 0;
 
 	NumVisibleStaticMeshElements = 0;
 	PrecomputedVisibilityData = 0;
@@ -1255,11 +1263,6 @@ void FViewInfo::SetupUniformBufferParameters(
 	}
 
 	ViewUniformShaderParameters.BufferToSceneTextureScale = FVector2f(1.0f, 1.0f);
-
-	{
-		extern bool IsWaterDistanceFieldShadowEnabled_Runtime(const FStaticShaderPlatform Platform);
-		ViewUniformShaderParameters.SeparateWaterMainDirLightLuminance = IsWaterDistanceFieldShadowEnabled_Runtime(ShaderPlatform) ? 1.0f : 0.0f;
-	}
 
 	FRHITexture* TransmittanceLutTextureFound = nullptr;
 	FRHITexture* SkyViewLutTextureFound = nullptr;
@@ -1844,7 +1847,7 @@ void FViewInfo::SetupUniformBufferParameters(
 
 	// Rect light. atlas
 	{
-		FRHITexture* AtlasTexture = RectLightAtlas::GetRectLightAtlasTexture();
+		FRHITexture* AtlasTexture = RectLightAtlas::GetAtlasTexture();
 		if (!AtlasTexture && GSystemTextures.BlackDummy.IsValid())
 		{
 			AtlasTexture = GSystemTextures.BlackDummy->GetRHI();
@@ -1859,6 +1862,24 @@ void FViewInfo::SetupUniformBufferParameters(
 			ViewUniformShaderParameters.RectLightAtlasSizeAndInvSize = FVector4f(AtlasSize.X, AtlasSize.Y, 1.0f / AtlasSize.X, 1.0f / AtlasSize.Y);
 		}
 		ViewUniformShaderParameters.RectLightAtlasTexture = OrBlack2DIfNull(ViewUniformShaderParameters.RectLightAtlasTexture);
+	}
+
+	// IES atlas
+	{
+		FRHITexture* AtlasTexture = IESAtlas::GetAtlasTexture();
+		if (!AtlasTexture && GSystemTextures.BlackDummy.IsValid())
+		{
+			AtlasTexture = GSystemTextures.BlackDummy->GetRHI();
+		}
+				
+		if (AtlasTexture)
+		{
+			const FIntVector AtlasSize = AtlasTexture->GetSizeXYZ();
+			ViewUniformShaderParameters.IESAtlasTexture = AtlasTexture;
+			ViewUniformShaderParameters.IESAtlasSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
+			ViewUniformShaderParameters.IESAtlasSizeAndInvSize = FVector4f(AtlasSize.X, AtlasSize.Y, 1.0f / AtlasSize.X, 1.0f / AtlasSize.Y);
+		}
+		ViewUniformShaderParameters.IESAtlasTexture = OrBlack2DIfNull(ViewUniformShaderParameters.IESAtlasTexture);
 	}
 
 	// Hair global resources 
@@ -2849,11 +2870,13 @@ void FSceneRenderer::PrepareViewRectsForRendering(FRHICommandListImmediate& RHIC
 
 		// Automatic screen percentage fallback.
 		{
+			extern bool DoesTemporalAAUseComputeShader(EShaderPlatform Platform);
 			// Tenmporal upsample is supported only if TAA is turned on.
 			if (View.PrimaryScreenPercentageMethod == EPrimaryScreenPercentageMethod::TemporalUpscale &&
 				(!IsTemporalAccumulationBasedMethod(View.AntiAliasingMethod) ||
 				 ViewFamily.EngineShowFlags.VisualizeBuffer || 
-				 ViewFamily.EngineShowFlags.VisualizeSSS))
+				 ViewFamily.EngineShowFlags.VisualizeSSS ||
+				 !DoesTemporalAAUseComputeShader(View.GetShaderPlatform())))
 			{
 				View.PrimaryScreenPercentageMethod = EPrimaryScreenPercentageMethod::SpatialUpscale;
 			}

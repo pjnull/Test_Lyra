@@ -84,7 +84,7 @@ public:
 
 		FOpenXRController(XrActionSet InActionSet, XrPath InUserPath, const char* InName);
 
-		void AddActionDevices(FOpenXRHMD* HMD);
+		void AddTrackedDevices(FOpenXRHMD* HMD);
 	};
 
 	struct FInteractionProfile
