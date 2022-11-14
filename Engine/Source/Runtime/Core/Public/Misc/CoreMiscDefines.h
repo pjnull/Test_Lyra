@@ -2,6 +2,8 @@
 
 #pragma once
 
+// HEADER_UNIT_SKIP - Included by rc files and break if I include proper files
+
 #include "../HAL/PreprocessorHelpers.h"
 
 
