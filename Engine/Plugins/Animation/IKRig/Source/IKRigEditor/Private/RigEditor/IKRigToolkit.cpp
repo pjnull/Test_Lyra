@@ -71,18 +71,21 @@ void FIKRigEditorToolkit::InitAssetEditor(
 		bCreateDefaultToolbar, 
 		IKRigAsset);
 
-	AddApplicationMode(
-		IKRigEditorModes::IKRigEditorMode,
-		MakeShareable(new FIKRigMode(SharedThis(this), PersonaToolkit->GetPreviewScene())));
+	TSharedRef<FIKRigMode> IKRigEditMode = MakeShareable(new FIKRigMode(SharedThis(this), PersonaToolkit->GetPreviewScene()));
+	AddApplicationMode(IKRigEditorModes::IKRigEditorMode, IKRigEditMode);
 
 	SetCurrentMode(IKRigEditorModes::IKRigEditorMode);
 
 	GetEditorModeManager().SetDefaultMode(FIKRigEditMode::ModeName);
-	GetEditorModeManager().ActivateMode(FIKRigEditMode::ModeName);
-	static_cast<FIKRigEditMode*>(GetEditorModeManager().GetActiveMode(FIKRigEditMode::ModeName))->SetEditorController(EditorController);
+	GetEditorModeManager().ActivateDefaultMode();
+	FIKRigEditMode* EditMode = GetEditorModeManager().GetActiveModeTyped<FIKRigEditMode>(FIKRigEditMode::ModeName);
+	EditMode->SetEditorController(EditorController);
 
 	ExtendToolbar();
 	RegenerateMenusAndToolbars();
+
+	// ignored if hierarchy / mesh already imported into IK Rig asset
+	EditorController->PromptUserToAssignMesh();
 }
 
 void FIKRigEditorToolkit::OnClose()
@@ -217,7 +220,6 @@ void FIKRigEditorToolkit::HandlePreviewSceneCreated(const TSharedRef<IPersonaPre
 	EditorController->AnimInstance = AnimInstance;
 	AnimInstance->SetIKRigAsset(EditorController->AssetController->GetAsset());
 	EditorController->SkelMeshComponent->PreviewInstance = AnimInstance;
-	EditorController->OnIKRigNeedsInitialized(EditorController->AssetController->GetAsset());
 	AnimInstance->InitializeAnimation();
 
 	// set the skeletal mesh on the component
