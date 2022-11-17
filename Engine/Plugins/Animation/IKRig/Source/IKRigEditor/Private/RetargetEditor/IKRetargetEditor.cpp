@@ -439,6 +439,28 @@ void FIKRetargetEditor::OnFinishedChangingDetails(const FPropertyChangedEvent& P
 	// if either the source or target meshes are possibly modified, update scene components, anim instance and UI
 	if (bTargetIKRigChanged || bSourceIKRigChanged || bTargetPreviewChanged || bSourcePreviewChanged)
 	{
+		EditorController->ClearOutputLog();
+		
+		// set the source and target skeletal meshes on the component
+		// NOTE: this must be done AFTER setting the AnimInstance so that the correct root anim node is loaded
+		USkeletalMesh* SourceMesh = EditorController->GetSkeletalMesh(ERetargetSourceOrTarget::Source);
+		USkeletalMesh* TargetMesh = EditorController->GetSkeletalMesh(ERetargetSourceOrTarget::Target);
+		EditorController->SourceSkelMeshComponent->SetSkeletalMesh(SourceMesh);
+		EditorController->TargetSkelMeshComponent->SetSkeletalMesh(TargetMesh);
+
+		// reset bone selections in case of incompatible indices
+		EditorController->ClearSelection();
+	
+		// apply mesh to the preview scene
+		TSharedRef<IPersonaPreviewScene> PreviewScene = GetPersonaToolkit()->GetPreviewScene();
+		if (PreviewScene->GetPreviewMesh() != SourceMesh)
+		{
+			PreviewScene->SetPreviewMeshComponent(EditorController->SourceSkelMeshComponent);
+			PreviewScene->SetPreviewMesh(SourceMesh);
+			EditorController->SourceSkelMeshComponent->bCanHighlightSelectedSections = false;
+		}
+		SetupAnimInstance();
+
 		AssetController->BroadcastNeedsReinitialized();
 	}
 }
