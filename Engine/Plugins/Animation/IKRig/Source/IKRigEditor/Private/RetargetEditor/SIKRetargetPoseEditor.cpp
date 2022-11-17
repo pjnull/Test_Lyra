@@ -130,7 +130,7 @@ void SIKRetargetPoseEditor::Construct(
 							SNew(SButton)
 							.OnClicked_Lambda([Controller]
 							{
-								Controller->PlaybackManager->StopPlayback();
+								Controller->StopPlayback();
 								return FReply::Handled();
 							})
 							.IsEnabled_Lambda([Controller]

@@ -79,8 +79,6 @@ public:
 	/** END FSelfRegisteringEditorUndoClient interface */
 
 	TSharedRef<FIKRetargetEditorController> GetController() const {return EditorController;};
-	
-	void SetupAnimInstance();
 
 private:
 
@@ -95,6 +93,7 @@ private:
 	void HandlePreviewSceneCreated(const TSharedRef<IPersonaPreviewScene>& InPersonaPreviewScene);
 	void HandleDetailsCreated(const TSharedRef<class IDetailsView>& InDetailsView);
 	void OnFinishedChangingDetails(const FPropertyChangedEvent& PropertyChangedEvent);
+	void SetupAnimInstance();
 	void HandleOnPreviewSceneSettingsCustomized(IDetailLayoutBuilder& DetailBuilder) const;
 	/** END preview scene setup */
 	
