@@ -1813,7 +1813,7 @@ void UMaterialInstance::SetStaticSwitchParameterValueEditorOnly(const FMaterialP
 	new(StaticParametersRuntime.StaticSwitchParameters) FStaticSwitchParameter(ParameterInfo, Value, true, FGuid());
 }
 
-void UMaterialInstance::GetStaticParameterValues(FStaticParameterSet& OutStaticParameters)
+void UMaterialInterface::GetStaticParameterValues(FStaticParameterSet& OutStaticParameters)
 {
 	check(IsInGameThread());
 
@@ -1823,25 +1823,24 @@ void UMaterialInstance::GetStaticParameterValues(FStaticParameterSet& OutStaticP
 		return;
 	}
 
-	if (Parent)
+	TMap<FMaterialParameterInfo, FMaterialParameterMetadata> ParameterValues;
+	for (int32 ParameterTypeIndex = 0; ParameterTypeIndex < NumMaterialParameterTypes; ++ParameterTypeIndex)
 	{
-		TMap<FMaterialParameterInfo, FMaterialParameterMetadata> ParameterValues;
-		for (int32 ParameterTypeIndex = 0; ParameterTypeIndex < NumMaterialParameterTypes; ++ParameterTypeIndex)
+		const EMaterialParameterType ParameterType = (EMaterialParameterType)ParameterTypeIndex;
+		if (IsStaticMaterialParameter(ParameterType))
 		{
-			const EMaterialParameterType ParameterType = (EMaterialParameterType)ParameterTypeIndex;
-			if (IsStaticMaterialParameter(ParameterType))
-			{
-				ParameterValues.Reset();
-				GetAllParametersOfType(ParameterType, ParameterValues);
-				OutStaticParameters.AddParametersOfType(ParameterType, ParameterValues);
-			}
+			ParameterValues.Reset();
+			GetAllParametersOfType(ParameterType, ParameterValues);
+			OutStaticParameters.AddParametersOfType(ParameterType, ParameterValues);
 		}
 	}
 
-	UMaterialInstanceEditorOnlyData* EditorOnly = GetEditorOnlyData();
-	if (EditorOnly)
+	if(UMaterialInstance* MaterialInstance = Cast<UMaterialInstance>(this))
 	{
-		OutStaticParameters.EditorOnly.TerrainLayerWeightParameters = EditorOnly->StaticParameters.TerrainLayerWeightParameters;
+		if (UMaterialInstanceEditorOnlyData* EditorOnly = MaterialInstance->GetEditorOnlyData())
+		{
+			OutStaticParameters.EditorOnly.TerrainLayerWeightParameters = EditorOnly->StaticParameters.TerrainLayerWeightParameters;
+		}
 	}
 
 	FMaterialLayersFunctions MaterialLayers;
