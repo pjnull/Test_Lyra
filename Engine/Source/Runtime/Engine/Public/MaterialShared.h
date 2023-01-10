@@ -20,6 +20,7 @@
 #include "RenderingThread.h"
 #endif
 #include "RenderDeferredCleanup.h"
+#include "RHIUniformBufferLayoutInitializer.h"
 #include "UniformBuffer.h"
 #include "Shader.h"
 #include "VertexFactory.h"

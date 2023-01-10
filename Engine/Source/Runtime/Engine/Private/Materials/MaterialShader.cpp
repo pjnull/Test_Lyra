@@ -22,6 +22,7 @@
 #include "ProfilingDebugging/CountersTrace.h"
 #include "ProfilingDebugging/LoadTimeTracker.h"
 #include "Misc/PathViews.h"
+#include "RHIStrings.h"
 #include "SceneTexturesConfig.h"
 #include "ShaderCodeLibrary.h"
 #include "UObject/UE5ReleaseStreamObjectVersion.h"

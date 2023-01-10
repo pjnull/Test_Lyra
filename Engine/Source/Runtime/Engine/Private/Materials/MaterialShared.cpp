@@ -33,6 +33,7 @@
 #include "ShaderPlatformQualitySettings.h"
 #include "MaterialShaderQualitySettings.h"
 #include "Engine/RendererSettings.h"
+#include "RHIStrings.h"
 #include "ShaderCodeLibrary.h"
 #include "HAL/FileManager.h"
 #include "ProfilingDebugging/LoadTimeTracker.h"
