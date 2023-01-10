@@ -10,7 +10,6 @@ D3D12Commands.cpp: D3D RHI commands implementation.
 #include "OneColorShader.h"
 #include "RHICommandList.h"
 #include "RHIStaticStates.h"
-#include "RHIStrings.h"
 #include "ShaderParameterUtils.h"
 #include "ShaderCompiler.h"
 #include "ScreenRendering.h"
