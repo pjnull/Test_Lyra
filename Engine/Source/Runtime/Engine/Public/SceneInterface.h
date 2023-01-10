@@ -46,6 +46,7 @@ class FViewInfo;
 class FVolumetricCloudRenderSceneInfo;
 class FVolumetricCloudSceneProxy;
 class UDecalComponent;
+struct FDeferredDecalUpdateParams;
 class UInstancedStaticMeshComponent;
 class ULightComponent;
 class UPlanarReflectionComponent;
@@ -176,6 +177,7 @@ public:
 	virtual void UpdateDecalTransform(UDecalComponent* Component) = 0;
 	virtual void UpdateDecalFadeOutTime(UDecalComponent* Component) = 0;
 	virtual void UpdateDecalFadeInTime(UDecalComponent* Component) = 0;
+	virtual void BatchUpdateDecals(TArray<FDeferredDecalUpdateParams>&& UpdateParams) = 0;
 
 	/** Adds a reflection capture to the scene. */
 	virtual void AddReflectionCapture(class UReflectionCaptureComponent* Component) {}
