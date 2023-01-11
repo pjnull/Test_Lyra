@@ -8,6 +8,16 @@
 
 typedef uint64 FNiagaraSystemInstanceID;
 
+UENUM()
+enum class ENiagaraIterationSource : uint8
+{
+	/** Iterate over all active particles. */
+	Particles = 0,
+	/** Iterate over all elements in the data interface. */
+	DataInterface,
+	/** Iterate over a user provided number of elements. */
+	DirectSet,
+};
 
 /** A utility class allowing for references to FNiagaraVariableBase outside of the Niagara module. */
 USTRUCT()
