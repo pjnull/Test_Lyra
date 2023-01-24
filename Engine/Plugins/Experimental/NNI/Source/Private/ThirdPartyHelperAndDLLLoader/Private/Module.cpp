@@ -10,7 +10,7 @@
 // This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 void FThirdPartyHelperAndDLLLoaderModule::StartupModule()
 {
-#if WITH_DIRECTML
+#ifdef WITH_DIRECTML
 	const FString DirectMLRuntimeBinPath = FString(FPlatformProcess::BaseDir()) / TEXT(PREPROCESSOR_TO_STRING(DIRECTML_PATH));
 	const FString DirectMLDLLPath = DirectMLRuntimeBinPath / TEXT("DirectML.dll");
 
