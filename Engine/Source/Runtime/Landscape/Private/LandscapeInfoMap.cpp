@@ -3,7 +3,6 @@
 #include "LandscapeInfoMap.h"
 #include "Engine/World.h"
 #include "LandscapeInfo.h"
-#include "UObject/UObjectThreadContext.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LandscapeInfoMap)
 
@@ -48,9 +47,6 @@ void ULandscapeInfoMap::AddReferencedObjects(UObject* InThis, FReferenceCollecto
 
 ULandscapeInfoMap& ULandscapeInfoMap::GetLandscapeInfoMap(const UWorld* World)
 {
-	checkf(!FUObjectThreadContext::Get().IsRoutingPostLoad, TEXT("This is probably a mistake to call this function in PostLoad, as the world used to register the landscape proxy is not the final world, \
-		since the actor's ULevel's final OwningWorld is only set after streaming is done"));
-
 	ULandscapeInfoMap *FoundObject = nullptr;
 	World->PerModuleDataObjects.FindItemByClass(&FoundObject);
 
