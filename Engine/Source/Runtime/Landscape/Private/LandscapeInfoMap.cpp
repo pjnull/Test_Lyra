@@ -3,6 +3,7 @@
 #include "LandscapeInfoMap.h"
 #include "Engine/World.h"
 #include "LandscapeInfo.h"
+#include "UObject/UObjectThreadContext.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LandscapeInfoMap)
 
