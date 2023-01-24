@@ -10,25 +10,9 @@
 // This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 void FThirdPartyHelperAndDLLLoaderModule::StartupModule()
 {
-#ifdef PLATFORM_WIN64
-#if WITH_EDITOR && !IS_MONOLITHIC
-
-	TSharedPtr<IPlugin> NNEPlugin = IPluginManager::Get().FindPlugin(TEXT("NNE"));
-	if (NNEPlugin.IsValid() && NNEPlugin->IsEnabled())
-	{
-		return;
-	}
-
-	const FString PluginDir = IPluginManager::Get().FindPlugin(TEXT("NeuralNetworkInference"))->GetBaseDir();
-	const FString DirectMLRuntimeBinPath = PluginDir / TEXT(PREPROCESSOR_TO_STRING(DIRECTML_PLATFORM_PATH));
-
-#else
-
-	const FString DirectMLRuntimeBinPath = FPlatformProcess::BaseDir();
-	
-#endif // WITH_EDITOR
-
-	const FString DirectMLDLLPath = DirectMLRuntimeBinPath / TEXT(PREPROCESSOR_TO_STRING(DIRECTML_DLL_NAME));
+#if WITH_DIRECTML
+	const FString DirectMLRuntimeBinPath = FString(FPlatformProcess::BaseDir()) / TEXT(PREPROCESSOR_TO_STRING(DIRECTML_PATH));
+	const FString DirectMLDLLPath = DirectMLRuntimeBinPath / TEXT("DirectML.dll");
 
 	// Sanity check
 	if (!FPaths::FileExists(DirectMLDLLPath))
@@ -43,7 +27,7 @@ void FThirdPartyHelperAndDLLLoaderModule::StartupModule()
 	DirectMLDLLHandle = FPlatformProcess::GetDllHandle(*DirectMLDLLPath);
 	FPlatformProcess::PopDllDirectory(*DirectMLRuntimeBinPath);
 
-#endif //PLATFORM_WIN64
+#endif // WITH_DIRECTML
 }
 
 // This function may be called during shutdown to clean up your module. For modules that support dynamic reloading,
