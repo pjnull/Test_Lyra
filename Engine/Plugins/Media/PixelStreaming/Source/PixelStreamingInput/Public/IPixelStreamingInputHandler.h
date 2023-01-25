@@ -7,28 +7,22 @@
 #include "Widgets/SViewport.h"
 #include "Widgets/SWindow.h"
 #include "Templates/SharedPointer.h"
-#include "PixelStreamingWebRTCIncludes.h"
 #include "Serialization/MemoryReader.h"
-
-enum class PIXELSTREAMING_API EPixelStreamingInputType : uint8
-{
-	RouteToWindow = 0,
-	RouteToWidget = 1
-};
+#include "PixelStreamingInputEnums.h"
 
 /**
  * IPixelStreamingInputHandler extends the IInputDevice interface. Setting the target viewport allows for
  * scaling of input from browser to application, and setting the target window ensure that if windows are tiled (eg editor)
  * that the streamed input only affect the target window.
  */
-class PIXELSTREAMING_API IPixelStreamingInputHandler : public IInputDevice
+class PIXELSTREAMINGINPUT_API IPixelStreamingInputHandler : public IInputDevice
 {
 public:
 	/**
 	 * @brief Handle the message from the WebRTC data channel.
 	 * @param Buffer The data channel message
 	 */
-	virtual void OnMessage(const webrtc::DataBuffer& Buffer) = 0;
+	virtual void OnMessage(TArray<uint8> Buffer) = 0;
 
 	/**
 	 * @brief Set the viewport this input device is associated with.
@@ -55,7 +49,7 @@ public:
 	virtual TWeakPtr<SWindow> GetTargetWindow() = 0;
 
 	/**
-	 * @brief Set the target screen size for this streamer. This is used to when the streamer doesn't have a singular target window / viewport 
+	 * @brief Set the target screen size for this streamer. This is used to when the streamer doesn't have a singular target window / viewport
 	 * and as such we just use the manual scale
 	 * @param InTargetWindow The target screen size
 	 */
@@ -76,21 +70,15 @@ public:
 
 	/**
 	 * @brief Register a function to be called whenever the specified message type is received.
-	 * 
+	 *
 	 * @param MessageType The human readable identifier for the message
 	 * @param Handler The function called when this message type is received. This handler must take a single parameter (an FMemoryReader) and have a return type of void
 	 */
 	virtual void RegisterMessageHandler(const FString& MessageType, const TFunction<void(FMemoryReader)>& Handler) = 0;
 
 	/**
-	 * @brief Register a custom function to execute when command JSON is received over the data channel: "{ type: "Command", YourCommand: YourCommandValue }".
-	 * Note: You can also override the default Pixel Streaming command handlers by setting handlers with the same name as those already used, e.g. "Stat.FPS".
-	 */
-	virtual void SetCommandHandler(const FString& CommandName, const TFunction<void(FString, FString)>& Handler) = 0;
-
-	/**
 	 * @brief Find the function to be called whenever the specified message type is received.
-	 * 
+	 *
 	 * @param MessageType The human readable identifier for the message
 	 * @return TFunction<void(FMemoryReader)> The function called when this message type is received.
 	 */

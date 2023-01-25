@@ -4,7 +4,7 @@
 
 #include "InputCoreTypes.h"
 
-namespace UE::PixelStreaming 
+namespace UE::PixelStreamingInput 
 {
 
 /**
@@ -277,4 +277,4 @@ namespace UE::PixelStreaming
 		/* 254 */ &EKeys::RightControl,
 		/* 255 */ &EKeys::RightAlt
 	};
-} // namespace UE::PixelStreaming
+} // namespace UE::PixelStreamingInput

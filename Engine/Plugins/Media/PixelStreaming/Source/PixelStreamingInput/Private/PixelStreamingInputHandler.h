@@ -5,15 +5,17 @@
 #include "GenericPlatform/GenericApplicationMessageHandler.h"
 #include "Slate/SceneViewport.h"
 #include "Widgets/SWindow.h"
-#include "WebRTCIncludes.h"
-#include "IPixelStreamingModule.h"
 #include "InputCoreTypes.h"
-#include "PixelStreamingApplicationWrapper.h"
+#include "ApplicationWrapper.h"
 #include "IPixelStreamingInputHandler.h"
+#include "XRMotionControllerBase.h"
+#include "HeadMountedDisplayTypes.h"
+#include "PixelStreamingHMDEnums.h"
+#include "PixelStreamingInputConversion.h"
 
-namespace UE::PixelStreaming
+namespace UE::PixelStreamingInput
 {
-	class FPixelStreamingInputHandler : public IPixelStreamingInputHandler
+	class FPixelStreamingInputHandler : public IPixelStreamingInputHandler, public FXRMotionControllerBase
 	{
 	public:
 		FPixelStreamingInputHandler(TSharedPtr<FPixelStreamingApplicationWrapper> InApplicationWrapper, const TSharedPtr<FGenericApplicationMessageHandler>& InTargetHandler);
@@ -23,13 +25,10 @@ namespace UE::PixelStreaming
 		virtual void Tick(float DeltaTime) override;
 
 		/** Poll for controller state and send events if needed */
-		virtual void SendControllerEvents() override {};
+		virtual void SendControllerEvents() override{};
 
 		/** Set which MessageHandler will route input  */
 		virtual void SetMessageHandler(const TSharedRef<FGenericApplicationMessageHandler>& InTargetHandler) override;
-
-		/** Register a custom function to execute when command JSON is received. */
-		virtual void SetCommandHandler(const FString& CommandName, const TFunction<void(FString, FString)>& Handler) override;
 
 		/** Exec handler to allow console commands to be passed through for debugging */
 		virtual bool Exec(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override;
@@ -37,75 +36,76 @@ namespace UE::PixelStreaming
 		 * IInputInterface pass through functions
 		 */
 		virtual void SetChannelValue(int32 ControllerId, FForceFeedbackChannelType ChannelType, float Value) override;
-
 		virtual void SetChannelValues(int32 ControllerId, const FForceFeedbackValues& values) override;
-
-		virtual void OnMessage(const webrtc::DataBuffer& Buffer) override;
-
+		virtual void OnMessage(TArray<uint8> Buffer) override;
 		virtual void SetTargetWindow(TWeakPtr<SWindow> InWindow) override;
 		virtual TWeakPtr<SWindow> GetTargetWindow() override;
-
 		virtual void SetTargetViewport(TWeakPtr<SViewport> InViewport) override;
 		virtual TWeakPtr<SViewport> GetTargetViewport() override;
-
 		virtual void SetTargetScreenSize(TWeakPtr<FIntPoint> InScreenSize) override;
 		virtual TWeakPtr<FIntPoint> GetTargetScreenSize() override;
-
 		virtual bool IsFakingTouchEvents() const override { return bFakingTouchEvents; }
-
-        virtual void RegisterMessageHandler(const FString& MessageType, const TFunction<void(FMemoryReader)>& Handler) override;
+		virtual void RegisterMessageHandler(const FString& MessageType, const TFunction<void(FMemoryReader)>& Handler) override;
 		virtual TFunction<void(FMemoryReader)> FindMessageHandler(const FString& MessageType) override;
-
 		virtual void SetInputType(EPixelStreamingInputType InInputType) override { InputType = InInputType; };
+		// IMotionController Interface
+		virtual FName GetMotionControllerDeviceTypeName() const override;
+		virtual bool GetControllerOrientationAndPosition(const int32 ControllerIndex, const FName MotionSource, FRotator& OutOrientation, FVector& OutPosition, float WorldToMetersScale) const override;
+		virtual bool GetControllerOrientationAndPosition(const int32 ControllerIndex, const EControllerHand DeviceHand, FRotator& OutOrientation, FVector& OutPosition, float WorldToMetersScale) const override;
+		virtual ETrackingStatus GetControllerTrackingStatus(const int32 ControllerIndex, const EControllerHand DeviceHand) const override;
+		virtual void EnumerateSources(TArray<FMotionControllerSource>& SourcesOut) const override;
+		// End IMotionController Interface
 
-    protected:
-        /**
-         * Key press handling
-         */
-        virtual void HandleOnKeyChar(FMemoryReader Ar);
-        virtual void HandleOnKeyDown(FMemoryReader Ar);
-        virtual void HandleOnKeyUp(FMemoryReader Ar);
-        /**
-         * Touch handling
-         */
-        virtual void HandleOnTouchStarted(FMemoryReader Ar);
-        virtual void HandleOnTouchMoved(FMemoryReader Ar);
-        virtual void HandleOnTouchEnded(FMemoryReader Ar);
-        /**
-         * Controller handling
-         */
-        virtual void HandleOnControllerAnalog(FMemoryReader Ar);
-        virtual void HandleOnControllerButtonPressed(FMemoryReader Ar);
-        virtual void HandleOnControllerButtonReleased(FMemoryReader Ar);
-        /**
-         * Mouse handling
-         */
-        virtual void HandleOnMouseEnter(FMemoryReader Ar);
-        virtual void HandleOnMouseLeave(FMemoryReader Ar);
-        virtual void HandleOnMouseUp(FMemoryReader Ar);
-        virtual void HandleOnMouseDown(FMemoryReader Ar);
-        virtual void HandleOnMouseMove(FMemoryReader Ar);
-        virtual void HandleOnMouseWheel(FMemoryReader Ar);
-		virtual void HandleOnMouseDoubleClick(FMemoryReader Ar);
-        /**
-         * Command handling
-         */
-        virtual void HandleCommand(FMemoryReader Ar);
-        /**
-         * UI Interaction handling
-         */
-        virtual void HandleUIInteraction(FMemoryReader Ar);
-
+	protected:
 		/**
-		 * Populate default command handlers for data channel messages sent with "{ type: "Command" }".
+		 * Key press handling
 		 */
-		void PopulateDefaultCommandHandlers();
+		virtual void HandleOnKeyChar(FMemoryReader Ar);
+		virtual void HandleOnKeyDown(FMemoryReader Ar);
+		virtual void HandleOnKeyUp(FMemoryReader Ar);
+		/**
+		 * Touch handling
+		 */
+		virtual void HandleOnTouchStarted(FMemoryReader Ar);
+		virtual void HandleOnTouchMoved(FMemoryReader Ar);
+		virtual void HandleOnTouchEnded(FMemoryReader Ar);
+		/**
+		 * Controller handling
+		 */
+		virtual void HandleOnControllerAnalog(FMemoryReader Ar);
+		virtual void HandleOnControllerButtonPressed(FMemoryReader Ar);
+		virtual void HandleOnControllerButtonReleased(FMemoryReader Ar);
+		/**
+		 * Mouse handling
+		 */
+		virtual void HandleOnMouseEnter(FMemoryReader Ar);
+		virtual void HandleOnMouseLeave(FMemoryReader Ar);
+		virtual void HandleOnMouseUp(FMemoryReader Ar);
+		virtual void HandleOnMouseDown(FMemoryReader Ar);
+		virtual void HandleOnMouseMove(FMemoryReader Ar);
+		virtual void HandleOnMouseWheel(FMemoryReader Ar);
+		virtual void HandleOnMouseDoubleClick(FMemoryReader Ar);
+		/**
+		 * XR handling
+		 */
+		virtual void HandleOnXRHMDTransform(FMemoryReader Ar);
+		virtual void HandleOnXRControllerTransform(FMemoryReader Ar);
+		virtual void HandleOnXRButtonPressed(FMemoryReader Ar);
+		virtual void HandleOnXRButtonTouched(FMemoryReader Ar);
+		virtual void HandleOnXRButtonReleased(FMemoryReader Ar);
+		virtual void HandleOnXRAnalog(FMemoryReader Ar);
+		virtual void HandleOnXRSystem(FMemoryReader Ar);
+		/**
+		 * Command handling
+		 */
+		virtual void HandleOnCommand(FMemoryReader Ar);
+		/**
+		 * UI Interaction handling
+		 */
+		virtual void HandleUIInteraction(FMemoryReader Ar);
 
 		FIntPoint ConvertFromNormalizedScreenLocation(const FVector2D& ScreenLocation, bool bIncludeOffset = true);
 		FWidgetPath FindRoutingMessageWidget(const FVector2D& Location) const;
-
-		FGamepadKeyNames::Type ConvertAxisIndexToGamepadAxis(uint8 AnalogAxis);
-		FGamepadKeyNames::Type ConvertButtonIndexToGamepadButton(uint8 ButtonIndex);
 		FKey TranslateMouseButtonToKey(const EMouseButtons::Type Button);
 
 		struct FCachedTouchEvent
@@ -127,27 +127,24 @@ namespace UE::PixelStreaming
 		void FindFocusedWidget();
 		bool FilterKey(const FKey& Key);
 
-        struct FMessage
-        {
-            TFunction<void(FMemoryReader)>* Handler;
-            TArray<uint8> Data;
-        };
+		struct FMessage
+		{
+			TFunction<void(FMemoryReader)>* Handler;
+			TArray<uint8> Data;
+		};
 
-		TWeakPtr<SWindow> 			TargetWindow;
-		TWeakPtr<SViewport> 		TargetViewport;
-		TWeakPtr<FIntPoint> 		TargetScreenSize; // Manual size override used when we don't have a single window/viewport target
-		uint8 						NumActiveTouches;
-		bool 						bIsMouseActive;
-		TQueue<FMessage> 			Messages;
-		EPixelStreamingInputType	InputType = EPixelStreamingInputType::RouteToWindow;
-		FVector2D					LastTouchLocation = FVector2D(EForceInit::ForceInitToZero);
+		TWeakPtr<SWindow> TargetWindow;
+		TWeakPtr<SViewport> TargetViewport;
+		TWeakPtr<FIntPoint> TargetScreenSize; // Manual size override used when we don't have a single window/viewport target
+		uint8 NumActiveTouches;
+		bool bIsMouseActive;
+		TQueue<FMessage> Messages;
+		EPixelStreamingInputType InputType = EPixelStreamingInputType::RouteToWindow;
+		FVector2D LastTouchLocation = FVector2D(EForceInit::ForceInitToZero);
 		TMap<uint8, TFunction<void(FMemoryReader)>> DispatchTable;
 
 		/** Reference to the message handler which events should be passed to. */
 		TSharedPtr<FGenericApplicationMessageHandler> MessageHandler;
-
-		/** For convenience we keep a reference to the Pixel Streaming plugin. */
-		IPixelStreamingModule* PixelStreamingModule;
 
 		/** For convenience, we keep a reference to the application wrapper owned by the input channel */
 		TSharedPtr<FPixelStreamingApplicationWrapper> PixelStreamerApplicationWrapper;
@@ -178,17 +175,17 @@ namespace UE::PixelStreaming
 		 */
 		const size_t MessageHeaderOffset = 1;
 
-		/**
-		 * A map of named commands we respond to when we receive a datachannel message of type "command".
-		 * Key = command name (e.g "Encoder.MaxQP")
-		 * Value = The command handler lambda function whose parameters are as follows:
-		 * 	FString - the descriptor (e.g. the full json payload of the command message)
-		 * 	FString - the parsed value of the command, e.g. if key was "Encoder.MaxQP" and descriptor was { type: "Command", "Encoder.MaxQP": 51 }, then parsed value is "51".
-		 */
-		TMap<FString, TFunction<void(FString, FString)>> CommandHandlers;
-	
+		struct FPixelStreamingXRController
+		{
+		public:
+			FTransform Transform;
+			EControllerHand Handedness;
+		};
+
+		TMap<EControllerHand, FPixelStreamingXRController> XRControllers;
+
 	private:
-		float uint16_MAX = (float) UINT16_MAX;
-		float int16_MAX = (float) SHRT_MAX;
+		float uint16_MAX = (float)UINT16_MAX;
+		float int16_MAX = (float)SHRT_MAX;
 	};
-} // namespace UE::PixelStreaming
+} // namespace UE::PixelStreamingInput

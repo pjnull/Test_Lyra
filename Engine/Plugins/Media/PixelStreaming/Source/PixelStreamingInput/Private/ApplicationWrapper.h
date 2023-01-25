@@ -5,12 +5,12 @@
 #include "GenericPlatform/GenericApplication.h"
 #include "Widgets/SWindow.h"
 
-namespace UE::PixelStreaming
+namespace UE::PixelStreamingInput
 {
-    /**
-	* Wrap the GenericApplication layer so we can replace the cursor and override
-	* certain behavior.
-	*/
+	/**
+	 * Wrap the GenericApplication layer so we can replace the cursor and override
+	 * certain behavior.
+	 */
 	class FPixelStreamingApplicationWrapper : public GenericApplication
 	{
 	public:
@@ -52,20 +52,20 @@ namespace UE::PixelStreaming
 		 * Functions with overridden behavior.
 		 */
 		virtual bool IsMouseAttached() const { return bMouseAlwaysAttached ? true : WrappedApplication->IsMouseAttached(); }
-        virtual bool IsCursorDirectlyOverSlateWindow() const { return true; }
-        virtual TSharedPtr<FGenericWindow> GetWindowUnderCursor() override;
+		virtual bool IsCursorDirectlyOverSlateWindow() const { return true; }
+		virtual TSharedPtr<FGenericWindow> GetWindowUnderCursor() override;
 
-        /**
-         * Custom functions
-         */
-        virtual void SetTargetWindow(TWeakPtr<SWindow> InTargetWindow);
+		/**
+		 * Custom functions
+		 */
+		virtual void SetTargetWindow(TWeakPtr<SWindow> InTargetWindow);
 
 		TSharedPtr<GenericApplication> WrappedApplication;
-        TWeakPtr<SWindow> TargetWindow;
+		TWeakPtr<SWindow> TargetWindow;
 		bool bMouseAlwaysAttached;
 	};
 
-    /**
+	/**
 	 * When reading input from a browser then the cursor position will be sent
 	 * across with mouse events. We want to use this position and avoid getting the
 	 * cursor position from the operating system. This is not relevant to touch
@@ -89,4 +89,4 @@ namespace UE::PixelStreaming
 		/** The cursor position sent across with mouse events. */
 		FVector2D Position;
 	};
-}
+} // namespace UE::PixelStreamingInput

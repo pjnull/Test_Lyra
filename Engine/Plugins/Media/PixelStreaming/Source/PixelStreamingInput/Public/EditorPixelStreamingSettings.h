@@ -9,7 +9,7 @@
 // Config loaded/saved to an .ini file.
 // It is also exposed through the plugin settings page in editor.
 UCLASS(config = PixelStreaming, defaultconfig, meta = (DisplayName = "PixelStreaming"))
-class PIXELSTREAMING_API UPixelStreamingSettings : public UDeveloperSettings
+class PIXELSTREAMINGINPUT_API UPixelStreamingSettings : public UDeveloperSettings
 {
 	GENERATED_UCLASS_BODY()
 

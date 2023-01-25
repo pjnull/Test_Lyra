@@ -6,7 +6,7 @@
 #include "Serialization/BufferArchive.h"
 #include "Serialization/MemoryReader.h"
 
-namespace UE::PixelStreaming
+namespace UE::PixelStreamingInput
 {
     struct TPayloadNoParam
     {
@@ -197,4 +197,4 @@ namespace UE::PixelStreaming
 		uint8 Force;	  // Amount of pressure being applied by the finger.
 		uint8 Valid;	  // 1 if the touch was within bounds.
     };
-} // namespace UE::PixelStreaming
+} // namespace UE::PixelStreamingInput
