@@ -23,11 +23,12 @@ public class DirectML_1_8_0 : ModuleRules
 			PublicSystemIncludePaths.Add(IncDirPath);
 			PublicAdditionalLibraries.Add(Path.Combine(LibDirPath, LibFileName + ".lib"));
 			PublicDelayLoadDLLs.Add(DllFileName);
-			RuntimeDependencies.Add("$(TargetOutputDir)/DML/DirectML.dll", DllFullPath);
+			RuntimeDependencies.Add("$(TargetOutputDir)/DML-NNI/DirectML.dll", DllFullPath);
 
 			// PublicDefinitions
-			PublicDefinitions.Add("WITH_DIRECTML=1");
-			PublicDefinitions.Add("DIRECTML_PATH=DML");
+			PublicDefinitions.Add("DIRECTML_USE_DLLS");
+			PublicDefinitions.Add("WITH_DIRECTML");
+			PublicDefinitions.Add("DIRECTML_PATH=DML-NNI");
 		}
 	}
 }
