@@ -777,7 +777,15 @@ FPropertyAccess::Result FPropertyNodeEditStack::InitializeInternal(const FProper
 		}
 		else if (Property->GetOwner<FProperty>() == ParentProperty) // TArrays, TMaps and TSets
 		{
-			MemoryStack.Add(FMemoryFrame(Property, (uint8*)ParentProperty->GetValueAddressAtIndex_Direct(Property, (void*)MemoryStack.Last().Memory, InNode->GetArrayIndex())));
+			uint8* ItemAddress = (uint8*)ParentProperty->GetValueAddressAtIndex_Direct(Property, (void*)MemoryStack.Last().Memory, InNode->GetArrayIndex());
+			if (ItemAddress)
+			{
+				MemoryStack.Add(FMemoryFrame(Property, ItemAddress));
+			}
+			else
+			{
+				return FPropertyAccess::Fail;
+			}
 		}
 		else
 		{
@@ -831,9 +839,15 @@ FPropertyAccess::Result FPropertyNodeEditStack::InitializeInternal(const FProper
 			int32 StackIndex = MemoryStack.Add(PropertyFrame);
 			Property->GetValue_InContainer(MemoryStack[StackIndex - 1].Memory, PropertyFrame.Memory);
 		}
-		else
+		else if ((uint8*)Object == Container)
 		{
 			MemoryStack.Add(FMemoryFrame(Property, (uint8*)Property->ContainerPtrToValuePtr<uint8>(Container)));
+		}
+		else
+		{
+			// This node represents a struct in which case the Container represents direct memory for the root property.
+			// todo: RobM: ideally we want Container to be the struct memory and not a property address
+			MemoryStack.Add(FMemoryFrame(Property, Container));
 		}
 	}
 	return Result;
@@ -873,19 +887,16 @@ FPropertyNodeEditStack::~FPropertyNodeEditStack()
 
 FPropertyAccess::Result FPropertyNode::GetPropertyValueString(FString& OutString, const bool bAllowAlternateDisplayValue, EPropertyPortFlags PortFlags) const
 {
-	UObject* ValueContainer = nullptr;
-	FPropertyAccess::Result Result = GetSingleObject(ValueContainer);
+	uint8* ValueAddress = nullptr;
+	FPropertyAccess::Result Result = GetSingleReadAddress(ValueAddress);
 
-	if (ValueContainer != nullptr)
+	if (ValueAddress != nullptr)
 	{
 		const FProperty* PropertyPtr = GetProperty();
 
 		// Check for bogus data
 		if (PropertyPtr != nullptr && GetParentNode() != nullptr)
 		{
-			FPropertyNodeEditStack PropStack(this, ValueContainer);
-			uint8* ValueAddress = PropStack.GetDirectPropertyAddress();
-
 			FPropertyTextUtilities::PropertyToTextHelper(OutString, this, PropertyPtr, ValueAddress, nullptr, PortFlags);
 
 			UEnum* Enum = nullptr;
@@ -932,17 +943,14 @@ FPropertyAccess::Result FPropertyNode::GetPropertyValueString(FString& OutString
 
 FPropertyAccess::Result FPropertyNode::GetPropertyValueText(FText& OutText, const bool bAllowAlternateDisplayValue) const
 {
-	UObject* ValueContainer = nullptr;
-	FPropertyAccess::Result Result = GetSingleObject(ValueContainer);
+	uint8* ValueAddress = nullptr;
+	FPropertyAccess::Result Result = GetSingleReadAddress(ValueAddress);
 
-	if (ValueContainer != nullptr)
+	if (ValueAddress != nullptr)
 	{
 		const FProperty* PropertyPtr = GetProperty();
 		if (PropertyPtr)
 		{
-			FPropertyNodeEditStack PropStack(this, ValueContainer);
-			uint8* ValueAddress = PropStack.GetDirectPropertyAddress();
-
 			if (PropertyPtr->IsA(FTextProperty::StaticClass()))
 			{
 				OutText = CastField<FTextProperty>(PropertyPtr)->GetPropertyValue(ValueAddress);
