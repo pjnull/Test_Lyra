@@ -86,6 +86,8 @@ $ bUseFastMonoCalls : New Monolithic Graphics drivers have optional "fast calls"
 
 $ NumIncludedBytesPerUnityCPP : An approximate number of bytes of C++ code to target for inclusion in a single unified C++ file.
 
+$ bDisableModuleNumIncludedBytesPerUnityCPPOverride : Disables overrides that are set by the module
+
 $ bStressTestUnity : Whether to stress test the C++ unity build robustness by including all C++ files files in a project from a single unified file.
 
 $ bDetailedUnityFiles : Whether to add additional information to the unity files, such as '_of_X' in the file name.
@@ -134,7 +136,7 @@ $ bPGOProfile : Whether to enable Profile Guided Optimization (PGO) instrumentat
 
 $ bPGOOptimize : Whether to optimize this build with Profile Guided Optimization (PGO).
 
-$ bSupportEditAndContinue : Whether to support edit and continue.  Only works on Microsoft compilers.
+$ bSupportEditAndContinue : Whether to support edit and continue.
 
 $ bOmitFramePointers : Whether to omit frame pointers or not. Disabling is useful for e.g. memory profiling on the PC.
 
@@ -260,6 +262,8 @@ $ PCHMemoryAllocationFactor : Determines the amount of memory that the compiler 
 
 $ AdditionalLinkerOptions : Allow the target to specify extra options for linking that aren't otherwise noted here
 
+$ bUseFastGenProfile : If specified along with -PGOProfile, then /FASTGENPROFILE will be used instead of /GENPROFILE. This usually means that the PGO data is generated faster, but the resulting data may not yield as efficient optimizations during -PGOOptimize
+
 $ bClangTimeTrace : (Experimental) Appends the -ftime-trace argument to the command line for Clang to output a JSON file containing a timeline for the compile. See http://aras-p.info/blog/2019/01/16/time-trace-timeline-flame-chart-profiler-for-Clang/ for more info.
 
 $ bCompilerTrace : Outputs compile timing information so that it can be analyzed.
@@ -320,7 +324,7 @@ $ ProcessorCountMultiplier : Processor count multiplier for local execution. Can
 
 $ MemoryPerActionBytes : Free memory per action in bytes, used to limit the number of parallel actions if the machine is memory starved. Set to 0 to disable free memory checking.
 
-$ ProcessPriority : The priority to set for spawned processes. Valid Settings: Idle, BelowNormal, Normal, AboveNormal, High Default: BelowNormal
+$ ProcessPriority : The priority to set for spawned processes. Valid Settings: Idle, BelowNormal, Normal, AboveNormal, High Default: BelowNormal or Normal for an Asymmetrical processor as BelowNormal can cause scheduling issues.
 
 $ bStopCompilationAfterErrors : When enabled, will stop compiling targets after a compile error occurs.
 
