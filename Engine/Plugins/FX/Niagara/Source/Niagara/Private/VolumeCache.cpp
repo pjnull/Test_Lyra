@@ -5,6 +5,7 @@
 =============================================================================*/
 
 #include "VolumeCache.h"
+#include "NiagaraSettings.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(VolumeCache)
 
@@ -21,7 +22,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogVolumeCache, Log, All);
 class NIAGARA_API FOpenVDBCacheData : public FVolumeCacheData
 {
 public:
-	FOpenVDBCacheData() {}
+	FOpenVDBCacheData() : TotalMemoryUsage(0) {}
 
 	virtual ~FOpenVDBCacheData()
 	{
@@ -39,6 +40,9 @@ public:
 	
 private:
 	TMap<int32, Vec4Grid::Ptr> OpenVDBGrids;
+	TQueue<int32> CacheQueue;
+
+	int64 TotalMemoryUsage;
 
 	FCriticalSection DenseGridGuard;
 	Vec4Dense::Ptr DenseGridPtr;
@@ -142,7 +146,13 @@ FString FVolumeCacheData::GetAssetPath(FString PathFormat, int32 FrameIndex) con
 void FOpenVDBCacheData::Init(FIntVector Resolution)
 {
 	FScopeLock ScopeLock(&DenseGridGuard);
+	
 	DenseGridPtr.reset(new Vec4Dense(openvdb::CoordBBox(0, 0, 0, Resolution.X - 1, Resolution.Y - 1, Resolution.Z - 1), Vec4(0.0, 0.0, 0.0, 0.0)));
+
+	if (OpenVDBGrids.Num() == 0)
+	{
+		TotalMemoryUsage = 0;
+	}
 }
 
 bool FOpenVDBCacheData::LoadFile(FString Path, int frame)
@@ -210,6 +220,20 @@ bool FOpenVDBCacheData::LoadFile(FString Path, int frame)
 
 			OpenVDBGrids.Add(frame, ColorGrid);
 
+			// add total memory usage reported in bytes
+			TotalMemoryUsage += ColorGrid->memUsage() / 1000000;
+
+			// enqueue 
+			CacheQueue.Enqueue(frame);
+
+			// if total memory usage is over the limit, dequeue oldest one
+			int64 MaxMemory = GetDefault<UNiagaraSettings>()->SimCacheMaxCPUMemoryVolumetrics;
+			if (TotalMemoryUsage > MaxMemory && !CacheQueue.IsEmpty())
+			{
+				int FrameToRemove = CacheQueue.Pop();
+				UnloadFile(FrameToRemove);
+			}
+
 			// if dense vdb buffer doesn't match current resolution, re initialize it				
 			FScopeLock ScopeLock(&DenseGridGuard);
 			if (DenseGridPtr == nullptr || (DenseGridPtr->bbox().dim() != openvdb::Coord(DenseResolution.X - 1, DenseResolution.Y - 1, DenseResolution.Z - 1)))
@@ -236,6 +260,7 @@ bool FOpenVDBCacheData::UnloadFile(int frame)
 {
 	if (OpenVDBGrids.Contains(frame) && OpenVDBGrids[frame] != nullptr)
 	{
+		TotalMemoryUsage -= OpenVDBGrids[frame]->memUsage() / 100000;
 		OpenVDBGrids[frame] = nullptr;
 		OpenVDBGrids.Remove(frame);
 
@@ -261,6 +286,9 @@ bool FOpenVDBCacheData::LoadRange(FString Path, int Start, int End)
 void FOpenVDBCacheData::UnloadAll()
 {
 	OpenVDBGrids.Reset();
+	CacheQueue.Empty();
+
+	TotalMemoryUsage = 0;
 }
 
 bool FOpenVDBCacheData::Fill3DTexture_RenderThread(int frame, FTextureRHIRef TextureToFill, FRHICommandListImmediate& RHICmdList)
