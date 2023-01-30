@@ -302,13 +302,13 @@ void FReplicationReader::EndReplication(uint32 InternalIndex, bool bTearOff, boo
 		Attachments.DropAllAttachments(ENetObjectAttachmentType::Normal, InternalIndex);
 
 		EReplicationBridgeDestroyInstanceReason DestroyReason = EReplicationBridgeDestroyInstanceReason::DoNotDestroy;
-		if (bDestroyInstance)
-		{
-			DestroyReason = EReplicationBridgeDestroyInstanceReason::Destroy;
-		}
-		else if (bTearOff)
+		if (bTearOff)
 		{
 			DestroyReason = EReplicationBridgeDestroyInstanceReason::TearOff;
+		}
+		else if (bDestroyInstance)
+		{
+			DestroyReason = EReplicationBridgeDestroyInstanceReason::Destroy;
 		}
 		EReplicationBridgeDestroyInstanceFlags DestroyFlags = (Data.bAllowDestroyInstanceFromRemote ? EReplicationBridgeDestroyInstanceFlags::AllowDestroyInstanceFromRemote : EReplicationBridgeDestroyInstanceFlags::None);
 		ReplicationBridge->DestroyNetObjectFromRemote(Data.RefHandle, DestroyReason, DestroyFlags);
@@ -478,7 +478,10 @@ void FReplicationReader::ReadObject(FNetSerializationContext& Context)
 			goto ErrorHandling;
 		}
 
-		InternalIndex = NetRefHandleManager->GetInternalIndex(NetRefHandle);		 
+		InternalIndex = NetRefHandleManager->GetInternalIndex(NetRefHandle);
+		FNetRefHandleManager::FReplicatedObjectData& ObjectData = NetRefHandleManager->GetReplicatedObjectDataNoCheck(InternalIndex);
+		ObjectData.bAllowDestroyInstanceFromRemote = EnumHasAnyFlags(CreateResult.Flags, EReplicationBridgeCreateNetRefHandleResultFlags::AllowDestroyInstanceFromRemote);
+
 		FReplicatedObjectInfo& ObjectInfo = StartReplication(InternalIndex);
 
 		ObjectInfo.bIsDeltaCompressionEnabled = bIsDeltaCompressed;
