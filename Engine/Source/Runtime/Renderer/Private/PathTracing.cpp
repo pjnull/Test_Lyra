@@ -302,13 +302,6 @@ TAutoConsoleVariable<float> CVarPathTracingMeshDecalBias(
 	ECVF_RenderThreadSafe
 );
 
-TAutoConsoleVariable<int32> CVarPathTracingMeshDecalsUseViewRay(
-	TEXT("r.PathTracing.MeshDecalUsesViewRay"),
-	1,
-	TEXT("Controls if mesh decals should be probed by the viewing ray (default) or by a short ray perpendicular to the surface (experimental)"),
-	ECVF_RenderThreadSafe
-);
-
 TAutoConsoleVariable<int32> CVarPathTracingLightFunctionColor(
 	TEXT("r.PathTracing.LightFunctionColor"),
 	0,
@@ -340,7 +333,6 @@ BEGIN_SHADER_PARAMETER_STRUCT(FPathTracingData, )
 	SHADER_PARAMETER(uint32, EnabledLightingContributions) // PATHTRACER_CONTRIBUTION_*
 	SHADER_PARAMETER(uint32, ApplyDiffuseSpecularOverrides)
 	SHADER_PARAMETER(int32, MaxRaymarchSteps)
-	SHADER_PARAMETER(int32, MeshDecalsUseViewRay)
 	SHADER_PARAMETER(float, MaxPathIntensity)
 	SHADER_PARAMETER(float, MaxNormalBias)
 	SHADER_PARAMETER(float, FilterWidth)
@@ -393,7 +385,6 @@ struct FPathTracingConfig
 			PathTracingData.DecalRoughnessCutoff != Other.PathTracingData.DecalRoughnessCutoff ||
 			PathTracingData.MeshDecalRoughnessCutoff != Other.PathTracingData.MeshDecalRoughnessCutoff ||
 			PathTracingData.MeshDecalBias != Other.PathTracingData.MeshDecalBias ||
-			PathTracingData.MeshDecalsUseViewRay != Other.PathTracingData.MeshDecalsUseViewRay ||
 			PathTracingData.MaxRaymarchSteps != Other.PathTracingData.MaxRaymarchSteps ||
 			ViewRect != Other.ViewRect ||
 			LightShowFlags != Other.LightShowFlags ||
@@ -571,7 +562,6 @@ static void PreparePathTracingData(const FScene* Scene, const FViewInfo& View, F
 
 	PathTracingData.MeshDecalRoughnessCutoff = PathTracing::UsesDecals(*View.Family) && Scene->RayTracingScene.GetRHIRayTracingScene()->GetInitializer().NumNativeInstancesPerLayer[(uint32)ERayTracingSceneLayer::Decals] > 0 ? CVarPathTracingMeshDecalRoughnessCutoff.GetValueOnRenderThread() : -1.0f;
 	PathTracingData.MeshDecalBias = CVarPathTracingMeshDecalBias.GetValueOnRenderThread();
-	PathTracingData.MeshDecalsUseViewRay = CVarPathTracingMeshDecalsUseViewRay.GetValueOnRenderThread();
 
 	PathTracingData.MaxRaymarchSteps = CVarPathTracingMaxRaymarchSteps.GetValueOnRenderThread();
 
@@ -772,7 +762,7 @@ class FPathTracingRG : public FGlobalShader
 
 	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
 	{
-		return ERayTracingPayloadType::PathTracingMaterial | ERayTracingPayloadType::Decals | ERayTracingPayloadType::MeshDecals;
+		return ERayTracingPayloadType::PathTracingMaterial | ERayTracingPayloadType::Decals;
 	}
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
