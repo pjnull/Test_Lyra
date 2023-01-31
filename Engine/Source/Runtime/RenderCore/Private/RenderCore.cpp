@@ -10,6 +10,7 @@
 #include "Modules/ModuleManager.h"
 #include "Shader.h"
 #include "HDRHelper.h"
+#include "RenderCounters.h"
 
 void UpdateShaderDevelopmentMode();
 
