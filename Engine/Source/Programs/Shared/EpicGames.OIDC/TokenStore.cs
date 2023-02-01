@@ -62,7 +62,15 @@ namespace EpicGames.OIDC
 
 			using FileStream fs = fi.OpenRead();
 			using TextReader tr = new StreamReader(fs);
-			TokenStoreState? state = JsonSerializer.Deserialize<TokenStoreState>(tr.ReadToEnd());
+			TokenStoreState? state;
+			try
+			{
+				state = JsonSerializer.Deserialize<TokenStoreState>(tr.ReadToEnd());
+			}
+			catch (JsonException)
+			{
+				state = null;
+			}
 
 			if (state == null)
 			{
@@ -87,9 +95,14 @@ namespace EpicGames.OIDC
 				Directory.CreateDirectory(fi.Directory!.FullName);
 			}
 
-			using FileStream fs = fi.Open(FileMode.Create, FileAccess.Write);
-			using Utf8JsonWriter writer = new Utf8JsonWriter(fs);
-			JsonSerializer.Serialize<TokenStoreState>(writer, new TokenStoreState(_crypt.IV, _providerToRefreshToken));
+			string tempFile = Path.GetTempFileName();
+			{
+				using FileStream fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write);
+				using Utf8JsonWriter writer = new Utf8JsonWriter(fs);
+				JsonSerializer.Serialize<TokenStoreState>(writer, new TokenStoreState(_crypt.IV, _providerToRefreshToken));
+			}
+
+			File.Move(tempFile, fi.FullName, true);
 		}
 
 		public bool TryGetRefreshToken(string oidcProvider, out string refreshToken)
