@@ -1840,6 +1840,7 @@ ETimeSliceWorkResult FRecastTileGenerator::DoWorkTimeSliced()
 			if (WorkResult != ETimeSliceWorkResult::CallAgainNextTimeSlice)
 			{
 				DumpAsyncData();
+				DumpSyncData();		// Currently, TIME_SLICE_NAV_REGEN can only be active if not async.
 
 				DoWorkTimeSlicedState = EDoWorkTimeSlicedState::Invalid;//Set to Invalid as we never want to call this again on this instance
 			}
@@ -1885,10 +1886,15 @@ void FRecastTileGenerator::DumpAsyncData()
 	Modifiers.Empty();
 	OffmeshLinks.Empty();
 
-	NavigationRelevantData.Empty();
 	NavSystem = nullptr;
 }
 
+void FRecastTileGenerator::DumpSyncData()
+{
+	ensure(IsInGameThread());
+	NavigationRelevantData.Empty();
+}
+	
 void FRecastTileGenerator::GatherGeometryFromSources()
 {
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_RecastNavMeshGenerator_GatherGeometryFromSources);
@@ -6196,10 +6202,11 @@ TArray<FNavTileRef> FRecastNavMeshGenerator::ProcessTileTasksAsyncAndGetUpdatedT
 
 		if (Element.AsyncTask->IsDone())
 		{
+			FRecastTileGenerator& TileGenerator = *(Element.AsyncTask->GetTask().TileGenerator);
+			
 			// Add generated tiles to navmesh
 			if (!Element.bShouldDiscard)
 			{
-				FRecastTileGenerator& TileGenerator = *(Element.AsyncTask->GetTask().TileGenerator);
 				TArray<FNavTileRef> UpdatedTileRefs = AddGeneratedTilesAndGetUpdatedTiles(TileGenerator);
 				UpdatedTiles.Append(UpdatedTileRefs);
 			
@@ -6209,6 +6216,8 @@ TArray<FNavTileRef> FRecastNavMeshGenerator::ProcessTileTasksAsyncAndGetUpdatedT
 				StoreDebugData(TileGenerator, Element.Coord.X, Element.Coord.Y);
 #endif
 			}
+
+			TileGenerator.DumpSyncData();
 
 			{
 				QUICK_SCOPE_CYCLE_COUNTER(STAT_RecastNavMeshGenerator_TileGeneratorRemoval);
