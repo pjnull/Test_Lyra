@@ -3,6 +3,7 @@
 #include "RuntimeVirtualTextureThumbnailRenderer.h"
 
 #include "Components/RuntimeVirtualTextureComponent.h"
+#include "Engine/World.h"
 #include "Materials/MaterialRenderProxy.h"
 #include "MaterialShared.h"
 #include "Math/Box.h"
@@ -78,6 +79,11 @@ void URuntimeVirtualTextureThumbnailRenderer::Draw(UObject* Object, int32 X, int
 	URuntimeVirtualTextureComponent* RuntimeVirtualTextureComponent = FindComponent(RuntimeVirtualTexture);
 	FSceneInterface* Scene = RuntimeVirtualTextureComponent != nullptr ? RuntimeVirtualTextureComponent->GetScene() : nullptr;
 	check(Scene != nullptr);
+
+	if (UWorld* World = Scene->GetWorld())
+	{
+		World->SendAllEndOfFrameUpdates();
+	}
 
 	const FBox2D DestBox = FBox2D(FVector2D(X, Y), FVector2D(Width, Height));
 	const FTransform Transform = RuntimeVirtualTextureComponent->GetComponentTransform();
