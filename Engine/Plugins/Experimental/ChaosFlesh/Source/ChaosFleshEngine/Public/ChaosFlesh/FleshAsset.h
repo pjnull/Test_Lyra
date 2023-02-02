@@ -15,7 +15,7 @@ class UFleshAsset;
 class UDataflow;
 class USkeletalMesh;
 class USkeleton;
-
+class UStaticMesh;
 
 /**
 *	FFleshAssetEdit
