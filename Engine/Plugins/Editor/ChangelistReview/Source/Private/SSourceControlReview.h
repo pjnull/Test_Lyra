@@ -144,6 +144,8 @@ public:
 private:
 	void OnChangelistLoadComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult, FString Changelist);
 	FReply OnLoadChangelistClicked();
+	bool IsSourceControlActive() const;
+	FText LoadChangelistTooltip() const;
 	void OnChangelistNumChanged(const FText& Text);
 	void OnChangelistNumCommitted(const FText& Text, ETextCommit::Type CommitMethod);
 
