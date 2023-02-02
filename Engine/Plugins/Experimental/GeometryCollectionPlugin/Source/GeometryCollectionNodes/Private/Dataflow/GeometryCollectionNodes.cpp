@@ -20,6 +20,7 @@
 #include "StaticMeshAttributes.h"
 #include "DynamicMeshEditor.h"
 #include "Operations/MeshBoolean.h"
+#include "Materials/Material.h"
 
 #include "EngineGlobals.h"
 #include "GeometryCollection/GeometryCollectionAlgo.h"
@@ -95,6 +96,9 @@ namespace Dataflow
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FGetCollectionAttributeDataTypedDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FSetCollectionAttributeDataTypedDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FBoolArrayToFaceSelectionDataflowNode);
+		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FFloatArrayToVertexSelectionDataflowNode);
+		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FSetVertexColorInCollectionDataflowNode);
+		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FMakeTransformDataflowNode);
 
 		// GeometryCollection
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY_NODE_COLORS_BY_CATEGORY("GeometryCollection", FLinearColor(0.55f, 0.45f, 1.0f), CDefaultNodeBodyTintColor);
@@ -109,7 +113,7 @@ namespace Dataflow
 		// Math
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY_NODE_COLORS_BY_CATEGORY("Math", FLinearColor(0.f, 0.4f, 0.8f), CDefaultNodeBodyTintColor);
 		// Generators
-		DATAFLOW_NODE_REGISTER_CREATION_FACTORY_NODE_COLORS_BY_CATEGORY("Generators", FLinearColor(.7f, 0.7f, 0.7f), CDefaultNodeBodyTintColor);
+		DATAFLOW_NODE_REGISTER_CREATION_FACTORY_NODE_COLORS_BY_CATEGORY("Generators", FLinearColor(.6f, 0.1f, 1.f), CDefaultNodeBodyTintColor);
 	}
 }
 
@@ -153,11 +157,11 @@ void FPrintStringDataflowNode::Evaluate(Dataflow::FContext& Context, const FData
 {
 	FString Value = GetValue<FString>(Context, &String);
 
-	if (PrintToScreen)
+	if (bPrintToScreen)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, Duration, Color, Value);
 	}
-	if (PrintToLog)
+	if (bPrintToLog)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Text, %s"), *Value);
 	}
@@ -165,7 +169,7 @@ void FPrintStringDataflowNode::Evaluate(Dataflow::FContext& Context, const FData
 
 void FLogStringDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
 {
-	if (PrintToLog)
+	if (bPrintToLog)
 	{
 		FString Value = GetValue<FString>(Context, &String);
 		UE_LOG(LogTemp, Warning, TEXT("[Dataflow Log] %s"), *Value);
@@ -372,7 +376,7 @@ void FRandomFloatDataflowNode::Evaluate(Dataflow::FContext& Context, const FData
 {
 	if (Out->IsA<float>(&Float))
 	{
-		if (Deterministic)
+		if (bDeterministic)
 		{
 			float RandomSeedVal = GetValue<float>(Context, &RandomSeed);
 
@@ -393,7 +397,7 @@ void FRandomFloatInRangeDataflowNode::Evaluate(Dataflow::FContext& Context, cons
 		float MinVal = GetValue<float>(Context, &Min);
 		float MaxVal = GetValue<float>(Context, &Max);
 
-		if (Deterministic)
+		if (bDeterministic)
 		{
 			float RandomSeedVal = GetValue<float>(Context, &RandomSeed);
 
@@ -411,7 +415,7 @@ void FRandomUnitVectorDataflowNode::Evaluate(Dataflow::FContext& Context, const 
 {
 	if (Out->IsA<FVector>(&Vector))
 	{
-		if (Deterministic)
+		if (bDeterministic)
 		{
 			float RandomSeedVal = GetValue<float>(Context, &RandomSeed);
 
@@ -432,7 +436,7 @@ void FRandomUnitVectorInConeDataflowNode::Evaluate(Dataflow::FContext& Context, 
 		FVector ConeDirectionVal = GetValue<FVector>(Context, &ConeDirection);
 		float ConeHalfAngleVal = GetValue<float>(Context, &ConeHalfAngle);
 
-		if (Deterministic)
+		if (bDeterministic)
 		{
 			float RandomSeedVal = GetValue<float>(Context, &RandomSeed);
 
@@ -582,7 +586,14 @@ void FGetNumArrayElementsDataflowNode::Evaluate(Dataflow::FContext& Context, con
 {
 	if (Out->IsA<int32>(&NumElements))
 	{
-		SetValue<int32>(Context, GetValue<TArray<FVector>>(Context, &Points).Num(), &NumElements);
+		if (IsConnected<TArray<FVector>>(&Points))
+		{
+			SetValue<int32>(Context, GetValue<TArray<FVector>>(Context, &Points).Num(), &NumElements);
+		}
+		else if (IsConnected<TArray<FVector3f>>(&Vector3fArray))
+		{
+			SetValue<int32>(Context, GetValue<TArray<FVector3f>>(Context, &Vector3fArray).Num(), &NumElements);
+		}
 	}
 }
 
@@ -677,7 +688,7 @@ void FTransformCollectionDataflowNode::Evaluate(Dataflow::FContext& Context, con
 			UniformScale,
 			RotatePivot,
 			ScalePivot,
-			InvertTransformation);
+			bInvertTransformation);
 
 		GeometryCollection::Facades::FCollectionTransformFacade TransformFacade(InCollection);
 		TransformFacade.Transform(NewTransform);
@@ -728,7 +739,7 @@ void FTransformMeshDataflowNode::Evaluate(Dataflow::FContext& Context, const FDa
 				UniformScale,
 				RotatePivot,
 				ScalePivot,
-				InvertTransformation);
+				bInvertTransformation);
 
 			UE::Geometry::FDynamicMesh3& DynamicMesh = NewMesh->GetMeshRef();
 
@@ -781,7 +792,7 @@ void FBranchDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowO
 {
 	if (Out->IsA<TObjectPtr<UDynamicMesh>>(&Mesh))
 	{
-		bool InCondition = GetValue<bool>(Context, &Condition);
+		bool InCondition = GetValue<bool>(Context, &bCondition);
 
 		if (InCondition)
 		{
@@ -861,10 +872,10 @@ void FRemoveOnBreakDataflowNode::Evaluate(Dataflow::FContext& Context, const FDa
 {
 	if (Out->IsA<FManagedArrayCollection>(&Collection))
 	{
-		const bool& InEnableRemoval = GetValue(Context, &EnabledRemoval, true);
+		const bool& InEnableRemoval = GetValue(Context, &bEnabledRemoval, true);
 		const FVector2f& InPostBreakTimer = GetValue(Context, &PostBreakTimer);
 		const FVector2f& InRemovalTimer = GetValue(Context, &RemovalTimer);
-		const bool& InClusterCrumbling = GetValue(Context, &ClusterCrumbling);
+		const bool& InClusterCrumbling = GetValue(Context, &bClusterCrumbling);
 
 		// we are making a copy of the collection because we are modifying it 
 		FManagedArrayCollection InCollection = GetValue<FManagedArrayCollection>(Context, &Collection);
@@ -916,7 +927,7 @@ void FSetAnchorStateDataflowNode::Evaluate(Dataflow::FContext& Context, const FD
 			InTransformSelection.AsArray(BoneIndices);
 			AnchoringFacade.SetAnchored(BoneIndices, bAnchored);
 
-			if (SetNotSelectedBonesToOppositeState)
+			if (bSetNotSelectedBonesToOppositeState)
 			{
 				InTransformSelection.Invert();
 				InTransformSelection.AsArray(BoneIndices);
@@ -1113,7 +1124,7 @@ void FGetCollectionAttributeDataTypedDataflowNode::Evaluate(Dataflow::FContext& 
 	if (Out->IsA<TArray<bool>>(&BoolAttributeData) ||
 		Out->IsA<TArray<float>>(&FloatAttributeData) ||
 		Out->IsA<TArray<int32>>(&IntAttributeData) ||
-		Out->IsA<TArray<FVector>>(&VectorAttributeData))
+		Out->IsA<TArray<FVector3f>>(&VectorAttributeData))
 	{
 		const FManagedArrayCollection& InCollection = GetValue<FManagedArrayCollection>(Context, &Collection);
 
@@ -1174,17 +1185,17 @@ void FGetCollectionAttributeDataTypedDataflowNode::Evaluate(Dataflow::FContext& 
 							SetValue<TArray<int32>>(Context, TArray<int32>(), &IntAttributeData);
 						}
 					}
-					else if (Out->IsA<TArray<FVector>>(&VectorAttributeData))
+					else if (Out->IsA<TArray<FVector3f>>(&VectorAttributeData))
 					{
-						if (TypeStr == FString("Vector3d"))
+						if (TypeStr == FString("Vector"))
 						{
-							const TManagedArray<FVector>& VectorAttributeArr = InCollection.GetAttribute<FVector>(FName(*AttrName), GroupNameToUse);
+							const TManagedArray<FVector3f>& VectorAttributeArr = InCollection.GetAttribute<FVector3f>(FName(*AttrName), GroupNameToUse);
 
-							SetValue<TArray<FVector>>(Context, VectorAttributeArr.GetConstArray(), &VectorAttributeData);
+							SetValue<TArray<FVector3f>>(Context, VectorAttributeArr.GetConstArray(), &VectorAttributeData);
 						}
 						else
 						{
-							SetValue<TArray<FVector>>(Context, TArray<FVector>(), &VectorAttributeData);
+							SetValue<TArray<FVector3f>>(Context, TArray<FVector3f>(), &VectorAttributeData);
 						}
 					}
 				}
@@ -1316,4 +1327,101 @@ void FBoolArrayToFaceSelectionDataflowNode::Evaluate(Dataflow::FContext& Context
 		SetValue<FDataflowFaceSelection>(Context, NewFaceSelection, &FaceSelection);
 	}
 }
+
+
+void FFloatArrayToVertexSelectionDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
+{
+	if (Out->IsA<FDataflowVertexSelection>(&VertexSelection))
+	{
+		const TArray<float>& InFloatArray = GetValue<TArray<float>>(Context, &FloatArray);
+
+		FDataflowVertexSelection NewVertexSelection;
+		NewVertexSelection.Initialize(InFloatArray.Num(), false);
+
+		for (int32 Idx = 0; Idx < InFloatArray.Num(); ++Idx)
+		{
+			if (Operation == ECompareOperationEnum::Dataflow_Compare_Equal)
+			{
+				if (InFloatArray[Idx] == Threshold)
+				{
+					NewVertexSelection.SetSelected(Idx);
+				}
+			}
+			else if (Operation == ECompareOperationEnum::Dataflow_Compare_Smaller)
+			{
+				if (InFloatArray[Idx] < Threshold)
+				{
+					NewVertexSelection.SetSelected(Idx);
+				}
+			}
+			else if (Operation == ECompareOperationEnum::Dataflow_Compare_SmallerOrEqual)
+			{
+				if (InFloatArray[Idx] <= Threshold)
+				{
+					NewVertexSelection.SetSelected(Idx);
+				}
+			}
+			else if (Operation == ECompareOperationEnum::Dataflow_Compare_Greater)
+			{
+				if (InFloatArray[Idx] > Threshold)
+				{
+					NewVertexSelection.SetSelected(Idx);
+				}
+			}
+			else if (Operation == ECompareOperationEnum::Dataflow_Compare_GreaterOrEqual)
+			{
+				if (InFloatArray[Idx] >= Threshold)
+				{
+					NewVertexSelection.SetSelected(Idx);
+				}
+			}
+		}
+
+		SetValue<FDataflowVertexSelection>(Context, NewVertexSelection, &VertexSelection);
+	}
+}
+
+
+void FSetVertexColorInCollectionDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
+{
+	if (Out->IsA<FManagedArrayCollection>(&Collection))
+	{
+		FManagedArrayCollection InCollection = GetValue<FManagedArrayCollection>(Context, &Collection);
+		const FDataflowVertexSelection& InVertexSelection = GetValue<FDataflowVertexSelection>(Context, &VertexSelection);
+
+		if (InCollection.NumElements(FGeometryCollection::VerticesGroup) == InVertexSelection.Num())
+		{
+			const int32 NumVertices = InCollection.NumElements(FGeometryCollection::VerticesGroup);
+
+//			TManagedArray<FLinearColor>& VertexColors = InCollection.ModifyAttribute<FLinearColor>("Color", FGeometryCollection::VerticesGroup);
+			if (TManagedArray<FLinearColor>* VertexColors = InCollection.FindAttribute<FLinearColor>("Color", FGeometryCollection::VerticesGroup))
+			{
+				for (int32 Idx = 0; Idx < NumVertices; ++Idx)
+				{
+					if (InVertexSelection.IsSelected(Idx))
+					{
+						(*VertexColors)[Idx] = SelectedColor;
+					}
+					else
+					{
+						(*VertexColors)[Idx] = NonSelectedColor;
+					}
+				}
+			}
+
+			SetValue<FManagedArrayCollection>(Context, MoveTemp(InCollection), &Collection);
+		}
+	}
+}
+
+
+void FMakeTransformDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
+{
+	if (Out->IsA<FTransform>(&Transform))
+	{
+		SetValue<FTransform>(Context, FTransform(InTransform), &Transform);
+	}
+}
+
+
 

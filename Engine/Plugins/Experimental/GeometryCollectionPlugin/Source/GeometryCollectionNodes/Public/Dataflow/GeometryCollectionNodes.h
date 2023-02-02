@@ -17,6 +17,7 @@
 class FGeometryCollection;
 class UGeometryCollection;
 class UStaticMesh;
+class UMaterial;
 
 
 /**
@@ -96,10 +97,10 @@ struct FPrintStringDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Print");
-	bool PrintToScreen = true;
+	bool bPrintToScreen = true;
 
 	UPROPERTY(EditAnywhere, Category = "Print");
-	bool PrintToLog = true;
+	bool bPrintToLog = true;
 
 	UPROPERTY(EditAnywhere, Category = "Print");
 	FColor Color = FColor::White;
@@ -134,7 +135,7 @@ struct FLogStringDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Print");
-	bool PrintToLog = true;
+	bool bPrintToLog = true;
 
 	UPROPERTY(EditAnywhere, Category = "Print", meta = (DataflowInput));
 	FString String = FString("");
@@ -726,7 +727,7 @@ struct FRandomFloatDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Seed")
-	bool Deterministic = false;
+	bool bDeterministic = false;
 
 	UPROPERTY(EditAnywhere, Category = "Seed", meta = (DataflowInput, EditCondition = "Deterministic"))
 	float RandomSeed = 0.f;
@@ -759,7 +760,7 @@ struct FRandomFloatInRangeDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Seed")
-	bool Deterministic = false;
+	bool bDeterministic = false;
 
 	UPROPERTY(EditAnywhere, Category = "Seed", meta = (DataflowInput, EditCondition = "Deterministic"))
 	float RandomSeed = 0.f;
@@ -801,7 +802,7 @@ struct FRandomUnitVectorDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Seed")
-	bool Deterministic = false;
+	bool bDeterministic = false;
 
 	UPROPERTY(EditAnywhere, Category = "Seed", meta = (DataflowInput, EditCondition = "Deterministic"))
 	float RandomSeed = 0.f;
@@ -835,7 +836,7 @@ struct FRandomUnitVectorInConeDataflowNode : public FDataflowNode
 
 public:
 	UPROPERTY(EditAnywhere, Category = "Seed")
-	bool Deterministic = false;
+	bool bDeterministic = false;
 
 	UPROPERTY(EditAnywhere, Category = "Seed", meta = (DataflowInput, EditCondition = "Deterministic"))
 	float RandomSeed = 0.f;
@@ -1140,9 +1141,13 @@ struct FGetNumArrayElementsDataflowNode : public FDataflowNode
 	DATAFLOW_NODE_DEFINE_INTERNAL(FGetNumArrayElementsDataflowNode, "GetNumArrayElements", "Utilities|Array", "")
 
 public:
-	/** Array input */
-	UPROPERTY(meta = (DataflowInput))
+	/** FVector array input */
+	UPROPERTY(meta = (DataflowInput, DisplayName = "VectorArray"))
 	TArray<FVector> Points;
+
+	/** FVector3f array input */
+	UPROPERTY(meta = (DataflowInput, DisplayName = "Vector3fArray"))
+	TArray<FVector3f> Vector3fArray;
 
 	/** Number of elements in the array */
 	UPROPERTY(meta = (DataflowOutput))
@@ -1152,6 +1157,7 @@ public:
 		: FDataflowNode(InParam, InGuid)
 	{
 		RegisterInputConnection(&Points);
+		RegisterInputConnection(&Vector3fArray);
 		RegisterOutputConnection(&NumElements);
 	}
 
@@ -1299,7 +1305,7 @@ public:
 
 	/** Invert the transformation */
 	UPROPERTY(EditAnywhere, Category = "General");
-	bool InvertTransformation = false;
+	bool bInvertTransformation = false;
 
 	FTransformCollectionDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
 		: FDataflowNode(InParam, InGuid)
@@ -1393,7 +1399,7 @@ public:
 
 	/** Invert the transformation */
 	UPROPERTY(EditAnywhere, Category = "General");
-	bool InvertTransformation = false;
+	bool bInvertTransformation = false;
 
 	FTransformMeshDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
 		: FDataflowNode(InParam, InGuid)
@@ -1483,7 +1489,7 @@ public:
 
 	/** If true, Output = MeshA, otherwise Output = MeshB */
 	UPROPERTY(EditAnywhere, Category = "Branch");
-	bool Condition = false;
+	bool bCondition = false;
 
 	/** Output mesh */
 	UPROPERTY(meta = (DataflowOutput))
@@ -1494,7 +1500,7 @@ public:
 	{
 		RegisterInputConnection(&MeshA);
 		RegisterInputConnection(&MeshB);
-		RegisterInputConnection(&Condition);
+		RegisterInputConnection(&bCondition);
 		RegisterOutputConnection(&Mesh);
 	}
 
@@ -1552,7 +1558,7 @@ public:
 
 	/** Whether or not to enable the removal on the selection */
 	UPROPERTY(EditAnywhere, Category = "Removal", meta = (DataflowInput))
-	bool EnabledRemoval = true;
+	bool bEnabledRemoval = true;
 
 	/** How long after the break the removal will start ( Min / Max ) */
 	UPROPERTY(EditAnywhere, Category = "Removal", meta = (DataflowInput))
@@ -1564,17 +1570,17 @@ public:
 
 	/** If applied to a cluster this will cause the cluster to crumble upon removal, otherwise will have no effect */
 	UPROPERTY(EditAnywhere, Category = "Removal", meta = (DataflowInput))
-	bool ClusterCrumbling = false;
+	bool bClusterCrumbling = false;
 
 	FRemoveOnBreakDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
 		: FDataflowNode(InParam, InGuid)
 	{
 		RegisterInputConnection(&Collection);
 		RegisterInputConnection(&TransformSelection);
-		RegisterInputConnection(&EnabledRemoval);
+		RegisterInputConnection(&bEnabledRemoval);
 		RegisterInputConnection(&PostBreakTimer);
 		RegisterInputConnection(&RemovalTimer);
-		RegisterInputConnection(&ClusterCrumbling);
+		RegisterInputConnection(&bClusterCrumbling);
 		RegisterOutputConnection(&Collection, &Collection);
 	}
 
@@ -1611,7 +1617,7 @@ public:
 
 	/** If true, sets the non selected bones to opposite anchor state */
 	UPROPERTY(EditAnywhere, Category = "Anchoring")
-	bool SetNotSelectedBonesToOppositeState = false;
+	bool bSetNotSelectedBonesToOppositeState = false;
 
 	/** GeometryCollection to set anchor state on */
 	UPROPERTY(meta = (DataflowInput, DataflowOutput, DataflowPassthrough = "Collection", DataflowIntrinsic))
@@ -1892,7 +1898,7 @@ public:
 
 	/** Vector type attribute data */
 	UPROPERTY(meta = (DataflowOutput));
-	TArray<FVector> VectorAttributeData;
+	TArray<FVector3f> VectorAttributeData;
 
 	FGetCollectionAttributeDataTypedDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
 		: FDataflowNode(InParam, InGuid)
@@ -1982,7 +1988,7 @@ struct FBoolArrayToFaceSelectionDataflowNode : public FDataflowNode
 
 public:
 	/** TArray<bool> data */
-	UPROPERTY(meta = (DataflowInput));
+	UPROPERTY(meta = (DataflowInput, DataflowIntrinsic));
 	TArray<bool> BoolAttributeData;
 
 	UPROPERTY(meta = (DataflowOutput, DisplayName = "FaceSelection"))
@@ -1998,6 +2004,116 @@ public:
 	virtual void Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const override;
 
 };
+
+
+/**
+ *
+ * Converts a TArray<float> to a FDataflowVertexSelection
+ *
+ */
+USTRUCT()
+struct FFloatArrayToVertexSelectionDataflowNode : public FDataflowNode
+{
+	GENERATED_USTRUCT_BODY()
+	DATAFLOW_NODE_DEFINE_INTERNAL(FFloatArrayToVertexSelectionDataflowNode, "FloatArrayToVertexSelection", "Utilities|Array", "")
+
+public:
+	/** TArray<floatl> array */
+	UPROPERTY(meta = (DataflowInput, DataflowIntrinsic));
+	TArray<float> FloatArray;
+
+	/** Comparison operation */
+	UPROPERTY(EditAnywhere, Category = "Compare");
+	ECompareOperationEnum Operation = ECompareOperationEnum::Dataflow_Compare_Greater;
+
+	/**  */
+	UPROPERTY(EditAnywhere, Category = "Compare")
+	float Threshold = 0.f;
+
+	UPROPERTY(meta = (DataflowOutput, DisplayName = "VertexSelection"))
+	FDataflowVertexSelection VertexSelection;
+
+	FFloatArrayToVertexSelectionDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
+		: FDataflowNode(InParam, InGuid)
+	{
+		RegisterInputConnection(&FloatArray);
+		RegisterOutputConnection(&VertexSelection);
+	}
+
+	virtual void Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const override;
+
+};
+
+
+/**
+ *
+ * 
+ *
+ */
+USTRUCT()
+struct FSetVertexColorInCollectionDataflowNode : public FDataflowNode
+{
+	GENERATED_USTRUCT_BODY()
+	DATAFLOW_NODE_DEFINE_INTERNAL(FSetVertexColorInCollectionDataflowNode, "SetVertexColorInCollection", "Collection|Utilities", "")
+
+public:
+	/** Collection */
+	UPROPERTY(meta = (DataflowInput, DataflowOutput, DataflowPassthrough = "Collection", DataflowIntrinsic))
+	FManagedArrayCollection Collection;
+
+	/**  */
+	UPROPERTY(meta = (DataflowInput, DisplayName = "VertexSelection", DataflowIntrinsic))
+	FDataflowVertexSelection VertexSelection;
+
+	/**  */
+	UPROPERTY(EditAnywhere, Category = "Color")
+	FLinearColor SelectedColor = FLinearColor(FColor::Yellow);
+
+	/**  */
+	UPROPERTY(EditAnywhere, Category = "Color", meta = (DisplayName = "NonSelected Color"))
+	FLinearColor NonSelectedColor = FLinearColor(FColor::Blue);
+
+	FSetVertexColorInCollectionDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
+		: FDataflowNode(InParam, InGuid)
+	{
+		RegisterInputConnection(&Collection);
+		RegisterInputConnection(&VertexSelection);
+		RegisterOutputConnection(&Collection, &Collection);
+	}
+
+	virtual void Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const override;
+
+};
+
+
+/**
+ *
+ * Description for this node
+ *
+ */
+USTRUCT()
+struct FMakeTransformDataflowNode : public FDataflowNode
+{
+	GENERATED_USTRUCT_BODY()
+	DATAFLOW_NODE_DEFINE_INTERNAL(FMakeTransformDataflowNode, "MakeTransform", "Generators|Transform", "")
+
+public:
+	UPROPERTY(EditAnywhere, Category = "Transform", meta = (DisplayName = "Transform"));
+	FTransform InTransform = FTransform::Identity;
+
+	UPROPERTY(meta = (DataflowOutput));
+	FTransform Transform = FTransform::Identity;
+
+	FMakeTransformDataflowNode(const Dataflow::FNodeParameters& InParam, FGuid InGuid = FGuid::NewGuid())
+		: FDataflowNode(InParam, InGuid)
+	{
+		RegisterOutputConnection(&Transform);
+	}
+
+	virtual void Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const override;
+
+};
+
 
 
 namespace Dataflow
