@@ -504,12 +504,6 @@ FDeferredShadingSceneRenderer::FDeferredShadingSceneRenderer(const FSceneViewFam
 {
 	ViewPipelineStates.SetNum(Views.Num());
 
-#if RHI_RAYTRACING
-	// Flags initialized later in render thread
-	bAnyRayTracingPassEnabled = false;
-	bShouldUpdateRayTracingScene = false;
-#endif
-
 	ShadowSceneRenderer = MakeUnique<FShadowSceneRenderer>(*this);
 }
 
