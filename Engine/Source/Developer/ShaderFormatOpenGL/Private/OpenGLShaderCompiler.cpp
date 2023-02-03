@@ -3129,6 +3129,8 @@ static bool CompileToGlslWithShaderConductor(
 
 		CrossCompiler::FShaderConductorTarget TargetDesc;
 
+		TargetDesc.CompileFlags.SetDefine(TEXT("relax_nan_checks"), 1);
+
 		switch (Version)
 		{
 		case GLSL_SWITCH_FORWARD:
