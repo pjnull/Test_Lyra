@@ -9727,6 +9727,7 @@ FBeginCookContext UCookOnTheFlyServer::CreateCookWorkerContext()
 {
 	FBeginCookContext BeginContext(*this);
 	*CookByTheBookOptions = CookWorkerClient->ConsumeCookByTheBookOptions();
+	bZenStore = CookWorkerClient->GetInitializationIsZenStore();
 	CookByTheBookOptions->CookTime = 0.0f;
 	CookByTheBookOptions->CookStartTime = FPlatformTime::Seconds();
 	*CookOnTheFlyOptions = CookWorkerClient->ConsumeCookOnTheFlyOptions();
