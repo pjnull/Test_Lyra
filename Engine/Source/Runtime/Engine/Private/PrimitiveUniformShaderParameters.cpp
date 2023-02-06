@@ -191,6 +191,7 @@ FPrimitiveSceneShaderData::FPrimitiveSceneShaderData(const FPrimitiveSceneProxy*
 		.VisibleInReflectionCaptures(Proxy->IsVisibleInReflectionCaptures())
 		.VisibleInRealTimeSkyCaptures(Proxy->IsVisibleInRealTimeSkyCaptures())
 		.VisibleInRayTracing(Proxy->IsVisibleInRayTracing())
+		.VisibleInLumenScene(Proxy->IsVisibleInLumenScene())
 		.VisibleInSceneCaptureOnly(Proxy->IsVisibleInSceneCaptureOnly())
 		.HiddenInSceneCapture(Proxy->IsHiddenInSceneCapture())
 		.ForceHidden(Proxy->IsForceHidden())
