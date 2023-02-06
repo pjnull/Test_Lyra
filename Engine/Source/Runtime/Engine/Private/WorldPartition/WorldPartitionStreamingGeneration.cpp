@@ -235,6 +235,14 @@ class FWorldPartitionStreamingGenerator
 		}
 	}
 
+	void ResolveRuntimeGrid(FWorldPartitionActorDescView& ActorDescView)
+	{
+		if (!bEnableStreaming)
+		{
+			ActorDescView.SetForcedNoRuntimeGrid();
+		}
+	}
+
 	void ResolveRuntimeDataLayers(FWorldPartitionActorDescView& ActorDescView, const FActorDescViewMap& ActorDescViewMap)
 	{
 		TArray<FName> RuntimeDataLayerInstanceNames;
@@ -487,6 +495,7 @@ class FWorldPartitionStreamingGenerator
 		auto ResolveActorDescView = [this, &ContainerDescriptor](FWorldPartitionActorDescView& ActorDescView)
 		{
 			ResolveRuntimeSpatiallyLoaded(ActorDescView);
+			ResolveRuntimeGrid(ActorDescView);
 			ResolveRuntimeDataLayers(ActorDescView, ContainerDescriptor.ActorDescViewMap);
 		};
 
@@ -621,7 +630,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					}
 					else
 					{
-						ActorDescView.SetInvalidRuntimeGrid();
+						ActorDescView.SetForcedNoRuntimeGrid();
 					}
 				}
 
@@ -732,8 +741,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 							}
 							else
 							{
-								RefererActorDescView->SetInvalidRuntimeGrid();
-								ReferenceActorDescView->SetInvalidRuntimeGrid();
+								RefererActorDescView->SetForcedNoRuntimeGrid();
+								ReferenceActorDescView->SetForcedNoRuntimeGrid();
 							}
 
 							NbErrorsDetected++;

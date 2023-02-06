@@ -77,7 +77,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	bool ShouldValidateRuntimeGrid() const;
 
 	void SetForcedNonSpatiallyLoaded();
-	void SetInvalidRuntimeGrid();
+	void SetForcedNoRuntimeGrid();
 	void SetInvalidDataLayers();
 	void SetRuntimeDataLayers(TArray<FName>& InRuntimeDataLayers);
 	void SetRuntimeReferences(TArray<FGuid>& InRuntimeReferences);
@@ -99,8 +99,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 protected:
 	const FWorldPartitionActorDesc* ActorDesc;
 	bool bIsForcedNonSpatiallyLoaded;
-	bool bInvalidDataLayers;
-	bool bInvalidRuntimeGrid;
+	bool bIsForcedNoRuntimeGrid;
+	bool bInvalidDataLayers;	
 	TOptional<TArray<FName>> RuntimeDataLayers;
 	TOptional<TArray<FGuid>> RuntimeReferences;
 };
