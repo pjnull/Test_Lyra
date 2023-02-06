@@ -4234,8 +4234,6 @@ void UPrimitiveComponent::PrecachePSOs()
 		return;
 	}
 
-	check(IsInGameThread());
-
 	// clear the current request data
 	MaterialPSOPrecacheRequestIDs.Empty();
 	PSOPrecacheCompileEvent = nullptr;
