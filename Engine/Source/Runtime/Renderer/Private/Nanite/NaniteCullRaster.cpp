@@ -2697,6 +2697,7 @@ FBinningData AddPass_Rasterize(
 	
 	const FMaterialRenderProxy* FixedMaterialProxy = UMaterial::GetDefaultMaterial(MD_Surface)->GetRenderProxy();
 	check(FixedMaterialProxy);
+	const FMaterialRenderProxy* HiddenMaterialProxy = GEngine->NaniteHiddenSectionMaterial->GetRenderProxy();
 
 	struct FRasterizerPass
 	{
@@ -2718,6 +2719,7 @@ FBinningData AddPass_Rasterize(
 
 		bool bVertexProgrammable = false;
 		bool bPixelProgrammable = false;
+		bool bHidden = false;
 
 		uint32 IndirectOffset = 0u;
 		uint32 RasterizerBin = ~uint32(0u);
@@ -2840,6 +2842,13 @@ FBinningData AddPass_Rasterize(
 				RasterizerPass.ComputeMaterialProxy == FixedMaterialProxy)
 			{
 				FixedFunctionPassIndex = RasterizerPasses.Num() - 1;
+			}
+
+			if (RasterizerPass.VertexMaterialProxy	== HiddenMaterialProxy &&
+				RasterizerPass.PixelMaterialProxy	== HiddenMaterialProxy &&
+				RasterizerPass.ComputeMaterialProxy	== HiddenMaterialProxy)
+			{
+				RasterizerPass.bHidden = true;
 			}
 		}
 	}
@@ -3012,6 +3021,11 @@ FBinningData AddPass_Rasterize(
 
 		for (const FRasterizerPass& RasterizerPass : RasterizerPasses)
 		{
+			if (RasterizerPass.bHidden)
+			{
+				continue;
+			}
+
 		#if WANTS_DRAW_MESH_EVENTS
 			SCOPED_CONDITIONAL_DRAW_EVENTF(RHICmdList, HWRaster, GNaniteShowDrawEvents != 0, TEXT("%s"), GetRasterMaterialName(RasterizerPass.RasterPipeline.RasterMaterial, FixedMaterialProxy));
 		#endif
@@ -3108,6 +3122,11 @@ FBinningData AddPass_Rasterize(
 
 			for (const FRasterizerPass& RasterizerPass : RasterizerPasses)
 			{
+				if (RasterizerPass.bHidden)
+				{
+					continue;
+				}
+
 			#if WANTS_DRAW_MESH_EVENTS
 				SCOPED_CONDITIONAL_DRAW_EVENTF(RHICmdList, SWRaster, GNaniteShowDrawEvents != 0, TEXT("%s"), GetRasterMaterialName(RasterizerPass.RasterPipeline.RasterMaterial, FixedMaterialProxy));
 			#endif
