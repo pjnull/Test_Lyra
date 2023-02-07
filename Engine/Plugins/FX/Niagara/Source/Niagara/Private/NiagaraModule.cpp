@@ -1378,7 +1378,7 @@ bool FNiagaraTypeDefinition::Serialize(FArchive& Ar)
 		}
 	}
 
-	if (Ar.IsLoading() || Ar.IsSaving())
+	if (Ar.IsLoading() || Ar.IsSaving() || Ar.IsModifyingWeakAndStrongReferences())
 	{
 		UScriptStruct* Struct = FNiagaraTypeDefinition::StaticStruct();
 		Struct->SerializeTaggedProperties(Ar, (uint8*)this, Struct, nullptr);
