@@ -344,6 +344,18 @@ void FSlateDrawElement::MakeRotatedBox(
 	}
 }
 
+#if !UE_BUILD_SHIPPING
+namespace UE::Slate::Private
+{
+	bool GLogPaintedText = false;
+	FAutoConsoleVariableRef LogPaintedTextRef(
+		TEXT("Slate.LogPaintedText"),
+		GLogPaintedText,
+		TEXT("If true, all text that is visible to the user will be logged when it is painted. This will log the full text to be painted, not the truncated or clipped version based on UI constraints.")
+	);
+}
+#endif
+
 void FSlateDrawElement::MakeText( FSlateWindowElementList& ElementList, uint32 InLayer, const FPaintGeometry& PaintGeometry, const FString& InText, const int32 StartIndex, const int32 EndIndex, const FSlateFontInfo& InFontInfo, ESlateDrawEffect InDrawEffects, const FLinearColor& InTint )
 {
 	SCOPE_CYCLE_COUNTER(STAT_SlateDrawElementMakeTime)
@@ -353,6 +365,13 @@ void FSlateDrawElement::MakeText( FSlateWindowElementList& ElementList, uint32 I
 	{
 		return;
 	}
+
+#if !UE_BUILD_SHIPPING
+	if (UE::Slate::Private::GLogPaintedText)
+	{
+		UE_LOG(LogSlate, Log, TEXT("MakeText: '%s'."), *InText);
+	}
+#endif
 
 	FSlateDrawElement& Element = ElementList.AddUninitialized();
 	FSlateTextPayload& DataPayload = ElementList.CreatePayload<FSlateTextPayload>(Element);
@@ -384,7 +403,12 @@ void FSlateDrawElement::MakeText( FSlateWindowElementList& ElementList, uint32 I
 	{
 		return;
 	}
-
+#if !UE_BUILD_SHIPPING
+	if (UE::Slate::Private::GLogPaintedText)
+	{
+		UE_LOG(LogSlate, Log, TEXT("MakeText: '%s'."), *InText);
+	}
+#endif
 	FSlateDrawElement& Element = ElementList.AddUninitialized();
 
 	FSlateTextPayload& DataPayload = ElementList.CreatePayload<FSlateTextPayload>(Element);
