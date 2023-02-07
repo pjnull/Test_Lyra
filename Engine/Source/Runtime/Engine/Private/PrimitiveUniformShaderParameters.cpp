@@ -164,7 +164,6 @@ FPrimitiveSceneShaderData::FPrimitiveSceneShaderData(const FPrimitiveSceneProxy*
 		.ActorWorldPosition(Proxy->GetActorPosition())
 		.WorldBounds(Proxy->GetBounds())
 		.LocalBounds(Proxy->GetLocalBounds())
-		.BoundsScale(Proxy->GetBoundsScale())
 		.PreSkinnedLocalBounds(PreSkinnedLocalBounds)
 		.CustomPrimitiveData(Proxy->GetCustomPrimitiveData())
 		.LightingChannelMask(Proxy->GetLightingChannelMask())
@@ -183,6 +182,7 @@ FPrimitiveSceneShaderData::FPrimitiveSceneShaderData(const FPrimitiveSceneProxy*
 		.CacheShadowAsStatic(PrimitiveSceneInfo->ShouldCacheShadowAsStatic())
 		.OutputVelocity(bOutputVelocity)
 		.EvaluateWorldPositionOffset(Proxy->EvaluateWorldPositionOffset() && Proxy->AnyMaterialHasWorldPositionOffset())
+		.MaxWorldPositionOffsetDistance(Proxy->GetMaxWorldPositionOffsetDistance())
 		.CastContactShadow(Proxy->CastsContactShadow())
 		.CastShadow(Proxy->CastsDynamicShadow())
 		.CastHiddenShadow(Proxy->CastsHiddenShadow())
@@ -322,7 +322,7 @@ void FPrimitiveSceneShaderData::Setup(const FPrimitiveUniformShaderParameters& P
 	Data[30].Z = PrimitiveUniformShaderParameters.InstanceWPODisableDistanceSquared;
 	Data[30].W = FMath::AsFloat(PrimitiveUniformShaderParameters.NaniteRayTracingDataOffset);
 
-	Data[31].X = PrimitiveUniformShaderParameters.BoundsScale;
+	Data[31].X = PrimitiveUniformShaderParameters.MaxWPODistance;
 	Data[31].Y = FMath::AsFloat(PrimitiveUniformShaderParameters.CustomStencilValueAndMask);
 	// .ZW Unused
 

@@ -338,6 +338,8 @@ FStaticMeshSceneProxy::FStaticMeshSceneProxy(UStaticMeshComponent* InComponent, 
 			{
 				MaterialRelevance |= UMaterial::GetDefaultMaterial(MD_Surface)->GetRelevance(FeatureLevel);
 			}
+
+			MaxWPODistance = FMath::Max(MaxWPODistance, SectionInfo.Material->GetMaxWorldPositionOffsetDistance());
 		}
 	}
 

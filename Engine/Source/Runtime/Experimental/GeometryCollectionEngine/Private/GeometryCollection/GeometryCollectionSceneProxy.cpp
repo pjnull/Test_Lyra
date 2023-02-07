@@ -1673,7 +1673,7 @@ FNaniteGeometryCollectionSceneProxy::FNaniteGeometryCollectionSceneProxy(UGeomet
 		FInstanceDynamicData& DynamicData = InstanceDynamicData[GeometryIndex];
 		DynamicData.PrevLocalToPrimitive.SetIdentity();
 
-		InstanceLocalBounds[GeometryIndex] = FRenderBounds();
+		SetInstanceLocalBounds(GeometryIndex, FRenderBounds(), false);
 	}
 }
 
@@ -1811,7 +1811,10 @@ void FNaniteGeometryCollectionSceneProxy::SetConstantData_RenderThread(FGeometry
 		FInstanceDynamicData& DynamicData = InstanceDynamicData.Emplace_GetRef();
 		DynamicData.PrevLocalToPrimitive = Instance.LocalToPrimitive;
 
-		InstanceLocalBounds.Emplace(NaniteData.LocalBounds);
+		int32 InstanceIndex = InstanceLocalBounds.Num();
+		InstanceLocalBounds.SetNumUninitialized(InstanceIndex + 1);
+		SetInstanceLocalBounds(InstanceIndex, NaniteData.LocalBounds);
+		
 		InstanceHierarchyOffset.Emplace(NaniteData.HierarchyOffset);
 	}
 
@@ -1861,7 +1864,10 @@ void FNaniteGeometryCollectionSceneProxy::SetDynamicData_RenderThread(FGeometryC
 				DynamicData.PrevLocalToPrimitive = Instance.LocalToPrimitive;
 			}
 
-			InstanceLocalBounds.Emplace(NaniteData.LocalBounds);
+			int32 InstanceIndex = InstanceLocalBounds.Num();
+			InstanceLocalBounds.SetNumUninitialized(InstanceIndex + 1);
+			SetInstanceLocalBounds(InstanceIndex, NaniteData.LocalBounds);
+			
 			InstanceHierarchyOffset.Emplace(NaniteData.HierarchyOffset);
 		}
 	}

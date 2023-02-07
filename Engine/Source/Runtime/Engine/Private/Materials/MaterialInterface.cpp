@@ -1194,6 +1194,11 @@ bool UMaterialInterface::IsMasked() const
 	return false;
 }
 
+float UMaterialInterface::GetMaxWorldPositionOffsetDistance() const
+{
+	return 0.0f;
+}
+
 bool UMaterialInterface::IsDeferredDecal() const
 {
 	return false;
