@@ -75,7 +75,6 @@ public:
 		, _AllowReadOnlyFolders(true)
 		, _ShowFavorites(false)
 		, _SelectionMode( ESelectionMode::Multi )
-		, _EditorConfig(nullptr)
 		{}
 
 		/** Content displayed to the left of the search bar */
@@ -126,7 +125,8 @@ public:
 		/** The plugin filter collection */
 		SLATE_ARGUMENT( TSharedPtr<FPluginFilterCollectionType>, PluginPathFilters)
 
-		SLATE_ARGUMENT( FPathViewConfig*, EditorConfig )
+		/** The instance name of the owning content browser. */
+		SLATE_ARGUMENT( FName, OwningContentBrowserName )
 
 	SLATE_END_ARGS()
 
@@ -301,6 +301,9 @@ protected:
 
 	/** Clear all root items and clear selection */
 	void ClearTreeItems();
+
+	/** Get this path view's editor config if OwningContentBrowserName is set. */
+	FPathViewConfig* GetEditorConfig() const;
 
 private:
 	/** Selects the given path only if it exists. Returns true if selected. */
@@ -482,7 +485,7 @@ private:
 	TSharedPtr<SExpandableArea> FavoritesArea;
 
 	/** The config instance to use. */
-	FPathViewConfig* EditorConfig = nullptr;
+	FName OwningContentBrowserName;
 };
 
 

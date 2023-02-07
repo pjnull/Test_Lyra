@@ -1049,8 +1049,6 @@ void SContentBrowser::SetPathViewExpanded(bool bExpanded)
 
 TSharedRef<SWidget> SContentBrowser::CreatePathView(const FContentBrowserConfig* Config)
 {	
-	FContentBrowserInstanceConfig* InstanceConfig = GetMutableInstanceConfig();
-
 	return
 		SAssignNew(PathArea, SExpandableArea)
 		.BorderImage(FAppStyle::Get().GetBrush("Brushes.Header"))
@@ -1109,7 +1107,7 @@ TSharedRef<SWidget> SContentBrowser::CreatePathView(const FContentBrowserConfig*
 					.AddMetaData<FTagMetaData>(FTagMetaData(TEXT("ContentBrowserSources")))
 					.ExternalSearch(SourcesSearch)
 					.PluginPathFilters(PluginPathFilters)
-					.EditorConfig(InstanceConfig != nullptr ? &InstanceConfig->PathView : nullptr)
+					.OwningContentBrowserName(InstanceName)
 				]
 			]
 		];
