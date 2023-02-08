@@ -1957,6 +1957,11 @@ void ShaderMapAppendKeyString(EShaderPlatform Platform, FString& KeyString)
 		{
 			KeyString += FString::Printf(TEXT("_ADVDEBUG"));
 		}
+
+		if (Strata::IsAccurateSRGBEnabled())
+		{
+			KeyString += FString::Printf(TEXT("_SRGB"));
+		}
 	}
 
 	{
