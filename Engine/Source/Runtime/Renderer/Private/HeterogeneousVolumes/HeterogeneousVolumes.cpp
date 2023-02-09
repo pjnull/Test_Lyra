@@ -356,7 +356,7 @@ namespace HeterogeneousVolumes
 
 	FIntVector GetLightingCacheResolution()
 	{
-		float DownsampleFactor = CVarHeterogeneousVolumesLightingCacheDownsampleFactor.GetValueOnRenderThread();
+		float DownsampleFactor = FMath::Max(CVarHeterogeneousVolumesLightingCacheDownsampleFactor.GetValueOnRenderThread(), 1);
 		FIntVector LightingCacheResolution = GetVolumeResolution() / DownsampleFactor;
 
 		return LightingCacheResolution;
