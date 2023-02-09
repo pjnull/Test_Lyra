@@ -18,6 +18,8 @@
 //#if UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_1
 #include "RenderGraph.h"
 #include "SceneRenderTargetParameters.h"
+
+#include "RendererUtils.h"
 //#endif
 
 class UClass;
@@ -199,6 +201,8 @@ public:
 
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters,	View)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters,	SceneTextures)
+
+		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FStrataPublicGlobalUniformParameters, StrataPublic)
 	END_SHADER_PARAMETER_STRUCT()
 
 	using FPermutationParameters = FNiagaraShaderPermutationParameters;

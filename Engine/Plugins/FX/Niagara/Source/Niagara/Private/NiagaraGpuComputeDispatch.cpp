@@ -1072,6 +1072,8 @@ void FNiagaraGpuComputeDispatch::ExecuteTicks(FRDGBuilder& GraphBuilder, TConstA
 		}
 	}
 
+	StrataPublicGlobalUniformParams = ::Strata::GetPublicGlobalUniformBuffer(GraphBuilder, *GetScene());
+
 	// Loop over dispatches
 	for ( const FNiagaraGpuDispatchGroup& DispatchGroup : DispatchList.DispatchGroups )
 	{
@@ -1349,6 +1351,7 @@ void FNiagaraGpuComputeDispatch::ExecuteTicks(FRDGBuilder& GraphBuilder, TConstA
 	SimulationViewInfos = TConstArrayView<FViewInfo>();
 	SceneTexturesUniformParams = nullptr;
 	MobileSceneTexturesUniformParams = nullptr;
+	StrataPublicGlobalUniformParams = nullptr;
 
 	CurrentPassExternalAccessQueue.Submit(GraphBuilder);
 }
@@ -1608,6 +1611,7 @@ void FNiagaraGpuComputeDispatch::DispatchStage(FRDGBuilder& GraphBuilder, const 
 	}
 	DispatchParameters->SceneTextures.SceneTextures			= SceneTexturesUniformParams;
 	DispatchParameters->SceneTextures.MobileSceneTextures	= MobileSceneTexturesUniformParams;
+	DispatchParameters->StrataPublic						= StrataPublicGlobalUniformParams;
 
 	// Indirect Gpu Dispatch
 	if (SimStageData.StageMetaData->bGpuIndirectDispatch)
