@@ -819,6 +819,7 @@ bool FOpenXRHMD::EnableStereo(bool stereo)
 
 			return true;
 		}
+		bStereoEnabled = false;
 		return false;
 	}
 	else
