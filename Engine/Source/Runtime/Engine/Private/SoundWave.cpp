@@ -1615,6 +1615,27 @@ void USoundWave::FlushAsyncLoadingDataFormats()
 		AsyncLoadingDataFormats.Empty();
 	}
 }
+
+void USoundWave::FlushAudioRenderingCommands() const
+{
+	check(IsInAudioThread());
+
+	// Waits for audio rendering commands to execute
+	if (GEngine && !GExitPurge)
+	{
+		FAudioDeviceManager* DeviceManager = GEngine->GetAudioDeviceManager();
+		if (DeviceManager)
+		{
+			DeviceManager->IterateOverAllDevices([](Audio::FDeviceId InDeviceID, FAudioDevice* InDevice)
+			{
+				if (InDevice)
+				{
+					InDevice->FlushAudioRenderingCommands(false /* bPumpSynchronously */);
+				}
+			});
+		}
+	}
+}
 #endif
 
 bool USoundWave::HasStreamingChunks()
@@ -3842,9 +3863,16 @@ void USoundWave::OverrideLoadingBehavior(ESoundWaveLoadingBehavior InLoadingBeha
 #if WITH_EDITOR
 void USoundWave::UpdateAsset(bool bMarkDirty)
 {
-	InvalidateCompressedData();
+	// Free playing sounds
 	FreeResources();
+	
+	// Flush audio rendering commands to ensure stopped sounds have finished decoding
+	// before invalidating compressed data.
+	FlushAudioRenderingCommands(); 
+
+	InvalidateCompressedData();
 	UpdatePlatformData();
+
 	if(bMarkDirty)
 	{
 		MarkPackageDirty();
