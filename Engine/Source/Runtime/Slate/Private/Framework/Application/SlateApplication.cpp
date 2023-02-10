@@ -79,13 +79,21 @@ static FAutoConsoleVariableRef CVarSlateVerifyWidgetLayerId(
 	GSlateVerifyWidgetLayerId,
 	TEXT("Every tick, verify that widgets have a LayerId range that fits with their siblings and their parent.")
 );
-
 namespace UE::Slate::Private
 {
 	void VerifyParentChildrenRelationship(const TSharedRef<SWindow>& WindowToDraw);
 	void VerifyWidgetLayerId(const TSharedRef<SWindow>& WindowToDraw);
 }
 #endif //WITH_SLATE_DEBUGGING
+
+//////////////////////////////////////////////////////////////////////////
+
+bool GSlateEnableGamepadEditorNavigation = true;
+static FAutoConsoleVariableRef CVarSlateEnableGamepadEditorNavigation(
+	TEXT("Slate.EnableGamepadEditorNavigation"),
+	GSlateEnableGamepadEditorNavigation,
+	TEXT("True implies we allow gamepad navigation outside of the game viewport.")
+);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -3381,7 +3389,11 @@ void FSlateApplication::ProcessReply( const FWidgetPath& CurrentEventPath, const
 
 		if (NavigationSource.IsValid())
 		{
-			if (TheReply.GetNavigationDestination().IsValid())
+			if (!GSlateEnableGamepadEditorNavigation && TheReply.GetNavigationGenesis() == ENavigationGenesis::Controller && !NavigationSource.GetLastWidget()->GetPersistentState().bIsInGameLayer)
+			{
+				// Gamepad navigation while not in a game layer, do nothing as specified by GSlateEnableGamepadEditorNavigation
+			}
+			else if (TheReply.GetNavigationDestination().IsValid())
 			{
 				const bool bAlwaysHandleNavigationAttempt = false;
 				ExecuteNavigation(NavigationSource, TheReply.GetNavigationDestination(), UserIndex, bAlwaysHandleNavigationAttempt);
