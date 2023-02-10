@@ -15,6 +15,9 @@
 
 #define LOCTEXT_NAMESPACE "MetasoundAudioBusWriterNode"
 
+// MetaSound Audio Bus writer node disabled in UE 5.2 due to existing issues (UE-170575).
+#define ENABLE_METASOUND_AUDIOBUS_WRITER_NODE 0
+
 namespace Metasound
 {
 	namespace AudioBusWriterNode
@@ -226,11 +229,14 @@ namespace Metasound
 	using FAudioBusWriterNode_##ChannelCount = TAudioBusWriterNode<ChannelCount>; \
 	METASOUND_REGISTER_NODE(FAudioBusWriterNode_##ChannelCount) \
 
+#if ENABLE_METASOUND_AUDIOBUS_WRITER_NODE
 	REGISTER_AUDIO_BUS_WRITER_NODE(1);
 	REGISTER_AUDIO_BUS_WRITER_NODE(2);
 	REGISTER_AUDIO_BUS_WRITER_NODE(4);
 	REGISTER_AUDIO_BUS_WRITER_NODE(6);
 	REGISTER_AUDIO_BUS_WRITER_NODE(8);
+#endif // #if ENABLE_METASOUND_AUDIOBUS_WRITER_NODE
+
 }
 
 #undef LOCTEXT_NAMESPACE
