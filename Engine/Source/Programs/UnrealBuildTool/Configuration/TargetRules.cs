@@ -2546,6 +2546,10 @@ namespace UnrealBuildTool
 					}
 				}
 			}
+			foreach (UnrealArch Arch in Architectures.Architectures)
+			{
+				yield return Arch;
+			}
 		}
 
 		/// <summary>
