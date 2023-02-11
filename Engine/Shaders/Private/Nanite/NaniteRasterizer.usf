@@ -242,7 +242,7 @@ uint DeduplicateVertIndexes( FNaniteView NaniteView, FPrimitiveSceneData Primiti
 	#define VERTEX_CACHE_SIZE 384
 #endif
 
-groupshared float3 GroupVerts[VERTEX_CACHE_SIZE * 3];
+groupshared float3 GroupVerts[VERTEX_CACHE_SIZE];
 
 #endif
 
