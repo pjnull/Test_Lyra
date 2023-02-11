@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "VCamPixelStreamingSubsystem.h"
+
+#include "Engine/Engine.h"
 #include "Features/IModularFeatures.h"
 
 #include "PixelStreamingEditorModule.h"
