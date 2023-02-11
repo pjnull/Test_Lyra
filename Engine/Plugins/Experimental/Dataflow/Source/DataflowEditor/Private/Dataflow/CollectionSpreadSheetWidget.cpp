@@ -498,7 +498,7 @@ FText SCollectionSpreadSheetWidget::GetNoOutputText()
 
 FText SCollectionSpreadSheetWidget::GetNoGroupText()
 {
-	return LOCTEXT("NoOutput", "No Group(s)");
+	return LOCTEXT("NoGroup", "No Group(s)");
 }
 
 
