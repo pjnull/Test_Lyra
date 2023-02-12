@@ -130,7 +130,6 @@ void FGeometryCollection::Construct()
 	InitializeInterfaces();
 }
 
-
 void FGeometryCollection::SetDefaults(FName Group, uint32 StartSize, uint32 NumElements)
 {
 	if (Group == FTransformCollection::TransformGroup)
@@ -146,6 +145,13 @@ void FGeometryCollection::SetDefaults(FName Group, uint32 StartSize, uint32 NumE
 		}
 
 		FGeometryCollectionConvexUtility::SetDefaults(this, Group, StartSize, NumElements);
+	}
+	else if (Group == FGeometryCollection::VerticesGroup)
+	{
+		for (uint32 Idx = StartSize; Idx < StartSize + NumElements; ++Idx)
+		{
+			Color[Idx] = FLinearColor::White;
+		}
 	}
 }
 
