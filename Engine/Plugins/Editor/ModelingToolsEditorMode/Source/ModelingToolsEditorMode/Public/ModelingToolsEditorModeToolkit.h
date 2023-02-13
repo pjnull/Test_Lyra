@@ -127,6 +127,8 @@ private:
 	void MakeGizmoNumericalUIOverlayWidget();
 	TSharedPtr<STransformGizmoNumericalUIOverlay> GizmoNumericalUIOverlayWidget;
 
+	TSharedRef<SWidget> MakeMenu_ModelingModeConfigSettings();
+
 	TSharedPtr<STextBlock> ModeWarningArea;
 	TSharedPtr<STextBlock> ModeHeaderArea;
 	TSharedPtr<STextBlock> ToolWarningArea;

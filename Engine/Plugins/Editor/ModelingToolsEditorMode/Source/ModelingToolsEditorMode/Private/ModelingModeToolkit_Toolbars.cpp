@@ -265,42 +265,6 @@ void MakeSubMenu_DefaultMeshObjectType(FMenuBuilder& MenuBuilder)
 
 
 
-TSharedRef<SWidget> MakeMenu_ModelingModeConfigSettings(FModelingToolsEditorModeToolkit* Toolkit)
-{
-	FMenuBuilder MenuBuilder(true, TSharedPtr<FUICommandList>());
-
-	MenuBuilder.BeginSection("Section_Selection", LOCTEXT("Section_Selection", "Selection"));
-	MakeSubMenu_ModeToggles(MenuBuilder);
-	MenuBuilder.EndSection();
-
-	MenuBuilder.BeginSection("Section_Gizmo", LOCTEXT("Section_Gizmo", "Gizmo"));
-	MakeSubMenu_GizmoVisibilityMode(Toolkit, MenuBuilder);
-	MenuBuilder.EndSection();
-
-	MenuBuilder.BeginSection("Section_MeshObjects", LOCTEXT("Section_MeshObjects", "New Mesh Objects"));
-	MenuBuilder.AddSubMenu(
-		LOCTEXT("MeshObjectTypeSubMenu", "New Mesh Settings"), LOCTEXT("MeshObjectTypeSubMenu_ToolTip", "Configure default settings for new Mesh Object Types"),
-		FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-			MakeSubMenu_DefaultMeshObjectType(SubMenuBuilder);
-		}));
-	MenuBuilder.EndSection();
-
-	MenuBuilder.BeginSection("Section_Settings", LOCTEXT("Section_Settings", "Quick Settings"));
-	MenuBuilder.AddSubMenu(
-		LOCTEXT("QuickSettingsSubMenu", "Jump To Settings"), LOCTEXT("QuickSettingsSubMenu_ToolTip", "Jump to sections of the Settings dialogs relevant to Modeling Mode"),
-		FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
-			MakeSubMenu_QuickSettings(SubMenuBuilder);
-			}));
-	MenuBuilder.EndSection();
-
-	TSharedRef<SWidget> MenuWidget = MenuBuilder.MakeWidget();
-	return MenuWidget;
-}
-
-
-
-
-
 void MakeSubMenu_Selection_DragMode(FModelingToolsEditorModeToolkit* Toolkit, FMenuBuilder& MenuBuilder)
 {
 	UModelingSelectionInteraction* SelectionInteraction = Cast<UModelingToolsEditorMode>(Toolkit->GetScriptableEditorMode())->GetSelectionInteraction();
@@ -404,7 +368,6 @@ TSharedRef<SWidget> MakeMenu_SelectionConfigSettings(FModelingToolsEditorModeToo
 
 
 
-
 TSharedRef<SWidget> MakeMenu_SelectionEdits(FModelingToolsEditorModeToolkit* Toolkit)
 {
 	FMenuBuilder MenuBuilder(true, Toolkit->GetToolkitCommands() );
@@ -427,6 +390,40 @@ TSharedRef<SWidget> MakeMenu_SelectionEdits(FModelingToolsEditorModeToolkit* Too
 
 } // end namespace UELocal
 
+
+TSharedRef<SWidget> FModelingToolsEditorModeToolkit::MakeMenu_ModelingModeConfigSettings()
+{
+	using namespace UELocal;
+
+	FMenuBuilder MenuBuilder(true, TSharedPtr<FUICommandList>());
+
+	MenuBuilder.BeginSection("Section_Selection", LOCTEXT("Section_Selection", "Instances"));
+	MakeSubMenu_ModeToggles(MenuBuilder);
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("Section_Gizmo", LOCTEXT("Section_Gizmo", "Gizmo"));
+	MakeSubMenu_GizmoVisibilityMode(this, MenuBuilder);
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("Section_MeshObjects", LOCTEXT("Section_MeshObjects", "New Mesh Objects"));
+	MenuBuilder.AddSubMenu(
+		LOCTEXT("MeshObjectTypeSubMenu", "New Mesh Settings"), LOCTEXT("MeshObjectTypeSubMenu_ToolTip", "Configure default settings for new Mesh Object Types"),
+		FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
+			MakeSubMenu_DefaultMeshObjectType(SubMenuBuilder);
+			}));
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("Section_Settings", LOCTEXT("Section_Settings", "Quick Settings"));
+	MenuBuilder.AddSubMenu(
+		LOCTEXT("QuickSettingsSubMenu", "Jump To Settings"), LOCTEXT("QuickSettingsSubMenu_ToolTip", "Jump to sections of the Settings dialogs relevant to Modeling Mode"),
+		FNewMenuDelegate::CreateLambda([=](FMenuBuilder& SubMenuBuilder) {
+			MakeSubMenu_QuickSettings(SubMenuBuilder);
+			}));
+	MenuBuilder.EndSection();
+
+	TSharedRef<SWidget> MenuWidget = MenuBuilder.MakeWidget();
+	return MenuWidget;
+}
 
 void FModelingToolsEditorModeToolkit::MakeSelectionPaletteOverlayWidget()
 {
@@ -479,25 +476,6 @@ void FModelingToolsEditorModeToolkit::MakeSelectionPaletteOverlayWidget()
 		[
 			SNew(SImage)
 			.Image(FModelingToolsEditorModeStyle::Get()->GetBrush("ModelingModeSelection.More_Right"))
-		] );
-
-
-	ToolbarBuilder.AddWidget( SNew(SSpacer).Size(FVector2D(1,10)) );
-
-	ToolbarBuilder.AddWidget(
-		SNew(SComboButton)
-		.HasDownArrow(false)
-		.MenuPlacement(EMenuPlacement::MenuPlacement_MenuRight)
-		.ComboButtonStyle(FAppStyle::Get(), "SimpleComboButton")
-		.OnGetMenuContent(FOnGetContent::CreateLambda([this]()
-		{
-			return UELocal::MakeMenu_ModelingModeConfigSettings(this);
-		}))
-		.ContentPadding(FMargin(3.0f, 1.0f))
-		.ButtonContent()
-		[
-			SNew(SImage)
-			.Image(FModelingToolsEditorModeStyle::Get()->GetBrush("ModelingMode.DefaultSettings"))
 		] );
 
 
