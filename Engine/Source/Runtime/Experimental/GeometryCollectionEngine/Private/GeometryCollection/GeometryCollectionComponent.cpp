@@ -802,7 +802,7 @@ void UGeometryCollectionComponent::SetSimulatePhysics(bool bEnabled)
 		BodyInstance.OwnerComponent = PreviousOwnerCOmponent;
 	}
 
-	if (bEnabled && !PhysicsProxy)
+	if (bEnabled && !PhysicsProxy && RestCollection)
 	{
 		RegisterAndInitializePhysicsProxy();
 	}
