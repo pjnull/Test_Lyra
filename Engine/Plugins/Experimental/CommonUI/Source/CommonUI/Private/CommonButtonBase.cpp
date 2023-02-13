@@ -1061,8 +1061,10 @@ void UCommonButtonBase::UpdateInputActionWidget()
 	// Update the input action state of the input action widget contextually based on the current state of the button
 	if (GetGameInstance() && InputActionWidget)
 	{
+		bool bIsEnhancedInputSupportEnabled = CommonUI::IsEnhancedInputSupportEnabled();
+
 		// Prefer visualizing the triggering enhanced input action before all else
-		if (CommonUI::IsEnhancedInputSupportEnabled() && TriggeringEnhancedInputAction)
+		if (bIsEnhancedInputSupportEnabled && TriggeringEnhancedInputAction)
 		{
 			InputActionWidget->SetEnhancedInputAction(TriggeringEnhancedInputAction);
 		}
@@ -1081,7 +1083,6 @@ void UCommonButtonBase::UpdateInputActionWidget()
 		{
 			FDataTableRowHandle HoverStateHandle;
 			UInputAction* HoverEnhancedInputAction = nullptr;
-			bool bIsEnhancedInputSupportEnabled = CommonUI::IsEnhancedInputSupportEnabled();
 			if (IsHovered())
 			{
 				if (bIsEnhancedInputSupportEnabled)
@@ -1105,6 +1106,11 @@ void UCommonButtonBase::UpdateInputActionWidget()
 		}
 		else
 		{
+			if (bIsEnhancedInputSupportEnabled)
+			{
+				InputActionWidget->SetEnhancedInputAction(nullptr);
+			}
+
 			FDataTableRowHandle EmptyStateHandle;
 			InputActionWidget->SetInputAction(EmptyStateHandle);
 		}
