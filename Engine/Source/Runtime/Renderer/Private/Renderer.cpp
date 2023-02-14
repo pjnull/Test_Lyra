@@ -37,6 +37,9 @@
 #include "CanvasRender.h"
 #include "RendererOnScreenNotification.h"
 #include "Lumen/Lumen.h"
+#include "SceneRenderTargetParameters.h"
+#include "EngineModule.h"
+#include "RendererInterface.h"
 
 DEFINE_LOG_CATEGORY(LogRenderer);
 
@@ -482,6 +485,11 @@ void FRendererModule::GPUBenchmark(FSynthBenchmarkResults& InOut, float WorkScal
 			RendererGPUBenchmark(RHICmdList, *InOutPtr, DummyView, WorkScale);
 		});
 	FlushRenderingCommands();
+}
+
+void FRendererModule::ResetSceneTextureExtentHistory()
+{
+	::ResetSceneTextureExtentHistory();
 }
 
 static void VisualizeTextureExec( const TCHAR* Cmd, FOutputDevice &Ar )
