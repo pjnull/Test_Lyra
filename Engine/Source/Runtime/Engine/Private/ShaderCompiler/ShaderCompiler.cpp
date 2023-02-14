@@ -5693,6 +5693,13 @@ void GlobalBeginCompileShader(
 		);
 }
 
+namespace
+{
+	bool ShaderFrequencyNeedsInstancedStereoMods(const FShaderType* ShaderType)
+	{
+		return !(IsRayTracingShaderFrequency(ShaderType->GetFrequency()));
+	}
+}
 
 void GlobalBeginCompileShader(
 	const FString& DebugGroupName,
@@ -5917,6 +5924,7 @@ void GlobalBeginCompileShader(
 	}
 
 	// Set VR definitions
+	if (ShaderFrequencyNeedsInstancedStereoMods(ShaderType))
 	{
 		const UE::StereoRenderUtils::FStereoShaderAspects Aspects(ShaderPlatform);
 
@@ -5947,6 +5955,12 @@ void GlobalBeginCompileShader(
 			GShaderCompilingManager->SuppressWarnings(ShaderPlatform);
 		}
 	}
+	else
+	{
+		Input.Environment.SetDefine(TEXT("INSTANCED_STEREO"), 0);
+		Input.Environment.SetDefine(TEXT("MULTI_VIEW"), 0);
+		Input.Environment.SetDefine(TEXT("MOBILE_MULTI_VIEW"), 0);
+	}
 
 	ShaderType->AddUniformBufferIncludesToEnvironment(Input.Environment, ShaderPlatform);
 
@@ -5955,7 +5969,7 @@ void GlobalBeginCompileShader(
 		VFType->AddUniformBufferIncludesToEnvironment(Input.Environment, ShaderPlatform);
 	}
 
-	// Add generated instanced stereo code
+	// Add generated instanced stereo code (this code also generates ViewState, so needed not just for ISR)
 	{
 		// this function may be called on multiple threads, so protect the storage
 		FScopeLock GeneratedInstancedCodeLock(&GCachedGeneratedInstancedStereoCodeLock);
