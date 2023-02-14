@@ -1026,7 +1026,7 @@ namespace UnrealBuildTool
 		/// <returns>Manifest file name</returns>
 		public static FileReference GetUHTModuleInfoFileName(TargetMakefile Makefile, string TargetName)
 		{
-			return FileReference.Combine(Makefile.ProjectIntermediateDirectory, TargetName + ".uhtmanifest");
+			return FileReference.Combine(Makefile.ProjectIntermediateDirectoryNoArch, TargetName + ".uhtmanifest");
 		}
 
 		/// <summary>
