@@ -1047,7 +1047,7 @@ void DispatchBasePass(
 				PassData.X = ShadingCommand.ShadingBin;
 
 				const uint32 IndirectOffset = (ShadingCommand.ShadingBin * IndirectArgStride) + 20u; // 6th dword is the start of the dispatch args
-				FComputeShaderUtils::ValidateIndirectArgsBuffer(ShadingPassParameters->MaterialIndirectArgs, IndirectOffset);
+				FComputeShaderUtils::ValidateIndirectArgsBuffer(ShadingPassParameters->MaterialIndirectArgs->GetSize(), IndirectOffset);
 
 				FRHIBuffer* IndirectArgsBuffer = ShadingPassParameters->MaterialIndirectArgs->GetIndirectRHICallBuffer();
 

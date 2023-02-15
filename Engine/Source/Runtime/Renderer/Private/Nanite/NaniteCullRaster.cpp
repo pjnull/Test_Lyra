@@ -3139,7 +3139,7 @@ FBinningData AddPass_Rasterize(
 
 				// TODO: Implement support for testing precache and skipping if needed
 
-				FComputeShaderUtils::ValidateIndirectArgsBuffer(IndirectArgsBuffer->GetSize(), RasterizerPass.IndirectOffset, IndirectArgsBuffer->GetStride());
+				FComputeShaderUtils::ValidateIndirectArgsBuffer(IndirectArgsBuffer->GetSize(), RasterizerPass.IndirectOffset);
 				SetComputePipelineState(RHICmdList, ShaderRHI);
 				SetShaderParameters(RHICmdList, RasterizerPass.RasterComputeShader, ShaderRHI, Parameters);
 				
