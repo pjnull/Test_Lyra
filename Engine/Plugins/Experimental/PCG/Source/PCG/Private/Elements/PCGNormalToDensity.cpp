@@ -7,23 +7,6 @@
 #include "PCGContext.h"
 #include "PCGPin.h"
 
-TArray<FPCGPinProperties> UPCGNormalToDensitySettings::InputPinProperties() const
-{
-	TArray<FPCGPinProperties> PinProperties;
-	PinProperties.Emplace(PCGPinConstants::DefaultInputLabel, EPCGDataType::Spatial);
-	PinProperties.Emplace(PCGPinConstants::DefaultParamsLabel, EPCGDataType::Param, /*bInAllowMultipleConnections*/ false);
-
-	return PinProperties;
-}
-
-TArray<FPCGPinProperties> UPCGNormalToDensitySettings::OutputPinProperties() const
-{
-	TArray<FPCGPinProperties> PinProperties;
-	PinProperties.Emplace(PCGPinConstants::DefaultOutputLabel, EPCGDataType::Spatial);
-
-	return PinProperties;
-}
-
 FPCGElementPtr UPCGNormalToDensitySettings::CreateElement() const
 {
 	return MakeShared<FPCGNormalToDensityElement>();
@@ -36,12 +19,10 @@ bool FPCGNormalToDensityElement::ExecuteInternal(FPCGContext* Context) const
 	const UPCGNormalToDensitySettings* Settings = Context->GetInputSettings<UPCGNormalToDensitySettings>();
 	check(Settings);
 
-	UPCGParamData* Params = Context->InputData.GetParams();
-
-	const FVector Normal = PCGSettingsHelpers::GetValue(GET_MEMBER_NAME_CHECKED(UPCGNormalToDensitySettings, Normal), Settings->Normal, Params);
-	const double Offset = PCGSettingsHelpers::GetValue(GET_MEMBER_NAME_CHECKED(UPCGNormalToDensitySettings, Offset), Settings->Offset, Params);
-	const double Strength = PCGSettingsHelpers::GetValue(GET_MEMBER_NAME_CHECKED(UPCGNormalToDensitySettings, Strength), Settings->Strength, Params);
-	const PCGNormalToDensityMode DensityMode = PCGSettingsHelpers::GetValue(GET_MEMBER_NAME_CHECKED(UPCGNormalToDensitySettings, DensityMode), Settings->DensityMode, Params);
+	const FVector& Normal = Settings->Normal;
+	const double Offset = Settings->Offset;
+	const double Strength = Settings->Strength;
+	const PCGNormalToDensityMode DensityMode = Settings->DensityMode;
 
 	TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
 	TArray<FPCGTaggedData>& Outputs = Context->OutputData.TaggedData;
