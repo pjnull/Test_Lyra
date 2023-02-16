@@ -16,7 +16,19 @@
 #include "MediaSubtitleDecoderOutput.h"
 #include "MediaMetaDataDecoderOutput.h"
 
+#include "HAL/IConsoleManager.h"
+
 using namespace Electra;
+
+//-----------------------------------------------------------------------------
+
+static int GElectraEnableBlockOnFetch = 0;							// Temporarily disable Electra's support for BlockOnFetch by default
+static FAutoConsoleVariableRef CVarElectraEnableBlockOnFetch(
+	TEXT("ElectraPlayer.EnableBlockOnFetch"),
+	GElectraEnableBlockOnFetch,
+	TEXT("Whether 'BlockOnFetch' support is enabled.\n")
+	TEXT(" 0: disabled (default)\n")
+	TEXT(" 1: enabled"));
 
 //-----------------------------------------------------------------------------
 
@@ -818,6 +830,10 @@ bool FElectraPlayerPlugin::CanControl(EMediaControl Control) const
 	EMediaState CurrentState = GetState();
 	if (Control == EMediaControl::BlockOnFetch)
 	{
+		if (GElectraEnableBlockOnFetch == 0)
+		{
+			return false;
+		}
 		return CurrentState == EMediaState::Playing;
 	}
 	else if (Control == EMediaControl::Pause)
