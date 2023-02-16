@@ -960,6 +960,7 @@ struct FTSRHistory
 
 	// Input resolution representation of the output
 	TRefCountPtr<IPooledRenderTarget> SubpixelDetails;
+	TRefCountPtr<IPooledRenderTarget> SubpixelDepth;
 	TRefCountPtr<IPooledRenderTarget> Guide;
 	TRefCountPtr<IPooledRenderTarget> Moire;
 	TRefCountPtr<IPooledRenderTarget> Velocity;
