@@ -35,6 +35,22 @@ FNiagaraSimCacheFeedbackContext::~FNiagaraSimCacheFeedbackContext()
 	}
 }
 
+int32 FNiagaraSimCacheDataBuffersLayout::IndexOfCacheVariable(const FNiagaraVariableBase& InVariable) const
+{
+	return Variables.IndexOfByPredicate(
+		[InVariable](const FNiagaraSimCacheVariable& CacheVariable)
+		{
+			return CacheVariable.Variable == InVariable;
+		}
+	);
+}
+
+const FNiagaraSimCacheVariable* FNiagaraSimCacheDataBuffersLayout::FindCacheVariable(const FNiagaraVariableBase& InVariable) const
+{
+	const int32 Index = IndexOfCacheVariable(InVariable);
+	return Index != INDEX_NONE ? &Variables[Index] : nullptr;
+}
+
 UNiagaraSimCache::UNiagaraSimCache(const FObjectInitializer& ObjectInitializer)
 {
 }
@@ -285,6 +301,10 @@ bool UNiagaraSimCache::WriteFrame(UNiagaraComponent* NiagaraComponent, FNiagaraS
 	FNiagaraSimCacheFrame& CacheFrame = CacheFrames.AddDefaulted_GetRef();
 	CacheFrame.LocalToWorld = Helper.SystemInstance->GatheredInstanceParameters.ComponentTrans;
 	CacheFrame.LWCTile = Helper.SystemInstance->GetLWCTile();
+	CacheFrame.SimulationAge = FMath::RoundToFloat(Helper.SystemInstance->GetAge() * CacheAgeResolution) / CacheAgeResolution;
+#if WITH_EDITORONLY_DATA
+	CacheFrame.SimulationTickCount = Helper.SystemInstance->GetTickCount();
+#endif
 
 	CacheFrame.SystemData.LocalBounds = Helper.SystemInstance->GetLocalBounds();
 
@@ -379,6 +399,7 @@ bool UNiagaraSimCache::EndWrite()
 		SoftNiagaraSystem.Reset();
 	}
 
+
 	if (DataInterfaceStorage.IsEmpty() == false)
 	{
 		bool bDataInterfacesSucess = true;
@@ -393,6 +414,58 @@ bool UNiagaraSimCache::EndWrite()
 		if (bDataInterfacesSucess == false)
 		{
 			SoftNiagaraSystem.Reset();
+		}
+	}
+
+	// If we allow interpolation we need to build our mapping table from Current -> Next
+	if (CreateParameters.bAllowInterpolation)
+	{
+		const auto& CreateInterpMapping =
+			[this](const FNiagaraSimCacheDataBuffersLayout& BufferLayout, FNiagaraSimCacheDataBuffers& BufferA, const FNiagaraSimCacheDataBuffers& BufferB)
+			{
+				if (BufferLayout.bAllowInterpolation == false)
+				{
+					return;
+				}
+
+				for (int32 i = 0; i < BufferA.InterpMapping.Num(); ++i)
+				{
+					BufferA.InterpMapping[i] = BufferB.InterpMapping.IndexOfByKey(BufferA.InterpMapping[i]);
+				}
+			};
+
+		const auto& ClearInterpMapping =
+			[this](const FNiagaraSimCacheDataBuffersLayout& BufferLayout, FNiagaraSimCacheDataBuffers& BufferA)
+			{
+				if (BufferLayout.bAllowInterpolation == false)
+				{
+					return;
+				}
+
+				for (int32 i = 0; i < BufferA.InterpMapping.Num(); ++i)
+				{
+					BufferA.InterpMapping[i] = INDEX_NONE;
+				}
+			};
+
+		// Do all frames that can Interp first
+		for (int32 iFrame=0; iFrame < CacheFrames.Num() - 1; ++iFrame)
+		{
+			FNiagaraSimCacheFrame& CacheFrameA = CacheFrames[iFrame];
+			const FNiagaraSimCacheFrame& CacheFrameB = CacheFrames[iFrame + 1];
+
+			CreateInterpMapping(CacheLayout.SystemLayout, CacheFrameA.SystemData.SystemDataBuffers, CacheFrameB.SystemData.SystemDataBuffers);
+			for (int32 iEmitter=0; iEmitter < CacheLayout.EmitterLayouts.Num(); ++iEmitter)
+			{
+				CreateInterpMapping(CacheLayout.EmitterLayouts[iEmitter], CacheFrameA.EmitterData[iEmitter].ParticleDataBuffers, CacheFrameB.EmitterData[iEmitter].ParticleDataBuffers);
+			}
+		}
+
+		// Final frame is special as we won't Interp
+		ClearInterpMapping(CacheLayout.SystemLayout, CacheFrames.Last().SystemData.SystemDataBuffers);
+		for (int32 iEmitter = 0; iEmitter < CacheLayout.EmitterLayouts.Num(); ++iEmitter)
+		{
+			ClearInterpMapping(CacheLayout.EmitterLayouts[iEmitter], CacheFrames.Last().EmitterData[iEmitter].ParticleDataBuffers);
 		}
 	}
 
@@ -479,6 +552,9 @@ bool UNiagaraSimCache::CanRead(UNiagaraSystem* NiagaraSystem)
 
 bool UNiagaraSimCache::Read(float TimeSeconds, FNiagaraSystemInstance* SystemInstance) const
 {
+	// Adjust time to match our allow resolution
+	TimeSeconds = FMath::RoundToFloat(TimeSeconds * CacheAgeResolution) / CacheAgeResolution;
+
 	const float RelativeTime = FMath::Max(TimeSeconds - StartSeconds, 0.0f);
 	if ( RelativeTime > DurationSeconds )
 	{
@@ -486,9 +562,48 @@ bool UNiagaraSimCache::Read(float TimeSeconds, FNiagaraSystemInstance* SystemIns
 		return false;
 	}
 
-	const float FrameTime		= DurationSeconds > 0.0f ? (RelativeTime / DurationSeconds) * float(CacheFrames.Num() - 1) : 0.0f;
-	const int32 FrameIndex		= FMath::FloorToInt(FrameTime);
-	const float FrameFraction	= FrameTime - float(FrameIndex);
+	//const float FrameTime		= DurationSeconds > 0.0f ? (RelativeTime / DurationSeconds) * float(CacheFrames.Num() - 1) : 0.0f;
+	//const int32 FrameIndex		= FMath::FloorToInt(FrameTime);
+	//const float FrameFraction	= FrameTime - float(FrameIndex);
+
+	// Take a guess at the frame then iterate to find the actual frame
+	// We have to do this because not all sources are recording the cache at a consistent rate
+	// This could also be replaced with a binary search but in most cases our guess will be very close to the actual
+	const int32 NumFramesMinusOne = CacheFrames.Num() - 1;
+
+	int32 FrameIndex = 0;
+	float FrameFraction = 0.0f;
+	if (DurationSeconds > 0.0f)
+	{
+		FrameIndex = FMath::FloorToInt((RelativeTime / DurationSeconds) * float(NumFramesMinusOne));
+	}
+
+	if ( CacheFrames[FrameIndex].SimulationAge > TimeSeconds)
+	{
+		while (FrameIndex > 0 && CacheFrames[FrameIndex].SimulationAge > TimeSeconds )
+		{
+			--FrameIndex;
+		}
+	}
+	else
+	{
+		while (FrameIndex < NumFramesMinusOne && CacheFrames[FrameIndex + 1].SimulationAge <= TimeSeconds)
+		{
+			++FrameIndex;
+		}
+	}
+
+	if (FrameIndex < NumFramesMinusOne)
+	{
+		const float SimulationAgeA = CacheFrames[FrameIndex].SimulationAge;
+		const float SimulationAgeB = CacheFrames[FMath::Min(FrameIndex + 1, NumFramesMinusOne)].SimulationAge;
+		FrameFraction = (TimeSeconds - SimulationAgeA) / (SimulationAgeB - SimulationAgeA);
+		if (!CreateParameters.bAllowInterpolation && !CreateParameters.bAllowVelocityExtrapolation && FrameFraction > 0.5f)
+		{
+			FrameFraction = 0.0f;
+			FrameIndex = FrameIndex + 1;
+		}
+	}
 
 	return ReadFrame(FrameIndex, FrameFraction, SystemInstance);
 }
@@ -511,8 +626,13 @@ bool UNiagaraSimCache::ReadFrame(int32 FrameIndex, float FrameFraction, FNiagara
 		RebaseTransform = RebaseTransform * CacheFrame.LocalToWorld.Inverse();
 	}
 
+
+	const int32 NextFrameIndex = FMath::Min(FrameIndex + 1, CacheFrames.Num() - 1);
+	const float FrameDeltaSeconds = CacheFrames[NextFrameIndex].SimulationAge - CacheFrame.SimulationAge;
+	const float SimDeltaSeconds = Helper.SystemInstance->CachedDeltaSeconds;
+
 	Helper.SystemInstance->LocalBounds = CacheFrame.SystemData.LocalBounds;
-	Helper.ReadDataBuffer(RebaseTransform, CacheLayout.SystemLayout, CacheFrame.SystemData.SystemDataBuffers, Helper.GetSystemSimulationDataSet());
+	Helper.ReadDataBuffer(FrameFraction, FrameDeltaSeconds, SimDeltaSeconds, RebaseTransform, CacheLayout.SystemLayout, CacheFrame.SystemData.SystemDataBuffers, CacheFrame.SystemData.SystemDataBuffers, Helper.GetSystemSimulationDataSet());
 
 	const int32 NumEmitters = CacheLayout.EmitterLayouts.Num();
 	for (int32 i=0; i < NumEmitters; ++i)
@@ -522,13 +642,14 @@ bool UNiagaraSimCache::ReadFrame(int32 FrameIndex, float FrameFraction, FNiagara
 		EmitterInstance.CachedBounds = CacheEmitterFrame.LocalBounds;
 		EmitterInstance.TotalSpawnedParticles = CacheEmitterFrame.TotalSpawnedParticles;
 
+		const FNiagaraSimCacheEmitterFrame& CacheEmitterFrameB = CacheFrames[NextFrameIndex].EmitterData[i];
 		if (CacheLayout.EmitterLayouts[i].SimTarget == ENiagaraSimTarget::GPUComputeSim)
 		{
-			Helper.ReadDataBufferGPU(RebaseTransform, EmitterInstance, CacheLayout.EmitterLayouts[i], CacheEmitterFrame.ParticleDataBuffers, EmitterInstance.GetData(), PendingCommandsInFlight);
+			Helper.ReadDataBufferGPU(FrameFraction, FrameDeltaSeconds, SimDeltaSeconds, RebaseTransform, EmitterInstance, CacheLayout.EmitterLayouts[i], CacheEmitterFrame.ParticleDataBuffers, CacheEmitterFrameB.ParticleDataBuffers, EmitterInstance.GetData(), PendingCommandsInFlight);
 		}
 		else
 		{
-			Helper.ReadDataBuffer(RebaseTransform, CacheLayout.EmitterLayouts[i], CacheEmitterFrame.ParticleDataBuffers, EmitterInstance.GetData());
+			Helper.ReadDataBuffer(FrameFraction, FrameDeltaSeconds, SimDeltaSeconds, RebaseTransform, CacheLayout.EmitterLayouts[i], CacheEmitterFrame.ParticleDataBuffers, CacheEmitterFrameB.ParticleDataBuffers, EmitterInstance.GetData());
 		}
 	}
 
@@ -536,7 +657,6 @@ bool UNiagaraSimCache::ReadFrame(int32 FrameIndex, float FrameFraction, FNiagara
 	//-OPT: We shouldn't need to search all the time here
 	if (DataInterfaceStorage.IsEmpty() == false)
 	{
-		const int NextFrameIndex = FMath::Min(FrameIndex + 1, CacheFrames.Num() - 1);
 		bool bDataInterfacesSucess = true;
 
 		FNiagaraDataInterfaceUtilities::ForEachDataInterface(
