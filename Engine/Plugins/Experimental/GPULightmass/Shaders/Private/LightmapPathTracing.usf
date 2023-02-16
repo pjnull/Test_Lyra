@@ -300,6 +300,7 @@ float3 TraceTransparentVisibilityRay(FRayDesc Ray, float PathRoughness)
 	for (;;)
 	{
 		// Trace the ray
+		PackedPayload.SetMiss();
 		TraceRay(
 			TLAS,
 			RayFlags,
