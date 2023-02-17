@@ -170,16 +170,22 @@ void FVulkanCommandListContext::RHIDispatchIndirectComputeShader(FRHIBuffer* Arg
 
 void FVulkanCommandListContext::RHISetUAVParameter(FRHIPixelShader* PixelShaderRHI, uint32 UAVIndex, FRHIUnorderedAccessView* UAVRHI)
 {
+	if (UAVRHI)
+	{
 	FVulkanUnorderedAccessView* UAV = ResourceCast(UAVRHI);
 	PendingGfxState->SetUAVForStage(ShaderStage::Pixel, UAVIndex, UAV);
+}
 }
 
 void FVulkanCommandListContext::RHISetUAVParameter(FRHIComputeShader* ComputeShaderRHI, uint32 UAVIndex, FRHIUnorderedAccessView* UAVRHI)
 {
-	check((UAVRHI == nullptr) || (PendingComputeState->GetCurrentShader() == ResourceCast(ComputeShaderRHI)));
+	if (UAVRHI)
+	{
+		check(PendingComputeState->GetCurrentShader() == ResourceCast(ComputeShaderRHI));
 
 	FVulkanUnorderedAccessView* UAV = ResourceCast(UAVRHI);
 	PendingComputeState->SetUAVForStage(UAVIndex, UAV);
+}
 }
 
 void FVulkanCommandListContext::RHISetUAVParameter(FRHIComputeShader* ComputeShaderRHI,uint32 UAVIndex, FRHIUnorderedAccessView* UAVRHI, uint32 InitialCount)
@@ -211,17 +217,23 @@ void FVulkanCommandListContext::RHISetShaderTexture(FRHIComputeShader* ComputeSh
 
 void FVulkanCommandListContext::RHISetShaderResourceViewParameter(FRHIGraphicsShader* ShaderRHI, uint32 TextureIndex, FRHIShaderResourceView* SRVRHI)
 {
+	if (SRVRHI)
+	{
 	ShaderStage::EStage Stage = GetAndVerifyShaderStage(ShaderRHI, PendingGfxState);
 	FVulkanShaderResourceView* SRV = ResourceCast(SRVRHI);
 	PendingGfxState->SetSRVForStage(Stage, TextureIndex, SRV);
 }
+}
 
 void FVulkanCommandListContext::RHISetShaderResourceViewParameter(FRHIComputeShader* ComputeShaderRHI,uint32 TextureIndex, FRHIShaderResourceView* SRVRHI)
 {
-	check((SRVRHI == nullptr) || (PendingComputeState->GetCurrentShader() == ResourceCast(ComputeShaderRHI)));
+	if (SRVRHI)
+	{
+		check(PendingComputeState->GetCurrentShader() == ResourceCast(ComputeShaderRHI));
 
 	FVulkanShaderResourceView* SRV = ResourceCast(SRVRHI);
 	PendingComputeState->SetSRVForStage(TextureIndex, SRV);
+}
 }
 
 void FVulkanCommandListContext::RHISetShaderSampler(FRHIGraphicsShader* ShaderRHI, uint32 SamplerIndex, FRHISamplerState* NewStateRHI)
