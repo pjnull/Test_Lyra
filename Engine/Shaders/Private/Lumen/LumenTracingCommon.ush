@@ -14,10 +14,6 @@
 #include "../SceneData.ush"
 #include "SurfaceCache/LumenSurfaceCacheSampling.ush"
 
-#ifndef VISIBILITY_ONLY_TRACE
-	#define VISIBILITY_ONLY_TRACE 0
-#endif
-
 #ifndef DEPTH_WEIGHTED_OIT_32_BIT
 	#define DEPTH_WEIGHTED_OIT_32_BIT 1
 #endif
@@ -128,15 +124,14 @@ struct FConeTraceInput
 
 struct FConeTraceResult
 {
-#if !VISIBILITY_ONLY_TRACE
 	float3 Lighting;
-#endif
 	float Transparency;
 	float NumSteps;
 	float NumOverlaps;
 	float OpaqueHitDistance;
 	float ExpandSurfaceAmount;
 	float3 Debug;
+	float3 GeometryWorldNormal;
 	float3 WorldVelocity;
 };
 
@@ -680,7 +675,7 @@ void ConeTraceMeshSDFsAndInterpolateFromCards(
 	OutResult.OpaqueHitDistance = TraceMeshSDFResult.HitDistance;
 }
 
-float4 EvaluateGlobalDistanceFieldHit(FConeTraceInput TraceInput, FGlobalSDFTraceResult SDFTraceResult)
+void EvaluateGlobalDistanceFieldHit(FConeTraceInput TraceInput, FGlobalSDFTraceResult SDFTraceResult, inout FConeTraceResult ConeTraceResult)
 {
 	const float3 SampleWorldPosition = TraceInput.ConeOrigin + TraceInput.ConeDirection * SDFTraceResult.HitTime;
 	const float3 SampleTranslatedWorldPosition = TraceInput.ConeTranslatedOrigin + TraceInput.ConeDirection * SDFTraceResult.HitTime;
@@ -805,7 +800,10 @@ float4 EvaluateGlobalDistanceFieldHit(FConeTraceInput TraceInput, FGlobalSDFTrac
 	}
 	#endif
 
-	return LightingAndAlpha;
+	ConeTraceResult.Lighting = LightingAndAlpha.xyz;
+	ConeTraceResult.Transparency = LightingAndAlpha.w;
+	ConeTraceResult.OpaqueHitDistance = SDFTraceResult.HitTime;
+	ConeTraceResult.GeometryWorldNormal = SampleWorldNormal;
 }
 
 /**
@@ -828,21 +826,17 @@ void RayTraceGlobalDistanceField(
 		SDFTraceResult = RayTraceGlobalDistanceField(SDFTraceInput);
 	}
 
-	float4 LightingAndAlpha = float4(0, 0, 0, 1);
+	OutResult = (FConeTraceResult)0;
+	OutResult.Lighting = float3(0.0f, 0.0f, 0.0f);
+	OutResult.Transparency = 1.0f;
+	OutResult.NumSteps = SDFTraceResult.TotalStepsTaken;
+	OutResult.OpaqueHitDistance = TraceInput.MaxTraceDistance;
+	OutResult.ExpandSurfaceAmount = SDFTraceResult.ExpandSurfaceAmount;
 
 	if (GlobalSDFTraceResultIsHit(SDFTraceResult))
 	{
-		LightingAndAlpha = EvaluateGlobalDistanceFieldHit(TraceInput, SDFTraceResult);
+		EvaluateGlobalDistanceFieldHit(TraceInput, SDFTraceResult, OutResult);
 	}
-
-	OutResult = (FConeTraceResult)0;
-	#if !VISIBILITY_ONLY_TRACE
-		OutResult.Lighting = LightingAndAlpha.rgb;
-	#endif
-	OutResult.Transparency = LightingAndAlpha.a;
-	OutResult.NumSteps = SDFTraceResult.TotalStepsTaken;
-	OutResult.OpaqueHitDistance = GlobalSDFTraceResultIsHit(SDFTraceResult) ? SDFTraceResult.HitTime : TraceInput.MaxTraceDistance;
-	OutResult.ExpandSurfaceAmount = SDFTraceResult.ExpandSurfaceAmount;
 }
 
 float ComputeSquaredDistanceBetweenAABBs(float3 CenterA, float3 ExtentA, float3 CenterB, float3 ExtentB)
@@ -921,12 +915,12 @@ void ConeTraceLumenSceneVoxels(
 		FConeTraceResult VoxelTraceResult;
 		RayTraceGlobalDistanceField(VoxelTraceInput, VoxelTraceResult);
 
-		#if !VISIBILITY_ONLY_TRACE
-			OutResult.Lighting += VoxelTraceResult.Lighting * OutResult.Transparency;
-		#endif
+		OutResult.Lighting += VoxelTraceResult.Lighting * OutResult.Transparency;
 		OutResult.Transparency *= VoxelTraceResult.Transparency;
 		OutResult.NumSteps += VoxelTraceResult.NumSteps;
 		OutResult.OpaqueHitDistance = min(OutResult.OpaqueHitDistance, VoxelTraceResult.OpaqueHitDistance);
+		OutResult.GeometryWorldNormal = VoxelTraceResult.GeometryWorldNormal;
+		OutResult.WorldVelocity = VoxelTraceResult.WorldVelocity;
 	}
 #endif
 }
@@ -973,9 +967,7 @@ void ApplySkylightToTraceResult(float3 ConeDirection, inout FConeTraceResult Tra
 		float TanConeAngle = 0.0f;
 		float Roughness = TanConeAngleToRoughness(TanConeAngle);
 
-		#if !VISIBILITY_ONLY_TRACE
-			TraceResult.Lighting += GetSkyLightReflection(ConeDirection, Roughness, SkyAverageBrightness) * TraceResult.Transparency;
-		#endif
+		TraceResult.Lighting += GetSkyLightReflection(ConeDirection, Roughness, SkyAverageBrightness) * TraceResult.Transparency;
 		TraceResult.Transparency = 0;
 	}
 #endif

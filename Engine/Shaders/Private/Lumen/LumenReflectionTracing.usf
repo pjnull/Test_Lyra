@@ -559,6 +559,7 @@ void TraceVoxels(
 	TraceResult.Lighting = 0;
 	TraceResult.Transparency = 1;
 	TraceResult.OpaqueHitDistance = TraceInput.MaxTraceDistance;
+	TraceResult.GeometryWorldNormal = 0.0f;
 
 	#if TRACE_GLOBAL_SDF
 	{
@@ -613,7 +614,7 @@ void TraceVoxels(
 	if (bHit)
 	{
 		float3 HitTranslatedWorldPosition = SampleTranslatedPosition + RayData.Direction * TraceResult.OpaqueHitDistance;
-		SampleSceneColorAtHit(HitTranslatedWorldPosition, ReflectionTracingCoord.Coord, RelativeDepthThickness, TraceResult.Lighting);
+		SampleSceneColorAtHit(HitTranslatedWorldPosition, TraceResult.GeometryWorldNormal, ReflectionTracingCoord.Coord, RelativeDepthThickness, TraceResult.Lighting);
 	}
 #endif
 

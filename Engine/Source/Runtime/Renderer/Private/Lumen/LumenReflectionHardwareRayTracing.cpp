@@ -135,6 +135,7 @@ class FLumenReflectionHardwareRayTracing : public FLumenHardwareRayTracingShader
 		SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint2>, TraceTexelDataPacked)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FLumenHZBScreenTraceParameters, HZBScreenTraceParameters)
 		SHADER_PARAMETER(float, RelativeDepthThickness)
+		SHADER_PARAMETER(float, SampleSceneColorNormalTreshold)
 		SHADER_PARAMETER(int32, SampleSceneColor)
 
 		SHADER_PARAMETER(int, ThreadCount)
@@ -384,6 +385,7 @@ void SetLumenHardwareRayTracingReflectionParameters(
 
 	extern float GLumenReflectionSampleSceneColorRelativeDepthThreshold;
 	Parameters->RelativeDepthThickness = GLumenReflectionSampleSceneColorRelativeDepthThreshold;
+	Parameters->SampleSceneColorNormalTreshold = LumenReflections::GetSampleSceneColorNormalTreshold();
 	Parameters->SampleSceneColor = bSampleSceneColorAtHit ? 1 : 0;
 
 	Parameters->ThreadCount = DefaultThreadCount;
