@@ -76,6 +76,7 @@ namespace Dataflow
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FHashStringDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FHashVectorDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FFloatToIntDataflowNode);
+		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FFloatArrayToIntArrayDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FMathConstantsDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FGetArrayElementDataflowNode);
 		DATAFLOW_NODE_REGISTER_CREATION_FACTORY(FGetNumArrayElementsDataflowNode);
@@ -513,6 +514,74 @@ void FFloatToIntDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataf
 		}
 	}
 }
+
+void FFloatArrayToIntArrayDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
+{
+	if (Out->IsA<TArray<int32>>(&IntArray))
+	{
+		TArray<float> FloatVal = GetValue<TArray<float>>(Context, &FloatArray);
+		TArray<int32> RetVal; RetVal.SetNumUninitialized(FloatVal.Num());
+		if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_Function_Floor)
+		{
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				RetVal[i] = FMath::FloorToInt32(FloatVal[i]);
+			}
+		}
+		else if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_Function_Ceil)
+		{
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				RetVal[i] = FMath::CeilToInt32(FloatVal[i]);
+			}
+		}
+		else if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_Function_Round)
+		{
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				RetVal[i] = FMath::RoundToInt32(FloatVal[i]);
+			}
+		}
+		else if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_Function_Truncate)
+		{
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				RetVal[i] = int32(FMath::TruncToFloat(FloatVal[i]));
+			}
+		}
+
+		else if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_NonZeroToIndex)
+		{
+			int32 RetValIndex = 0;
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				if (FloatVal[i] != 0.0)
+				{
+					RetVal[RetValIndex] = i;
+					RetValIndex++;
+				}
+			}
+			RetVal.SetNum(RetValIndex);
+		}
+		else if (Function == EFloatArrayToIntArrayFunctionEnum::Dataflow_FloatToInt_ZeroToIndex)
+		{
+			int32 RetValIndex = 0;
+			for (int32 i = 0; i < FloatVal.Num(); i++)
+			{
+				if (FloatVal[i] == 0.0)
+				{
+					RetVal[RetValIndex] = i;
+					RetValIndex++;
+				}
+			}
+			RetVal.SetNum(RetValIndex);
+		}
+
+		SetValue<TArray<int32>>(Context, RetVal, &IntArray);
+	}
+}
+
+
 
 void FMathConstantsDataflowNode::Evaluate(Dataflow::FContext& Context, const FDataflowOutput* Out) const
 {
