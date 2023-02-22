@@ -4579,6 +4579,11 @@ UObject* FSequencer::FindSpawnedObjectOrTemplate(const FGuid& BindingId)
 void
 FSequencer::FCachedViewState::StoreViewState()
 {
+	if (bValid)
+	{
+		return;
+	}
+
 	bValid = true;
 	bIsViewportUIHidden = GLevelEditorModeTools().IsViewportUIHidden();
 	GLevelEditorModeTools().SetHideViewportUI(!GLevelEditorModeTools().IsViewportUIHidden());
