@@ -1937,8 +1937,6 @@ void USkeletalMesh::BeginBuildInternal(FSkinnedAssetBuildContext& Context)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMesh::BeginBuildInternal);
 
-	SetInternalFlags(EInternalObjectFlags::Async);
-	
 	// Unregister all instances of this component
 	Context.RecreateRenderStateContext = MakeUnique<FSkinnedMeshComponentRecreateRenderStateContext>(this, false);
 
@@ -1989,8 +1987,6 @@ void USkeletalMesh::FinishBuildInternal(FSkinnedAssetBuildContext& Context)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMesh::FinishBuildInternal);
 
-	ClearInternalFlags(EInternalObjectFlags::Async);
-
 	ReleaseAsyncProperty();
 
 	ApplyFinishBuildInternalData(&Context);
@@ -2020,7 +2016,7 @@ void USkeletalMesh::LockPropertiesUntil(FEvent* Event)
 	};
 
 	//Use the async task compile to lock the properties
-	FSkinnedAsyncTaskContext Context(!HasAnyInternalFlags(EInternalObjectFlags::Async), AsyncTaskFunction);
+	FSkinnedAsyncTaskContext Context(AsyncTaskFunction);
 	BeginAsyncTaskInternal(Context);
 	PrepareForAsyncCompilation();
 	FQueuedThreadPool* SkeletalMeshThreadPool = FSkinnedAssetCompilingManager::Get().GetThreadPool();
@@ -2035,10 +2031,6 @@ void USkeletalMesh::BeginAsyncTaskInternal(FSkinnedAsyncTaskContext& Context)
 {
 	check(IsInGameThread());
 
-	if (Context.bResetAsyncFlagOnFinish)
-	{
-		SetInternalFlags(EInternalObjectFlags::Async);
-	}
 	AcquireAsyncProperty();
 	//Allow thumbnail data so content browser get refresh properly
 	ReleaseAsyncProperty((uint64)ESkeletalMeshAsyncProperties::ThumbnailInfo);
@@ -2052,10 +2044,6 @@ void USkeletalMesh::ExecuteAsyncTaskInternal(FSkinnedAsyncTaskContext& Context)
 void USkeletalMesh::FinishAsyncTaskInternal(FSkinnedAsyncTaskContext& Context)
 {
 	check(IsInGameThread());
-	if (Context.bResetAsyncFlagOnFinish)
-	{
-		ClearInternalFlags(EInternalObjectFlags::Async);
-	}
 	ReleaseAsyncProperty();
 }
 
@@ -2691,19 +2679,6 @@ bool USkeletalMesh::IsAsyncTaskComplete() const
 	return AsyncTask == nullptr || AsyncTask->IsWorkDone();
 }
 
-bool USkeletalMesh::TryCancelAsyncTasks()
-{
-	if (AsyncTask)
-	{
-		if (AsyncTask->IsDone() || AsyncTask->Cancel())
-		{
-			AsyncTask.Reset();
-		}
-	}
-
-	return AsyncTask == nullptr;
-}
-
 void USkeletalMesh::PostLoadEnsureImportDataExist()
 {
 	//If we have a LODModel with no import data and the LOD model have at least one section using more bone then any platform max GPU bone count. We will recreate the import data to allow the asset to be build and chunk properly.
@@ -2987,8 +2962,6 @@ void USkeletalMesh::BeginPostLoadInternal(FSkinnedAssetPostLoadContext& Context)
 #if WITH_EDITOR
 	TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMesh::BeginPostLoadInternal);
 
-	SetInternalFlags(EInternalObjectFlags::Async);
-
 	// Lock all properties that should not be modified/accessed during async post-load
 	AcquireAsyncProperty();
 
@@ -3216,8 +3189,6 @@ void USkeletalMesh::FinishPostLoadInternal(FSkinnedAssetPostLoadContext& Context
 	TRACE_CPUPROFILER_EVENT_SCOPE(USkeletalMesh::FinishPostLoadInternal);
 	
 #if WITH_EDITOR
-
-	ClearInternalFlags(EInternalObjectFlags::Async);
 
 	// This scope allows us to use any locked properties without causing stalls
 	FSkinnedAssetAsyncBuildScope AsyncBuildScope(this);
