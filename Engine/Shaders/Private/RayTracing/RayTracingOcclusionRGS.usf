@@ -60,13 +60,12 @@ uint				bUseHairVoxel;
 float				HairOcclusionThreshold;
 Texture2D<uint>		HairLightChannelMaskTexture;
 
-void NeedTraceHair(
+bool NeedTraceHair(
 	in uint2 PixelCoord,
-	inout bool bTraceHairRay,
 	inout float HairDeviceZ)
 {
 	const float HairSampleDepth = HairStrands.HairOnlyDepthTexture.Load(uint3(PixelCoord, 0)).x;
-	bTraceHairRay = false;
+	bool bTraceHairRay = false;
 	HairDeviceZ = 0;
 	if (HairSampleDepth > 0)
 	{
@@ -74,6 +73,8 @@ void NeedTraceHair(
 		HairDeviceZ = HairSampleDepth;
 		bTraceHairRay = (HairLightChannel & LightingChannelMask) != 0;
 	}
+
+	return bTraceHairRay;
 }
 #endif
 
@@ -312,6 +313,7 @@ struct FOcclusionShadingParameters
 	bool bIsValid;
 	bool bBackfaceCulling;
 	bool bIsHair;
+	bool bIsHairStrands;
 	bool bIsSubsurface;
 	bool bHasSubsurfaceProfile;
 };
@@ -342,7 +344,7 @@ FOcclusionResult ComputeOcclusion(
 	// toward the view point (this create issue for transmitted light)
 	// It seems having proper transmission is more important, thus the light 
 	// version is enabled by default
-	if (ShadingDesc.bIsHair)
+	if (ShadingDesc.bIsHair || ShadingDesc.bIsHairStrands)
 	{
 	#if LIGHT_TYPE == LIGHT_TYPE_DIRECTIONAL
 		const float3 LightDirection = LightParameters.Direction;
@@ -436,7 +438,7 @@ FOcclusionResult ComputeOcclusion(
 		}
 
 	#if USE_HAIR_LIGHTING
-		if (ShadingDesc.bIsHair)
+		if (ShadingDesc.bIsHairStrands)
 		{
 			// Denoiser mode 0 doesn't use depth, so take first hit
 			RayFlags |= RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
@@ -481,7 +483,7 @@ FOcclusionResult ComputeOcclusion(
 #endif
 
 		#if USE_HAIR_LIGHTING
-		if (!ShadingDesc.bIsHair && bUseHairVoxel)
+		if (!ShadingDesc.bIsHairStrands && bUseHairVoxel)
 		{
 			MinimalPayload.HitT = TraverseHair(PixelCoord, RandSequence, Ray.Origin, Ray.Direction, MinimalPayload.HitT, VirtualVoxel.Raytracing_ShadowOcclusionThreshold);
 		}
@@ -676,12 +678,6 @@ RAY_TRACING_ENTRY_RAYGEN(OcclusionRGS)
 			LocalSamplesPerPixel = 0;
 		}
 
-	#if USE_HAIR_LIGHTING
-		bool bTraceHairRay = false;
-		float HairDeviceZ = 0;
-		NeedTraceHair(PixelCoord, bTraceHairRay, HairDeviceZ);
-	#endif
-
 		Occlusion = ComputeOcclusion(
 			PixelCoord,
 			RAY_TRACING_MASK_SHADOW | RAY_TRACING_MASK_THIN_SHADOW,
@@ -693,17 +689,22 @@ RAY_TRACING_ENTRY_RAYGEN(OcclusionRGS)
 			LocalSamplesPerPixel);
 
 		#if USE_HAIR_LIGHTING
-		if (bTraceHairRay)
+		float HairDeviceZ = 0;
+		if (NeedTraceHair(PixelCoord, HairDeviceZ))
 		{
-			ShadingParameters.bIsHair = true;
+			FTransmissionProfileParams HairTransmissionParameters = (FTransmissionProfileParams)0;
+			FOcclusionShadingParameters HairOcclusionShadingParameters = (FOcclusionShadingParameters)0;
+			HairOcclusionShadingParameters.bIsValid = true;
+			HairOcclusionShadingParameters.bIsHairStrands = true;
+
 			HairOcclusion = ComputeOcclusion(
 				PixelCoord,
 				RAY_TRACING_MASK_SHADOW,
 				HairDeviceZ,
 				float3(1,0,0),
-				ShadingParameters,
+				HairOcclusionShadingParameters,
 				LightParameters,
-				TransmissionParameters,
+				HairTransmissionParameters,
 				RequestedSamplePerPixel);
 		}
 		#endif
