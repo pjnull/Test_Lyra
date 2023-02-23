@@ -1092,6 +1092,7 @@ uint64 FLumenViewState::GetGPUSizeBytes(bool bLogSizes) const
 	return
 		ScreenProbeGatherState.GetGPUSizeBytes(bLogSizes) +
 		ReflectionState.GetGPUSizeBytes(bLogSizes) +
+		TranslucentReflectionState.GetGPUSizeBytes(bLogSizes) +
 		GetRenderTargetGPUSizeBytes(DepthHistoryRT, bLogSizes) +
 		GetRenderTargetGPUSizeBytes(TranslucencyVolume0, bLogSizes) +
 		GetRenderTargetGPUSizeBytes(TranslucencyVolume1, bLogSizes) +
