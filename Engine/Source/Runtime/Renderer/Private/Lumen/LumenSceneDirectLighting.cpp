@@ -1717,7 +1717,7 @@ void FDeferredShadingSceneRenderer::RenderDirectLightingForLumenScene(
 {
 	LLM_SCOPE_BYTAG(Lumen);
 
-	if (GLumenDirectLighting)
+	if (GLumenDirectLighting && CardUpdateContext.MaxUpdateTiles > 0)
 	{
 		RDG_EVENT_SCOPE(GraphBuilder, "DirectLighting");
 		QUICK_SCOPE_CYCLE_COUNTER(RenderDirectLightingForLumenScene);
