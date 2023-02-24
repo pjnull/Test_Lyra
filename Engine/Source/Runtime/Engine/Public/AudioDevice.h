@@ -499,7 +499,7 @@ public:
 	ENGINE_API FAudioDevice();
 
 	PRAGMA_DISABLE_DEPRECATION_WARNINGS // supress deprecation warning in default dtor
-	virtual ~FAudioDevice() = default;
+	ENGINE_API virtual ~FAudioDevice() = default;
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	/** Returns an array of available audio devices names for the platform */
