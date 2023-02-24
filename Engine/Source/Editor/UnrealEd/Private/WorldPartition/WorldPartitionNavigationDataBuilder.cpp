@@ -411,6 +411,8 @@ bool UWorldPartitionNavigationDataBuilder::SavePackages(const TArray<UPackage*>&
 		}
 	}
 
+	UPackage::WaitForAsyncFileWrites();
+
 	return true;
 }
 

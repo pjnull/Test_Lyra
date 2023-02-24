@@ -1649,6 +1649,8 @@ int32 UWorldPartitionConvertCommandlet::Main(const FString& Params)
 					return 1;
 				}
 			}
+			
+			UPackage::WaitForAsyncFileWrites();
 		}
 
 		// Add packages
@@ -1669,8 +1671,6 @@ int32 UWorldPartitionConvertCommandlet::Main(const FString& Params)
 		{
 			GEditor->CleanupPhysicsSceneThatWasInitializedForSave(MainWorld, bForceInitializeWorld);
 		}
-
-		UPackage::WaitForAsyncFileWrites();
 
 		UE_LOG(LogWorldPartitionConvertCommandlet, Log, TEXT("######## CONVERSION COMPLETED SUCCESSFULLY ########"));
 	}
