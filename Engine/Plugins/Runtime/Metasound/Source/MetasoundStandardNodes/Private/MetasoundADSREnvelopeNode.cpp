@@ -220,7 +220,7 @@ namespace Metasound
 				// We are in attack
 				if (AttackSamplesLeft > 0)
 				{
-					EndAttackFrame = FMath::Min(StartFrame + AttackSamplesLeft, EndFrame);
+					EndAttackFrame = FMath::Max(1, FMath::Min(StartFrame + AttackSamplesLeft, EndFrame));
 					for (int32 i = StartFrame; i < EndAttackFrame; ++i)
 					{
 						float AttackFraction = (float)++(InState.CurrentSampleIndex) / InState.AttackSampleCount;
@@ -562,10 +562,10 @@ namespace Metasound
 			, DecayCurveFactor(InArgs.DecayCurveFactor)
 			, ReleaseCurveFactor(InArgs.ReleaseCurveFactor)
 			, bHardReset(InArgs.bInHardReset)
-			, OnDecayTrigger(TDataWriteReferenceFactory<FTrigger>::CreateAny(InArgs.OperatorSettings))
-			, OnSustainTrigger(TDataWriteReferenceFactory<FTrigger>::CreateAny(InArgs.OperatorSettings))
-			, OnDone(TDataWriteReferenceFactory<FTrigger>::CreateAny(InArgs.OperatorSettings))
-			, OutputEnvelope(TDataWriteReferenceFactory<ValueType>::CreateAny(InArgs.OperatorSettings))
+			, OnDecayTrigger(TDataWriteReferenceFactory<FTrigger>::CreateExplicitArgs(InArgs.OperatorSettings))
+			, OnSustainTrigger(TDataWriteReferenceFactory<FTrigger>::CreateExplicitArgs(InArgs.OperatorSettings))
+			, OnDone(TDataWriteReferenceFactory<FTrigger>::CreateExplicitArgs(InArgs.OperatorSettings))
+			, OutputEnvelope(TDataWriteReferenceFactory<ValueType>::CreateExplicitArgs(InArgs.OperatorSettings))
 		{
 			NumFramesPerBlock = InArgs.OperatorSettings.GetNumFramesPerBlock();
 
@@ -614,10 +614,10 @@ namespace Metasound
 			float AttackTimeSeconds = AttackTime->GetSeconds();
 			float DecayTimeSeconds = DecayTime->GetSeconds();
 			float ReleaseTimeSeconds = ReleaseTime->GetSeconds();
-			EnvState.AttackSampleCount = FMath::Max(1, SampleRate * FMath::Max(0.0f, AttackTimeSeconds));
-			EnvState.DecaySampleCount = SampleRate * FMath::Max(0.0f, DecayTimeSeconds);
+			EnvState.AttackSampleCount = FMath::Max(1, static_cast<int32>(SampleRate * FMath::Max(0.0f, AttackTimeSeconds)));
+			EnvState.DecaySampleCount = FMath::Max(0, static_cast<int32>(SampleRate * FMath::Max(0.0f, DecayTimeSeconds)));
 			EnvState.SustainLevel = FMath::Max(0.0f, *SustainLevel);
-			EnvState.ReleaseSampleCount = SampleRate * FMath::Max(0.0f, ReleaseTimeSeconds);
+			EnvState.ReleaseSampleCount = FMath::Max(0, static_cast<int32>(SampleRate * FMath::Max(0.0f, ReleaseTimeSeconds)));
 			EnvState.AttackCurveFactor = FMath::Max(KINDA_SMALL_NUMBER, *AttackCurveFactor);
 			EnvState.DecayCurveFactor = FMath::Max(KINDA_SMALL_NUMBER, *DecayCurveFactor);
 			EnvState.ReleaseCurveFactor = FMath::Max(KINDA_SMALL_NUMBER, *ReleaseCurveFactor);

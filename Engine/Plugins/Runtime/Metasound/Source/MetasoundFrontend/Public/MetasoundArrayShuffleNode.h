@@ -217,40 +217,24 @@ namespace Metasound
 			, SeedValue(InSeedValue)
 			, bAutoShuffle(bInAutoShuffle)
 			, bEnableSharedState(bInEnableSharedState)
-			, TriggerOnNext(FTriggerWriteRef::CreateNew(InParams.OperatorSettings))
 			, TriggerOnShuffle(FTriggerWriteRef::CreateNew(InParams.OperatorSettings))
-			, TriggerOnReset(FTriggerWriteRef::CreateNew(InParams.OperatorSettings))
 			, OutValue(TDataWriteReferenceFactory<ElementType>::CreateAny(InParams.OperatorSettings))
 		{
 			using namespace Frontend;
 
-			// Check to see if this is a global shuffler or a local one. 
-			// Global shuffler will use a namespace to opt into it.
+			SharedStateUniqueId = INDEX_NONE;
+			if (InParams.Environment.Contains<uint32>(SourceInterface::Environment::SoundUniqueID))
+			{
+				// Get the environment variable for the unique ID of the sound
+				SharedStateUniqueId = InParams.Environment.GetValue<uint32>(SourceInterface::Environment::SoundUniqueID);
+			}
+
 			PrevSeedValue = *SeedValue;
 
-			const ArrayType& InputArrayRef = *InputArray;
-			int32 ArraySize = InputArrayRef.Num();
+			InitializeShufflers(InputArray->Num());
 
-			if (ArraySize > 0)
-			{
-				if (*bEnableSharedState)
-				{
-					// Get the environment variable for the unique ID of the sound
-					SharedStateUniqueId = InParams.Environment.GetValue<uint32>(SourceInterface::Environment::SoundUniqueID);
-					check(SharedStateUniqueId != INDEX_NONE);
-
-					FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
-					SM.InitSharedState(SharedStateUniqueId, PrevSeedValue, ArraySize);
-				}
-				else
-				{
-					ArrayIndexShuffler = MakeUnique<FArrayIndexShuffler>(PrevSeedValue, ArraySize);
-				}
-			}
-			else 
-			{
-				UE_LOG(LogMetaSound, Error, TEXT("Array Shuffle: Can't shuffle an empty array"));
-			}
+			TriggerOnShuffle->Reset();
+			*OutValue = TDataTypeFactory<ElementType>::CreateAny(InParams.OperatorSettings);
 		}
 
 		virtual ~TArrayShuffleOperator() = default;
@@ -276,9 +260,9 @@ namespace Metasound
 			using namespace ArrayNodeShuffleVertexNames;
 
 			FDataReferenceCollection Outputs;
-			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputTriggerOnNext), TriggerOnNext);
+			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputTriggerOnNext), TriggerNext);
 			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputTriggerOnShuffle), TriggerOnShuffle);
-			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputTriggerOnResetSeed), TriggerOnReset);
+			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputTriggerOnResetSeed), TriggerReset);
 			Outputs.AddDataReadReference(METASOUND_GET_PARAM_NAME(OutputShuffledValue), OutValue);
 
 			return Outputs;
@@ -286,33 +270,24 @@ namespace Metasound
 
 		void Execute()
 		{
-			TriggerOnNext->AdvanceBlock();
 			TriggerOnShuffle->AdvanceBlock();
-			TriggerOnReset->AdvanceBlock();
 
 			const ArrayType& InputArrayRef = *InputArray;
- 
-			// Check for a seed change
-			if (PrevSeedValue != *SeedValue)
-			{
-				PrevSeedValue = *SeedValue;
-
-				if (SharedStateUniqueId != INDEX_NONE)
-				{
-					FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
-					SM.SetSeed(SharedStateUniqueId, PrevSeedValue);
-				}
-				else
-				{
-					check(ArrayIndexShuffler.IsValid());
-					ArrayIndexShuffler->SetSeed(PrevSeedValue);
-				}
-			}
-
 			// Don't do anything if our array is empty
 			if (InputArrayRef.Num() == 0)
 			{
 				return;
+			}
+
+			if (PrevArraySize != InputArrayRef.Num())
+			{
+				InitializeShufflers(InputArrayRef.Num());
+			}
+ 
+			// Check for a seed change
+			if (PrevSeedValue != *SeedValue)
+			{
+				Seed(*SeedValue);
 			}
 
 			TriggerReset->ExecuteBlock(
@@ -321,17 +296,7 @@ namespace Metasound
 				},
 				[this](int32 StartFrame, int32 EndFrame)
 				{
-					if (SharedStateUniqueId != INDEX_NONE)
-					{
-						FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
-						SM.ResetSeed(SharedStateUniqueId);
-					}
-					else
-					{
-						check(ArrayIndexShuffler.IsValid());
-						ArrayIndexShuffler->ResetSeed();
-					}
-					TriggerOnReset->TriggerFrame(StartFrame);
+					Reset();
 				}
 			);
 
@@ -341,16 +306,8 @@ namespace Metasound
 				},
 				[this](int32 StartFrame, int32 EndFrame)
 				{
-					if (SharedStateUniqueId != INDEX_NONE)
-					{
-						FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
-						SM.ShuffleArray(SharedStateUniqueId);
-					}
-					else
-					{
-						check(ArrayIndexShuffler.IsValid());
-						ArrayIndexShuffler->ShuffleArray();
-					}
+					Shuffle();
+
 					TriggerOnShuffle->TriggerFrame(StartFrame);
 				}
 			);
@@ -363,26 +320,11 @@ namespace Metasound
 				{
 					const ArrayType& InputArrayRef = *InputArray;
 
-					bool bShuffleTriggered = false;
 					int32 OutShuffleIndex = INDEX_NONE;
-
-					if (SharedStateUniqueId != INDEX_NONE)
-					{
-						FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
-						bShuffleTriggered = SM.NextValue(SharedStateUniqueId, *bAutoShuffle, OutShuffleIndex);
-					}
-					else
-					{
-						check(ArrayIndexShuffler.IsValid());
-						bShuffleTriggered = ArrayIndexShuffler->NextValue(*bAutoShuffle, OutShuffleIndex);
-					}
-
-					check(OutShuffleIndex != INDEX_NONE);
+					bool bShuffleTriggered = GetNextIndex(OutShuffleIndex);
 
 					// The input array size may have changed, so make sure it's wrapped into range of the input array
 					*OutValue = InputArrayRef[OutShuffleIndex % InputArrayRef.Num()];
-
-					TriggerOnNext->TriggerFrame(StartFrame);
 
 					// Trigger out if the array was auto-shuffled
 					if (bShuffleTriggered)
@@ -394,6 +336,84 @@ namespace Metasound
 		}
 
 	private:
+		void InitializeShufflers(int32 InSize)
+		{
+			PrevArraySize = InSize;
+
+			if (InSize > 0)
+			{
+				if (SharedStateUniqueId != INDEX_NONE)
+				{
+					FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
+					SM.InitSharedState(SharedStateUniqueId, PrevSeedValue, InSize);
+				}
+				ArrayIndexShuffler = MakeUnique<FArrayIndexShuffler>(PrevSeedValue, InSize);
+			}
+		}
+
+
+		void Seed(int32 InNewSeed)
+		{
+			PrevSeedValue = InNewSeed;
+
+			if (SharedStateUniqueId != INDEX_NONE)
+			{
+				FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
+				SM.SetSeed(SharedStateUniqueId, InNewSeed);
+			}
+
+			if (ArrayIndexShuffler.IsValid())
+			{
+				ArrayIndexShuffler->SetSeed(InNewSeed);
+			}
+		}
+
+		void Reset()
+		{
+			if (SharedStateUniqueId != INDEX_NONE)
+			{
+				FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
+				SM.ResetSeed(SharedStateUniqueId);
+			}
+		
+			if (ArrayIndexShuffler.IsValid())
+			{
+				ArrayIndexShuffler->ResetSeed();
+			}
+		}
+
+		bool GetNextIndex(int32& OutIndex) 
+		{
+			if (*bEnableSharedState && SharedStateUniqueId != INDEX_NONE)
+			{
+				FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
+				return SM.NextValue(SharedStateUniqueId, *bAutoShuffle, OutIndex);
+			}
+			else if (ArrayIndexShuffler.IsValid())
+			{
+				return ArrayIndexShuffler->NextValue(*bAutoShuffle, OutIndex);
+			}
+			else
+			{
+				checkNoEntry();
+				OutIndex = 0;
+				return false;
+			}
+		}
+
+		void Shuffle()
+		{
+			if (SharedStateUniqueId != INDEX_NONE)
+			{
+				FSharedStateShuffleManager& SM = FSharedStateShuffleManager::Get();
+				SM.ShuffleArray(SharedStateUniqueId);
+			}
+
+			if (ArrayIndexShuffler.IsValid())
+			{
+				ArrayIndexShuffler->ShuffleArray();
+			}
+		}
 
 		// Inputs
 		TDataReadReference<FTrigger> TriggerNext;
@@ -405,14 +425,13 @@ namespace Metasound
 		TDataReadReference<bool> bEnableSharedState;
 
 		// Outputs
-		TDataWriteReference<FTrigger> TriggerOnNext;
 		TDataWriteReference<FTrigger> TriggerOnShuffle;
-		TDataWriteReference<FTrigger> TriggerOnReset;
 		TDataWriteReference<ElementType> OutValue;
 
 		// Data
 		TUniquePtr<FArrayIndexShuffler> ArrayIndexShuffler;
 		int32 PrevSeedValue = INDEX_NONE;
+		int32 PrevArraySize = 0;
 		uint32 SharedStateUniqueId = INDEX_NONE;
 	};
 
