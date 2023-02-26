@@ -172,6 +172,7 @@ class FScreenProbeTraceScreenTexturesCS : public FGlobalShader
 		SHADER_PARAMETER_STRUCT_INCLUDE(FLumenCardTracingParameters, TracingParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FLumenHZBScreenTraceParameters, HZBScreenTraceParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureParameters, SceneTextures)
+		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FStrataGlobalUniformParameters, Strata)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, FurthestHZBTexture)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D<uint>, LightingChannelsTexture)
 		SHADER_PARAMETER(float, MaxHierarchicalScreenTraceIterations)
@@ -424,6 +425,7 @@ class FScreenProbeSetupVisualizeTracesCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_BUFFER_UAV(RWBuffer<float4>, RWVisualizeTracesData)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FScreenProbeParameters, ScreenProbeParameters)
+		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneTextureUniformParameters, SceneTexturesStruct)
 	END_SHADER_PARAMETER_STRUCT()
 		
 	class FStructuredImportanceSampling : SHADER_PERMUTATION_BOOL("STRUCTURED_IMPORTANCE_SAMPLING");
@@ -452,6 +454,7 @@ TRefCountPtr<FRDGPooledBuffer> GVisualizeTracesData;
 
 void SetupVisualizeTraces(
 	FRDGBuilder& GraphBuilder,
+	const FSceneTextures& SceneTextures,
 	const FScene* Scene,
 	const FViewInfo& View,
 	const FScreenProbeParameters& ScreenProbeParameters,
@@ -479,6 +482,7 @@ void SetupVisualizeTraces(
 		PassParameters->View = View.ViewUniformBuffer;
 		PassParameters->ScreenProbeParameters = ScreenProbeParameters;
 		PassParameters->RWVisualizeTracesData = GraphBuilder.CreateUAV(FRDGBufferUAVDesc(VisualizeTracesData, PF_A32B32G32R32F));
+		PassParameters->SceneTexturesStruct = SceneTextures.UniformBuffer;
 
 		FScreenProbeSetupVisualizeTracesCS::FPermutationDomain PermutationVector;
 		PermutationVector.Set< FScreenProbeSetupVisualizeTracesCS::FStructuredImportanceSampling >(LumenScreenProbeGather::UseImportanceSampling(View));
@@ -686,6 +690,7 @@ void TraceScreenProbes(
 				PassParameters->SceneTextures.GBufferVelocityTexture = GSystemTextures.GetBlackDummy(GraphBuilder);
 			}
 
+			PassParameters->Strata = Strata::BindStrataGlobalUniformParameters(View);
 			PassParameters->FurthestHZBTexture = View.HZB;
 			PassParameters->LightingChannelsTexture = LightingChannelsTexture;
 			PassParameters->MaxHierarchicalScreenTraceIterations = GLumenScreenProbeGatherHierarchicalScreenTracesMaxIterations;
@@ -907,6 +912,6 @@ void TraceScreenProbes(
 
 	if (GLumenScreenProbeGatherVisualizeTraces)
 	{
-		SetupVisualizeTraces(GraphBuilder, Scene, View, ScreenProbeParameters, ComputePassFlags);
+		SetupVisualizeTraces(GraphBuilder, SceneTextures, Scene, View, ScreenProbeParameters, ComputePassFlags);
 	}
 }
