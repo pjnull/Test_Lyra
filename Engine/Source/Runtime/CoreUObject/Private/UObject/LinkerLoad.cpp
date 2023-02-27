@@ -4932,7 +4932,7 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 			{
 				Preload(LoadClass);
 			}
-			else if ((Export.Object == nullptr) && !(Export.ObjectFlags & RF_ClassDefaultObject))
+			else if (Export.Object == nullptr)
 			{
 				bool const bExportWasDeferred = DeferExportCreation(Index, ThisParent);
 				if (bExportWasDeferred)
@@ -4941,7 +4941,7 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 					check(Export.Object != nullptr);
 #endif // USE_DEFERRED_DEPENDENCY_CHECK_VERIFICATION_TESTS
 					return Export.Object;
-				}				
+				}
 			}
 			else if (Cast<ULinkerPlaceholderExportObject>(Export.Object))
 			{
@@ -5214,24 +5214,6 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 			}
 		}
 
-		const bool bIsBlueprintCDO = ((Export.ObjectFlags & RF_ClassDefaultObject) != 0) && LoadClass->HasAnyClassFlags(CLASS_CompiledFromBlueprint) &&
-			LoadClass->GetClass()->HasAnyClassFlags(CLASS_NeedsDeferredDependencyLoading);
-
-#if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
-		const bool bDeferCDOSerialization = bIsBlueprintCDO && ((LoadFlags & LOAD_DeferDependencyLoads) != 0);
-		if (bDeferCDOSerialization)
-		{
-			// if LOAD_DeferDependencyLoads is set, then we're already
-			// serializing the blueprint's class somewhere up the chain... 
-			// we don't want the class regenerated while it in the middle of
-			// serializing. we also don't want to construct the CDO yet,
-			// as that may depend on other deferred imports which may not
-			// be fully resolved (e.g. default subobject class overrides).
-			DeferredCDOIndex = Index;
-			return Export.Object;
-		}
-#endif // USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
-
 		LoadClass->GetDefaultObject();
 
 		FStaticConstructObjectParameters Params(LoadClass);
@@ -5283,8 +5265,21 @@ UObject* FLinkerLoad::CreateExport( int32 Index )
 		
 		if( Export.Object )
 		{
+			const bool bIsBlueprintCDO = ((Export.ObjectFlags & RF_ClassDefaultObject) != 0) && LoadClass->HasAnyClassFlags(CLASS_CompiledFromBlueprint) &&
+				LoadClass->GetClass()->HasAnyClassFlags(CLASS_NeedsDeferredDependencyLoading);
+
 #if USE_CIRCULAR_DEPENDENCY_LOAD_DEFERRING
-			if (bIsBlueprintCDO && IsBlueprintFinalizationPending())
+			const bool bDeferCDOSerialization = bIsBlueprintCDO && ((LoadFlags & LOAD_DeferDependencyLoads) != 0);
+			if (bDeferCDOSerialization)
+			{
+				// if LOAD_DeferDependencyLoads is set, then we're already
+				// serializing the blueprint's class somewhere up the chain... 
+				// we don't want the class regenerated while it in the middle of
+				// serializing
+				DeferredCDOIndex = Index;
+				return Export.Object;
+			}
+			else if (bIsBlueprintCDO && IsBlueprintFinalizationPending())
 			{
 				// Class regeneration is deferred until Blueprint finalization, so just return the CDO.
 				return Export.Object;
