@@ -2500,7 +2500,6 @@ static FOpenGLLinkedProgram* LinkProgram( const FOpenGLLinkedProgramConfiguratio
 	check( (Config.Shaders[CrossCompiler::SHADER_STAGE_VERTEX].Resource == 0) != (Config.Shaders[CrossCompiler::SHADER_STAGE_COMPUTE].Resource == 0));
 	check( (Config.Shaders[CrossCompiler::SHADER_STAGE_PIXEL].Resource == 0) != (Config.Shaders[CrossCompiler::SHADER_STAGE_COMPUTE].Resource == 0));
 
-	GLuint Program = 0;
 	if (FOpenGLProgramBinaryCache::IsEnabled())
 	{
 		UE_CLOG(bFromPSOFileCache && !FOpenGLProgramBinaryCache::IsBuildingCache(), LogRHI, Error, TEXT("precompile PSO %s should be precompiled but is requesting compile."), *Config.ProgramKey.ToString());
@@ -2509,7 +2508,7 @@ static FOpenGLLinkedProgram* LinkProgram( const FOpenGLLinkedProgramConfiguratio
 		UE::OpenGL::CompilePendingShaders(Config);
 	}
 
-	if (Program == 0)
+	GLuint Program = 0;
 	{
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_glGenProgramPipelines);
 		FOpenGL::GenProgramPipelines(1, &Program);
