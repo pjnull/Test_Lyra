@@ -108,7 +108,7 @@ FViewModel::ESetParentResult FViewModel::SetParentOnly(const TSharedPtr<FViewMod
 	else
 	{
 		WeakParent = nullptr;
-		SharedData = nullptr;
+		SetSharedData(nullptr);
 
 		return ESetParentResult::ClearedParent;
 	}
