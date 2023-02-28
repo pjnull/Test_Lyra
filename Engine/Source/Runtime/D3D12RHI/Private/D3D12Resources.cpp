@@ -274,7 +274,7 @@ HRESULT FD3D12Adapter::CreateCommittedResource(const FD3D12ResourceDesc& InDesc,
 
 	HRESULT hr = S_OK;
 #if INTEL_EXTENSIONS
-	if (InDesc.bRequires64BitAtomicSupport && IsRHIDeviceIntel() && GRHISupportsAtomicUInt64)
+	if (InDesc.bRequires64BitAtomicSupport && IsRHIDeviceIntel() && GDX12INTCAtomicUInt64Emulation)
 	{
 		INTC_D3D12_RESOURCE_DESC_0001 IntelLocalDesc{};
 		IntelLocalDesc.pD3D12Desc = &LocalDesc;
@@ -329,7 +329,7 @@ HRESULT FD3D12Adapter::CreatePlacedResource(const FD3D12ResourceDesc& InDesc, FD
 	TRefCountPtr<ID3D12Resource> pResource;
 	HRESULT hr = S_OK;
 #if INTEL_EXTENSIONS
-	if (InDesc.bRequires64BitAtomicSupport && IsRHIDeviceIntel() && GRHISupportsAtomicUInt64)
+	if (InDesc.bRequires64BitAtomicSupport && IsRHIDeviceIntel() && GDX12INTCAtomicUInt64Emulation)
 	{
 		FD3D12ResourceDesc LocalDesc = InDesc;
 		INTC_D3D12_RESOURCE_DESC_0001 IntelLocalDesc{};
