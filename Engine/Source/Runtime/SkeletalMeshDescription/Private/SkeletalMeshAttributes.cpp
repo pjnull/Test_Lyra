@@ -16,12 +16,15 @@ static FString SkinWeightAttributeNamePrefix()
 	return MeshAttribute::Vertex::SkinWeights.ToString() + TEXT("-");
 }
 
-void FSkeletalMeshAttributes::Register()
+void FSkeletalMeshAttributes::Register(bool bKeepExistingAttribute)
 {
-	MeshDescription.VertexAttributes().RegisterAttribute<int32[]>(MeshAttribute::Vertex::SkinWeights, 1, 0, EMeshAttributeFlags::Mandatory);
+	if (!MeshDescription.VertexAttributes().HasAttribute(MeshAttribute::Vertex::SkinWeights) || !bKeepExistingAttribute)
+	{
+		MeshDescription.VertexAttributes().RegisterAttribute<int32[]>(MeshAttribute::Vertex::SkinWeights, 1, 0, EMeshAttributeFlags::Mandatory);
+	}
 
 	// Call super class
-	FStaticMeshAttributes::Register();
+	FStaticMeshAttributes::Register(bKeepExistingAttribute);
 }
 
 bool FSkeletalMeshAttributes::RegisterSkinWeightAttribute(const FName InProfileName)

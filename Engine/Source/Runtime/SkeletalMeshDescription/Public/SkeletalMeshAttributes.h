@@ -88,7 +88,7 @@ public:
 		FSkeletalMeshAttributesShared(InMeshDescription)
 	{}
 
-	virtual void Register() override;
+	virtual void Register(bool bKeepExistingAttribute = false) override;
 
 	/// Register a new skin weight profile with the given name. The attribute name will encode the profile name and
 	/// it will be listed in GetSkinWeightProfileNames(). Returns \c true if the profile was successfully registered.
