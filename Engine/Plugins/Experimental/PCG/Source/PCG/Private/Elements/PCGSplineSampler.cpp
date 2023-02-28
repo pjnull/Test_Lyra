@@ -862,6 +862,8 @@ namespace PCGSplineSampler
 		TArray<TArray<TTuple<FTransform, FVector, float>>> InteriorSplinePointData;
 		InteriorSplinePointData.SetNum(NumDispatch);
 
+		const FTransform LineDataTransform = LineData->GetTransform();
+
 		ParallelFor(NumDispatch, [&](int32 DispatchIndex)
 		{
 			const bool bIsLastIteration = (DispatchIndex == (NumDispatch - 1));
@@ -902,6 +904,8 @@ namespace PCGSplineSampler
 					{
 						continue;
 					}
+
+					InteriorSplinePointData[DispatchIndex].Reserve(2 + FMath::Max(MaxX - MinX, 0) / Params.InteriorSampleSpacing);
 
 					for (FVector::FReal X = MinX; X < MaxX + UE_KINDA_SMALL_NUMBER; X += Params.InteriorSampleSpacing)
 					{
@@ -1006,7 +1010,7 @@ namespace PCGSplineSampler
 							Density = DensityFalloffCurve->Eval(T);
 						}
 
-						InteriorSplinePointData[DispatchIndex].Emplace(TransformLS * LineData->GetTransform(), PointLocationLS, Density);
+						InteriorSplinePointData[DispatchIndex].Emplace(TransformLS * LineDataTransform, PointLocationLS, Density);
 					}
 				}
 			}
