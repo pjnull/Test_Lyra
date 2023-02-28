@@ -535,6 +535,7 @@ RAY_TRACING_ENTRY_CLOSEST_HIT(PathTracingMaterialCHS,
 		Payload.SetWaterExtinction(WaterExtinction);
 		Payload.SetWaterPhaseG(PhaseG);
 
+		Payload.Opacity = GetMaterialOpacity(PixelMaterialInputs);
 		Payload.Ior = DielectricF0ToIor(DielectricSpecularToF0(Specular));
 		Payload.BlendingMode = RAY_TRACING_BLEND_MODE_TRANSLUCENT;
 	}
