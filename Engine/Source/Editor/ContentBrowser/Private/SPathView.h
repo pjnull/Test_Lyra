@@ -52,6 +52,7 @@ struct FGeometry;
 struct FHistoryData;
 struct FPathViewConfig;
 struct FPointerEvent;
+struct FContentBrowserInstanceConfig;
 
 typedef TTextFilter< const FString& > FolderTextFilter;
 
@@ -303,7 +304,10 @@ protected:
 	void ClearTreeItems();
 
 	/** Get this path view's editor config if OwningContentBrowserName is set. */
-	FPathViewConfig* GetEditorConfig() const;
+	FPathViewConfig* GetPathViewConfig() const;
+
+	/** Get this path view's content browser instance config if OwningContentBrowserName is set. */
+	FContentBrowserInstanceConfig* GetContentBrowserConfig() const;
 
 private:
 	/** Selects the given path only if it exists. Returns true if selected. */

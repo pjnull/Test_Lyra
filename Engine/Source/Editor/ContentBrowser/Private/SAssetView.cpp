@@ -2157,21 +2157,10 @@ void SAssetView::ToggleShowAllFolder()
 	const bool bNewValue = !IsShowingAllFolder();
 	GetMutableDefault<UContentBrowserSettings>()->bShowAllFolder = bNewValue;
 	GetMutableDefault<UContentBrowserSettings>()->PostEditChange();
-
-	if (FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		Config->bShowAllFolder = bNewValue;
-		UContentBrowserConfig::Get()->SaveEditorConfig();
-	}
 }
 
 bool SAssetView::IsShowingAllFolder() const
 {
-	if (FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		return Config->bShowAllFolder;
-	}
-
 	return GetDefault<UContentBrowserSettings>()->bShowAllFolder;
 }
 
@@ -2180,21 +2169,10 @@ void SAssetView::ToggleOrganizeFolders()
 	const bool bNewValue = !IsOrganizingFolders();
 	GetMutableDefault<UContentBrowserSettings>()->bOrganizeFolders = bNewValue;
 	GetMutableDefault<UContentBrowserSettings>()->PostEditChange();
-
-	if (FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		Config->bOrganizeFolders = bNewValue;
-		UContentBrowserConfig::Get()->SaveEditorConfig();
-	}
 }
 
 bool SAssetView::IsOrganizingFolders() const
 {
-	if (FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		return Config->bOrganizeFolders;
-	}
-
 	return GetDefault<UContentBrowserSettings>()->bOrganizeFolders;
 }
 
@@ -3006,12 +2984,6 @@ void SAssetView::ToggleRealTimeThumbnails()
 
 	GetMutableDefault<UContentBrowserSettings>()->RealTimeThumbnails = bNewState;
 	GetMutableDefault<UContentBrowserSettings>()->PostEditChange();
-
-	if (FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		Config->bRealTimeThumbnails = bNewState;
-		UContentBrowserConfig::Get()->SaveEditorConfig();
-	}
 }
 
 bool SAssetView::CanShowRealTimeThumbnails() const
@@ -3024,11 +2996,6 @@ bool SAssetView::IsShowingRealTimeThumbnails() const
 	if (!CanShowRealTimeThumbnails())
 	{
 		return false;
-	}
-	
-	if (const FContentBrowserInstanceConfig* Config = GetContentBrowserConfig())
-	{
-		return Config->bRealTimeThumbnails;
 	}
 
 	return GetDefault<UContentBrowserSettings>()->RealTimeThumbnails;
