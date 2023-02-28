@@ -30,6 +30,11 @@ namespace UnrealBuildTool
 		public readonly DirectoryReference IntermediateDirectory;
 
 		/// <summary>
+		/// The directory for this module's generated files that are architecture independent
+		/// </summary>
+		public readonly DirectoryReference IntermediateDirectoryNoArch;
+
+		/// <summary>
 		/// The name that uniquely identifies the module.
 		/// </summary>
 		public string Name
@@ -209,11 +214,13 @@ namespace UnrealBuildTool
 		/// </summary>
 		/// <param name="Rules">Rules for this module</param>
 		/// <param name="IntermediateDirectory">Intermediate directory for this module</param>
+		/// <param name="IntermediateDirectoryNoArch">Intermediate directory for this module for files that are architecture independent</param>
 		/// <param name="Logger">Logger for output</param>
-		public UEBuildModule(ModuleRules Rules, DirectoryReference IntermediateDirectory, ILogger Logger)
+		public UEBuildModule(ModuleRules Rules, DirectoryReference IntermediateDirectory, DirectoryReference IntermediateDirectoryNoArch, ILogger Logger)
 		{
 			this.Rules = Rules;
 			this.IntermediateDirectory = IntermediateDirectory;
+			this.IntermediateDirectoryNoArch = IntermediateDirectoryNoArch;
 
 			ModuleApiDefine = Name.ToUpperInvariant() + "_API";
 
