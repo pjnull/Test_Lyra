@@ -2075,6 +2075,8 @@ void FBlueprintEditorUtils::PostDuplicateBlueprint(UBlueprint* Blueprint, bool b
 			check(NewCDO != nullptr);
 			UEditorEngine::CopyPropertiesForUnrelatedObjects(OldCDO, NewCDO);
 
+			FBlueprintEditorUtils::ReconstructAllNodes(Blueprint);
+
 			if (!FBlueprintDuplicationScopeFlags::HasAnyFlag(FBlueprintDuplicationScopeFlags::NoExtraCompilation))
 			{
 				// And compile again to make sure they go into the generated class, get cleaned up, etc...
