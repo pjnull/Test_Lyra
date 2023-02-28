@@ -633,14 +633,12 @@ void SCinematicLevelViewport::CleanUp()
 	TransportControlsContainer->SetContent(SNullWidget::NullWidget);
 	TimeRangeContainer->SetContent(SNullWidget::NullWidget);
 
+	CurrentToolkit.Reset();
 }
 
 void SCinematicLevelViewport::OnEditorOpened(FLevelSequenceEditorToolkit& Toolkit)
 {
-	if (!CurrentToolkit.IsValid())
-	{
-		Setup(Toolkit);
-	}
+	Setup(Toolkit);
 }
 
 void SCinematicLevelViewport::OnEditorClosed()
