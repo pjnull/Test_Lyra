@@ -8,7 +8,9 @@
 
 #include "LightData.ush"
 
-#if INSTANCED_STEREO
+#if MOBILE_MULTI_VIEW
+	#define ForwardLightDataISR MobileBasePass.ForwardMMV
+#elif INSTANCED_STEREO
 	#if MATERIALBLENDING_ANY_TRANSLUCENT
 		#define ForwardLightDataISR TranslucentBasePass.Shared.ForwardISR
 	#else
@@ -27,7 +29,7 @@ FLightGridData GetLightGridData(uint EyeIndex)
 {
 	FLightGridData Result;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	BRANCH
 	if (EyeIndex == 0)
 	{
@@ -37,7 +39,7 @@ FLightGridData GetLightGridData(uint EyeIndex)
 		Result.LightGridZParams = ForwardLightData.LightGridZParams;
 		Result.CulledGridSize = ForwardLightData.CulledGridSize;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	}
 	else
 	{
@@ -84,7 +86,7 @@ uint ComputeLightGridCellIndex(uint2 PixelPos, float SceneDepth)
 
 uint GetNumLocalLights(uint EyeIndex)
 {
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	return (EyeIndex == 0) ? ForwardLightData.NumLocalLights : ForwardLightDataISR.NumLocalLights;
 #else
 	return ForwardLightData.NumLocalLights;
@@ -101,7 +103,7 @@ FCulledLightsGridData GetCulledLightsGrid(uint GridIndex, uint EyeIndex)
 {
 	FCulledLightsGridData Result;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	BRANCH
 	if (EyeIndex == 0)
 	{
@@ -110,7 +112,7 @@ FCulledLightsGridData GetCulledLightsGrid(uint GridIndex, uint EyeIndex)
 		Result.NumLocalLights = min(ForwardLightData.NumCulledLightsGrid[GridIndex * NUM_CULLED_LIGHTS_GRID_STRIDE + 0], ForwardLightData.NumLocalLights);
 		Result.DataStartIndex = ForwardLightData.NumCulledLightsGrid[GridIndex * NUM_CULLED_LIGHTS_GRID_STRIDE + 1];
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	}
 	else
 	{
@@ -154,7 +156,7 @@ FDirectionalLightData GetDirectionalLightData(uint EyeIndex)
 {
 	FDirectionalLightData Result;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	BRANCH
 	if (EyeIndex == 0)
 	{
@@ -167,7 +169,7 @@ FDirectionalLightData GetDirectionalLightData(uint EyeIndex)
 		Result.DirectionalLightDirection			= ForwardLightData.DirectionalLightDirection;
 		Result.DirectionalLightSourceRadius			= ForwardLightData.DirectionalLightSourceRadius;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	}
 	else
 	{
@@ -230,7 +232,7 @@ FLocalLightData GetLocalLightData(uint GridIndex, uint EyeIndex)
 {
 	FLocalLightData Out;
 
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	BRANCH
 	if (EyeIndex == 0)
 	{
@@ -249,7 +251,7 @@ FLocalLightData GetLocalLightData(uint GridIndex, uint EyeIndex)
 			ForwardLightData.ForwardLocalLightBuffer[LocalLightBaseIndex + 3],
 			ForwardLightData.ForwardLocalLightBuffer[LocalLightBaseIndex + 4],
 			ForwardLightData.ForwardLocalLightBuffer[LocalLightBaseIndex + 5]);
-#if INSTANCED_STEREO
+#if (INSTANCED_STEREO || MOBILE_MULTI_VIEW)
 	}
 	else
 	{
