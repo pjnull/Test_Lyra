@@ -1923,6 +1923,7 @@ void FGroomBuilder::BuildData(
 		OutGroupInfo.MaxImportedWidth = InHairDescriptionGroup.Info.MaxImportedWidth;
 
 		// Rendering data
+		if (InHairDescriptionGroup.Strands.IsValid())
 		{
 			OutRen = InHairDescriptionGroup.Strands;
 
@@ -2141,7 +2142,6 @@ void Decimate(
 	const bool bHasAO = InData.StrandsPoints.PointsAO.Num() > 0;
 	const bool bHasClumpIDs = InData.StrandsCurves.ClumpIDs.Num() > 0;
 	const bool bHasStrandIDs = InData.StrandsCurves.StrandIDs.Num() > 0;
-	check(InData.StrandsCurves.MaxRadius > 0);
 
 	if (bHasColor)		{ OutData.StrandsPoints.PointsBaseColor.SetNum(PointCount); }
 	if (bHasRoughness)	{ OutData.StrandsPoints.PointsRoughness.SetNum(PointCount); }
@@ -2224,7 +2224,6 @@ void Decimate(
 	const bool bHasAO = InData.StrandsPoints.PointsAO.Num() > 0;
 	const bool bHasClumpIDs = InData.StrandsCurves.ClumpIDs.Num() > 0;
 	const bool bHasStrandIDs = InData.StrandsCurves.StrandIDs.Num() > 0;
-	check(InData.StrandsCurves.MaxRadius > 0);
 
 	FRandomStream Random;
 	Random.Initialize(0xdeedbeed);
