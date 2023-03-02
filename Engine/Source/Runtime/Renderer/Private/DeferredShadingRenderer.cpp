@@ -3411,7 +3411,7 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 	SetupRayTracingLightDataForViews(GraphBuilder);
 #endif
 
-	if (!bHasRayTracedOverlay && !LumenSceneDirectLighting::UseShadowMaps(ViewFamily))
+	if (!bHasRayTracedOverlay)
 	{
 #if RHI_RAYTRACING
 		// Lumen scene lighting requires ray tracing scene to be ready if HWRT shadows are desired
@@ -3610,13 +3610,6 @@ void FDeferredShadingSceneRenderer::Render(FRDGBuilder& GraphBuilder)
 			bNeedToWaitForRayTracingScene = false;
 		}
 #endif // RHI_RAYTRACING
-
-		if (LumenSceneDirectLighting::UseShadowMaps(ViewFamily))
-		{
-			LLM_SCOPE_BYTAG(Lumen);
-			BeginGatheringLumenSurfaceCacheFeedback(GraphBuilder, Views[0], LumenFrameTemporaries);
-			RenderLumenSceneLighting(GraphBuilder, LumenFrameTemporaries);
-		}
 	}
 
 	ExternalAccessQueue.Submit(GraphBuilder);
