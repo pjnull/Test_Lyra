@@ -846,7 +846,7 @@ class FDeferredLightPS : public FGlobalShader
 			}
 		}
 
-		if (!DoesPlatformSupportNanite(Parameters.Platform, false) && PermutationVector.Get<FVirtualShadowMapMask>() != 0)
+		if (!DoesPlatformSupportVirtualShadowMaps(Parameters.Platform) && PermutationVector.Get<FVirtualShadowMapMask>() != 0)
 		{
 			return false;
 		}
