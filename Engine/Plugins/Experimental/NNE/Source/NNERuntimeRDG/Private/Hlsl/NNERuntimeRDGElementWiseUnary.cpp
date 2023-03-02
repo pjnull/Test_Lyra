@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "NNERuntimeRDGElementWiseUnary.h"
+#include "NNERuntimeRDGHelperElementWiseUnary.h"
 #include "NNEHlslShadersElementWiseUnaryCS.h"
 #include "NNERuntimeRDGHlslHelper.h"
 #include "NNECoreAttributeMap.h"
@@ -38,6 +39,11 @@ namespace UE::NNERuntimeRDG::Private::Hlsl
 			check(InputTensors.Num() == 1);
 			check(OutputTensors.Num() == 1);
 			OutputTensors[0]->SetShape(InputTensors[0]->GetShape());
+
+			const NNECore::Internal::FTensor& X = *InputTensors[0];
+
+			Internal::CPUHelper::ElementWiseUnary::Apply(OpType, X, Alpha, Beta, Gamma, *OutputTensors[0]);
+			
 			return 0;
 		}
 
@@ -109,6 +115,16 @@ namespace UE::NNERuntimeRDG::Private::Hlsl
 	template<> TElementWiseUnary<NNECore::Internal::EElementWiseUnaryOperatorType::LeakyRelu>::TElementWiseUnary()
 		: Alpha(0.01f), Beta(0.0f), Gamma(0.0f)
 	{
+	}
+
+	template<> bool TElementWiseUnary<NNECore::Internal::EElementWiseUnaryOperatorType::Clip>::Initialize(TConstArrayView<NNECore::FTensorDesc> InputTensorDescs, TConstArrayView<NNECore::FTensorDesc> OutputTensorDescs, const NNECore::FAttributeMap& Attributes)
+	{
+		check(InputTensorDescs.Num() == 1);
+		check(OutputTensorDescs.Num() == 1);
+
+		Alpha = Attributes.GetValueOrDefault(TEXT("min"), -3.402823e+38f);
+		Beta = Attributes.GetValueOrDefault(TEXT("max"), 3.402823e+38f);
+		return true;
 	}
 
 	template<NNECore::Internal::EElementWiseUnaryOperatorType OpType>
@@ -202,6 +218,26 @@ namespace UE::NNERuntimeRDG::Private::Hlsl
 
 		return bIsValid;
 	}
+
+	template<>
+	bool ValidateElementWiseUnaryOperator<NNECore::Internal::EElementWiseUnaryOperatorType::Clip>(const NNECore::FAttributeMap& AttributeMap, TConstArrayView<ENNETensorDataType> InputTypes, TConstArrayView<NNECore::FSymbolicTensorShape> InputShapes)
+	{
+		bool bIsValid = true;
+
+		//version 6 of operator Clip, next version is 11
+		//https://github.com/onnx/onnx/blob/main/docs/Changelog.md#Clip-6
+		FAttributeValidator AttributeValidator;
+		AttributeValidator.AddOptional(TEXT("min"), ENNEAttributeDataType::Float);
+		AttributeValidator.AddOptional(TEXT("max"), ENNEAttributeDataType::Float);
+		bIsValid &= AttributeValidator.Validate(AttributeMap);
+
+		FInputValidator InputValidator;
+		InputValidator.AddSupportedType(ENNETensorDataType::Float);
+		InputValidator.AddRequired();
+		bIsValid &= InputValidator.Validate(InputTypes);
+
+		return bIsValid;
+	}
 	
 	bool RegisterElementWiseUnaryOperators(FOperatorRegistryHlsl& Registry)
 	{
@@ -214,9 +250,8 @@ namespace UE::NNERuntimeRDG::Private::Hlsl
 		OP(Atan);
 		OP(Atanh);
 		//OP(BitShift);
-		//OP(Cast);
 		OP(Ceil);
-		//OP(Clip);
+		OP(Clip);
 		OP(Cos);
 		OP(Cosh);
 		OP(Elu);

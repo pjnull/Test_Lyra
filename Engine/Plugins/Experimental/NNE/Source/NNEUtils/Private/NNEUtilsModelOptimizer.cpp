@@ -27,6 +27,9 @@ NNE_THIRD_PARTY_INCLUDES_START
 NNE_THIRD_PARTY_INCLUDES_END
 
 
+namespace UE::NNEUtils::Internal
+{
+
 #define Print(Format, ...) UE_LOG(LogNNE, Display, Format, __VA_ARGS__)
 
 class FModelGraphPrinter
@@ -255,15 +258,12 @@ ENNETensorDataType GetDataTypeFromGraphTensor(Ort::GraphTensorDataType TensorDat
 		CASE(kComplex128, Complex128);
 		CASE(kBFloat16, BFloat16);
 
-		default:
-			return ENNETensorDataType::None;
+	default:
+		return ENNETensorDataType::None;
 	}
 }
 
 #undef CASE
-
-namespace UE::NNEUtils::Internal
-{
 
 class FModelOptimizerBase : public NNECore::Internal::IModelOptimizer
 {
@@ -489,6 +489,17 @@ public:
 	}
 
 private:
+	int32 ConvertInt32AttributeValueFromORT(int32 ORTValue, const FString& AttributeName, const FString& OpName)
+	{
+		if (OpName == TEXT("Cast") && AttributeName == TEXT("to"))
+		{
+			//Cast.to attribute follow TensorProto.DataType itself a match to Ort::GraphTensorDataType
+			//however NNE format is agnostic to TensorProto thus we need a convertion.
+			return (int32)GetDataTypeFromGraphTensor((Ort::GraphTensorDataType)ORTValue);
+		}
+		return ORTValue;
+	}
+
 	bool BuildNNEFormat(Ort::IModelGraph* Graph, TArray<uint8>& NNEData)
 	{
 		TUniquePtr<IModelBuilder>	Builder(CreateNNEModelBuilder());
@@ -552,7 +563,8 @@ private:
 				}
 				else if (AttrInfo.type == Ort::GraphAttributeType::kInt)
 				{
-					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue((int32)AttrValue.i));
+					int32 NNEAttributeValue = ConvertInt32AttributeValueFromORT((int32)AttrValue.i, AttrInfo.name, NodeInfo.opName);
+					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue(NNEAttributeValue));
 				}
 				else if (AttrInfo.type == Ort::GraphAttributeType::kInts)
 				{
@@ -569,6 +581,30 @@ private:
 				else if (AttrInfo.type == Ort::GraphAttributeType::kString)
 				{
 					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue(FString(AttrValue.s)));
+				}
+				else if (AttrInfo.type == Ort::GraphAttributeType::kStrings)
+				{
+					TArray<FString> Values;
+					Values.SetNum(AttrValue.count);
+
+					for (int i = 0; i < AttrValue.count; i++)
+					{
+						Values[i] = FString(UTF8_TO_TCHAR(AttrValue.strings[i]->c_str()));
+					}
+
+					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue(Values));
+				}
+				else if (AttrInfo.type == Ort::GraphAttributeType::kFloats)
+				{
+					TArray<float> Values;
+					Values.SetNumUninitialized(AttrValue.count);
+
+					for (int i = 0; i < AttrValue.count; i++)
+					{
+						Values[i] = AttrValue.floats[i];
+					}
+
+					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue(Values));
 				}
 				else
 				{

@@ -83,6 +83,14 @@ private:
 			}
 			else
 			{
+				if (Runtime.SkipStatic)
+				{
+					TestSetup.SkipStaticTestForRuntime.Add(Runtime.Name);
+				}
+				if (Runtime.SkipVariadic)
+				{
+					TestSetup.SkipStaticTestForRuntime.Add(Runtime.Name);
+				}
 				if (Runtime.AbsoluteTolerance != Json::JSON_TOLERANCE_NOTSET)
 				{
 					TestSetup.AbsoluteToleranceForRuntime.Emplace(Runtime.Name, Runtime.AbsoluteTolerance);
@@ -290,6 +298,20 @@ private:
 					for (int32 Val : Value.GetValue<TArray<int32>>())
 					{
 						ArrayStrings.Add(FString::FromInt(Val));
+					}
+
+					return TEXT("[") + FString::Join(ArrayStrings, TEXT(",")) + TEXT("]");
+				}
+				case ENNEAttributeDataType::StringArray:
+				{
+					return TEXT("[") + FString::Join(Value.GetValue<TArray<FString>>(), TEXT(",")) + TEXT("]");
+				}
+				case ENNEAttributeDataType::FloatArray:
+				{
+					TArray<FString> ArrayStrings;
+					for (float Val : Value.GetValue<TArray<float>>())
+					{
+						ArrayStrings.Add(FString::SanitizeFloat(Val));
 					}
 
 					return TEXT("[") + FString::Join(ArrayStrings, TEXT(",")) + TEXT("]");

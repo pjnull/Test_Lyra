@@ -37,10 +37,39 @@ FOperatorHlsl* OpCreate(const FString& OpName, TConstArrayView<NNECore::FTensorD
 
 } // namespace ModelUtils
 
-bool FModel::AddWeightsToRDGGraph(FRDGBuilder& RDGBuilder)
+bool FModel::PrepareModelRDG(FRDGBuilder& RDGBuilder)
 {
-	check(WeightTensorRDGs.Num() == WeightsExternalRDGResources.Num());
+	//Register constant tensors to graph, uploading if needed
+	check(IntermediateTensorRDGs.Num() == ConstantsExternalRDGResources.Num());
+	for (int32 Idx = 0; Idx < ConstantsExternalRDGResources.Num(); ++Idx)
+	{
+		FTensorRDG& Tensor = IntermediateTensorRDGs[Idx];
+		TRefCountPtr<FRDGPooledBuffer>& PooledBuffer = ConstantsExternalRDGResources[Idx];
 
+		if (Tensor.HasPreparedData())
+		{
+			if (!PooledBuffer.IsValid())
+			{
+				FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(Tensor.GetElemByteSize(), Tensor.GetVolume());
+				const FRDGBufferRef TransientRDGBuffer = RDGBuilder.CreateBuffer(BufferDesc, *Tensor.GetName(), ERDGBufferFlags::None);
+				const uint8* TensorData = Tensor.GetPreparedData<uint8>().GetData();
+				PooledBuffer = RDGBuilder.ConvertToExternalBuffer(TransientRDGBuffer);
+
+				// Data is copied so model can be released safely or another upload added to the queue
+				RDGBuilder.QueueBufferUpload(TransientRDGBuffer, TensorData, Tensor.GetDataSize(), ERDGInitialDataFlags::None);
+			}
+			check(PooledBuffer.IsValid())
+			FRDGBufferRef Buffer = RDGBuilder.RegisterExternalBuffer(PooledBuffer);
+			Tensor.SetBuffer(Buffer);
+		}
+		else
+		{
+			Tensor.SetBuffer(nullptr);
+		}
+	}
+
+	//Register weight tensors to graph
+	check(WeightTensorRDGs.Num() == WeightsExternalRDGResources.Num());
 	for (int32 Idx = 0; Idx < WeightsExternalRDGResources.Num(); ++Idx)
 	{
 		const TRefCountPtr<FRDGPooledBuffer>& PooledBuffer = WeightsExternalRDGResources[Idx];
@@ -121,13 +150,28 @@ void FModel::AddDispatchOps_RenderThread(FRDGBuilder& GraphBuilder)
 		{
 			InputTensors.Add(AllTensorRDGRefs[i]);
 		}
+		bool AllOutputTensorConstant = true;
 		OutputTensors.Reset(OperatorOutputTensorIndices.Num());
 		for (int32 i : OperatorOutputTensorIndices[Idx])
 		{
+			AllOutputTensorConstant &= AllTensorRDGRefs[i]->HasPreparedData();
 			OutputTensors.Add(AllTensorRDGRefs[i]);
 		}
 
-		Operators[Idx]->Dispatch(GraphBuilder, InputTensors, OutputTensors);
+		//If all output for operator are constant we don't need to run it.
+		if (!AllOutputTensorConstant)
+		{
+			Operators[Idx]->Dispatch(GraphBuilder, InputTensors, OutputTensors);
+		}
+	}
+
+	//If a model output is constant we upload to it (a user provided GPU buffer).
+	for (const FTensorRDG& OutputTensor : OutputTensorRDGs)
+	{
+		if (OutputTensor.HasPreparedData())
+		{
+			GraphBuilder.QueueBufferUpload(OutputTensor.GetBuffer(), OutputTensor.GetPreparedData<uint8>().GetData(), OutputTensor.GetDataSize(), ERDGInitialDataFlags::None);
+		}
 	}
 }
 
@@ -159,6 +203,10 @@ int FModel::PrepareTensorShapesAndData()
 			AllInitializedTensors[Idx] = true;
 		}
 	);
+
+	//Release uploaded GPU side constants tensors.
+	ConstantsExternalRDGResources.Reset();
+	ConstantsExternalRDGResources.SetNum(IntermediateTensorRDGs.Num());
 
 	// Run model preparation (including shape inference) on all operators
 	// This loop could be abstracted to a different system as it apply on FTensorRef & IPrepareOperator witch are RDG agnostics.
@@ -203,57 +251,83 @@ int FModel::PrepareTensorShapesAndData()
 	return 0;
 }
 
+namespace UploadHelper
+{
+
+void EnqueueTensorUpload(TArray<TRefCountPtr<FRDGPooledBuffer>>& OutExternalRDGResources,
+	FTensorRDGArray& TensorToUploadRDGs, ERDGInitialDataFlags CopyDataFlag)
+	{
+		OutExternalRDGResources.Reset();
+		OutExternalRDGResources.SetNum(TensorToUploadRDGs.Num());
+
+		bool AtLeastOneConstantTensor = false;
+		for (const FTensorRDG& TensorRDG : TensorToUploadRDGs)
+		{
+			if (TensorRDG.HasPreparedData())
+			{
+				AtLeastOneConstantTensor = true;
+			}
+		}
+		if (!AtLeastOneConstantTensor)
+		{
+			return;
+		}
+
+		FEvent* Signal = FGenericPlatformProcess::GetSynchEventFromPool(false);
+
+		ENQUEUE_RENDER_COMMAND(FModel_UploadTensors)
+		(
+			[Signal, &OutExternalRDGResources, &TensorToUploadRDGs, CopyDataFlag](FRHICommandListImmediate& RHICmdList)
+			{
+				TOptional<ERHIPipeline> Pipeline = RHICmdList.GetPipeline();
+				if (Pipeline == ERHIPipeline::None)
+				{
+					RHICmdList.SwitchPipeline(ERHIPipeline::Graphics);
+				}
+
+				FRDGBuilder	RDGBuilder(RHICmdList);
+
+				for (int32 i = 0; i < TensorToUploadRDGs.Num(); ++i)
+				{
+					FTensorRDG& Tensor = TensorToUploadRDGs[i];
+					check(!Tensor.HasBuffer());
+					if (Tensor.HasPreparedData())
+					{
+
+						FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(Tensor.GetElemByteSize(), Tensor.GetVolume());
+						const FRDGBufferRef TransientRDGBuffer = RDGBuilder.CreateBuffer(BufferDesc, *Tensor.GetName(), ERDGBufferFlags::None);
+						const uint8* TensorData = Tensor.GetPreparedData<uint8>().GetData();
+
+						OutExternalRDGResources[i] = RDGBuilder.ConvertToExternalBuffer(TransientRDGBuffer);
+						RDGBuilder.QueueBufferUpload(TransientRDGBuffer, TensorData, Tensor.GetDataSize(), CopyDataFlag);
+					}
+				}
+
+				RDGBuilder.Execute();
+
+				if (CopyDataFlag == ERDGInitialDataFlags::NoCopy)
+				{
+					//To prevent any problem if model is released before upload is done to the GPU. To be improved.
+					RHICmdList.BlockUntilGPUIdle();
+				}
+
+
+				Signal->Trigger();
+			}
+		);
+
+		Signal->Wait();	// Wait for render thread to finish
+
+		FGenericPlatformProcess::ReturnSynchEventToPool(Signal);
+	}
+}
+
 bool FModel::PrepareWeights()
 {
-	if (!WeightsExternalRDGResources.IsEmpty())
-	{
-		check(WeightsExternalRDGResources.Num() == WeightTensorRDGs.Num())
-		return true;
-	}
+	check(WeightsExternalRDGResources.IsEmpty());
 
-	//Upload to GPU
-	FEvent* Signal = FGenericPlatformProcess::GetSynchEventFromPool(false);
-	WeightsExternalRDGResources.SetNum(WeightTensorRDGs.Num());
-
-	ENQUEUE_RENDER_COMMAND(FModel_PrepareWeights)
-	(
-		[&Signal, this](FRHICommandListImmediate& RHICmdList)
-		{
-			TOptional<ERHIPipeline> Pipeline = RHICmdList.GetPipeline();
-			if (Pipeline == ERHIPipeline::None)
-			{
-				RHICmdList.SwitchPipeline(ERHIPipeline::Graphics);
-			}
-
-			FRDGBuilder	RDGBuilder(RHICmdList);
-
-			for (int32 i = 0; i < WeightTensorRDGs.Num(); ++i)
-			{
-				FTensorRDG& Tensor = WeightTensorRDGs[i];
-				check(!Tensor.HasBuffer());
-				check(Tensor.HasPreparedData());
-				FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(Tensor.GetElemByteSize(), Tensor.GetVolume());
-				const FRDGBufferRef TransientRDGBuffer = RDGBuilder.CreateBuffer(BufferDesc, *Tensor.GetName(), ERDGBufferFlags::None);
-				const uint8* TensorData = Tensor.GetPreparedData<uint8>().GetData();
-				
-				WeightsExternalRDGResources[i] = RDGBuilder.ConvertToExternalBuffer(TransientRDGBuffer);
-				Tensor.SetBuffer(TransientRDGBuffer);
-				RDGBuilder.QueueBufferUpload(TransientRDGBuffer, TensorData, Tensor.GetDataSize(), ERDGInitialDataFlags::NoCopy);
-			}
-
-			RDGBuilder.Execute();
-
-			//To prevent any problem if model is released before upload is done to the GPU. To be improved.
-			RHICmdList.BlockUntilGPUIdle();
-
-			Signal->Trigger();
-		}
-	);
-
-	// We need to wait for render thread to finish
-	Signal->Wait();
-
-	FGenericPlatformProcess::ReturnSynchEventToPool(Signal);
+	// Data is not copied. A GPU sync will happens see EnqueueTensorUpload().
+	UploadHelper::EnqueueTensorUpload(WeightsExternalRDGResources, WeightTensorRDGs, ERDGInitialDataFlags::NoCopy);
 
 	return true;
 }

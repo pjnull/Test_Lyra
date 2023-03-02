@@ -248,7 +248,23 @@ public:
 		else if (Value.GetType() == ENNEAttributeDataType::String)
 		{
 			Attribute->set_type(onnx::AttributeProto::STRING);
-			Attribute->set_s(TCHAR_TO_ANSI(*Value.GetValue<FString>()));
+			Attribute->set_s(TCHAR_TO_UTF8(*Value.GetValue<FString>()));
+		}
+		else if (Value.GetType() == ENNEAttributeDataType::StringArray)
+		{
+			Attribute->set_type(onnx::AttributeProto::STRINGS);
+			for (const FString& Val : Value.GetValue<TArray<FString>>())
+			{
+				Attribute->add_strings(TCHAR_TO_UTF8(*Val));
+			}
+		}
+		else if (Value.GetType() == ENNEAttributeDataType::FloatArray)
+		{
+			Attribute->set_type(onnx::AttributeProto::FLOATS);
+			for (float Val : Value.GetValue<TArray<float>>())
+			{
+				Attribute->add_floats(Val);
+			}
 		}
 		else
 		{
@@ -334,10 +350,15 @@ NNEUTILS_API bool CreateONNXModelForOperator(bool UseVariadicShapeForModel, cons
 	
 	int64 IrVersion = OnnxIrVersion;
 	int64 OpsetVersion = OnnxOpsetVersion;
-	if (OperatorName == TEXT("Upsample") || OperatorName == TEXT("Pad"))
+	if (OperatorName == TEXT("BatchNormalization") ||	// current implementation is opset 9 (next version is 14)
+		OperatorName == TEXT("Clip") ||					// current implementation is opset 6 (next version is 11)
+		OperatorName == TEXT("Pad") ||					// current implementation is opset 2 (next version is 11)
+		OperatorName == TEXT("Shape") ||				// current implementation is opset 1 (next version is 13)
+		OperatorName == TEXT("Slice") ||				// current implementation is opset 1 (next version is 10)
+		OperatorName == TEXT("Squeeze") ||				// current implementation is opset 1 (next version is 11)
+		OperatorName == TEXT("Unsqueeze") ||			// current implementation is opset 1 (next version is 11)
+		OperatorName == TEXT("Upsample"))				// deprecated starting opset 10
 	{
-		// Upsample is deprecated starting opset 10
-		// Pad current implementation is opset 2 (next version is 11)
 		OpsetVersion = 9;
 	}
 	TUniquePtr<IModelBuilder> Builder(CreateONNXModelBuilder(IrVersion, OpsetVersion));

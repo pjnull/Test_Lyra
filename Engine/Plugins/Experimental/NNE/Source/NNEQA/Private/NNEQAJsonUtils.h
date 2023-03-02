@@ -41,13 +41,17 @@ namespace Json
 	struct FTestConfigRuntime : FJsonSerializable
 	{
 		FString Name;
-		bool Skip;
 		float AbsoluteTolerance = JSON_TOLERANCE_NOTSET;
 		float RelativeTolerance = JSON_TOLERANCE_NOTSET;
+		bool Skip;
+		bool SkipStatic;
+		bool SkipVariadic;
 
 		BEGIN_JSON_SERIALIZER
 			JSON_SERIALIZE("name", Name);
 			JSON_SERIALIZE("skip", Skip);
+			JSON_SERIALIZE("skip_static_test", SkipStatic);
+			JSON_SERIALIZE("skip_variadic_test", SkipVariadic);
 			JSON_SERIALIZE("absolute_tolerance", AbsoluteTolerance);
 			JSON_SERIALIZE("relative_tolerance", RelativeTolerance);
 		END_JSON_SERIALIZER
@@ -95,7 +99,15 @@ namespace Json
 					Value = FNNEAttributeValue(TmpValue);
 					break;
 				}
-
+				case ENNEAttributeDataType::FloatArray:
+				{
+					TArray<FString> TmpValue;
+					JSON_SERIALIZE_ARRAY("value", TmpValue);
+					TArray<float> ConvertedValue;
+					Algo::Transform(TmpValue, ConvertedValue, [](const FString& In){ return FCString::Atof(*In); });
+					Value = FNNEAttributeValue(ConvertedValue);
+					break;
+				}
 				case ENNEAttributeDataType::Int32:
 				{
 					int TmpValue;
@@ -114,6 +126,13 @@ namespace Json
 				{
 					FString TmpValue;
 					JSON_SERIALIZE("value", TmpValue);
+					Value = FNNEAttributeValue(TmpValue);
+					break;
+				}
+				case ENNEAttributeDataType::StringArray:
+				{
+					TArray<FString> TmpValue;
+					JSON_SERIALIZE_ARRAY("value", TmpValue);
 					Value = FNNEAttributeValue(TmpValue);
 					break;
 				}

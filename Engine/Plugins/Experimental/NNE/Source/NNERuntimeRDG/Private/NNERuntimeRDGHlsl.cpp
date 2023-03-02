@@ -8,15 +8,27 @@
 #include "NNERuntimeRDGHlslHelper.h"
 #include "NNERuntimeRDGModelHlsl.h"
 #include "NNEUtilsModelOptimizer.h"
+#include "Hlsl/NNERuntimeRDGBatchNormalization.h"
+#include "Hlsl/NNERuntimeRDGCast.h"
 #include "Hlsl/NNERuntimeRDGConv.h"
-#include "Hlsl/NNERuntimeRDGConv.h"
+#include "Hlsl/NNERuntimeRDGConcat.h"
 #include "Hlsl/NNERuntimeRDGConvTranspose.h"
+#include "Hlsl/NNERuntimeRDGDropout.h"
 #include "Hlsl/NNERuntimeRDGElementWiseBinary.h"
 #include "Hlsl/NNERuntimeRDGElementWiseUnary.h"
 #include "Hlsl/NNERuntimeRDGElementWiseVariadic.h"
+#include "Hlsl/NNERuntimeRDGFlatten.h"
+#include "Hlsl/NNERuntimeRDGGather.h"
 #include "Hlsl/NNERuntimeRDGGemm.h"
+#include "Hlsl/NNERuntimeRDGIdentity.h"
 #include "Hlsl/NNERuntimeRDGInstanceNormalization.h"
 #include "Hlsl/NNERuntimeRDGPad.h"
+#include "Hlsl/NNERuntimeRDGReshape.h"
+#include "Hlsl/NNERuntimeRDGShape.h"
+#include "Hlsl/NNERuntimeRDGSize.h"
+#include "Hlsl/NNERuntimeRDGSlice.h"
+#include "Hlsl/NNERuntimeRDGSqueeze.h"
+#include "Hlsl/NNERuntimeRDGUnsqueeze.h"
 #include "Hlsl/NNERuntimeRDGUpsample.h"
 #include "Hlsl/NNERuntimeRDGMatMul.h"
 
@@ -30,16 +42,29 @@ bool UNNERuntimeRDGHlslImpl::Init()
 	FOperatorRegistryHlsl* registry = FOperatorRegistryHlsl::Get();
 	check(registry != nullptr);
 
-	RegisterElementWiseUnaryOperators(*registry);
-	RegisterElementWiseBinaryOperators(*registry);
-	RegisterElementWiseVariadicOperators(*registry);
-	RegisterGemmOperator(*registry);
+	RegisterBatchNormalizationOperator(*registry);
+	RegisterCastOperator(*registry);
 	RegisterConvOperator(*registry);
+	RegisterConcatOperator(*registry);
 	RegisterConvTransposeOperator(*registry);
-	RegisterMatMulOperator(*registry);
+	RegisterDropoutOperator(*registry);
+	RegisterElementWiseBinaryOperators(*registry);
+	RegisterElementWiseUnaryOperators(*registry);
+	RegisterElementWiseVariadicOperators(*registry);
+	RegisterFlattenOperator(*registry);
+	RegisterGatherOperator(*registry);
+	RegisterGemmOperator(*registry);
+	RegisterIdentityOperator(*registry);
 	RegisterInstanceNormalizationOperator(*registry);
-	RegisterUpsampleOperator(*registry);
 	RegisterPadOperator(*registry);
+	RegisterReshapeOperator(*registry);
+	RegisterShapeOperator(*registry);
+	RegisterSizeOperator(*registry);
+	RegisterSliceOperator(*registry);
+	RegisterSqueezeOperator(*registry);
+	RegisterUnsqueezeOperator(*registry);
+	RegisterUpsampleOperator(*registry);
+	RegisterMatMulOperator(*registry);
 
 	return true;
 }

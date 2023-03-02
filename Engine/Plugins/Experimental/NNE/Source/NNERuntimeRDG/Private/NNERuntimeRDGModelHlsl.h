@@ -23,7 +23,7 @@ public:
 protected:
 
 	virtual int PrepareTensorShapesAndData() override;
-	virtual bool AddWeightsToRDGGraph(FRDGBuilder& RDGBuilder) override;
+	virtual bool PrepareModelRDG(FRDGBuilder& RDGBuilder) override;
 	virtual void AddDispatchOps_RenderThread(FRDGBuilder& GraphBuilder) override;
 
 	bool PrepareWeights();
@@ -32,6 +32,7 @@ private:
 
 	TArray<FOperatorHlsl*>	Operators;
 	TArray<TRefCountPtr<FRDGPooledBuffer>> WeightsExternalRDGResources;
+	TArray<TRefCountPtr<FRDGPooledBuffer>> ConstantsExternalRDGResources;
 };
 
 } // namespace UE::NNERuntimeRDG::Private::Hlsl
