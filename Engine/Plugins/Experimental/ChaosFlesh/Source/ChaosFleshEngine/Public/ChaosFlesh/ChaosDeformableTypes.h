@@ -24,5 +24,5 @@ struct FChaosEngineDeformableCVarParams
 	bool bDoDrawSimulationMesh = false;
 #endif
 	bool bDoDrawSkeletalMeshBindingPositions = false;
-	float DrawSkeletalMeshBindingPositionsAnimationBlendWeight = 0.f;
+	float DrawSkeletalMeshBindingPositionsSimulationBlendWeight = 1.f;
 };
