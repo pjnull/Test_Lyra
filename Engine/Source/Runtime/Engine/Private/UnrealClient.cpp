@@ -737,7 +737,7 @@ int32 FStatUnitData::DrawStat(FViewport* InViewport, FCanvas* InCanvas, int32 In
 				{
 					DrawCell(
 						GPURowId++, GPUIndex * ColumnPerGPU + AvgUnitColumnId, GPUColumnCount,
-						FString::Printf(TEXT("GPU%d"), GPUIndex), NoUnitGraphColor);
+						GVirtualMGPU ? FString::Printf(TEXT("VGPU%d"), GPUIndex) : FString::Printf(TEXT("GPU%d"), GPUIndex), NoUnitGraphColor);
 				}
 
 				if (!bHaveGPUData[GPUIndex])
@@ -764,7 +764,12 @@ int32 FStatUnitData::DrawStat(FViewport* InViewport, FCanvas* InCanvas, int32 In
 					GPURowId++;
 				}
 
-				if (GRHISupportsGPUUsage)
+				// Only display the GPU usage of one GPU usage when using the -VMGPU 
+				if (GRHISupportsGPUUsage && GPUIndex > 0 && GVirtualMGPU)
+				{
+					GPURowId = GPURowCount;
+				}
+				else if (GRHISupportsGPUUsage)
 				{
 					{
 						const FColor Color = (GPUClockFraction[GPUIndex] < 0.5f) ? StatRed : ((GPUClockFraction[GPUIndex] < 0.75f) ? StatOrange : StatGreen);
