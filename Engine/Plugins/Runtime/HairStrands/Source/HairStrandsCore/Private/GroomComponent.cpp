@@ -2926,7 +2926,6 @@ void UGroomComponent::InitResources(bool bIsBindingReloading)
 						// (Lazy) Allocate static raytracing resources (owned by the grooom asset)
 						InstanceLOD.RaytracingResourceOwned = false;
 						InstanceLOD.RaytracingResource = GroomAsset->AllocateMeshesRaytracingResources(GroupIt, MeshLODIndex);
-						check(InstanceLOD.RaytracingResource);
 					}
 				}
 				#endif
