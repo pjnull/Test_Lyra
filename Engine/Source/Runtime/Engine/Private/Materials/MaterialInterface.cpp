@@ -1189,6 +1189,11 @@ bool UMaterialInterface::IsTranslucencyWritingVelocity() const
 	return false;
 }
 
+bool UMaterialInterface::IsTranslucencyWritingFrontLayerTransparency() const
+{
+	return false;
+}
+
 bool UMaterialInterface::IsMasked() const
 {
 	return false;
