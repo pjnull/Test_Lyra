@@ -2375,6 +2375,12 @@ protected:
 	}
 
 public:
+	void FlushAllPendingComputeParameters()
+	{
+		PreDispatch();
+	}
+
+public:
 	FRHIComputeCommandList(FRHIGPUMask GPUMask = FRHIGPUMask::All(), ERecordingThread InRecordingThread = ERecordingThread::Render)
 		: FRHICommandListBase(GPUMask, InRecordingThread)
 	{}
