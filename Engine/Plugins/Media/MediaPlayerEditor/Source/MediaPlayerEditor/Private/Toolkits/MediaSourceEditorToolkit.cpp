@@ -77,7 +77,7 @@ void FMediaSourceEditorToolkit::Initialize(UMediaSource* InMediaSource, const ET
 	GEditor->RegisterForUndo(this);
 
 	MediaPlayer = NewObject<UMediaPlayer>(GetTransientPackage());
-	MediaPlayer->SetLooping(false);
+	MediaPlayer->SetLooping(true);
 	MediaPlayer->PlayOnOpen = true;
 
 	MediaTexture = NewObject<UMediaTexture>(GetTransientPackage(), NAME_None, RF_Transient | RF_Public);
