@@ -350,5 +350,6 @@ void SequencerHelpers::AddPropertiesMenu(FSequencer& Sequencer, FMenuBuilder& Me
 	DetailsView->SetObjects(Sections);
 
 	DetailsNotifyWrapper->SetDetailsAndSequencer(DetailsView, Sequencer.AsShared());
+	DetailsNotifyWrapper->SetEnabled(!Sequencer.IsReadOnly());
 	MenuBuilder.AddWidget(DetailsNotifyWrapper, FText::GetEmpty(), true);
 }
