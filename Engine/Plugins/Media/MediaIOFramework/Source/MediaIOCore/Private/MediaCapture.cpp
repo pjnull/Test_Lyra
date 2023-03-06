@@ -414,6 +414,7 @@ namespace UE::MediaCaptureData
 		FTexture2DRHIRef ResourceToCapture;
 		FRDGTextureRef RDGResourceToCapture = nullptr;
 		FIntPoint DesiredSize = FIntPoint::ZeroValue;
+		FIntRect SourceViewRect{0,0,0,0};
 
 		EPixelFormat GetFormat() const
 		{
@@ -458,7 +459,7 @@ namespace UE::MediaCaptureData
 		FVector2D SizeU = FVector2D::ZeroVector;
 		FVector2D SizeV = FVector2D::ZeroVector;
 	};
-
+	
 	/** Helper class to be able to friend it and call methods on input media capture */
 	class FMediaCaptureHelper
 	{
@@ -482,7 +483,25 @@ namespace UE::MediaCaptureData
 
 			if (Args.MediaCapture->DesiredCaptureOptions.Crop == EMediaCaptureCroppingType::None)
 			{
-				if (Args.DesiredSize.X != Args.GetSizeX() || Args.DesiredSize.Y != Args.GetSizeY())
+				if (Args.SourceViewRect.Area() != 0)
+				{
+					if (Args.DesiredSize.X != Args.SourceViewRect.Width() || Args.DesiredSize.Y != Args.SourceViewRect.Height())
+					{
+						UE_LOG(LogMediaIOCore, Error, TEXT("The capture will stop for '%s'. The Source size doesn't match with the user requested size. Requested: %d,%d  Source: %d,%d")
+							, *Args.MediaCapture->MediaOutputName
+							, Args.SourceViewRect.Width(), Args.SourceViewRect.Height()
+							, Args.GetSizeX(), Args.GetSizeY());
+
+						return false;
+					}
+					else
+					{
+						// If source view rect is passed, it will override the crop passed as argument.
+						Args.MediaCapture->DesiredCaptureOptions.Crop = EMediaCaptureCroppingType::Custom;
+						Args.MediaCapture->DesiredCaptureOptions.CustomCapturePoint = Args.SourceViewRect.Min;
+					}
+				}
+				else if (Args.SourceViewRect.Area() == 0 && (Args.DesiredSize.X != Args.GetSizeX() || Args.DesiredSize.Y != Args.GetSizeY()))
 				{
 					UE_LOG(LogMediaIOCore, Error, TEXT("The capture will stop for '%s'. The Source size doesn't match with the user requested size. Requested: %d,%d  Source: %d,%d")
 						, *Args.MediaCapture->MediaOutputName
@@ -904,7 +923,7 @@ namespace UE::MediaCaptureData
 					Args.MediaCapture->LockDMATexture_RenderThread(CapturingFrame->GetTextureResource());
 				}
 			}
-
+			
 			{
 				TRACE_CPUPROFILER_EVENT_SCOPE(UMediaCapture::FrameCapture);
 				SCOPE_CYCLE_COUNTER(STAT_MediaCapture_RenderThread_FrameCapture);
@@ -924,7 +943,7 @@ namespace UE::MediaCaptureData
 
 				// Register output resource used by the current capture method (texture or buffer)
 				FRDGViewableResource* OutputResource = CapturingFrame->RegisterResource(Args.GraphBuilder);
-				
+
 				{
 					TRACE_CPUPROFILER_EVENT_SCOPE(UMediaCapture::GraphSetup);
 					SCOPED_DRAW_EVENTF(Args.GraphBuilder.RHICmdList, MediaCapture, TEXT("MediaCapture"));
@@ -1453,22 +1472,26 @@ bool UMediaCapture::SetCaptureAudioDevice(const FAudioDeviceHandle& InAudioDevic
 	return bSuccess;
 }
 
-void UMediaCapture::CaptureImmediate_RenderThread(FRDGBuilder& GraphBuilder, FRHITexture* InSourceTexture)
+void UMediaCapture::CaptureImmediate_RenderThread(FRDGBuilder& GraphBuilder, FRHITexture* InSourceTexture, FIntRect SourceViewRect)
 {
 	UE::MediaCaptureData::FCaptureFrameArgs CaptureArgs{GraphBuilder};
 	CaptureArgs.MediaCapture = this;
     CaptureArgs.DesiredSize = DesiredSize;
     CaptureArgs.ResourceToCapture = InSourceTexture;
+	CaptureArgs.SourceViewRect = SourceViewRect;
+	
 	CaptureImmediate_RenderThread(CaptureArgs);
 }
 
 
-void UMediaCapture::CaptureImmediate_RenderThread(FRDGBuilder& GraphBuilder,  FRDGTextureRef InSourceTextureRef)
+void UMediaCapture::CaptureImmediate_RenderThread(FRDGBuilder& GraphBuilder,  FRDGTextureRef InSourceTextureRef, FIntRect SourceViewRect)
 {
 	UE::MediaCaptureData::FCaptureFrameArgs CaptureArgs{GraphBuilder};
 	CaptureArgs.MediaCapture = this;
 	CaptureArgs.DesiredSize = DesiredSize;
 	CaptureArgs.RDGResourceToCapture = InSourceTextureRef;
+	CaptureArgs.SourceViewRect = SourceViewRect;
+	
 	CaptureImmediate_RenderThread(CaptureArgs);
 }
 
@@ -1515,15 +1538,26 @@ void UMediaCapture::CaptureImmediate_RenderThread(const UE::MediaCaptureData::FC
 	// Get cached capture data from game thread. We want to find a cached frame matching current render thread frame number
 	bool bFoundMatchingData = false;
 	FQueuedCaptureData NextCaptureData;
-	while (CaptureDataQueue.Dequeue(NextCaptureData))
+
 	{
-		if (NextCaptureData.BaseData.SourceFrameNumberRenderThread == GFrameCounterRenderThread)
+		FScopeLock ScopeLock(&CaptureDataQueueCriticalSection);
+		for (auto It = CaptureDataQueue.CreateIterator(); It; ++It)
 		{
-			bFoundMatchingData = true;
-			break;
+			if (It->BaseData.SourceFrameNumberRenderThread == GFrameCounterRenderThread)
+			{
+				NextCaptureData = *It;
+				bFoundMatchingData = true;
+				It.RemoveCurrent();
+				break;
+			}
+			else if (GFrameCounterRenderThread > It->BaseData.SourceFrameNumberRenderThread &&
+					GFrameCounterRenderThread - It->BaseData.SourceFrameNumberRenderThread > MaxCaptureDataAgeInFrames)
+			{
+				// Remove old frame data that wasn't used.
+				It.RemoveCurrent();
+			}
 		}
 	}
-
 	if (bFoundMatchingData == false)
 	{
 		UE_LOG(LogMediaIOCore, Warning, TEXT("Can't capture frame. Could not find the matching game frame %d."), GFrameCounterRenderThread);
@@ -1933,7 +1967,7 @@ void UMediaCapture::InitializeOutputResources(int32 InNumberOfBuffers)
 
 
 					NewFrame->RenderTarget = AllocatePooledTexture(OutputDesc, *FString::Format(TEXT("MediaCapture RenderTarget {0}"), { Index }));
-
+					
 					// Only create CPU readback resource when we are using the CPU callback
 					if (!This->bShouldCaptureRHIResource)
 					{
@@ -1988,7 +2022,7 @@ void UMediaCapture::InitializeCaptureFrame(const TSharedPtr<UE::MediaCaptureData
 	{
 		CaptureFrame->CaptureBaseData.SourceFrameTimecode = FApp::GetTimecode();
 		CaptureFrame->CaptureBaseData.SourceFrameTimecodeFramerate = FApp::GetTimecodeFrameRate();
-		CaptureFrame->CaptureBaseData.SourceFrameNumberRenderThread = GFrameNumber;
+		CaptureFrame->CaptureBaseData.SourceFrameNumberRenderThread = GFrameCounter;
 		CaptureFrame->CaptureBaseData.SourceFrameNumber = ++CaptureRequestCount;
 		CaptureFrame->UserData = GetCaptureFrameUserData_GameThread();
 	}
@@ -2071,8 +2105,9 @@ void UMediaCapture::OnBeginFrame_GameThread()
 		CaptureData.BaseData.SourceFrameTimecodeFramerate = FApp::GetTimecodeFrameRate();
 		CaptureData.BaseData.SourceFrameNumberRenderThread = GFrameCounter;
 		CaptureData.UserData = GetCaptureFrameUserData_GameThread();
-		
-		CaptureDataQueue.Enqueue(MoveTemp(CaptureData));
+
+		FScopeLock Lock(&CaptureDataQueueCriticalSection);
+		CaptureDataQueue.Insert(MoveTemp(CaptureData), 0);
 	}
 }
 
@@ -2080,7 +2115,7 @@ void UMediaCapture::OnEndFrame_GameThread()
 {
 	using namespace UE::MediaCaptureData;
 
-	TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*FString::Printf(TEXT("MediaCapture End Frame %d"), GFrameNumber));
+	TRACE_CPUPROFILER_EVENT_SCOPE_TEXT(*FString::Printf(TEXT("MediaCapture End Frame %d"), GFrameCounter));
 
 	if (!bOutputResourcesInitialized)
 	{
