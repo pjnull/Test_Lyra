@@ -8,6 +8,7 @@
 #include "IRemoteControlModule.h"
 #include "RCVirtualPropertyContainer.h"
 #include "RCVirtualProperty.h"
+#include "RemoteControlDefaultPreprocessors.h"
 #include "RemoteControlReflectionUtils.h"
 #include "RemoteControlRoute.h"
 #include "RemoteControlSettings.h"
@@ -302,7 +303,7 @@ void FWebRemoteControlModule::StartupModule()
 		const TArray<FString>* InPassphrase = Message.Header.Find(WebRemoteControlInternalUtils::PassphraseHeader);
 		const FString Passphrase = InPassphrase ? InPassphrase->Last() : FString("");
 		
-		const bool bCanBeDispatched = CheckPassphrase(Passphrase);
+		const bool bCanBeDispatched = WebRemoteControlInternalUtils::CheckPassphrase(Passphrase);
 
 		if (!bCanBeDispatched)
 		{
@@ -312,7 +313,7 @@ void FWebRemoteControlModule::StartupModule()
 			Wrapper.Passphrase = Passphrase;
 			Wrapper.Verb = "401";
 			
-			WebRemoteControlInternalUtils::CreateUTF8ErrorMessage(FString::Printf(TEXT("Given Passphrase is not correct!")), Wrapper.TCHARBody);
+			WebRemoteControlInternalUtils::CreateUTF8ErrorMessage(WebRemoteControlInternalUtils::InvalidPassphraseError, Wrapper.TCHARBody);
 			WebRemoteControlUtils::SerializeMessage(Wrapper, Response);
 
 			WebSocketServer.Send(Message.ClientId, MoveTemp(Response));
@@ -1702,7 +1703,7 @@ bool FWebRemoteControlModule::HandlePassphraseRoute(const FHttpServerRequest& Re
 		Passphrase = PassphraseHeader->Last();
 	}
 	
-	if (bool bIsCorrect = CheckPassphrase(Passphrase))
+	if (bool bIsCorrect = WebRemoteControlInternalUtils::CheckPassphrase(Passphrase))
 	{
 		WebRemoteControlUtils::SerializeMessage(FCheckPassphraseResponse{ bIsCorrect}, Response->Body);
 		Response->Code = EHttpServerResponseCodes::Ok;
@@ -1985,34 +1986,6 @@ bool FWebRemoteControlModule::HandleEntityMetadataOperationsRoute(const FHttpSer
 
 	OnComplete(MoveTemp(Response));
 	return true;
-}
-
-bool FWebRemoteControlModule::CheckPassphrase(const FString& HashedPassphrase) const
-{
-	bool bOutResult = !(GetMutableDefault<URemoteControlSettings>()->bUseRemoteControlPassphrase);
-
-	if (bOutResult)
-	{
-		return true;
-	}
-
-	TArray<FString> HashedPassphrases = GetMutableDefault<URemoteControlSettings>()->GetHashedPassphrases();
-	if (HashedPassphrases.IsEmpty())
-	{
-		return true;
-	}
-	
-	for (const FString& InPassphrase : HashedPassphrases)
-	{
-		bOutResult = bOutResult || InPassphrase == HashedPassphrase;
-
-		if (bOutResult)
-		{
-			break;
-		}
-	}
-	
-	return bOutResult;
 }
 
 bool FWebRemoteControlModule::HandleEntitySetLabelRoute(const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2339,96 +2312,15 @@ void FWebRemoteControlModule::InvokeWrappedRequest(const FRCRequestWrapper& Wrap
 
 void FWebRemoteControlModule::RegisterDefaultPreprocessors()
 {
-	const FHttpRequestHandler PassphraseRequestHandler = FHttpRequestHandler([this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
-		{
-			TUniquePtr<FHttpServerResponse> Response = WebRemoteControlInternalUtils::CreateHttpResponse();
-
-			TArray<FString> ValueArray = {};
-			if (Request.Headers.Find(WebRemoteControlInternalUtils::PassphraseHeader))
-			{
-				ValueArray = Request.Headers[WebRemoteControlInternalUtils::PassphraseHeader];
-			}
-			
-			const FString Passphrase = !ValueArray.IsEmpty() ? ValueArray.Last() : "";
-
-			if (!CheckPassphrase(Passphrase))
-			{
-				WebRemoteControlInternalUtils::CreateUTF8ErrorMessage(FString::Printf(TEXT("Given Passphrase is not correct!")), Response->Body);
-				Response->Code = EHttpServerResponseCodes::Denied;
-				OnComplete(MoveTemp(Response));
-				return true;
-			}
-
-			return false;
-		});
-
-	const FHttpRequestHandler IPValidationRequestHandler = FHttpRequestHandler([this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+	using namespace UE::WebRemoteControl;
+	auto RegisterInternalPreprocessor = [this](FRCPreprocessorHandler PreprocessorHandler)
 	{
-		const URemoteControlSettings* Settings = GetDefault<URemoteControlSettings>();
-		if (Settings->bRestrictServerAccess)
-		{
-			TUniquePtr<FHttpServerResponse> Response = WebRemoteControlInternalUtils::CreateHttpResponse();
+		AllRegisteredPreprocessorHandlers.Add(HttpRouter->RegisterRequestPreprocessor(MakeHttpRequestHandler(MoveTemp(PreprocessorHandler))));
+	};
 
-			FString OriginHeader;
-			if (const TArray<FString>* OriginHeaders = Request.Headers.Find(WebRemoteControlInternalUtils::OriginHeader))
-			{
-				if (OriginHeaders->Num())
-				{
-					OriginHeader = (*OriginHeaders)[0];
-				}
-			}
-
-			OriginHeader.RemoveSpacesInline();
-			OriginHeader.TrimStartAndEndInline();
-			
-			auto SimplifyAddress = [] (FString Address)
-			{
-				Address.RemoveFromStart(TEXT("https://www."));
-				Address.RemoveFromStart(TEXT("http://www."));
-				Address.RemoveFromStart(TEXT("https://"));
-				Address.RemoveFromStart(TEXT("http://"));
-				Address.RemoveFromEnd(TEXT("/"));
-				return Address;
-			};
-
-			const FString SimplifiedOrigin = SimplifyAddress(OriginHeader);
-			if (Settings->AllowedOrigin != TEXT("*"))
-			{
-				const FWildcardString SimplifiedAllowedOrigin = SimplifyAddress(Settings->AllowedOrigin);
-				if (!SimplifiedAllowedOrigin.IsMatch(SimplifiedOrigin))
-				{
-					WebRemoteControlInternalUtils::CreateUTF8ErrorMessage(FString::Printf(TEXT("Client origin %s does not respect the allowed origin set in Remote Control Settings."), *OriginHeader), Response->Body);
-					Response->Code = EHttpServerResponseCodes::Denied;
-					OnComplete(MoveTemp(Response));
-					return true;
-				}
-			}
-
-			if (Request.PeerAddress)
-			{
-				constexpr bool bAppendPort = false;
-				FString ClientIP = Request.PeerAddress->ToString(bAppendPort);
-
-				// Allow requests from localhost
-				if (ClientIP != TEXT("localhost") && ClientIP != TEXT("127.0.0.1"))
-				{
-					const FWildcardString WildcardAllowedIP = SimplifyAddress(Settings->AllowedIP);
-					if (!WildcardAllowedIP.IsEmpty() && WildcardAllowedIP.IsMatch(ClientIP))
-					{
-						WebRemoteControlInternalUtils::CreateUTF8ErrorMessage(FString::Printf(TEXT("Client IP %s does not respect the allowed IP set in Remote Control Settings."), *ClientIP), Response->Body);
-						Response->Code = EHttpServerResponseCodes::Denied;
-						OnComplete(MoveTemp(Response));
-						return true;
-					}
-				}
-			}
-		}
-
-		return false;
-	});
-
-	AllRegisteredPreprocessorHandlers.Add(HttpRouter->RegisterRequestPreprocessor(PassphraseRequestHandler));
-	AllRegisteredPreprocessorHandlers.Add(HttpRouter->RegisterRequestPreprocessor(IPValidationRequestHandler));
+	RegisterInternalPreprocessor(&RemotePassphraseEnforcementPreprocessor);
+	RegisterInternalPreprocessor(&PassphrasePreprocessor);
+	RegisterInternalPreprocessor(&IPValidationPreprocessor);
 }
 
 void FWebRemoteControlModule::UnregisterAllPreprocessors()
