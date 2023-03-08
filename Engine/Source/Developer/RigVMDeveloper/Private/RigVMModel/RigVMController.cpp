@@ -14139,6 +14139,23 @@ void URigVMController::AddPinsForTemplate(const FRigVMTemplate* InTemplate, cons
 		}
 		Pin->Direction = Arg->GetDirection();
 
+		Pin->bIsDynamicArray = FRigVMRegistry::Get().IsArrayType(TypeIndex);
+		if (Pin->Direction == ERigVMPinDirection::Hidden)
+		{
+			if (InTemplate->GetArgumentMetaData(Arg->Name, FRigVMStruct::ArraySizeMetaName).IsEmpty())
+			{
+				Pin->bIsDynamicArray = true;
+			}
+		}
+
+		if (Pin->bIsDynamicArray)
+		{
+			if (!InTemplate->GetArgumentMetaData(Arg->Name, FRigVMStruct::SingletonMetaName).IsEmpty())
+			{
+				Pin->bIsDynamicArray = false;
+			}
+		}
+
 		AddNodePin(InNode, Pin);
 
 		if(!Pin->IsWildCard() && !Pin->IsArray())
@@ -14219,10 +14236,17 @@ void URigVMController::ConfigurePinFromProperty(FProperty* InProperty, URigVMPin
 	InOutPin->CPPType += ExtendedCppType;
 
 	InOutPin->bIsDynamicArray = false;
+	FProperty* PropertyForType = InProperty;
+	FArrayProperty* ArrayProperty = CastField<FArrayProperty>(PropertyForType);
+	if (ArrayProperty)
+	{
+		PropertyForType = ArrayProperty->Inner;
+		InOutPin->bIsDynamicArray = true;
+	}
 #if WITH_EDITOR
 	if (InOutPin->Direction == ERigVMPinDirection::Hidden)
 	{
-		if (!InProperty->HasMetaData(TEXT("ArraySize")))
+		if (!InProperty->HasMetaData(FRigVMStruct::ArraySizeMetaName))
 		{
 			InOutPin->bIsDynamicArray = true;
 		}
@@ -14236,13 +14260,6 @@ void URigVMController::ConfigurePinFromProperty(FProperty* InProperty, URigVMPin
 		}
 	}
 #endif
-
-	FProperty* PropertyForType = InProperty;
-	FArrayProperty* ArrayProperty = CastField<FArrayProperty>(PropertyForType);
-	if (ArrayProperty)
-	{
-		PropertyForType = ArrayProperty->Inner;
-	}
 
 	if (FStructProperty* StructProperty = CastField<FStructProperty>(PropertyForType))
 	{
