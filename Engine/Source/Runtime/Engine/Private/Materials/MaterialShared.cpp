@@ -2626,7 +2626,6 @@ bool FMaterial::CacheShaders(const FMaterialShaderMapId& ShaderMapId, EShaderPla
 	if (!GameThreadShaderMap)
 	{
 		TRefCountPtr<FMaterialShaderMap> ShaderMap;
-		check(!bFoundCompiling); // sanity check
 		if (CacheShadersPending.IsValid()) // we started a load above, check the result
 		{
 			ShaderMap = CacheShadersPending->Get();
