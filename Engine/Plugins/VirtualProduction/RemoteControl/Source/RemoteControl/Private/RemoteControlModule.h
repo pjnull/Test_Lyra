@@ -121,6 +121,17 @@ private:
 	 */
 	void RegisterMaskingFactories();
 
+	/**
+	 * Whether function can be intercepted by a remote control interceptor.
+	 */
+	bool CanInterceptFunction(const FRCCall& RCCall) const;
+
+	/**
+	 * Used to log once per program execution. Called by the REMOTE_CONTROL_LOG_ONCE macro.
+	 */
+	void LogOnce(ELogVerbosity::Type InVerbosity, const FString& LogDetails, const FString& FileName, int32 LineNumber) const;
+
+
 #if WITH_EDITOR
 	/**
 	 * End the ongoing modification if one exists and is a mismatch for the new object to edit.
