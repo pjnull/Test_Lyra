@@ -713,6 +713,7 @@ public:
 private:
 
 	FOnExternalVariablesChanged ExternalVariablesChangedEvent;
+	bool bUpdatingExternalVariables;
 	void BroadcastExternalVariablesChangedEvent();
 	FCompilerResultsLog CompileLog;
 
