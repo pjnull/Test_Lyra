@@ -504,7 +504,7 @@ TRDGUniformBufferRef<FNaniteUniformParameters> CreateDebugNaniteUniformBuffer(FR
 	UniformParameters->DbgBuffer32					= SystemTextures.Black;
 	UniformParameters->ShadingRate					= SystemTextures.Black;
 	UniformParameters->MaterialResolve				= SystemTextures.Black;
-	UniformParameters->MaterialDepthTable			= GraphBuilder.CreateSRV(GSystemTextures.GetDefaultBuffer(GraphBuilder, 4, 0u), PF_R32_UINT);
+	UniformParameters->MaterialDepthTable			= GraphBuilder.GetPooledBuffer(GSystemTextures.GetDefaultBuffer(GraphBuilder, 4, 0u))->GetSRV(FRHIBufferSRVCreateInfo(PF_R32_UINT));
 	UniformParameters->MultiViewIndices				= GraphBuilder.CreateSRV(GSystemTextures.GetDefaultStructuredBuffer<uint32>(GraphBuilder));
 	UniformParameters->MultiViewRectScaleOffsets	= GraphBuilder.CreateSRV(GSystemTextures.GetDefaultStructuredBuffer<FVector4>(GraphBuilder));
 	UniformParameters->InViews						= GraphBuilder.CreateSRV(GSystemTextures.GetDefaultStructuredBuffer<FPackedNaniteView>(GraphBuilder));
@@ -719,7 +719,7 @@ FNaniteShadingPassParameters CreateNaniteShadingPassParams(
 		}
 		
 		UniformParameters->MaterialResolve = MaterialResolve;
-		UniformParameters->MaterialDepthTable = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(MaterialCommands.GetMaterialDepthDataBuffer()));
+		UniformParameters->MaterialDepthTable = MaterialCommands.GetMaterialDepthSRV();
 
 		UniformParameters->MultiViewEnabled = 0;
 		UniformParameters->MultiViewIndices = GraphBuilder.CreateSRV(MultiViewIndices);
@@ -2173,7 +2173,7 @@ void DrawLumenMeshCapturePass(
 			UniformParameters->DbgBuffer32				= SystemTextures.Black;
 			UniformParameters->ShadingRate				= SystemTextures.Black;
 			UniformParameters->MaterialResolve			= SystemTextures.Black;
-			UniformParameters->MaterialDepthTable		= GraphBuilder.CreateSRV(GSystemTextures.GetDefaultBuffer(GraphBuilder, 4, 0u), PF_R32_UINT);
+			UniformParameters->MaterialDepthTable		= GraphBuilder.GetPooledBuffer(GSystemTextures.GetDefaultBuffer(GraphBuilder, 4, 0u))->GetSRV();
 
 			UniformParameters->MultiViewEnabled          = 1;
 			UniformParameters->MultiViewIndices          = GraphBuilder.CreateSRV(ViewIndexBuffer);
