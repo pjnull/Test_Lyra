@@ -94,11 +94,12 @@ static TAutoConsoleVariable<bool> CVarDiffuseIndirectOffUseDepthBoundsAO(
 	TEXT("Use depth bounds when we apply the AO when DiffuseIndirect is disabled."),
 	ECVF_RenderThreadSafe);
 
-
 DECLARE_GPU_STAT_NAMED(ReflectionEnvironment, TEXT("Reflection Environment"));
 DECLARE_GPU_STAT_NAMED(RayTracingReflections, TEXT("Ray Tracing Reflections"));
 DECLARE_GPU_STAT(SkyLightDiffuse);
 
+float GetLumenReflectionSpecularScale();
+float GetLumenReflectionContrast();
 int GetReflectionEnvironmentCVar();
 bool IsAmbientCubemapPassRequired(const FSceneView& View);
 
@@ -158,6 +159,8 @@ class FDiffuseIndirectCompositePS : public FGlobalShader
 		SHADER_PARAMETER(uint32, bLumenReflectionInputIsSSR)
 		SHADER_PARAMETER(float, LumenFoliageOcclusionStrength)
 		SHADER_PARAMETER(float, LumenMaxAOMultibounceAlbedo)
+		SHADER_PARAMETER(float, LumenReflectionSpecularScale)
+		SHADER_PARAMETER(float, LumenReflectionContrast)
 
 		SHADER_PARAMETER_STRUCT(FSSDSignalTextures, DiffuseIndirect)
 		SHADER_PARAMETER_SAMPLER(SamplerState, DiffuseIndirectSampler)
@@ -1216,6 +1219,8 @@ void FDeferredShadingSceneRenderer::RenderDiffuseIndirectAndAmbientOcclusion(
 			PassParameters->LumenFoliageOcclusionStrength = GLumenShortRangeAOFoliageOcclusionStrength;
 			extern float GLumenMaxShortRangeAOMultibounceAlbedo;
 			PassParameters->LumenMaxAOMultibounceAlbedo = GLumenMaxShortRangeAOMultibounceAlbedo;
+			PassParameters->LumenReflectionSpecularScale = GetLumenReflectionSpecularScale();
+			PassParameters->LumenReflectionContrast = GetLumenReflectionContrast();
 
 			PassParameters->bVisualizeDiffuseIndirect = bIsVisualizePass;
 
