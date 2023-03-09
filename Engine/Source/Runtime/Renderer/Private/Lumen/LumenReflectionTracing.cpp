@@ -11,7 +11,6 @@
 #include "LumenReflections.h"
 #include "HairStrands/HairStrandsData.h"
 #include "LumenTracingUtils.h"
-#include "FogRendering.h"
 
 int32 GLumenReflectionScreenTraces = 1;
 FAutoConsoleVariableRef CVarLumenReflectionScreenTraces(
@@ -108,22 +107,10 @@ static TAutoConsoleVariable<float> CVarLumenReflectionsSampleSceneColorNormalTre
 	ECVF_Scalability | ECVF_RenderThreadSafe
 );
 
-static TAutoConsoleVariable<int32> CVarLumenReflectionsSampleFog(
-	TEXT("r.Lumen.Reflections.SampleFog"),
-	1,
-	TEXT("Sample the fog contribution in Lumen reflections."),
-	ECVF_Scalability | ECVF_RenderThreadSafe
-);
-
 float LumenReflections::GetSampleSceneColorNormalTreshold()
 {
 	const float Radians = FMath::DegreesToRadians(FMath::Clamp(CVarLumenReflectionsSampleSceneColorNormalTreshold.GetValueOnRenderThread(), 0.0f, 180.0f));
 	return FMath::Cos(Radians);
-}
-
-bool LumenReflections::SampleHeightFog()
-{
-	return CVarLumenReflectionsSampleFog.GetValueOnRenderThread() > 0;
 }
 
 class FReflectionClearTracesCS : public FGlobalShader
@@ -339,7 +326,6 @@ class FReflectionTraceMeshSDFsCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneTextureUniformParameters, SceneTexturesStruct)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FVirtualVoxelParameters, HairStrandsVoxel)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FStrataGlobalUniformParameters, Strata)
-		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FFogUniformParameters, FogUniformParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FCompactedReflectionTraceParameters, CompactedTraceParameters)
 	END_SHADER_PARAMETER_STRUCT()
 		
@@ -399,7 +385,6 @@ class FReflectionTraceVoxelsCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneTextureUniformParameters, SceneTexturesStruct)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FVirtualVoxelParameters, HairStrandsVoxel)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FStrataGlobalUniformParameters, Strata)
-		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FFogUniformParameters, FogUniformParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FCompactedReflectionTraceParameters, CompactedTraceParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(LumenRadianceCache::FRadianceCacheInterpolationParameters, RadianceCacheParameters)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FLumenHZBScreenTraceParameters, HZBScreenTraceParameters)
@@ -816,7 +801,6 @@ void TraceReflections(
 						PassParameters->HairStrandsVoxel = HairStrands::BindHairStrandsVoxelUniformParameters(View);
 					}
 					PassParameters->Strata = Strata::BindStrataGlobalUniformParameters(View);
-					PassParameters->FogUniformParameters = CreateFogUniformBuffer(GraphBuilder, View);
 
 					FReflectionTraceMeshSDFsCS::FPermutationDomain PermutationVector;
 					PermutationVector.Set< FReflectionTraceMeshSDFsCS::FThreadGroupSize32 >(Lumen::UseThreadGroupSize32());
@@ -861,7 +845,6 @@ void TraceReflections(
 			PassParameters->CompactedTraceParameters = CompactedTraceParameters;
 			PassParameters->RadianceCacheParameters = RadianceCacheParameters;
 			PassParameters->Strata = Strata::BindStrataGlobalUniformParameters(View);
-			PassParameters->FogUniformParameters = CreateFogUniformBuffer(GraphBuilder, View);
 			if (bNeedTraceHairVoxel)
 			{
 				PassParameters->HairStrandsVoxel = HairStrands::BindHairStrandsVoxelUniformParameters(View);
