@@ -1176,11 +1176,6 @@ public:
 		return CachedSRV;
 	}
 
-	FORCEINLINE FRHIShaderResourceView* GetSRV(const FRHIBufferSRVCreateInfo& SRVDesc)
-	{
-		return GetOrCreateSRV(SRVDesc);
-	}
-
 	FORCEINLINE uint32 GetSize() const
 	{
 		return Desc.GetSize();
