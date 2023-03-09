@@ -180,13 +180,30 @@ struct FNiagaraSystemCompileRequest
 	UPROPERTY()
 	TArray<TObjectPtr<UObject>> RootObjects;
 
-	TArray<TSharedPtr<FNiagaraAsyncCompileTask, ESPMode::ThreadSafe>> DDCTasks;
-	
+	using FAsyncTaskPtr = TSharedPtr<FNiagaraAsyncCompileTask, ESPMode::ThreadSafe>;
+
+#if WITH_EDITORONLY_DATA
+	void Abort();
+	FAsyncTaskPtr* FindTask(const UNiagaraScript* Script);
+	bool QueryCompileComplete(UNiagaraSystem* OwningSystem, bool bWait, const double& MaxDuration);
+	bool Resolve(UNiagaraSystem* OwningSystem, FNiagaraParameterStore& ExposedParameters);
+	void Reset();
+	void UpdateSpawnDataInterfaces();
+	void Launch(UNiagaraSystem* OwningSystem, TConstArrayView<UNiagaraScript*> ScriptsNeedingCompile, TConstArrayView<FAsyncTaskPtr> Tasks);
+
 	bool bIsValid = true;
 	bool bForced = false;
 	bool bAllScriptsSynchronized = false;
+	bool bEvaluateParametersPending = false;
 
 	float CombinedCompileTime = 0.0f;
+
+private:
+	TArray<FAsyncTaskPtr> DDCTasks;
+
+	bool bDDCGetCompleted = false;
+
+#endif
 };
 
 struct FNiagaraEmitterExecutionIndex
@@ -258,6 +275,7 @@ public:
 	virtual void PreEditChange(FProperty* PropertyThatWillChange)override;
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override; 
 	virtual void BeginCacheForCookedPlatformData(const ITargetPlatform *TargetPlatform) override;
+	virtual bool IsCachedCookedPlatformDataLoaded(const ITargetPlatform* TargetPlatform) override;
 	//~ End UObject interface
 
 	/** Helper method to handle when an internal variable has been renamed. Renames any downstream dependencies in the emitters or exposed variables.*/
@@ -771,6 +789,9 @@ public:
 
 	/** Updates any post compile data based upon data interfaces. */
 	void OnCompiledDataInterfaceChanged();
+
+	/** Updates the rapid iteration parameters for all scripts referenced by the system. */
+	void PrepareRapidIterationParametersForCompilation();
 #endif
 
 private:
@@ -802,7 +823,6 @@ private:
 
 	/** Helper for filling in attribute datasets per emitter. */
 	void InitEmitterDataSetCompiledData(FNiagaraDataSetCompiledData& DataSetToInit, const FNiagaraEmitterHandle& InAssociatedEmitterHandle);
-	void PrepareRapidIterationParametersForCompilation();
 #endif
 
 	void ResolveScalabilitySettings();

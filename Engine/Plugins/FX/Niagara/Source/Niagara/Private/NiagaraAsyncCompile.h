@@ -60,6 +60,7 @@ class FNiagaraAsyncCompileTask
 #if WITH_EDITORONLY_DATA
 public:
 	FString DDCKey;
+	TOptional<FString> AlternateDDCKey;
 	FString AssetPath;
 	FString UniqueEmitterName;
 	uint32 TaskHandle = 0;
@@ -71,9 +72,15 @@ public:
 	bool bUsedShaderCompilerWorker = false;
 	bool bFetchedGCObjects = false;
 	bool bExperimentalVMDisabled = true;
+
+	// in order to coordinate between tasks associated with a system CheckDDC can be handled external to the task.
+	// In that case we disable this flag
+	bool bCheckDDCEnabled = true;
+
 	UNiagaraSystem* OwningSystem;
 	FEmitterCompiledScriptPair ScriptPair;
 	TArray<FNiagaraVariable> EncounteredExposedVars;
+	TArray<FNiagaraVariable> BakedRapidIterationParameters;
 
 	ENiagaraCompilationState CurrentState;
 
@@ -103,5 +110,8 @@ public:
 	void ProcessResult();
 	void OptimizeByteCode();
 
+	void AssignInitialCompilationId(const FNiagaraVMExecutableDataId& InitialCompilationId);
+	void UpdateCompilationId(const FNiagaraVMExecutableDataId& UpdatedCompilationId);
+	bool CompilationIdMatchesRequest() const;
 #endif
 };
