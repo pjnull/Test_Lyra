@@ -64,6 +64,7 @@ static FAutoConsoleVariableRef CVarHairCardsVoxelDebug(TEXT("r.HairStrands.Cards
 
 FCachedGeometry GetCacheGeometryForHair(
 	FRDGBuilder& GraphBuilder,
+	FSceneInterface* Scene,
 	FHairGroupInstance* Instance,
 	FGlobalShaderMap* ShaderMap,
 	const bool bOutputTriangleData);
@@ -71,6 +72,7 @@ FCachedGeometry GetCacheGeometryForHair(
 static void GetGroomInterpolationData(
 	FRDGBuilder& GraphBuilder,
 	FGlobalShaderMap* ShaderMap,
+	FSceneInterface* Scene,
 	const FHairStrandsInstances& Instances,
 	const EHairStrandsProjectionMeshType MeshType,
 	FHairStrandsProjectionMeshData::LOD& OutGeometries)
@@ -82,7 +84,7 @@ static void GetGroomInterpolationData(
 		if (!Instance || !Instance->Debug.MeshComponent)
 			continue;
 
-		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Instance, ShaderMap, true);
+		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Scene, Instance, ShaderMap, true);
 		if (CachedGeometry.Sections.Num() == 0)
 			continue;
 
@@ -1039,6 +1041,7 @@ static void AddHairDebugPrintInstancePass(
 void RunHairStrandsDebug(
 	FRDGBuilder& GraphBuilder,
 	FGlobalShaderMap* ShaderMap,
+	FSceneInterface* Scene,
 	const FSceneView& View,
 	const FHairStrandsInstances& Instances,
 	const FUintVector4& InstanceCountPerType,
@@ -1060,10 +1063,10 @@ void RunHairStrandsDebug(
 		{
 			if (GHairDebugMeshProjection_SkinCacheMesh > 0)
 			{
-				auto RenderMeshProjection = [ShaderMap, ShaderPrintData, Viewport, &ViewUniformBuffer, Instances, &GraphBuilder](FRDGBuilder& LocalGraphBuilder, EHairStrandsProjectionMeshType MeshType)
+				auto RenderMeshProjection = [ShaderMap, Scene, ShaderPrintData, Viewport, &ViewUniformBuffer, Instances, &GraphBuilder](FRDGBuilder& LocalGraphBuilder, EHairStrandsProjectionMeshType MeshType)
 				{
 					FHairStrandsProjectionMeshData::LOD MeshProjectionLODData;
-					GetGroomInterpolationData(GraphBuilder, ShaderMap, Instances, MeshType, MeshProjectionLODData);
+					GetGroomInterpolationData(GraphBuilder, ShaderMap, Scene, Instances, MeshType, MeshProjectionLODData);
 					for (FHairStrandsProjectionMeshData::Section& Section : MeshProjectionLODData.Sections)
 					{
 						AddDebugProjectionMeshPass(LocalGraphBuilder, ShaderMap, ShaderPrintData, Viewport, ViewUniformBuffer, MeshType, Section);

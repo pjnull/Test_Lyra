@@ -21,6 +21,8 @@
 #include "RenderGraphEvent.h"
 #include "RenderGraphUtils.h"
 #include "CachedGeometry.h"
+#include "SceneInterface.h"
+#include "PrimitiveSceneInfo.h"
 
 static int32 GHairStrandsMinLOD = 0;
 static FAutoConsoleVariableRef CVarGHairStrandsMinLOD(TEXT("r.HairStrands.MinLOD"), GHairStrandsMinLOD, TEXT("Clamp the min hair LOD to this value, preventing to reach lower/high-quality LOD."), ECVF_Scalability);
@@ -36,6 +38,9 @@ static FAutoConsoleVariableRef CVarGHairStrands_ManualSkinCache(TEXT("r.HairStra
 
 static int32 GHairStrands_InterpolationFrustumCullingEnable = 1;
 static FAutoConsoleVariableRef CVarHairStrands_InterpolationFrustumCullingEnable(TEXT("r.HairStrands.Interoplation.FrustumCulling"), GHairStrands_InterpolationFrustumCullingEnable, TEXT("Swap rendering buffer at the end of frame. This is an experimental toggle. Default:1"));
+
+static int32 GHairStrands_UseSkelMeshPersistentPrimitiveIndex = 1;
+static FAutoConsoleVariableRef CVarHairStrands_UseSkelMeshPersistentPrimitiveIndex(TEXT("r.HairStrands.UseSkelMeshPersistentPrimitiveIndex"), GHairStrands_UseSkelMeshPersistentPrimitiveIndex, TEXT("Use persistent primitive index for skel. mesh lookup (experimental)."), ECVF_RenderThreadSafe);
 
 EHairBufferSwapType GetHairSwapBufferType()
 {
@@ -78,9 +83,37 @@ static bool IsSkeletalMeshEvaluationEnabled()
 	return CVarSkelMeshGDME ? CVarSkelMeshGDME->GetValueOnAnyThread() == 0 : true;
 }
 
+// Retrive the skel. mesh scene info
+static FPrimitiveSceneInfo* GetMeshSceneInfo(FSceneInterface* Scene, FHairGroupInstance* Instance)
+{
+	if (!Instance->Debug.MeshComponentId.IsValid())
+	{
+		return nullptr;
+	}
+
+	// Try to use the cached persistent primitive index (fast)
+	FPrimitiveSceneInfo* PrimitiveSceneInfo = nullptr;
+	if (Instance->Debug.CachedMeshPersistentPrimitiveIndex.IsValid())
+	{
+		PrimitiveSceneInfo = Scene->GetPrimitiveSceneInfo(Instance->Debug.CachedMeshPersistentPrimitiveIndex);
+		PrimitiveSceneInfo = (PrimitiveSceneInfo && PrimitiveSceneInfo->PrimitiveComponentId == Instance->Debug.MeshComponentId) ? PrimitiveSceneInfo : nullptr;
+	}
+
+	// If this fails, find the primitive index, and then the primitive scene info (slow)
+	if (PrimitiveSceneInfo == nullptr)
+	{
+		const int32 PrimitiveIndex = Scene->GetScenePrimitiveComponentIds().Find(Instance->Debug.MeshComponentId);
+		PrimitiveSceneInfo = Scene->GetPrimitiveSceneInfo(PrimitiveIndex);
+		Instance->Debug.CachedMeshPersistentPrimitiveIndex = PrimitiveSceneInfo ? PrimitiveSceneInfo->GetPersistentIndex() : FPersistentPrimitiveIndex();
+	}
+
+	return PrimitiveSceneInfo;
+}
+
 // Returns the cached geometry of the underlying geometry on which a hair instance is attached to
 FCachedGeometry GetCacheGeometryForHair(
 	FRDGBuilder& GraphBuilder, 
+	FSceneInterface* Scene,
 	FHairGroupInstance* Instance, 
 	FGlobalShaderMap* ShaderMap,
 	const bool bOutputTriangleData)
@@ -90,19 +123,33 @@ FCachedGeometry GetCacheGeometryForHair(
 	{
 		if (IsSkeletalMeshEvaluationEnabled())
 		{
-			//todo: It's unsafe to be accessing the component directly here. This can be solved when we have persistent ids available on the render thread.
-			if (const USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(Instance->Debug.MeshComponent))
+			if (GHairStrands_UseSkelMeshPersistentPrimitiveIndex)
 			{
-				if (FSkeletalMeshSceneProxy* SceneProxy = static_cast<FSkeletalMeshSceneProxy*>(SkeletalMeshComponent->SceneProxy))
+				if (const FPrimitiveSceneInfo* PrimitiveSceneInfo = GetMeshSceneInfo(Scene, Instance))
 				{
-					SceneProxy->GetCachedGeometry(Out);
+					if (const FSkeletalMeshSceneProxy* SceneProxy = static_cast<const FSkeletalMeshSceneProxy*>(PrimitiveSceneInfo->Proxy))
+					{
+					
+						SceneProxy->GetCachedGeometry(Out);
+					}
 				}
-
-				if (GHairStrands_ManualSkinCache > 0 && Out.Sections.Num() == 0)
+			}
+			else
+			{
+				//todo: It's unsafe to be accessing the component directly here. This can be solved when we have persistent ids available on the render thread.
+				if (const USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(Instance->Debug.MeshComponent))
 				{
-					//#hair_todo: Need to have a (frame) cache to insure that we don't recompute the same projection several time
-					// Actual populate the cache with only the needed part based on the groom projection data. At the moment it recompute everything ...
-					BuildCacheGeometry(GraphBuilder, ShaderMap, SkeletalMeshComponent, bOutputTriangleData, Out);
+					if (FSkeletalMeshSceneProxy* SceneProxy = static_cast<FSkeletalMeshSceneProxy*>(SkeletalMeshComponent->SceneProxy))
+					{
+						SceneProxy->GetCachedGeometry(Out);
+					}
+
+					if (GHairStrands_ManualSkinCache > 0 && Out.Sections.Num() == 0)
+					{
+						//#hair_todo: Need to have a (frame) cache to insure that we don't recompute the same projection several time
+						// Actual populate the cache with only the needed part based on the groom projection data. At the moment it recompute everything ...
+						BuildCacheGeometry(GraphBuilder, ShaderMap, SkeletalMeshComponent, bOutputTriangleData, Out);
+					}
 				}
 			}
 		}
@@ -134,6 +181,7 @@ static int32 GetCacheGeometryLODIndex(const FCachedGeometry& In)
 
 static void RunInternalHairStrandsInterpolation(
 	FRDGBuilder& GraphBuilder,
+	FSceneInterface* Scene,
 	const FSceneView* View,
 	const uint32 ViewUniqueID,
 	const FHairStrandsInstances& Instances,
@@ -164,7 +212,7 @@ static void RunInternalHairStrandsInterpolation(
 		check(Instance->HairGroupPublicData);
 
 		FHairStrandsProjectionMeshData::LOD MeshDataLOD;
-		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Instance, ShaderMap, true);
+		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Scene, Instance, ShaderMap, true);
 		for (int32 SectionIndex = 0; SectionIndex < CachedGeometry.Sections.Num(); ++SectionIndex)
 		{
 			// Ensure all mesh's sections have the same LOD index
@@ -395,6 +443,7 @@ static void RunInternalHairStrandsInterpolation(
 
 static void RunHairStrandsInterpolation_Guide(
 	FRDGBuilder& GraphBuilder,
+	FSceneInterface* Scene,
 	const FSceneView* View,
 	const uint32 ViewUniqueID,
 	const FHairStrandsInstances& Instances,
@@ -410,6 +459,7 @@ static void RunHairStrandsInterpolation_Guide(
 
 	RunInternalHairStrandsInterpolation(
 		GraphBuilder,
+		Scene,
 		View,
 		ViewUniqueID,
 		Instances,
@@ -421,6 +471,7 @@ static void RunHairStrandsInterpolation_Guide(
 
 static void RunHairStrandsInterpolation_Strands(
 	FRDGBuilder& GraphBuilder,
+	FSceneInterface* Scene,
 	const FSceneView* View,
 	const uint32 ViewUniqueID,
 	const FHairStrandsInstances& Instances,
@@ -436,6 +487,7 @@ static void RunHairStrandsInterpolation_Strands(
 
 	RunInternalHairStrandsInterpolation(
 		GraphBuilder,
+		Scene,
 		View,
 		ViewUniqueID,
 		Instances,
@@ -690,6 +742,7 @@ void AddHairStreamingRequest(FHairGroupInstance* Instance, int32 InLODIndex)
 
 static void RunHairLODSelection(
 	FRDGBuilder& GraphBuilder, 
+	FSceneInterface* Scene,
 	const FHairStrandsInstances& Instances, 
 	const TArray<const FSceneView*>& Views, 
 	FGlobalShaderMap* ShaderMap)
@@ -719,7 +772,7 @@ static void RunHairLODSelection(
 
 		check(Instance);
 		check(Instance->HairGroupPublicData);
-		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Instance, ShaderMap, false);
+		const FCachedGeometry CachedGeometry = GetCacheGeometryForHair(GraphBuilder, Scene, Instance, ShaderMap, false);
 		const int32 MeshLODIndex = GetCacheGeometryLODIndex(CachedGeometry);
 
 		// Perform LOD selection based on all the views	
@@ -1035,6 +1088,7 @@ static void RunHairStrandsProcess(FRDGBuilder& GraphBuilder, FGlobalShaderMap* S
 void RunHairStrandsDebug(
 	FRDGBuilder& GraphBuilder,
 	FGlobalShaderMap* ShaderMap,
+	FSceneInterface* Scene,
 	const FSceneView& View,
 	const FHairStrandsInstances& Instances,
 	const FUintVector4& InstanceCountPerType,
@@ -1088,6 +1142,7 @@ void ProcessHairStrandsBookmark(
 		check(GraphBuilder);
 		RunHairLODSelection(
 			*GraphBuilder,
+			Parameters.Scene,
 			*Parameters.Instances,
 			Parameters.AllViews,
 			Parameters.ShaderMap);
@@ -1106,6 +1161,7 @@ void ProcessHairStrandsBookmark(
 		check(GraphBuilder);
 		RunHairStrandsInterpolation_Guide(
 			*GraphBuilder,
+			Parameters.Scene,
 			Parameters.View,
 			Parameters.ViewUniqueID,
 			Instances,
@@ -1124,6 +1180,7 @@ void ProcessHairStrandsBookmark(
 		check(GraphBuilder);
 		RunHairStrandsInterpolation_Strands(
 			*GraphBuilder,
+			Parameters.Scene,
 			Parameters.View,
 			Parameters.ViewUniqueID,
 			Instances,
@@ -1137,6 +1194,7 @@ void ProcessHairStrandsBookmark(
 		RunHairStrandsDebug(
 			*GraphBuilder,
 			Parameters.ShaderMap,
+			Parameters.Scene,
 			*Parameters.View,
 			Instances,
 			Parameters.InstanceCountPerType,
