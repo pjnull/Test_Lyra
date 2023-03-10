@@ -588,6 +588,10 @@ void RenderLightingCacheWithPreshadingHardwareRayTracing(
 	FRDGTextureRef& LightingCacheTexture
 )
 {
+	// Note must be done in the same scope as we add the pass otherwise the UB lifetime will not be guaranteed
+	FDeferredLightUniformStruct DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
+	TUniformBufferRef<FDeferredLightUniformStruct> DeferredLightUB = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+
 	FRenderLightingCacheWithPreshadingRGS::FParameters* PassParameters = GraphBuilder.AllocParameters<FRenderLightingCacheWithPreshadingRGS::FParameters>();
 	{
 		// Scene
@@ -600,8 +604,7 @@ void RenderLightingCacheWithPreshadingHardwareRayTracing(
 		PassParameters->bApplyEmissionAndTransmittance = bApplyEmissionAndTransmittance;
 		PassParameters->bApplyDirectLighting = bApplyDirectLighting;
 		PassParameters->bApplyShadowTransmittance = bApplyShadowTransmittance;
-		FDeferredLightUniformStruct DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
-		PassParameters->DeferredLight = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+		PassParameters->DeferredLight = DeferredLightUB;
 		PassParameters->LightType = LightType;
 		PassParameters->VolumetricScatteringIntensity = LightSceneInfo->Proxy->GetVolumetricScatteringIntensity();
 
@@ -728,6 +731,14 @@ void RenderSingleScatteringWithPreshadingHardwareRayTracing(
 	FRDGTextureRef& HeterogeneousVolumeTexture
 )
 {
+	// Note must be done in the same scope as we add the pass otherwise the UB lifetime will not be guaranteed
+	FDeferredLightUniformStruct DeferredLightUniform;
+	if (bApplyDirectLighting && (LightSceneInfo != nullptr))
+	{
+		DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
+	}
+	TUniformBufferRef<FDeferredLightUniformStruct> DeferredLightUB = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+
 	FRenderSingleScatteringWithPreshadingRGS::FParameters* PassParameters = GraphBuilder.AllocParameters<FRenderSingleScatteringWithPreshadingRGS::FParameters>();
 	{
 		// Scene
@@ -736,15 +747,13 @@ void RenderSingleScatteringWithPreshadingHardwareRayTracing(
 		PassParameters->SceneTextures = GetSceneTextureParameters(GraphBuilder, SceneTextures);
 
 		// Light data
-		FDeferredLightUniformStruct DeferredLightUniform;
 		PassParameters->bApplyEmissionAndTransmittance = bApplyEmissionAndTransmittance;
 		PassParameters->bApplyDirectLighting = bApplyDirectLighting;
 		if (PassParameters->bApplyDirectLighting && (LightSceneInfo != nullptr))
 		{
-			DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
 			PassParameters->VolumetricScatteringIntensity = LightSceneInfo->Proxy->GetVolumetricScatteringIntensity();
 		}
-		PassParameters->DeferredLight = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+		PassParameters->DeferredLight = DeferredLightUB;
 		PassParameters->LightType = LightType;
 
 		// Shadow data

@@ -406,6 +406,10 @@ void RenderLightingCacheWithPreshadingCompute(
 	FRDGTextureRef& LightingCacheTexture
 )
 {
+	// Note must be done in the same scope as we add the pass otherwise the UB lifetime will not be guaranteed
+	FDeferredLightUniformStruct DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
+	TUniformBufferRef<FDeferredLightUniformStruct> DeferredLightUB = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+
 	FRenderLightingCacheWithPreshadingCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FRenderLightingCacheWithPreshadingCS::FParameters>();
 	{
 		// Scene data
@@ -417,8 +421,7 @@ void RenderLightingCacheWithPreshadingCompute(
 		PassParameters->bApplyEmissionAndTransmittance = bApplyEmissionAndTransmittance;
 		PassParameters->bApplyDirectLighting = bApplyDirectLighting;
 		PassParameters->bApplyShadowTransmittance = bApplyShadowTransmittance;
-		FDeferredLightUniformStruct DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
-		PassParameters->DeferredLight = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+		PassParameters->DeferredLight = DeferredLightUB;
 		PassParameters->LightType = LightType;
 		PassParameters->VolumetricScatteringIntensity = LightSceneInfo->Proxy->GetVolumetricScatteringIntensity();
 
@@ -527,6 +530,14 @@ void RenderSingleScatteringWithPreshadingCompute(
 		TEXT("HeterogeneousVolumes.VoxelOutputBuffer")
 	);
 
+	// Note must be done in the same scope as we add the pass otherwise the UB lifetime will not be guaranteed
+	FDeferredLightUniformStruct DeferredLightUniform;
+	if (bApplyDirectLighting && (LightSceneInfo != nullptr))
+	{
+		DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
+	}
+	TUniformBufferRef<FDeferredLightUniformStruct> DeferredLightUB = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+
 	FRenderSingleScatteringWithPreshadingCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FRenderSingleScatteringWithPreshadingCS::FParameters>();
 	{
 		// Scene data
@@ -534,15 +545,13 @@ void RenderSingleScatteringWithPreshadingCompute(
 		PassParameters->SceneTextures = GetSceneTextureParameters(GraphBuilder, SceneTextures);
 
 		// Light data
-		FDeferredLightUniformStruct DeferredLightUniform;
 		PassParameters->bApplyEmissionAndTransmittance = bApplyEmissionAndTransmittance;
 		PassParameters->bApplyDirectLighting = bApplyDirectLighting;
 		if (PassParameters->bApplyDirectLighting && (LightSceneInfo != nullptr))
 		{
-			DeferredLightUniform = GetDeferredLightParameters(View, *LightSceneInfo);
 			PassParameters->VolumetricScatteringIntensity = LightSceneInfo->Proxy->GetVolumetricScatteringIntensity();
 		}
-		PassParameters->DeferredLight = CreateUniformBufferImmediate(DeferredLightUniform, UniformBuffer_SingleDraw);
+		PassParameters->DeferredLight = DeferredLightUB;
 		PassParameters->LightType = LightType;
 
 		// Shadow data
