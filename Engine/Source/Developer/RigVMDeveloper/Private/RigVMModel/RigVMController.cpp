@@ -18039,6 +18039,12 @@ bool URigVMController::RecomputeAllTemplateFilteredPermutations(bool bSetupUndoR
 		// Apply all links to update filtered permutations
 		TArray<URigVMLink*> SortedLinks = Graph->GetLinks().FilterByPredicate([this](URigVMLink* Link)
 		{
+			// filter out invalid links
+			if(Link->GetSourcePin() == nullptr || Link->GetTargetPin() == nullptr)
+			{
+				return false;
+			}
+			
 			// Filter out detached links
 			if(!Link->GetSourcePin()->IsLinkedTo(Link->GetTargetPin()))
 			{
