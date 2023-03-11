@@ -20,6 +20,7 @@ struct FSingleLayerWaterPrePassResult;
 class FNaniteVisibilityResults;
 class FSceneRenderer;
 struct FShaderCompilerEnvironment;
+struct FFrontLayerTranslucencyData;
 
 namespace Nanite
 {
@@ -270,7 +271,8 @@ public:
 		const FSortedLightSetSceneInfo& SortedLights, 
 		const TArray<FVisibleLightInfo, SceneRenderingAllocator> &VisibleLightInfos, 
 		const TArray<Nanite::FRasterResults, TInlineAllocator<2>> &NaniteRasterResults,
-		const FSingleLayerWaterPrePassResult* SingleLayerWaterPrePassResult);
+		const FSingleLayerWaterPrePassResult* SingleLayerWaterPrePassResult,
+		const FFrontLayerTranslucencyData& FrontLayerTranslucencyData);
 
 	bool IsAllocated() const
 	{
