@@ -1571,12 +1571,15 @@ void FViewport::HighResScreenshot()
 	// End the frame that was started before HighResScreenshot() was called. Pass nullptr for the viewport because there's no need to
 	// call EndRenderFrame on the real viewport, as BeginRenderFrame hasn't been called yet.
 	HighResScreenshotEndFrame(nullptr);
-
+	GIsHighResScreenshot = false;
 	// Perform run-up.
 	while (FrameDelay)
 	{
 		HighResScreenshotBeginFrame(DummyViewport);
-
+		if (FrameDelay == 1)
+		{
+			GIsHighResScreenshot = true;
+		}
 		FCanvas Canvas(DummyViewport, NULL, ViewportClient->GetWorld(), ViewportClient->GetWorld()->FeatureLevel);
 		{
 			ViewportClient->Draw(DummyViewport, &Canvas);
