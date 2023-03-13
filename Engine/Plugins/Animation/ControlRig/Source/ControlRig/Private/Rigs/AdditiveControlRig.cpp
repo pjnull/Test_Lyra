@@ -61,9 +61,12 @@ bool UAdditiveControlRig::Execute_Internal(const FName& InEventName)
 	}
 	else if(InEventName == FRigUnit_PrepareForExecution::EventName)
 	{
-		if (USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(GetObjectBinding()->GetBoundObject()))
+		if(const TSharedPtr<IControlRigObjectBinding> Binding = GetObjectBinding())
 		{
-			CreateRigElements(SkeletalMeshComponent->GetSkeletalMeshAsset());
+			if (const USkeletalMeshComponent* SkeletalMeshComponent = Cast<USkeletalMeshComponent>(Binding->GetBoundObject()))
+			{
+				CreateRigElements(SkeletalMeshComponent->GetSkeletalMeshAsset());
+			}
 		}
 
 		// add units and initialize
