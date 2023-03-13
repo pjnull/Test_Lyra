@@ -4860,8 +4860,11 @@ void AInstancedFoliageActor::PostLoad()
 					}
 				}
 			}
-				
+
+#if !WITH_EDITOR
+			// If we are running in -game we still need foliage info for any remote transactional events.
 			Pair.Value = FFoliageInfo();
+#endif
 		}
 
 		if (bHasISMFoliage)
