@@ -1220,6 +1220,13 @@ FRigVMExprAST* FRigVMParserAST::TraverseLink(int32 InLinkIndex, FRigVMExprAST* I
 			bRequiresCopy = true;
 		}
 	}
+	if (!bRequiresCopy)
+	{
+		if (SourcePin->GetTypeIndex() != TargetPin->GetTypeIndex())
+		{
+			bRequiresCopy = true;
+		}
+	}
 
 	FRigVMAssignExprAST* AssignExpr = nullptr;
 	if (bRequiresCopy)
