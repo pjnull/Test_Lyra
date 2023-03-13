@@ -415,6 +415,7 @@ private:
 	bool					bSpaceAccellerationSupported;
 	bool					bProjectionLayerAlphaEnabled;
 	bool					bIsStandaloneStereoOnlyDevice;
+	bool					bIsTrackingOnlySession;
 	float					WorldToMetersScale = 100.0f;
 	float					RuntimePixelDensityMax = FHeadMountedDisplayBase::PixelDensityMax;
 
