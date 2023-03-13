@@ -352,6 +352,8 @@ namespace Nanite
 	extern bool IsStatFilterActive(const FString& FilterName);
 }
 
+bool IsVSMTranslucentHighQualityEnabled();
+
 FMatrix CalcTranslatedWorldToShadowUVMatrix(
 	const FMatrix& TranslatedWorldToShadowView,
 	const FMatrix& ViewToClip)
@@ -1508,6 +1510,8 @@ void FVirtualShadowMapArray::BuildPageAllocations(
 					const FIntPoint PixelStride(
 						FMath::Clamp(CVarVirtualShadowMapPageMarkingPixelStrideX.GetValueOnRenderThread(), 1, 128),
 						FMath::Clamp(CVarVirtualShadowMapPageMarkingPixelStrideY.GetValueOnRenderThread(), 1, 128));
+					
+					const bool bFrontLayerEnabled = IsVSMTranslucentHighQualityEnabled() && FrontLayerTranslucencyData.IsValid();
 
 					PassParameters->HairStrands = HairStrands::BindHairStrandsViewUniformParameters(View);
 					PassParameters->View = View.ViewUniformBuffer;
@@ -1524,7 +1528,7 @@ void FVirtualShadowMapArray::BuildPageAllocations(
 							GSystemTextures.GetDefaultStructuredBuffer(GraphBuilder, sizeof(uint32), 0xFFFFFFFF));
 						PassParameters->SingleLayerWaterTileViewRes = SingleLayerWaterPrePassResult->ViewTileClassification[ViewIndex].TiledViewRes;
 					}
-					if (FrontLayerTranslucencyData.IsValid())
+					if (bFrontLayerEnabled)
 					{
 						PassParameters->FrontLayerTranslucencyDepthTexture = FrontLayerTranslucencyData.SceneDepth;
 					}
@@ -1560,7 +1564,7 @@ void FVirtualShadowMapArray::BuildPageAllocations(
 						FGeneratePageFlagsFromPixelsCS::FPermutationDomain PermutationVector;
 						PermutationVector.Set<FGeneratePageFlagsFromPixelsCS::FInputType>(static_cast<uint32>(InputType));
 						PermutationVector.Set<FGeneratePageFlagsFromPixelsCS::FWaterDepth>(SingleLayerWaterPrePassResult != nullptr);
-						PermutationVector.Set<FGeneratePageFlagsFromPixelsCS::FTranslucencyDepth>(FrontLayerTranslucencyData.IsValid());
+						PermutationVector.Set<FGeneratePageFlagsFromPixelsCS::FTranslucencyDepth>(bFrontLayerEnabled);
 						auto ComputeShader = View.ShaderMap->GetShader<FGeneratePageFlagsFromPixelsCS>(PermutationVector);
 						FComputeShaderUtils::AddPass(
 							GraphBuilder,
