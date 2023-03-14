@@ -4948,6 +4948,7 @@ void FSceneRenderer::ComputeViewVisibility(
 	}
 
 	ComputeLightVisibilityTask.Wait();
+	Scene->WaitForCreateLightPrimitiveInteractionsTask();
 
 	PreGatherDynamicMeshElements();
 
@@ -5297,8 +5298,6 @@ void FDeferredShadingSceneRenderer::BeginInitViews(FRDGBuilder& GraphBuilder, co
 	{
 		InitSkyAtmosphereForViews(RHICmdList);
 	}
-
-	Scene->WaitForCreateLightPrimitiveInteractionsTask();
 
 	PostVisibilityFrameSetup(ILCTaskData);
 
