@@ -18,7 +18,6 @@
 #include "RHIStaticStates.h"
 
 #include "RenderingThread.h"
-#include "RendererPrivate.h"
 
 #include "RenderResource.h"
 #include "CommonRenderResources.h"
@@ -29,108 +28,113 @@
 #include "ShaderParameterUtils.h"
 
 #include "ScreenRendering.h"
-#include "PostProcess/SceneFilterRendering.h"
+#include "RendererPrivate.h"
 
 #include "RenderTargetPool.h"
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-namespace TextureShareResourcesHelpers
+namespace UE
 {
-	static bool IsSizeResampleRequired(FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect, FIntRect& OutSrcRect, FIntRect& OutDstRect)
+	namespace TextureShare
 	{
-		FIntVector SrcSizeXYZ = SrcTexture->GetSizeXYZ();
-		FIntVector DstSizeXYZ = DstTexture->GetSizeXYZ();
-
-		FIntPoint SrcSize(SrcSizeXYZ.X, SrcSizeXYZ.Y);
-		FIntPoint DstSize(DstSizeXYZ.X, DstSizeXYZ.Y);
-
-		OutSrcRect = SrcTextureRect ? (*SrcTextureRect) : (FIntRect(FIntPoint(0, 0), SrcSize));
-		OutDstRect = DstTextureRect ? (*DstTextureRect) : (FIntRect(FIntPoint(0, 0), DstSize));
-
-		if (OutSrcRect.Size() != OutDstRect.Size())
+		namespace ResourcesProxy
 		{
-			return true;
+			static bool IsSizeResampleRequired(FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect, FIntRect& OutSrcRect, FIntRect& OutDstRect)
+			{
+				FIntVector SrcSizeXYZ = SrcTexture->GetSizeXYZ();
+				FIntVector DstSizeXYZ = DstTexture->GetSizeXYZ();
+
+				FIntPoint SrcSize(SrcSizeXYZ.X, SrcSizeXYZ.Y);
+				FIntPoint DstSize(DstSizeXYZ.X, DstSizeXYZ.Y);
+
+				OutSrcRect = SrcTextureRect ? (*SrcTextureRect) : (FIntRect(FIntPoint(0, 0), SrcSize));
+				OutDstRect = DstTextureRect ? (*DstTextureRect) : (FIntRect(FIntPoint(0, 0), DstSize));
+
+				if (OutSrcRect.Size() != OutDstRect.Size())
+				{
+					return true;
+				}
+
+				return false;
+			}
+
+			static void DirectCopyTexture_RenderThread(FRHICommandListImmediate& RHICmdList, FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect)
+			{
+				FIntRect SrcRect, DstRect;
+				IsSizeResampleRequired(SrcTexture, DstTexture, SrcTextureRect, DstTextureRect, SrcRect, DstRect);
+
+				const FIntPoint InRectSize = SrcRect.Size();
+				// Copy with resolved params
+				FRHICopyTextureInfo Params = {};
+				Params.Size = FIntVector(InRectSize.X, InRectSize.Y, 0);
+				Params.SourcePosition = FIntVector(SrcRect.Min.X, SrcRect.Min.Y, 0);
+				Params.DestPosition = FIntVector(DstRect.Min.X, DstRect.Min.Y, 0);
+
+				RHICmdList.CopyTexture(SrcTexture, DstTexture, Params);
+			}
+
+			static void ResampleCopyTexture_RenderThread(FRHICommandListImmediate& RHICmdList, FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect)
+			{
+				FIntRect SrcRect, DstRect;
+				IsSizeResampleRequired(SrcTexture, DstTexture, SrcTextureRect, DstTextureRect, SrcRect, DstRect);
+
+				// Texture format mismatch, use a shader to do the copy.
+				FRHIRenderPassInfo RPInfo(DstTexture, ERenderTargetActions::Load_Store);
+				RHICmdList.Transition(FRHITransitionInfo(DstTexture, ERHIAccess::Unknown, ERHIAccess::RTV));
+				RHICmdList.BeginRenderPass(RPInfo, TEXT("TextureShare_ResampleTexture"));
+				{
+					FIntVector SrcSizeXYZ = SrcTexture->GetSizeXYZ();
+					FIntVector DstSizeXYZ = DstTexture->GetSizeXYZ();
+
+					FIntPoint SrcSize(SrcSizeXYZ.X, SrcSizeXYZ.Y);
+					FIntPoint DstSize(DstSizeXYZ.X, DstSizeXYZ.Y);
+
+					RHICmdList.SetViewport(0.f, 0.f, 0.0f, DstSize.X, DstSize.Y, 1.0f);
+
+					FGraphicsPipelineStateInitializer GraphicsPSOInit;
+					RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
+					GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
+					GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
+					GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
+
+					FGlobalShaderMap* ShaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+					TShaderMapRef<FScreenVS> VertexShader(ShaderMap);
+					TShaderMapRef<FScreenPS> PixelShader(ShaderMap);
+
+					GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GFilterVertexDeclaration.VertexDeclarationRHI;
+					GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
+					GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
+					GraphicsPSOInit.PrimitiveType = PT_TriangleList;
+
+					SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
+
+					if (SrcRect.Size() != DstRect.Size())
+					{
+						PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SrcTexture);
+					}
+					else
+					{
+						PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Point>::GetRHI(), SrcTexture);
+					}
+
+					// Set up vertex uniform parameters for scaling and biasing the rectangle.
+					// Note: Use DrawRectangle in the vertex shader to calculate the correct vertex position and uv.
+					FDrawRectangleParameters Parameters;
+					{
+						Parameters.PosScaleBias = FVector4f(DstRect.Size().X, DstRect.Size().Y, DstRect.Min.X, DstRect.Min.Y);
+						Parameters.UVScaleBias = FVector4f(SrcRect.Size().X, SrcRect.Size().Y, SrcRect.Min.X, SrcRect.Min.Y);
+						Parameters.InvTargetSizeAndTextureSize = FVector4f(1.0f / DstSize.X, 1.0f / DstSize.Y, 1.0f / SrcSize.X, 1.0f / SrcSize.Y);
+
+						SetUniformBufferParameterImmediate(RHICmdList, VertexShader.GetVertexShader(), VertexShader->GetUniformBufferParameter<FDrawRectangleParameters>(), Parameters);
+					}
+
+					FPixelShaderUtils::DrawFullscreenQuad(RHICmdList, 1);
+				}
+				RHICmdList.EndRenderPass();
+			}
 		}
-
-		return false;
-	}
-
-	static void DirectCopyTexture_RenderThread(FRHICommandListImmediate& RHICmdList, FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect)
-	{
-		FIntRect SrcRect, DstRect;
-		IsSizeResampleRequired(SrcTexture, DstTexture, SrcTextureRect, DstTextureRect, SrcRect, DstRect);
-
-		const FIntPoint InRectSize = SrcRect.Size();
-		// Copy with resolved params
-		FRHICopyTextureInfo Params = {};
-		Params.Size = FIntVector(InRectSize.X, InRectSize.Y, 0);
-		Params.SourcePosition = FIntVector(SrcRect.Min.X, SrcRect.Min.Y, 0);
-		Params.DestPosition= FIntVector(DstRect.Min.X, DstRect.Min.Y, 0);
-
-		RHICmdList.CopyTexture(SrcTexture, DstTexture, Params);
-	}
-
-	static void ResampleCopyTexture_RenderThread(FRHICommandListImmediate& RHICmdList, FRHITexture* SrcTexture, FRHITexture* DstTexture, const FIntRect* SrcTextureRect, const FIntRect* DstTextureRect)
-	{
-		FIntRect SrcRect, DstRect;
-		IsSizeResampleRequired(SrcTexture, DstTexture, SrcTextureRect, DstTextureRect, SrcRect, DstRect);
-
-		// Texture format mismatch, use a shader to do the copy.
-		FRHIRenderPassInfo RPInfo(DstTexture, ERenderTargetActions::Load_Store);
-		RHICmdList.Transition(FRHITransitionInfo(DstTexture, ERHIAccess::Unknown, ERHIAccess::RTV));
-		RHICmdList.BeginRenderPass(RPInfo, TEXT("TextureShare_ResampleTexture"));
-		{
-			FIntVector SrcSizeXYZ = SrcTexture->GetSizeXYZ();
-			FIntVector DstSizeXYZ = DstTexture->GetSizeXYZ();
-
-			FIntPoint SrcSize(SrcSizeXYZ.X, SrcSizeXYZ.Y);
-			FIntPoint DstSize(DstSizeXYZ.X, DstSizeXYZ.Y);
-
-			RHICmdList.SetViewport(0.f, 0.f, 0.0f, DstSize.X, DstSize.Y, 1.0f);
-
-			FGraphicsPipelineStateInitializer GraphicsPSOInit;
-			RHICmdList.ApplyCachedRenderTargets(GraphicsPSOInit);
-			GraphicsPSOInit.BlendState = TStaticBlendState<>::GetRHI();
-			GraphicsPSOInit.RasterizerState = TStaticRasterizerState<>::GetRHI();
-			GraphicsPSOInit.DepthStencilState = TStaticDepthStencilState<false, CF_Always>::GetRHI();
-
-			FGlobalShaderMap* ShaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
-			TShaderMapRef<FScreenVS> VertexShader(ShaderMap);
-			TShaderMapRef<FScreenPS> PixelShader(ShaderMap);
-
-			GraphicsPSOInit.BoundShaderState.VertexDeclarationRHI = GFilterVertexDeclaration.VertexDeclarationRHI;
-			GraphicsPSOInit.BoundShaderState.VertexShaderRHI = VertexShader.GetVertexShader();
-			GraphicsPSOInit.BoundShaderState.PixelShaderRHI = PixelShader.GetPixelShader();
-			GraphicsPSOInit.PrimitiveType = PT_TriangleList;
-
-			SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit, 0);
-
-			if (SrcRect.Size() != DstRect.Size())
-			{
-				PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Bilinear>::GetRHI(), SrcTexture);
-			}
-			else
-			{
-				PixelShader->SetParameters(RHICmdList, TStaticSamplerState<SF_Point>::GetRHI(), SrcTexture);
-			}
-
-			// Set up vertex uniform parameters for scaling and biasing the rectangle.
-			// Note: Use DrawRectangle in the vertex shader to calculate the correct vertex position and uv.
-			FDrawRectangleParameters Parameters;
-			{
-				Parameters.PosScaleBias = FVector4f(DstRect.Size().X, DstRect.Size().Y, DstRect.Min.X, DstRect.Min.Y);
-				Parameters.UVScaleBias = FVector4f(SrcRect.Size().X, SrcRect.Size().Y, SrcRect.Min.X, SrcRect.Min.Y);
-				Parameters.InvTargetSizeAndTextureSize = FVector4f(1.0f / DstSize.X, 1.0f / DstSize.Y, 1.0f / SrcSize.X, 1.0f / SrcSize.Y);
-
-				SetUniformBufferParameterImmediate(RHICmdList, VertexShader.GetVertexShader(), VertexShader->GetUniformBufferParameter<FDrawRectangleParameters>(), Parameters);
-			}
-
-			FPixelShaderUtils::DrawFullscreenQuad(RHICmdList, 1);
-		}
-		RHICmdList.EndRenderPass();
 	}
 };
-using namespace TextureShareResourcesHelpers;
+using namespace UE::TextureShare::ResourcesProxy;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 DECLARE_STATS_GROUP(TEXT("TextureShare"), STATGROUP_TextureShare, STATCAT_Advanced);
@@ -181,6 +185,13 @@ void FTextureShareResourcesProxy::RHIThreadFlush_RenderThread(FRHICommandListImm
 
 	if (bRHIFlushRequired || bRHIThreadChanged || bForceRHIFlush || PooledTempRTTs.Num())
 	{
+		UE_TS_LOG(LogTextureShareResource, Log, TEXT("RHIThreadFlush_RenderThread( %s%s%s%s)"),
+			bRHIFlushRequired ? TEXT("bRHIFlushRequired ") : TEXT(""),
+			bRHIThreadChanged ? TEXT("bRHIThreadChanged ") : TEXT(""),
+			bForceRHIFlush ? TEXT("bForceRHIFlush ") : TEXT(""),
+			PooledTempRTTs.Num() ? TEXT("PooledTempRTTs ") : TEXT("")
+		);
+
 		bRHIThreadChanged = false;
 		bForceRHIFlush = false;
 
@@ -277,6 +288,7 @@ void FTextureShareResourcesProxy::PushReceiveResource_RenderThread(const FTextur
 {
 	if (InSrcSharedResource && InDestTexture)
 	{
+		UE_TS_LOG(LogTextureShareResource, Log, TEXT("%s:PushReceiveResource_RenderThread(%s.%s)"), *InSrcSharedResource->GetCoreObjectName(), *InSrcSharedResource->GetResourceDesc().ViewDesc.Id, *InSrcSharedResource->GetResourceDesc().ResourceName);
 		ReceiveResourceData.AddUnique(FReceiveResourceData(InResourceRequest, InSrcSharedResource, InDestTexture, InDestTextureSubRect));
 	}
 }
@@ -313,13 +325,13 @@ void FTextureShareResourcesProxy::PushRegisterResource_RenderThread(const FTextu
 	}
 }
 
-void FTextureShareResourcesProxy::RunRegisterResourceHandles_RenderThread()
+void FTextureShareResourcesProxy::RunRegisterResourceHandles_RenderThread(FRHICommandListImmediate& RHICmdList)
 {
 	for (FRegisteredResourceData& ResourceIt : RegisteredResources)
 	{
 		if (ResourceIt.SharedResource)
 		{
-			ResourceIt.SharedResource->RegisterResourceHandle(ResourceIt.ResourceRequest);
+			ResourceIt.SharedResource->RegisterResourceHandle_RenderThread(RHICmdList, ResourceIt.ResourceRequest);
 		}
 	};
 
@@ -370,6 +382,8 @@ bool FTextureShareResourcesProxy::WriteToShareTexture_RenderThread(FRHICommandLi
 	{
 		if (FRHITexture* InDestSharedTexture = InDestSharedResource->GetResourceTextureRHI())
 		{
+			UE_TS_LOG(LogTextureShareResource, Log, TEXT("%s:WriteToShareTexture_RenderThread(%s.%s)"), *InDestSharedResource->GetCoreObjectName(), *InDestSharedResource->GetResourceDesc().ViewDesc.Id, *InDestSharedResource->GetResourceDesc().ResourceName);
+
 			const EPixelFormat InDestFormat = InDestSharedTexture->GetFormat();
 			const bool bIsFormatResampleRequired = InSrcTexture->GetFormat() != InDestFormat;
 
@@ -419,6 +433,8 @@ bool FTextureShareResourcesProxy::ReadFromShareTexture_RenderThread(FRHICommandL
 	{
 		if (FRHITexture* InSrcSharedTexture = InSrcSharedResource->GetResourceTextureRHI())
 		{
+			UE_TS_LOG(LogTextureShareResource, Log, TEXT("%s:ReadFromShareTexture_RenderThread(%s.%s)"), *InSrcSharedResource->GetCoreObjectName(), *InSrcSharedResource->GetResourceDesc().ViewDesc.Id, *InSrcSharedResource->GetResourceDesc().ResourceName);
+
 			const EPixelFormat InSrcFormat = InSrcSharedTexture->GetFormat();
 			const EPixelFormat InDestFormat = InDestTexture->GetFormat();
 			const bool bIsFormatResampleRequired = InSrcFormat != InDestFormat;

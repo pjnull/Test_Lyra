@@ -12,65 +12,68 @@
 #include "RHICommandList.h"
 #include "RHIResources.h"
 #include "SceneView.h"
-#include "SceneTextures.h"
+#include "SceneRendering.h"
 
-#include "PostProcess/SceneRenderTargets.h"
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-namespace TextureShareSceneViewExtensionHelpers
+namespace UE
 {
-	static void GetTextureShareCoreSceneViewMatrices(const FViewMatrices& InViewMatrices, FTextureShareCoreSceneViewMatrices& OutViewMatrices)
+	namespace TextureShare
 	{
-		OutViewMatrices.ProjectionMatrix = InViewMatrices.GetProjectionMatrix();
-		OutViewMatrices.ProjectionNoAAMatrix = InViewMatrices.GetProjectionNoAAMatrix();
-		OutViewMatrices.ViewMatrix = InViewMatrices.GetViewMatrix();
-		OutViewMatrices.ViewProjectionMatrix = InViewMatrices.GetViewProjectionMatrix();
-		OutViewMatrices.TranslatedViewProjectionMatrix = InViewMatrices.GetTranslatedViewProjectionMatrix();
-		OutViewMatrices.PreViewTranslation = InViewMatrices.GetPreViewTranslation();
-		OutViewMatrices.ViewOrigin = InViewMatrices.GetViewOrigin();
-		OutViewMatrices.ProjectionScale = InViewMatrices.GetProjectionScale();
-		OutViewMatrices.TemporalAAProjectionJitter = InViewMatrices.GetTemporalAAJitter();
-		OutViewMatrices.ScreenScale = InViewMatrices.GetScreenScale();
-	}
+		namespace SceneViewExtension
+		{
+			static void GetTextureShareCoreSceneViewMatrices(const FViewMatrices& InViewMatrices, FTextureShareCoreSceneViewMatrices& OutViewMatrices)
+			{
+				OutViewMatrices.ProjectionMatrix = InViewMatrices.GetProjectionMatrix();
+				OutViewMatrices.ProjectionNoAAMatrix = InViewMatrices.GetProjectionNoAAMatrix();
+				OutViewMatrices.ViewMatrix = InViewMatrices.GetViewMatrix();
+				OutViewMatrices.ViewProjectionMatrix = InViewMatrices.GetViewProjectionMatrix();
+				OutViewMatrices.TranslatedViewProjectionMatrix = InViewMatrices.GetTranslatedViewProjectionMatrix();
+				OutViewMatrices.PreViewTranslation = InViewMatrices.GetPreViewTranslation();
+				OutViewMatrices.ViewOrigin = InViewMatrices.GetViewOrigin();
+				OutViewMatrices.ProjectionScale = InViewMatrices.GetProjectionScale();
+				OutViewMatrices.TemporalAAProjectionJitter = InViewMatrices.GetTemporalAAJitter();
+				OutViewMatrices.ScreenScale = InViewMatrices.GetScreenScale();
+			}
 
-	static void GetTextureShareCoreSceneView(const FSceneView& InSceneView, FTextureShareCoreSceneView& OutSceneView)
-	{
-		GetTextureShareCoreSceneViewMatrices(InSceneView.ViewMatrices, OutSceneView.ViewMatrices);
+			static void GetTextureShareCoreSceneView(const FSceneView& InSceneView, FTextureShareCoreSceneView& OutSceneView)
+			{
+				GetTextureShareCoreSceneViewMatrices(InSceneView.ViewMatrices, OutSceneView.ViewMatrices);
 
-		OutSceneView.UnscaledViewRect = InSceneView.UnscaledViewRect;
-		OutSceneView.UnconstrainedViewRect = InSceneView.UnconstrainedViewRect;
-		OutSceneView.ViewLocation = InSceneView.ViewLocation;
-		OutSceneView.ViewRotation = InSceneView.ViewRotation;
-		OutSceneView.BaseHmdOrientation = InSceneView.BaseHmdOrientation;
-		OutSceneView.BaseHmdLocation = InSceneView.BaseHmdLocation;
-		OutSceneView.WorldToMetersScale = InSceneView.WorldToMetersScale;
+				OutSceneView.UnscaledViewRect = InSceneView.UnscaledViewRect;
+				OutSceneView.UnconstrainedViewRect = InSceneView.UnconstrainedViewRect;
+				OutSceneView.ViewLocation = InSceneView.ViewLocation;
+				OutSceneView.ViewRotation = InSceneView.ViewRotation;
+				OutSceneView.BaseHmdOrientation = InSceneView.BaseHmdOrientation;
+				OutSceneView.BaseHmdLocation = InSceneView.BaseHmdLocation;
+				OutSceneView.WorldToMetersScale = InSceneView.WorldToMetersScale;
 
-		OutSceneView.StereoViewIndex = InSceneView.StereoViewIndex;
-		OutSceneView.PrimaryViewIndex = InSceneView.PrimaryViewIndex;
+				OutSceneView.StereoViewIndex = InSceneView.StereoViewIndex;
+				OutSceneView.PrimaryViewIndex = InSceneView.PrimaryViewIndex;
 
-		OutSceneView.FOV = InSceneView.FOV;
-		OutSceneView.DesiredFOV = InSceneView.DesiredFOV;
-	}
+				OutSceneView.FOV = InSceneView.FOV;
+				OutSceneView.DesiredFOV = InSceneView.DesiredFOV;
+			}
 
-	static void GetTextureShareCoreSceneGameTime(const FGameTime& InGameTime, FTextureShareCoreSceneGameTime& OutGameTime)
-	{
-		OutGameTime.RealTimeSeconds = InGameTime.GetRealTimeSeconds();
-		OutGameTime.WorldTimeSeconds = InGameTime.GetWorldTimeSeconds();
-		OutGameTime.DeltaRealTimeSeconds = InGameTime.GetDeltaRealTimeSeconds();
-		OutGameTime.DeltaWorldTimeSeconds = InGameTime.GetDeltaWorldTimeSeconds();
-	}
+			static void GetTextureShareCoreSceneGameTime(const FGameTime& InGameTime, FTextureShareCoreSceneGameTime& OutGameTime)
+			{
+				OutGameTime.RealTimeSeconds = InGameTime.GetRealTimeSeconds();
+				OutGameTime.WorldTimeSeconds = InGameTime.GetWorldTimeSeconds();
+				OutGameTime.DeltaRealTimeSeconds = InGameTime.GetDeltaRealTimeSeconds();
+				OutGameTime.DeltaWorldTimeSeconds = InGameTime.GetDeltaWorldTimeSeconds();
+			}
 
-	static void GetTextureShareCoreSceneViewFamily(const FSceneViewFamily& InViewFamily, FTextureShareCoreSceneViewFamily& OutViewFamily)
-	{
-		GetTextureShareCoreSceneGameTime(InViewFamily.Time, OutViewFamily.GameTime);
+			static void GetTextureShareCoreSceneViewFamily(const FSceneViewFamily& InViewFamily, FTextureShareCoreSceneViewFamily& OutViewFamily)
+			{
+				GetTextureShareCoreSceneGameTime(InViewFamily.Time, OutViewFamily.GameTime);
 
-		OutViewFamily.FrameNumber = InViewFamily.FrameNumber;
-		OutViewFamily.bIsHDR = InViewFamily.bIsHDR;
-		OutViewFamily.GammaCorrection = InViewFamily.GammaCorrection;
-		OutViewFamily.SecondaryViewFraction = InViewFamily.SecondaryViewFraction;
+				OutViewFamily.FrameNumber = InViewFamily.FrameNumber;
+				OutViewFamily.bIsHDR = InViewFamily.bIsHDR;
+				OutViewFamily.GammaCorrection = InViewFamily.GammaCorrection;
+				OutViewFamily.SecondaryViewFraction = InViewFamily.SecondaryViewFraction;
+			}
+		}
 	}
 };
-using namespace TextureShareSceneViewExtensionHelpers;
+using namespace UE::TextureShare::SceneViewExtension;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 struct FTextureShareSceneView
@@ -80,10 +83,11 @@ struct FTextureShareSceneView
 		, SceneView(InSceneView)
 	{
 #if WITH_MGPU
-		if (InViewFamily.bMultiGPUForkAndJoin)
-		{
-			GPUIndex = InSceneView.GPUMask.GetFirstIndex();
-		}
+		checkSlow(InSceneView.bIsViewInfo);
+		const FViewInfo& InSceneViewInfo = static_cast<const FViewInfo&>(InSceneView);
+		const uint32 GPUIndex_RenderingThread = InSceneViewInfo.GPUMask.GetFirstIndex();
+
+		GPUIndex = (GPUIndex_RenderingThread < GNumExplicitGPUsForRendering) ? GPUIndex_RenderingThread : -1;
 #endif
 
 		UnconstrainedViewRect = SceneView.UnconstrainedViewRect;
@@ -140,17 +144,17 @@ void FTextureShareSceneViewExtension::ShareSceneViewColors_RenderThread(FRDGBuil
 			InTextureRef, InView.GPUIndex, &InView.UnconstrainedViewRect);
 	};
 
-	AddShareTexturePass(TextureShareStrings::SceneTextures::SceneColor, SceneTextures.Color.Resolve);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::SceneColor, SceneTextures.Color.Resolve);
 
-	AddShareTexturePass(TextureShareStrings::SceneTextures::SceneDepth, SceneTextures.Depth.Resolve);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::SmallDepthZ, SceneTextures.SmallDepth);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::SceneDepth, SceneTextures.Depth.Resolve);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::SmallDepthZ, SceneTextures.SmallDepth);
 
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferA, SceneTextures.GBufferA);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferB, SceneTextures.GBufferB);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferC, SceneTextures.GBufferC);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferD, SceneTextures.GBufferD);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferE, SceneTextures.GBufferE);
-	AddShareTexturePass(TextureShareStrings::SceneTextures::GBufferF, SceneTextures.GBufferF);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferA, SceneTextures.GBufferA);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferB, SceneTextures.GBufferB);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferC, SceneTextures.GBufferC);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferD, SceneTextures.GBufferD);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferE, SceneTextures.GBufferE);
+	AddShareTexturePass(UE::TextureShareStrings::SceneTextures::GBufferF, SceneTextures.GBufferF);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -303,19 +307,19 @@ void FTextureShareSceneViewExtension::PostRenderViewFamily_RenderThread(FRHIComm
 		GetSceneViewData_RenderThread(ViewIt);
 
 		// Share only if the resource is requested from a remote process
-		if (const FTextureShareCoreResourceRequest* ExistResourceRequest = ObjectProxy->GetData_RenderThread().FindResourceRequest(FTextureShareCoreResourceDesc(TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Undefined)))
+		if (const FTextureShareCoreResourceRequest* ExistResourceRequest = ObjectProxy->GetData_RenderThread().FindResourceRequest(FTextureShareCoreResourceDesc(UE::TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Undefined)))
 		{
 			FTexture2DRHIRef RenderTargetTexture = InViewFamily.RenderTarget->GetRenderTargetTexture();
 			if (RenderTargetTexture.IsValid())
 			{
 				// Send
-				const FTextureShareCoreResourceDesc SendResourceDesc(TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Read);
+				const FTextureShareCoreResourceDesc SendResourceDesc(UE::TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Read);
 				ObjectProxy->ShareResource_RenderThread(RHICmdList, SendResourceDesc, RenderTargetTexture, ViewIt.GPUIndex, &ViewIt.UnscaledViewRect);
 
 				if (bEnableObjectProxySync)
 				{
 					// Receive
-					const FTextureShareCoreResourceDesc ReceiveResourceDesc(TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Write, ETextureShareSyncStep::FrameSceneFinalColorEnd);
+					const FTextureShareCoreResourceDesc ReceiveResourceDesc(UE::TextureShareStrings::SceneTextures::FinalColor, ViewIt.ViewInfo.ViewDesc, ETextureShareTextureOp::Write, ETextureShareSyncStep::FrameSceneFinalColorEnd);
 					if (ObjectProxy->ShareResource_RenderThread(RHICmdList, ReceiveResourceDesc, RenderTargetTexture, ViewIt.GPUIndex, &ViewIt.UnscaledViewRect))
 					{
 						ObjectProxy->FrameSync_RenderThread(RHICmdList, ETextureShareSyncStep::FrameSceneFinalColorEnd);
