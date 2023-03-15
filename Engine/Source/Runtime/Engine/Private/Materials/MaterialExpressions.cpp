@@ -23980,17 +23980,28 @@ bool UMaterialExpressionStrataConvertToDecal::IsResultStrataMaterial(int32 Outpu
 
 void UMaterialExpressionStrataConvertToDecal::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (!StrataMaterialInfo.PushStrataTreeStack())
+	{
+		return;
+	}
+
 	if (DecalMaterial.GetTracedInput().Expression)
 	{
 		DecalMaterial.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, DecalMaterial.OutputIndex);
 	}
 	StrataMaterialInfo.AddShadingModel(SSM_Decal);
+
+	StrataMaterialInfo.PopStrataTreeStack();
 }
 
 FStrataOperator* UMaterialExpressionStrataConvertToDecal::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
 {
 	const bool bUseParameterBlending = true;
 	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_WEIGHT, Compiler->StrataTreeStackGetPathUniqueId(), Parent, Compiler->StrataTreeStackGetParentPathUniqueId(), bUseParameterBlending);
+	if (Compiler->GetStrataTreeOutOfStackDepthOccurred())
+	{
+		return &StrataOperator; // Out ot stack space, return now to fail the compilation
+	}
 
 	UMaterialExpression* ChildDecalMaterialExpression = DecalMaterial.GetTracedInput().Expression;
 	FStrataOperator* OpA = nullptr;
@@ -24566,6 +24577,11 @@ bool UMaterialExpressionStrataHorizontalMixing::IsResultStrataMaterial(int32 Out
 
 void UMaterialExpressionStrataHorizontalMixing::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (!StrataMaterialInfo.PushStrataTreeStack())
+	{
+		return;
+	}
+
 	if (Foreground.GetTracedInput().Expression)
 	{
 		Foreground.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Foreground.OutputIndex);
@@ -24574,11 +24590,17 @@ void UMaterialExpressionStrataHorizontalMixing::GatherStrataMaterialInfo(FStrata
 	{
 		Background.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Background.OutputIndex);
 	}
+
+	StrataMaterialInfo.PopStrataTreeStack();
 }
 
 FStrataOperator* UMaterialExpressionStrataHorizontalMixing::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
 {
 	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_HORIZONTAL, Compiler->StrataTreeStackGetPathUniqueId(), Parent, Compiler->StrataTreeStackGetParentPathUniqueId(), bUseParameterBlending);
+	if (Compiler->GetStrataTreeOutOfStackDepthOccurred())
+	{
+		return &StrataOperator; // Out ot stack space, return now to fail the compilation
+	}
 
 	UMaterialExpression* ChildAExpression = Background.GetTracedInput().Expression;
 	UMaterialExpression* ChildBExpression = Foreground.GetTracedInput().Expression;
@@ -24749,6 +24771,11 @@ bool UMaterialExpressionStrataVerticalLayering::IsResultStrataMaterial(int32 Out
 
 void UMaterialExpressionStrataVerticalLayering::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (!StrataMaterialInfo.PushStrataTreeStack())
+	{
+		return;
+	}
+
 	if (Top.GetTracedInput().Expression)
 	{
 		Top.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Top.OutputIndex);
@@ -24757,11 +24784,17 @@ void UMaterialExpressionStrataVerticalLayering::GatherStrataMaterialInfo(FStrata
 	{
 		Base.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, Base.OutputIndex);
 	}
+
+	StrataMaterialInfo.PopStrataTreeStack();
 }
 
 FStrataOperator* UMaterialExpressionStrataVerticalLayering::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
 {
 	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_VERTICAL, Compiler->StrataTreeStackGetPathUniqueId(), Parent, Compiler->StrataTreeStackGetParentPathUniqueId(), bUseParameterBlending);
+	if (Compiler->GetStrataTreeOutOfStackDepthOccurred())
+	{
+		return &StrataOperator; // Out ot stack space, return now to fail the compilation
+	}
 
 	UMaterialExpression* ChildAExpression = Top.GetTracedInput().Expression;
 	UMaterialExpression* ChildBExpression = Base.GetTracedInput().Expression;
@@ -24911,6 +24944,11 @@ bool UMaterialExpressionStrataAdd::IsResultStrataMaterial(int32 OutputIndex)
 
 void UMaterialExpressionStrataAdd::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (!StrataMaterialInfo.PushStrataTreeStack())
+	{
+		return;
+	}
+
 	if (A.GetTracedInput().Expression)
 	{
 		A.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, A.OutputIndex);	
@@ -24919,11 +24957,17 @@ void UMaterialExpressionStrataAdd::GatherStrataMaterialInfo(FStrataMaterialInfo&
 	{
 		B.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, B.OutputIndex);
 	}
+
+	StrataMaterialInfo.PopStrataTreeStack();
 }
 
 FStrataOperator* UMaterialExpressionStrataAdd::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
 {
 	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_ADD, Compiler->StrataTreeStackGetPathUniqueId(), Parent, Compiler->StrataTreeStackGetParentPathUniqueId(), bUseParameterBlending);
+	if (Compiler->GetStrataTreeOutOfStackDepthOccurred())
+	{
+		return &StrataOperator; // Out ot stack space, return now to fail the compilation
+	}
 
 	UMaterialExpression* ChildAExpression = A.GetTracedInput().Expression;
 	UMaterialExpression* ChildBExpression = B.GetTracedInput().Expression;
@@ -25037,15 +25081,26 @@ bool UMaterialExpressionStrataWeight::IsResultStrataMaterial(int32 OutputIndex)
 
 void UMaterialExpressionStrataWeight::GatherStrataMaterialInfo(FStrataMaterialInfo& StrataMaterialInfo, int32 OutputIndex)
 {
+	if (!StrataMaterialInfo.PushStrataTreeStack())
+	{
+		return;
+	}
+
 	if (A.GetTracedInput().Expression)
 	{
 		A.GetTracedInput().Expression->GatherStrataMaterialInfo(StrataMaterialInfo, A.OutputIndex);
 	}
+
+	StrataMaterialInfo.PopStrataTreeStack();
 }
 
 FStrataOperator* UMaterialExpressionStrataWeight::StrataGenerateMaterialTopologyTree(class FMaterialCompiler* Compiler, class UMaterialExpression* Parent, int32 OutputIndex)
 {
 	FStrataOperator& StrataOperator = Compiler->StrataCompilationRegisterOperator(STRATA_OPERATOR_WEIGHT, Compiler->StrataTreeStackGetPathUniqueId(), Parent, Compiler->StrataTreeStackGetParentPathUniqueId());
+	if (Compiler->GetStrataTreeOutOfStackDepthOccurred())
+	{
+		return &StrataOperator; // Out ot stack space, return now to fail the compilation
+	}
 
 	UMaterialExpression* ChildAExpression = A.GetTracedInput().Expression;
 	FStrataOperator* OpA = nullptr;
