@@ -1671,7 +1671,7 @@ void FRHIRenderPassInfo::Validate() const
 			}
 			else
 			{
-				ensure(Entry.RenderTarget->GetNumSamples() == NumSamples);
+				ensureMsgf(Entry.RenderTarget->GetNumSamples() == NumSamples, TEXT("RenderTarget have inconsistent NumSamples: first %d, then %d"), NumSamples, Entry.RenderTarget->GetNumSamples());
 			}
 
 			ERenderTargetStoreAction Store = GetStoreAction(Entry.Action);
