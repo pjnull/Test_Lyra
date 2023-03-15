@@ -182,6 +182,8 @@ void FAnimTimelineClipboardUtilities::OverwriteSelectedCurveDataFromClipboard(co
 	
 	if (const TSharedRef<FAnimTimelineTrack>& Track = *CurveTracks.CreateConstIterator(); Track->IsA<FAnimTimelineTrack_Curve>())
 	{
+		IAnimationDataController::FScopedBracket ScopedBracket(Controller, NSLOCTEXT("AnimTimelineClipboardUtilities", "PasteCurveKeys_Bracket", "Paste Animation Curve Keys"));
+		
 		const FAnimTimelineTrack_Curve & CurveTrack = Track->As<FAnimTimelineTrack_Curve>();
 
 		// Get selected curve track information
@@ -258,75 +260,79 @@ void FAnimTimelineClipboardUtilities::OverwriteOrAddCurvesFromClipboardContent(c
 	check(Skeleton != nullptr)
 	IAnimationDataController& Controller = InTargetSequence->GetController();
 	
-	for (TObjectPtr<UAnimCurveBaseCopyObject> InCurveCopyObj : ClipboardContent->Curves)
+	if (ClipboardContent->Curves.Num())
 	{
-		// Exit on types not supported by animation controller
-		if (InCurveCopyObj->CurveType != ERawCurveTrackTypes::RCT_Float && InCurveCopyObj->CurveType != ERawCurveTrackTypes::RCT_Transform)
-		{
-			UE_LOG(LogAnimation, Warning, TEXT("Attempting to paste curve { %s } of unsupported type { %s } by animation controller. "), *InCurveCopyObj->DisplayName.ToString(), *UEnum::GetValueAsString(InCurveCopyObj->CurveType));
-			continue;
-		}
-		
-		// Ensure we are not pasting data into the same curve we copying data from
-		if (InCurveCopyObj->OriginName.Compare(Controller.GetModelInterface().GetObject()->GetOuter()->GetFName()) == 0 && Controller.GetModel()->FindCurve(InCurveCopyObj->GetAnimationCurveIdentifier()))
-		{
-			// Do nothing and exit.
-			UE_LOG(LogAnimation, Warning, TEXT("Attempting to paste already existing curve: %s"), *InCurveCopyObj->DisplayName.ToString());
-		}
-		else
-		{
-			FSmartName CurveTrackName(InCurveCopyObj->DisplayName, SmartName::MaxUID);
-			FAnimationCurveIdentifier CurveIdentifier = InCurveCopyObj->GetAnimationCurveIdentifier();
-			const FName & CurveContainerName = InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Float ? USkeleton::AnimCurveMappingName : USkeleton::AnimTrackCurveMappingName;
-			
-			const SmartName::UID_Type FoundCurveUID = Skeleton->GetUIDByName(CurveContainerName, InCurveCopyObj->DisplayName);
-			if (FoundCurveUID != SmartName::MaxUID)
-			{
-				// Update identifier since skeleton does has curve name in the mapping container
-				CurveTrackName.UID = FoundCurveUID;
-				CurveIdentifier.InternalName.UID = FoundCurveUID;
-			}
-			else
-			{
-				// Add new curve name based on clipboard information
-				Skeleton->AddSmartNameAndModify(CurveContainerName, InCurveCopyObj->DisplayName, CurveTrackName);
-					
-				// Ensure that curve smart name exists
-				FSmartName NewName;
-				ensureAlways(Skeleton->GetSmartNameByUID(CurveContainerName, CurveTrackName.UID, NewName));
-
-				// Update identifier since skeleton does has curve name in the mapping container
-				CurveIdentifier.InternalName = NewName;
-			}
-			
-			// Create curve with clipboard information if needed
-			if (!Controller.GetModel()->FindCurve(CurveIdentifier))
-			{
-				Controller.AddCurve(CurveIdentifier);
-			}
-				
-			// Update data for the curve
-			if (CurveTrackName.IsValid()) 
-			{
-				if (InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Float)
-				{
-					const UFloatCurveCopyObject* FloatCopyObject = Cast<UFloatCurveCopyObject>(InCurveCopyObj);
-					
-					Controller.SetCurveKeys(CurveIdentifier, FloatCopyObject->Curve.FloatCurve.GetConstRefOfKeys());
-					Controller.SetCurveFlags(CurveIdentifier, FloatCopyObject->Curve.GetCurveTypeFlags());
-				}
-				else if (InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Transform)
-				{
-					const UTransformCurveCopyObject* TransformCopyObject = Cast<UTransformCurveCopyObject>(InCurveCopyObj);
-					
-					TArray<float> TimeKeys;
-					TArray<FTransform> TransformValues;
-					TransformCopyObject->Curve.GetKeys(TimeKeys, TransformValues); // TODO: Optimize this if possible!
-		
-					Controller.SetTransformCurveKeys(CurveIdentifier, TransformValues, TimeKeys);
-					Controller.SetCurveFlags(CurveIdentifier, TransformCopyObject->Curve.GetCurveTypeFlags());
-				}
-			}
-		}
+		IAnimationDataController::FScopedBracket ScopedBracket(Controller, NSLOCTEXT("AnimTimelineClipboardUtilities", "PasteCurves_Bracket", "Paste Animation Curves"));
+	    for (TObjectPtr<UAnimCurveBaseCopyObject> InCurveCopyObj : ClipboardContent->Curves)
+	    {
+		    // Exit on types not supported by animation controller
+		    if (InCurveCopyObj->CurveType != ERawCurveTrackTypes::RCT_Float && InCurveCopyObj->CurveType != ERawCurveTrackTypes::RCT_Transform)
+		    {
+			    UE_LOG(LogAnimation, Warning, TEXT("Attempting to paste curve { %s } of unsupported type { %s } by animation controller. "), *InCurveCopyObj->DisplayName.ToString(), *UEnum::GetValueAsString(InCurveCopyObj->CurveType));
+			    continue;
+		    }
+		    
+		    // Ensure we are not pasting data into the same curve we copying data from
+		    if (InCurveCopyObj->OriginName.Compare(Controller.GetModelInterface().GetObject()->GetOuter()->GetFName()) == 0 && Controller.GetModel()->FindCurve(InCurveCopyObj->GetAnimationCurveIdentifier()))
+		    {
+			    // Do nothing and exit.
+				UE_LOG(LogAnimation, Warning, TEXT("Attempting to paste already existing curve: %s"), *InCurveCopyObj->DisplayName.ToString());
+		    }
+		    else
+		    {
+			    FSmartName CurveTrackName(InCurveCopyObj->DisplayName, SmartName::MaxUID);
+			    FAnimationCurveIdentifier CurveIdentifier = InCurveCopyObj->GetAnimationCurveIdentifier();
+			    const FName & CurveContainerName = InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Float ? USkeleton::AnimCurveMappingName : USkeleton::AnimTrackCurveMappingName;
+			    
+			    const SmartName::UID_Type FoundCurveUID = Skeleton->GetUIDByName(CurveContainerName, InCurveCopyObj->DisplayName);
+			    if (FoundCurveUID != SmartName::MaxUID)
+			    {
+				    // Update identifier since skeleton does has curve name in the mapping container
+				    CurveTrackName.UID = FoundCurveUID;
+				    CurveIdentifier.InternalName.UID = FoundCurveUID;
+			    }
+			    else
+			    {
+				    // Add new curve name based on clipboard information
+				    Skeleton->AddSmartNameAndModify(CurveContainerName, InCurveCopyObj->DisplayName, CurveTrackName);
+					    
+				    // Ensure that curve smart name exists
+				    FSmartName NewName;
+				    ensureAlways(Skeleton->GetSmartNameByUID(CurveContainerName, CurveTrackName.UID, NewName));
+    
+				    // Update identifier since skeleton does has curve name in the mapping container
+				    CurveIdentifier.InternalName = NewName;
+			    }
+			    
+			    // Create curve with clipboard information if needed
+			    if (!Controller.GetModel()->FindCurve(CurveIdentifier))
+			    {
+				    Controller.AddCurve(CurveIdentifier);
+			    }
+				    
+			    // Update data for the curve
+			    if (CurveTrackName.IsValid()) 
+			    {
+				    if (InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Float)
+				    {
+					    const UFloatCurveCopyObject* FloatCopyObject = Cast<UFloatCurveCopyObject>(InCurveCopyObj);
+					    
+					    Controller.SetCurveKeys(CurveIdentifier, FloatCopyObject->Curve.FloatCurve.GetConstRefOfKeys());
+					    Controller.SetCurveFlags(CurveIdentifier, FloatCopyObject->Curve.GetCurveTypeFlags());
+				    }
+				    else if (InCurveCopyObj->CurveType == ERawCurveTrackTypes::RCT_Transform)
+				    {
+					    const UTransformCurveCopyObject* TransformCopyObject = Cast<UTransformCurveCopyObject>(InCurveCopyObj);
+					    
+					    TArray<float> TimeKeys;
+					    TArray<FTransform> TransformValues;
+					    TransformCopyObject->Curve.GetKeys(TimeKeys, TransformValues); // TODO: Optimize this if possible!
+		    
+					    Controller.SetTransformCurveKeys(CurveIdentifier, TransformValues, TimeKeys);
+					    Controller.SetCurveFlags(CurveIdentifier, TransformCopyObject->Curve.GetCurveTypeFlags());
+				    }
+			    }
+		    }
+	    }
 	}
 }

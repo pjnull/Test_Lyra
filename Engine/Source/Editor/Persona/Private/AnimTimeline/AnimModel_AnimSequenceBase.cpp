@@ -621,9 +621,7 @@ void FAnimModel_AnimSequenceBase::PasteDataFromClipboardToSelectedCurve()
 {
 	if (const UAnimTimelineClipboardContent* ClipboardContent = FAnimTimelineClipboardUtilities::GetContentFromClipboard())
 	{
-		// Setup for modifying animation sequence 
 		const FScopedTransaction Transaction(LOCTEXT("AnimSequenceBase_PasteCurveData", "Paste Data To Selected Curve"));
-		AnimSequenceBase->Modify();
 
 		// Paste data
 		FAnimTimelineClipboardUtilities::OverwriteSelectedCurveDataFromClipboard(ClipboardContent, SelectedTracks, AnimSequenceBase);
@@ -643,10 +641,7 @@ void FAnimModel_AnimSequenceBase::PasteFromClipboard()
 {
 	if (const UAnimTimelineClipboardContent* ClipboardContent = FAnimTimelineClipboardUtilities::GetContentFromClipboard())
 	{
-		// Setup for modifying animation sequence 
 		const FScopedTransaction Transaction(LOCTEXT("AnimSequenceBase_PasteCurves", "Paste"));
-		AnimSequenceBase->Modify();
-
 		// Paste curves from clipboard
 		FAnimTimelineClipboardUtilities::OverwriteOrAddCurvesFromClipboardContent(ClipboardContent, AnimSequenceBase);
 	}
