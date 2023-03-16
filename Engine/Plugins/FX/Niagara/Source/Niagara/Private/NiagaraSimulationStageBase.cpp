@@ -38,6 +38,7 @@ void UNiagaraSimulationStageBase::SetEnabled(bool bInEnabled)
 	{
 		bEnabled = bInEnabled;
 		RequestRecompile();
+		OnChanged().Broadcast();
 	}
 }
 
@@ -45,7 +46,7 @@ void UNiagaraSimulationStageBase::RequestRecompile()
 {
 	if (!bEnabled)
 	{
-		Script->InvalidateCompileResults(TEXT("SimulatoinStage changed."));
+		Script->InvalidateCompileResults(TEXT("SimulationStage changed."));
 	}
 
 	FVersionedNiagaraEmitter OuterEmitter = GetOuterEmitter();
