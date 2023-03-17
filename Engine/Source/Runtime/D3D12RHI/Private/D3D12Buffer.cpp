@@ -6,6 +6,8 @@ D3D12Buffer.cpp: D3D Common code for buffers.
 
 #include "D3D12RHIPrivate.h"
 
+extern int32 GD3D12BindResourceLabels;
+
 FD3D12Buffer::~FD3D12Buffer()
 {
 	if (EnumHasAnyFlags(GetUsage(), EBufferUsageFlags::VertexBuffer) && GetParentDevice())
@@ -836,7 +838,7 @@ void FD3D12DynamicRHI::RHICopyBuffer(FRHIBuffer* SourceBufferRHI, FRHIBuffer* De
 
 void FD3D12DynamicRHI::RHIBindDebugLabelName(FRHIBuffer* BufferRHI, const TCHAR* Name)
 {
-	if (BufferRHI == nullptr)
+	if (BufferRHI == nullptr || !GD3D12BindResourceLabels)
 	{
 		return;
 	}
