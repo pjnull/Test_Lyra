@@ -2349,9 +2349,12 @@ void FRDGBuilder::SetupPassInternals(FRDGPass* Pass)
 #endif
 
 #if RDG_GPU_DEBUG_SCOPES && RDG_ENABLE_DEBUG
-	if (const FRDGEventScope* Scope = Pass->GPUScopes.Event)
+	if (GRDGValidation != 0)
 	{
-		Pass->FullPathIfDebug = Scope->GetPath(Pass->Name);
+		if (const FRDGEventScope* Scope = Pass->GPUScopes.Event)
+		{
+			Pass->FullPathIfDebug = Scope->GetPath(Pass->Name);
+		}
 	}
 #endif
 }
@@ -3914,7 +3917,7 @@ void FRDGBuilder::VisualizePassOutputs(const FRDGPass* Pass)
 
 void FRDGBuilder::ClobberPassOutputs(const FRDGPass* Pass)
 {
-	if (!GRDGClobberResources || !AuxiliaryPasses.IsClobberAllowed())
+	if (!GRDGValidation || !GRDGClobberResources || !AuxiliaryPasses.IsClobberAllowed())
 	{
 		return;
 	}
