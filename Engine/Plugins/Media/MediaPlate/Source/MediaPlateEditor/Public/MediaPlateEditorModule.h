@@ -10,12 +10,14 @@
 #include "UObject/ObjectPtr.h"
 
 class FDragDropEvent;
+class FPlacementModeID;
 class IAssetTools;
 class IAssetTypeActions;
 class ISlateStyle;
 class UMediaPlateComponent;
 class UMediaSource;
 struct FAssetData;
+struct FPlacementCategoryInfo;
 
 /** Log category for this module. */
 DECLARE_LOG_CATEGORY_EXTERN(LogMediaPlateEditor, Log, All);
@@ -70,6 +72,13 @@ private:
 	TMap<FString, TWeakObjectPtr<UMediaSource>> MapFileToMediaSource;
 	/** Caches if real time viewports are enabled. */
 	bool bIsRealTimeViewportsEnabled = false;
+	/** Stores what we have aded to the placement module. */
+	TArray<TOptional<FPlacementModeID>> PlaceActors;
+
+	/**
+	 * Gathers the Info on the Media Plate Place Actors Category.
+	 */
+	const FPlacementCategoryInfo* GetMediaCategoryRegisteredInfo() const;
 
 	/**
 	 * Registers all of our asset tools.
@@ -85,9 +94,19 @@ private:
 	void RegisterAssetTypeAction(IAssetTools& AssetTools, TSharedRef<IAssetTypeActions> Action);
 
 	/**
+	 * Register items to show up in the Place Actors panel.
+	 */
+	void RegisterPlacementModeItems();
+
+	/**
 	 * Unregisters all of our asset tools.
 	 */
 	void UnregisterAssetTools();
+
+	/**
+	 * Unregister items in Place Actors panel.
+	 */
+	void UnregisterPlacementModeItems();
 
 	/**
 	 * Called after the engine has initialized.
