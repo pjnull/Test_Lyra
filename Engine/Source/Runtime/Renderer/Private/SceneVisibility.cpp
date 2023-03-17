@@ -2326,6 +2326,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 	FRelevancePrimSet<FPrimitiveLODMask> PrimitivesLODMask; // group both lod mask with primitive index to be able to properly merge them in the view
 
 	uint16 CombinedShadingModelMask;
+	uint8 StrataUintPerPixel;
 	uint8 StrataBSDFCountMask;
 	bool bUsesGlobalDistanceField;
 	bool bUsesLightingChannels;
@@ -2365,6 +2366,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		, bHasDistortionPrimitives(false)
 		, bHasCustomDepthPrimitives(false)
 		, CombinedShadingModelMask(0)
+		, StrataUintPerPixel(0)
 		, StrataBSDFCountMask(0)
 		, bUsesGlobalDistanceField(false)
 		, bUsesLightingChannels(false)
@@ -2389,6 +2391,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 	void ComputeRelevance()
 	{
 		CombinedShadingModelMask = 0;
+		StrataUintPerPixel = 0;
 		StrataBSDFCountMask = 0;
 		bSceneHasSkyMaterial = 0;
 		bHasSingleLayerWaterMaterial = 0;
@@ -2518,6 +2521,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 			}
 			
 			CombinedShadingModelMask |= ViewRelevance.ShadingModelMask;
+			StrataUintPerPixel = FMath::Max(StrataUintPerPixel, ViewRelevance.StrataUintPerPixel);
 			StrataBSDFCountMask |= ViewRelevance.StrataBSDFCountMask;
 			bUsesGlobalDistanceField |= ViewRelevance.bUsesGlobalDistanceField;
 			bUsesLightingChannels |= ViewRelevance.bUsesLightingChannels;
@@ -3019,6 +3023,7 @@ struct FRelevancePacket : public FSceneRenderingAllocatorObject<FRelevancePacket
 		WriteView.bUsesCustomDepth |= bUsesCustomDepth;
 		WriteView.bUsesCustomStencil |= bUsesCustomStencil;
 		WriteView.StrataViewData.MaxBSDFCount = FMath::Max(WriteView.StrataViewData.MaxBSDFCount, 8u - FMath::CountLeadingZeros8(StrataBSDFCountMask));
+		WriteView.StrataViewData.MaxBytePerPixel = FMath::Max(WriteView.StrataViewData.MaxBytePerPixel, StrataUintPerPixel * 4u);
 		DirtyIndirectLightingCacheBufferPrimitives.AppendTo(WriteView.DirtyIndirectLightingCacheBufferPrimitives);
 
 		WriteView.MeshDecalBatches.Append(MeshDecalBatches);
