@@ -64,6 +64,7 @@ uint ThreadCount;
 uint GroupCount;
 int NearFieldLightingMode;
 float MaxTraceDistance;
+float MinTraceDistanceToSampleSurfaceCache;
 float FarFieldBias;
 float FarFieldMaxTraceDistance;
 float PullbackBias;
@@ -186,6 +187,7 @@ LUMEN_HARDWARE_RAY_TRACING_ENTRY(LumenScreenProbeGatherHardwareRayTracing)
 			MaxTranslucentSkipCount,
 			MaxTraversalIterations);
 		Context.bCalculateHitVelocity = true;
+		Context.MinTraceDistanceToSampleSurfaceCache = MinTraceDistanceToSampleSurfaceCache;
 
 #if LUMEN_HARDWARE_INLINE_RAYTRACING
 		Context.HitGroupData = HitGroupData;
