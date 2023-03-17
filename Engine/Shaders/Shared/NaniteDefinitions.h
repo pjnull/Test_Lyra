@@ -248,6 +248,8 @@ struct FNaniteStats
 	UINT_TYPE NumEmptyRasterBins;
 	UINT_TYPE NumTotalShadingBins;
 	UINT_TYPE NumEmptyShadingBins;
+	UINT_TYPE NumMainPassIndirections;
+	UINT_TYPE NumPostPassIndirections;
 };
 
 struct FNanitePickingFeedback
