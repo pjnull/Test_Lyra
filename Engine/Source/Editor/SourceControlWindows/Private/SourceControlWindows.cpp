@@ -291,7 +291,7 @@ bool FSourceControlWindows::PromptForCheckin(FCheckinResultInfo& OutResultInfo, 
 			{ 
 				if (SourceControlProvider.IsAvailable())
 				{
-					return SourceControlProvider.UsesFileRevisions();
+					return !SourceControlProvider.UsesSnapshots();
 				}
 				return true;
 			})

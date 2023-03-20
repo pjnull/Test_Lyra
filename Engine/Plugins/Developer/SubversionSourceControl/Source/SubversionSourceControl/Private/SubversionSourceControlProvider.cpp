@@ -231,6 +231,11 @@ bool FSubversionSourceControlProvider::UsesFileRevisions() const
 	return true;
 }
 
+bool FSubversionSourceControlProvider::UsesSnapshots() const
+{
+	return false;
+}
+
 bool FSubversionSourceControlProvider::AllowsDiffAgainstDepot() const
 {
 	return true;
