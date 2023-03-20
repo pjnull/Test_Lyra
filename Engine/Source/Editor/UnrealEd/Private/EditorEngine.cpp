@@ -7757,7 +7757,8 @@ void UEditorEngine::OnEffectivePreviewShaderPlatformChange()
 		IStereoRenderTargetManager* StereoRenderTargetManager = StereoRenderingDevice->GetRenderTargetManager();
 		if (StereoRenderTargetManager)
 		{
-			StereoRenderTargetManager->ReconfigureForShaderPlatform(PreviewPlatform.ShaderPlatform);
+			StereoRenderTargetManager->ReconfigureForShaderPlatform(
+				PreviewPlatform.bPreviewFeatureLevelActive ? PreviewPlatform.ShaderPlatform : CachedEditorShaderPlatform);
 		}
 	}
 }
