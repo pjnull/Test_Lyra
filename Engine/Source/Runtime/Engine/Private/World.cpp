@@ -7724,17 +7724,12 @@ bool UWorld::IsGameWorld() const
 
 bool UWorld::IsEditorWorld() const
 {
-	return WorldType == EWorldType::Editor || WorldType == EWorldType::EditorPreview || WorldType == EWorldType::PIE || WorldType == EWorldType::EditorStorage;
+	return WorldType == EWorldType::Editor || WorldType == EWorldType::EditorPreview || WorldType == EWorldType::PIE;
 }
 
 bool UWorld::IsPreviewWorld() const
 {
 	return WorldType == EWorldType::EditorPreview || WorldType == EWorldType::GamePreview;
-}
-
-bool UWorld::IsStorageWorld() const
-{
-	return WorldType == EWorldType::EditorStorage;
 }
 
 bool UWorld::UsesGameHiddenFlags() const
@@ -9063,7 +9058,6 @@ FString ToString(EWorldType::Type Type)
 	case EWorldType::Editor: return TEXT("Editor");
 	case EWorldType::PIE: return TEXT("PIE");
 	case EWorldType::EditorPreview: return TEXT("EditorPreview");
-	case EWorldType::EditorStorage: return TEXT("EditorStorage");
 	case EWorldType::GamePreview: return TEXT("GamePreview");
 	case EWorldType::GameRPC: return TEXT("GameRPC");
 	case EWorldType::Inactive: return TEXT("Inactive");
