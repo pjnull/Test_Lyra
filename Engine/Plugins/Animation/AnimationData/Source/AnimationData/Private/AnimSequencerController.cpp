@@ -400,7 +400,8 @@ void UAnimSequencerController::FindOrAddCurveNamesOnSkeleton(USkeleton* Skeleton
 			{
 			case ERawCurveTrackTypes::RCT_Float:
 				{
-					for (TPair<FAnimationCurveIdentifier, FAnimationCurveMetaData>& IdentifierPair : Model->CurveIdentifierToMetaData)
+					TMap<FAnimationCurveIdentifier, FAnimationCurveMetaData> MetaDataCopy = Model->CurveIdentifierToMetaData;
+					for (TPair<FAnimationCurveIdentifier, FAnimationCurveMetaData>& IdentifierPair : MetaDataCopy)
 					{
 						if (IdentifierPair.Key.CurveType == ERawCurveTrackTypes::RCT_Float)
 						{
@@ -410,13 +411,9 @@ void UAnimSequencerController::FindOrAddCurveNamesOnSkeleton(USkeleton* Skeleton
 							if (NewSmartName != CurrentSmartName)
 							{
 								ensure(CurrentSmartName.DisplayName == NewSmartName.DisplayName);
-								IdentifierPair.Key.InternalName = NewSmartName;
-
-								// Update float curve name itself as well
-								if (FFloatCurve* FloatCurve = Model->FindMutableFloatCurveById(FAnimationCurveIdentifier(CurrentSmartName, ERawCurveTrackTypes::RCT_Float)))
-								{
-									FloatCurve->Name = NewSmartName;
-								}
+								const FAnimationCurveIdentifier CurrentId(CurrentSmartName, SupportedCurveType);
+								const FAnimationCurveIdentifier NewId(NewSmartName, SupportedCurveType);
+								RenameCurve(CurrentId, NewId, bShouldTransact);
 							}
 						}
 					}

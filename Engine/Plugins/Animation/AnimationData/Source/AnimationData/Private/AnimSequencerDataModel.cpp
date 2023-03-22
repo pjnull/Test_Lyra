@@ -380,7 +380,7 @@ const FTransformCurve* UAnimationSequencerDataModel::FindTransformCurve(const FA
 	ensure(CurveIdentifier.CurveType == ERawCurveTrackTypes::RCT_Transform);
     for (const FTransformCurve& TransformCurve : GetCurveData().TransformCurves)
     {
-    	if (TransformCurve.Name == CurveIdentifier.InternalName || TransformCurve.Name.UID == CurveIdentifier.InternalName.UID)
+    	if (TransformCurve.Name == CurveIdentifier.InternalName || (TransformCurve.Name.UID == CurveIdentifier.InternalName.UID && TransformCurve.Name.UID != SmartName::MaxUID))
     	{
     		return &TransformCurve;
     	}
@@ -1454,7 +1454,7 @@ FTransformCurve* UAnimationSequencerDataModel::FindMutableTransformCurveById(con
 {
 	for (FTransformCurve& TransformCurve : LegacyCurveData.TransformCurves)
 	{
-		if (TransformCurve.Name.UID == CurveIdentifier.InternalName.UID)
+		if (TransformCurve.Name == CurveIdentifier.InternalName || (TransformCurve.Name.UID == CurveIdentifier.InternalName.UID && TransformCurve.Name.UID != SmartName::MaxUID))
 		{
 			return &TransformCurve;
 		}
@@ -1467,7 +1467,7 @@ FFloatCurve* UAnimationSequencerDataModel::FindMutableFloatCurveById(const FAnim
 {
 	for (FFloatCurve& FloatCurve : LegacyCurveData.FloatCurves)
 	{
-		if (FloatCurve.Name.UID == CurveIdentifier.InternalName.UID)
+		if (FloatCurve.Name == CurveIdentifier.InternalName || (FloatCurve.Name.UID == CurveIdentifier.InternalName.UID && FloatCurve.Name.UID != SmartName::MaxUID))
 		{
 			return &FloatCurve;
 		}
