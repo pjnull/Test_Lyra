@@ -400,7 +400,16 @@ void FAnimNode_ControlRig::PropagateInputProperties(const UObject* InSourceInsta
 	if (TargetInstance)
 	{
 		UControlRig* TargetControlRig = Cast<UControlRig>((UObject*)TargetInstance);
-
+		if(TargetControlRig == nullptr)
+		{
+			return;
+		}
+		URigHierarchy* TargetHierarchy = TargetControlRig->GetHierarchy();
+		if(TargetHierarchy == nullptr)
+		{
+			return;
+		}
+		
 		// First copy properties
 		check(SourceProperties.Num() == DestProperties.Num());
 		for (int32 PropIdx = 0; PropIdx < SourceProperties.Num(); ++PropIdx)
@@ -535,7 +544,7 @@ void FAnimNode_ControlRig::PropagateInputProperties(const UObject* InSourceInsta
 
 				if(bIsValid)
 				{
-					TargetControlRig->GetHierarchy()->SetControlValue(ControlElement, Value, ERigControlValueType::Current);
+					TargetHierarchy->SetControlValue(ControlElement, Value, ERigControlValueType::Current);
 				}
 				continue;
 			}
