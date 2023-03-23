@@ -2396,7 +2396,7 @@ void FWebRemoteControlModule::OnSettingsModified(UObject* Settings, FPropertyCha
 	const bool bIsWebServerStarted = HttpRouter.IsValid();
 	const bool bIsWebSocketServerStarted = WebSocketServer.IsRunning();
 	const bool bRestartHttpServer = RCSettings->RemoteControlHttpServerPort != HttpServerPort;
-	const bool bRestartWebSocketServer = RCSettings->RemoteControlWebSocketServerPort != WebSocketServerPort;
+	const bool bRestartWebSocketServer = RCSettings->RemoteControlWebSocketServerPort != WebSocketServerPort || RCSettings->RemoteControlWebsocketServerBindAddress != WebsocketServerBindAddress;
 
 	if (PropertyChangedEvent.ChangeType != EPropertyChangeType::Interactive)
 	{
@@ -2413,6 +2413,7 @@ void FWebRemoteControlModule::OnSettingsModified(UObject* Settings, FPropertyCha
 			|| (!bIsWebSocketServerStarted && RCSettings->bAutoStartWebSocketServer))
 		{
 			WebSocketServerPort = RCSettings->RemoteControlWebSocketServerPort;
+			WebsocketServerBindAddress = RCSettings->RemoteControlWebsocketServerBindAddress;
 			StopWebSocketServer();
 			StartWebSocketServer();
 		}
