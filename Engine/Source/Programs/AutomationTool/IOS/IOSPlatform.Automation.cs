@@ -15,6 +15,7 @@ using System.Diagnostics;
 using EpicGames.Core;
 using System.Xml;
 using UnrealBuildBase;
+using Microsoft.Extensions.Logging;
 
 static class IOSEnvVarNames
 {
@@ -679,7 +680,7 @@ public class IOSPlatform : ApplePlatform
 		if (DirectoryReference.Exists(LocalizationDirectory))
 		{
 			IEnumerable<DirectoryReference> LocalizationDirsToStage = DirectoryReference.EnumerateDirectories(LocalizationDirectory, "*.lproj", SearchOption.TopDirectoryOnly);
-			LogInformation("There are {0} Localization directories.", LocalizationDirsToStage.Count());
+			Log.Logger.LogInformation("There are {0} Localization directories.", LocalizationDirsToStage.Count());
 
 			foreach (DirectoryReference FullLocDirPath in LocalizationDirsToStage)
 			{
@@ -689,7 +690,7 @@ public class IOSPlatform : ApplePlatform
 		}
 		else
 		{
-			LogInformation("App has no custom Localization resources");
+			Log.Logger.LogInformation("App has no custom Localization resources");
 		}
 	}
 
@@ -768,7 +769,7 @@ public class IOSPlatform : ApplePlatform
 
 	public override void Package(ProjectParams Params, DeploymentContext SC, int WorkingCL)
 	{
-		LogInformation("Package {0}", Params.RawProjectPath);
+		Log.Logger.LogInformation("Package {0}", Params.RawProjectPath);
 
 		bool bIsBuiltAsFramework = IsBuiltAsFramework(Params, SC);
 
@@ -1167,7 +1168,7 @@ public class IOSPlatform : ApplePlatform
 							UUID = AllText.Substring(idx, AllText.IndexOf("</string>", idx) - idx);
 							Arguments += " PROVISIONING_PROFILE_SPECIFIER=" + UUID;
 
-							LogInformation("Extracted Provision UUID {0} from {1}", UUID, Provision);
+							Log.Logger.LogInformation("Extracted Provision UUID {0} from {1}", UUID, Provision);
 						}
 					}
 				}
@@ -1698,7 +1699,7 @@ public class IOSPlatform : ApplePlatform
 			IdeviceInstallerArgs = GetLibimobileDeviceNetworkedArgument(IdeviceInstallerArgs, Params.DeviceNames[0]);
 
 			var DeviceInstaller = GetPathToLibiMobileDeviceTool("ideviceinstaller");
-			LogInformation("Checking if bundle {0} is installed", BundleIdentifier);
+			Log.Logger.LogInformation("Checking if bundle {0} is installed", BundleIdentifier);
 
 			string Output = CommandUtils.RunAndLog(DeviceInstaller, IdeviceInstallerArgs);
 			bool bBundleIsInstalled = Output.Contains(string.Format("CFBundleIdentifier -> {0}{1}", BundleIdentifier, Environment.NewLine));
@@ -1706,7 +1707,7 @@ public class IOSPlatform : ApplePlatform
 
 			if (bBundleIsInstalled)
 			{
-				LogInformation("Bundle {0} found, retrieving deployed manifests...", BundleIdentifier);
+				Log.Logger.LogInformation("Bundle {0} found, retrieving deployed manifests...", BundleIdentifier);
 
 				var DeviceFS = GetPathToLibiMobileDeviceTool("idevicefs");
 
@@ -1731,7 +1732,7 @@ public class IOSPlatform : ApplePlatform
 			}
 			else
 			{
-				LogInformation("Bundle {0} not found, skipping retrieving deployed manifests", BundleIdentifier);
+				Log.Logger.LogInformation("Bundle {0} not found, skipping retrieving deployed manifests", BundleIdentifier);
 			}
 		}
 		catch (System.Exception)
@@ -2322,7 +2323,7 @@ public class IOSPlatform : ApplePlatform
 	{
 		if (HostPlatform.Current.HostEditorPlatform != UnrealTargetPlatform.Mac)
 		{
-			LogInformation("Wrangling data for debug for an iOS/tvOS app for XCode is a Mac only feature. Aborting command.");
+			Log.Logger.LogInformation("Wrangling data for debug for an iOS/tvOS app for XCode is a Mac only feature. Aborting command.");
 			return;
 		}
 
@@ -2343,16 +2344,16 @@ public class IOSPlatform : ApplePlatform
 		PayloadPath += "/Payload/";
 		string CookedDataDirectory = PayloadPath + PackageName + ".app/cookeddata/";
 
-		LogInformation("ClientPlatform : {0}", ClientPlatform);
-		LogInformation("ProjectFilePath : {0}", ProjectFilePath);
-		LogInformation("Source : {0}", SourcePackage);
-		LogInformation("ZipFile {0}", ZipFile);
-		LogInformation("PackageName {0}", PackageName);
-		LogInformation("PayloadPath {0}", PayloadPath);
+		Log.Logger.LogInformation("ClientPlatform : {0}", ClientPlatform);
+		Log.Logger.LogInformation("ProjectFilePath : {0}", ProjectFilePath);
+		Log.Logger.LogInformation("Source : {0}", SourcePackage);
+		Log.Logger.LogInformation("ZipFile {0}", ZipFile);
+		Log.Logger.LogInformation("PackageName {0}", PackageName);
+		Log.Logger.LogInformation("PayloadPath {0}", PayloadPath);
 
 		if (File.Exists(ZipFile))
 		{
-			LogInformation("Deleting previously present ZIP file created from IPA");
+			Log.Logger.LogInformation("Deleting previously present ZIP file created from IPA");
 			File.Delete(ZipFile);
 		}
 
@@ -2377,18 +2378,18 @@ public class IOSPlatform : ApplePlatform
 		}
 
 		//cleanup
-		LogInformation("Deleting temp files ...");
+		Log.Logger.LogInformation("Deleting temp files ...");
 		File.Delete(ZipFile);
-		LogInformation("{0} deleted", ZipFile);
+		Log.Logger.LogInformation("{0} deleted", ZipFile);
 		Directory.Delete(PayloadPath, true);
-		LogInformation("{0} deleted", PayloadPath);
+		Log.Logger.LogInformation("{0} deleted", PayloadPath);
 	}
 
 	public void UnzipPackage(string PackageToUnzip)
 	{
 		string UnzipPath = PackageToUnzip;
 		UnzipPath = UnzipPath.Substring(0, UnzipPath.LastIndexOf('/'));
-		LogInformation("Unzipping to {0}", UnzipPath);
+		Log.Logger.LogInformation("Unzipping to {0}", UnzipPath);
 
 		using (Ionic.Zip.ZipFile Zip = new Ionic.Zip.ZipFile(PackageToUnzip))
 		{
@@ -2400,7 +2401,7 @@ public class IOSPlatform : ApplePlatform
 				{
 					Entry.Extract(OutputStream);
 				}
-				LogInformation("Extracted {0}", OutputFileName);
+				Log.Logger.LogInformation("Extracted {0}", OutputFileName);
 			}
 		}
 	}
