@@ -99,6 +99,11 @@ private:
 	void RegisterPlacementModeItems();
 
 	/**
+	 * Register which categories belong to which section.
+	 */
+	void RegisterSectionMappings();
+
+	/**
 	 * Unregisters all of our asset tools.
 	 */
 	void UnregisterAssetTools();

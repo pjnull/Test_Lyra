@@ -35,6 +35,7 @@ void FMediaPlateEditorModule::StartupModule()
 
 	RegisterAssetTools();
 	RegisterPlacementModeItems();
+	RegisterSectionMappings();
 
 	// Register customizations.
 	MediaPlateName = UMediaPlateComponent::StaticClass()->GetFName();
@@ -225,6 +226,16 @@ void FMediaPlateEditorModule::RegisterPlacementModeItems()
 			FCoreDelegates::OnPostEngineInit.AddLambda(RegisterPlaceActors);
 		}
 	}
+}
+
+void FMediaPlateEditorModule::RegisterSectionMappings()
+{
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+
+	// Media Plate.
+	TSharedRef<FPropertySection> Section = PropertyModule.FindOrCreateSection("Object", "General", LOCTEXT("General", "General"));
+	Section->AddCategory("Control");
+	Section->AddCategory("MediaPlate");
 }
 
 void FMediaPlateEditorModule::UnregisterAssetTools()

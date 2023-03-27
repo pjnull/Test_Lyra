@@ -73,9 +73,11 @@ void FMediaPlateCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBuil
 	IDetailCategoryBuilder& StaticMeshCategory = DetailBuilder.EditCategory("StaticMesh");
 	StaticMeshCategory.SetCategoryVisibility(false);
 
+	IDetailCategoryBuilder& ControlCategory = DetailBuilder.EditCategory("Control");
 	IDetailCategoryBuilder& MediaPlateCategory = DetailBuilder.EditCategory("MediaPlate");
 	// Place this at the top.
-	MediaPlateCategory.SetSortOrder(0);
+	ControlCategory.SetSortOrder(0);
+	MediaPlateCategory.SetSortOrder(1);
 
 	// Get objects we are editing.
 	TArray<TWeakObjectPtr<UObject>> Objects;
@@ -196,7 +198,7 @@ void FMediaPlateCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBuil
 		];
 
 	// Add media control buttons.
-	MediaPlateCategory.AddCustomRow(LOCTEXT("MediaPlateControls", "MediaPlate Controls"))
+	ControlCategory.AddCustomRow(LOCTEXT("MediaPlateControls", "MediaPlate Controls"))
 		[
 			SNew(SHorizontalBox)
 
