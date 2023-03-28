@@ -97,6 +97,11 @@ TArrayType GetNiagaraArrayValue(UNiagaraComponent* NiagaraComponent, FName Overr
 
 FNiagaraLWCConverter GetLWCConverter(UNiagaraComponent* NiagaraComponent)
 {
+	if (NiagaraComponent == nullptr)
+	{
+		return FNiagaraLWCConverter();
+	}
+
 	FNiagaraSystemInstanceControllerPtr SystemInstanceController = NiagaraComponent->GetSystemInstanceController();
 	if (!SystemInstanceController.IsValid())
 	{
