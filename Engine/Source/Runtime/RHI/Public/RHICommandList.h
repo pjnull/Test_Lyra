@@ -5187,7 +5187,10 @@ class TRHICommandList_RecursiveHazardous : public FRHICommandList_RecursiveHazar
 		void ExecuteAndDestruct(FRHICommandListBase& CmdList, FRHICommandListDebugContext&) override final
 		{
 			// RunOnContext always requires the lowest level (platform) context, not the validation RHI context.
-			Lambda(static_cast<ContextType&>(CmdList.GetContext().GetLowestLevelContext()));
+			ContextType& Context = static_cast<ContextType&>(CmdList.GetContext().GetLowestLevelContext());
+			Context.BeginRecursiveCommand();
+
+			Lambda(Context);
 			Lambda.~LAMBDA();
 		}
 	};
@@ -5203,7 +5206,10 @@ public:
 		if (Bypass())
 		{
 			// RunOnContext always requires the lowest level (platform) context, not the validation RHI context.
-			Lambda(static_cast<ContextType&>(GetContext().GetLowestLevelContext()));
+			ContextType& Context = static_cast<ContextType&>(GetContext().GetLowestLevelContext());
+			Context.BeginRecursiveCommand();
+
+			Lambda(Context);
 		}
 		else
 		{
@@ -5238,7 +5244,10 @@ class TRHIComputeCommandList_RecursiveHazardous : public FRHIComputeCommandList_
 		void ExecuteAndDestruct(FRHICommandListBase& CmdList, FRHICommandListDebugContext&) override final
 		{
 			// RunOnContext always requires the lowest level (platform) context, not the validation RHI context.
-			Lambda(static_cast<ContextType&>(CmdList.GetComputeContext().GetLowestLevelContext()));
+			ContextType& Context = static_cast<ContextType&>(CmdList.GetComputeContext().GetLowestLevelContext());
+			Context.BeginRecursiveCommand();
+
+			Lambda(Context);
 			Lambda.~LAMBDA();
 		}
 	};
@@ -5254,7 +5263,10 @@ public:
 		if (Bypass())
 		{
 			// RunOnContext always requires the lowest level (platform) context, not the validation RHI context.
-			Lambda(static_cast<ContextType&>(GetComputeContext().GetLowestLevelContext()));
+			ContextType& Context = static_cast<ContextType&>(GetComputeContext().GetLowestLevelContext());
+			Context.BeginRecursiveCommand();
+
+			Lambda(Context);
 		}
 		else
 		{
