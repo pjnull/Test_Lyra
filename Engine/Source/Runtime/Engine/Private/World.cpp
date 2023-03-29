@@ -90,6 +90,7 @@
 	#include "WorldPartition/DataLayer/WorldDataLayers.h"
 	#include "PieFixupSerializer.h"
 	#include "ActorFolder.h"
+	#include "ActorDeferredScriptManager.h"
 #endif
 
 
@@ -1267,6 +1268,9 @@ void UWorld::PreSaveRoot(FObjectPreSaveRootContext ObjectSaveContext)
 
 	// Flush outstanding static mesh compilation to ensure that construction scripts are properly ran and not deferred prior to saving
 	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+
+	// Execute all pending actor construction scripts
+	FActorDeferredScriptManager::Get().FinishAllCompilation();
 #endif
 
 	// Update components and keep track off whether we need to clean them up afterwards.
