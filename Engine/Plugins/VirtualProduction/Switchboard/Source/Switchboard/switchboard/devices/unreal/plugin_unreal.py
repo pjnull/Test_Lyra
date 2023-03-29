@@ -16,7 +16,7 @@ from collections import OrderedDict
 from datetime import datetime
 from functools import wraps
 from ipaddress import IPv4Address
-from typing import Callable, List, Optional, Set
+from typing import Callable, Generator, List, Optional, Set
 
 import switchboard.switchboard_widgets as sb_widgets
 from PySide2 import QtCore, QtGui, QtWidgets
@@ -1296,6 +1296,13 @@ class DeviceUnreal(Device):
                 "There is nothing to sync!")
             return
 
+        for device in self.devices_sharing_workspace():
+            if device.status >= DeviceStatus.OPEN:
+                LOGGER.warning(f'{self.name}: Unable to sync, because another '
+                               f'device ({device.name}) using the same '
+                               'workspace is already running.')
+                return
+
         program_name = 'sync'
 
         # check if it is already on its way:
@@ -1395,12 +1402,20 @@ class DeviceUnreal(Device):
             unreal_client=self.unreal_client,
         )
 
-        if self.status != DeviceStatus.SYNCING:
-            self.status = DeviceStatus.SYNCING
+        for device in self.devices_sharing_workspace():
+            if device.status != DeviceStatus.SYNCING:
+                device.status = DeviceStatus.SYNCING
 
     def build(self):
         if self.exclude_from_build.get_value():
             return
+
+        for device in self.devices_sharing_workspace():
+            if device.status >= DeviceStatus.OPEN:
+                LOGGER.warning(f'{self.name}: Unable to build, because '
+                               f'another device ({device.name}) using the '
+                               'same workspace is already running.')
+                return
 
         program_name = 'build_project'
 
@@ -1530,7 +1545,9 @@ class DeviceUnreal(Device):
             LOGGER.info(
                 f"{self.name}: Sending {program_name} command: "
                 f"{ubt_path} {ubt_args}")
-            self.status = DeviceStatus.BUILDING
+            
+            for device in self.devices_sharing_workspace():
+                device.status = DeviceStatus.BUILDING
 
         # Queue the build command
         self.program_start_queue.add(
@@ -1901,9 +1918,11 @@ class DeviceUnreal(Device):
             self.status = DeviceStatus.OPEN
             self.unreal_started_signal.emit()
         elif prog.name.startswith('build_'):
-            self.status = DeviceStatus.BUILDING
+            for device in self.devices_sharing_workspace():
+                device.status = DeviceStatus.BUILDING
         elif prog.name == 'sync':
-            self.status = DeviceStatus.SYNCING
+            for device in self.devices_sharing_workspace():
+                device.status = DeviceStatus.SYNCING
 
         self.program_start_queue.update_running_program(prog=prog)
 
@@ -1923,10 +1942,11 @@ class DeviceUnreal(Device):
             LOGGER.error(f"Could not start {program_name}: {message['error']}")
 
             if program_name == 'sync' or program_name.startswith('build_'):
-                self.status = DeviceStatus.CLOSED
-                # Force to show existing project_changelist to hide
-                # building/syncing.
-                self.project_changelist = self.project_changelist
+                for device in self.devices_sharing_workspace():
+                    device.status = DeviceStatus.CLOSED
+
+                    # This has the effect of hiding building/syncing status.
+                    device.project_changelist = device.project_changelist
             elif program_name == 'unreal':
                 self.status = DeviceStatus.CLOSED
             elif program_name == 'retrieve':
@@ -2052,6 +2072,14 @@ class DeviceUnreal(Device):
 
             self.status = DeviceStatus.CLOSED
 
+            for other in self.devices_sharing_workspace(skip=self):
+                sync_method = CONFIG.ENGINE_SYNC_METHOD.get_value()
+                if sync_method == EngineSyncMethod.Build_Engine.value:
+                    other.engine_changelist = self.engine_changelist
+
+                other.project_changelist = self.project_changelist
+                other.status = DeviceStatus.CLOSED
+
         elif program_name.startswith('build_'):
             if returncode == 0:
                 LOGGER.info(f"{self.name}: {program_name} successful!")
@@ -2066,11 +2094,12 @@ class DeviceUnreal(Device):
                         LOGGER.error(f"{self.name}: {line}")
 
             if 'build_project' == program_name:
-                self.status = DeviceStatus.CLOSED
-                
-                self._request_project_changelist_number()
+                for device in self.devices_sharing_workspace():
+                    device.status = DeviceStatus.CLOSED
+
                 # Forces an update to the changelist field (to hide the
                 # Building state).
+                self._request_project_changelist_number()
                 if CONFIG.ENGINE_SYNC_METHOD.get_value() == EngineSyncMethod.Build_Engine.value:
                     self._request_engine_changelist_number()
                     self._request_unreal_editor_version_file()
@@ -2102,14 +2131,16 @@ class DeviceUnreal(Device):
                 LOGGER.info(
                     f"{self.name}: Project {project_name} "
                     f"is on revision {current_changelist}")
-                self.project_changelist = current_changelist
+                for device in self.devices_sharing_workspace():
+                    device.project_changelist = current_changelist
             elif program_name.endswith("engine"):
                 project_name = os.path.basename(
                     os.path.dirname(CONFIG.UPROJECT_PATH.get_value(self.name)))
                 LOGGER.info(
                     f"{self.name}: Engine used for project "
                     f"{project_name} is on revision {current_changelist}")
-                self.engine_changelist = current_changelist
+                for device in self.devices_sharing_workspace():
+                    device.engine_changelist = current_changelist
 
     def on_program_killed(self, message):
         '''
@@ -2156,7 +2187,9 @@ class DeviceUnreal(Device):
         '''
         decoded_content = base64.b64decode(content).decode()
         data = json.loads(decoded_content)
-        self.built_engine_changelist = data.get("CompatibleChangelist", None)
+        compatible_cl = data.get("CompatibleChangelist", None)
+        for device in self.devices_sharing_workspace():
+            device.built_engine_changelist = compatible_cl
 
     def on_file_receive_failed(self, source_path, error):
         roles = self.setting_roles.get_value()
@@ -2191,33 +2224,73 @@ class DeviceUnreal(Device):
         #
         if process['name'].startswith('build_'):
             for line in lines:
-                if '@progress' in line:
-                    stepparts = line.split("'")
+                if '@progress' not in line:
+                    continue
 
-                    if len(stepparts) < 2:
-                        break
+                stepparts = line.split("'")
 
-                    step = stepparts[-2].strip()
+                if len(stepparts) < 2:
+                    break
 
-                    percent = line.split(' ')[-1].strip()
+                step = stepparts[-2].strip()
+                percent = line.split(' ')[-1].strip()
 
-                    if '%' == percent[-1]:
-                        self.device_qt_handler.signal_device_build_update.emit(
-                            self, step, percent
-                        )
-                        
+                if percent[-1] != '%':
+                    continue
+
+                for device in self.devices_sharing_workspace():
+                    device.device_qt_handler.signal_device_build_update.emit(
+                            device, step, percent)
 
         elif process['name'] == 'sync':
             for line in lines:
-                if 'Progress:' in line:
-                    match = re.search(r'Progress: (\d{1,3}\.\d\d%)', line)
-                    if match:
-                        sync_progress = match.group(1)
-                        self.device_qt_handler.signal_device_sync_update.emit(
-                            self, sync_progress)
+                if 'Progress:' not in line:
+                    continue
+
+                match = re.search(r'Progress: (\d{1,3}\.\d\d%)', line)
+                if not match:
+                    continue
+
+                sync_progress = match.group(1)
+                for device in self.devices_sharing_workspace():
+                    device.device_qt_handler.signal_device_sync_update.emit(
+                        device, sync_progress)
 
         for line in lines:
             LOGGER.debug(f"{self.name} {process['name']}: {line}")
+
+    @classmethod
+    def devices(
+        cls, *,
+        where: Callable[[DeviceUnreal], bool] = lambda _: True,
+        only_connected: bool = True,
+        skip: Optional[DeviceUnreal] = None,
+    ) -> Generator[DeviceUnreal, None, None]:
+        for other in cls.active_unreal_devices:
+            if other == skip:
+                continue
+
+            if only_connected and other.is_disconnected:
+                continue
+
+            if where(other):
+                yield other
+
+    def devices_sharing_workspace(
+        self, *,
+        only_connected: bool = True,
+        skip: Optional[DeviceUnreal] = None,
+    ) -> Generator[DeviceUnreal, None, None]:
+        def get_ws(device):
+            return CONFIG.SOURCE_CONTROL_WORKSPACE.get_value(
+                device.name).casefold()
+
+        self_ws = get_ws(self)
+        return DeviceUnreal.devices(
+            where=lambda x: get_ws(x) == self_ws,
+            only_connected=only_connected,
+            skip=skip,
+        )
 
     def on_listener_state(self, message):
         '''
