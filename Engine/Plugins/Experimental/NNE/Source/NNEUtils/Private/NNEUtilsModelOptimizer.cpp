@@ -525,6 +525,8 @@ private:
 			Builder->AddInput(Tensor);
 		}
 
+		TArray<uint8> TensorDataBlob;
+
 		// Add tensors for graph outputs
 		for (int Idx = 0; Idx < GraphInfo.outputCount; ++Idx)
 		{
@@ -540,11 +542,37 @@ private:
 				);
 
 			Builder->AddOutput(Tensor);
+
+			Ort::GraphTensorInitializer	TensorInit = Graph->GetTensorInitializer(TensorInfo.name);
+			if (TensorInit)
+			{
+				const void* Data = nullptr;
+				uint64	DataSize = 0;
+
+				DataSize = Graph->GetTensorDataSize(TensorInit);
+				if (TensorDataBlob.Num() < DataSize)
+				{
+					TensorDataBlob.SetNumUninitialized(DataSize);
+				}
+
+				Graph->GetTensorData(TensorInit, TensorDataBlob.GetData(), DataSize, 0);
+				Data = TensorDataBlob.GetData();
+
+				auto TensorInitializer =
+					Builder->AddTensor(
+						FString(ANSI_TO_TCHAR(TensorInfo.name)) + TEXT("_NNEInitializer"),
+						DataType,
+						MakeArrayView(TensorInfo.shape, TensorInfo.shapeLen),
+						Data, DataSize
+					);
+
+				auto Op = Builder->AddOperator(TEXT("Identity"));
+				Builder->AddOperatorInput(Op, TensorInitializer);
+				Builder->AddOperatorOutput(Op, Tensor);
+			}
 		}
 
 		// Traverse all the nodes get their inputs, outputs and tensor data
-		TArray<uint8> TensorDataBlob;
-
 		for (int Idx = 0; Idx < GraphInfo.nodeCount; ++Idx)
 		{
 			Ort::GraphNode		Node = Graph->GetNode(Idx);
@@ -574,6 +602,11 @@ private:
 					for (int i = 0; i < AttrValue.count; i++)
 					{
 						Values[i] = (int32)AttrValue.ints[i];
+						if((int64)Values[i] != AttrValue.ints[i])
+						{
+							UE_LOG(LogNNE, Error, TEXT("Overflow detected when converting to int32 attribute '%s' in node '%s'"), ANSI_TO_TCHAR(AttrInfo.name), ANSI_TO_TCHAR(NodeInfo.opName));
+							return false;
+						}
 					}
 
 					Builder->AddOperatorAttribute(Op, AttrInfo.name, FNNEAttributeValue(Values));
@@ -625,16 +658,13 @@ private:
 				{
 					DataSize = Graph->GetTensorDataSize(TensorInit);
 
-					if (DataSize)
+					if (TensorDataBlob.Num() < DataSize)
 					{
-						if (TensorDataBlob.Num() < DataSize)
-						{
-							TensorDataBlob.SetNumUninitialized(DataSize);
-						}
-
-						Graph->GetTensorData(TensorInit, TensorDataBlob.GetData(), DataSize, 0);
-						Data = TensorDataBlob.GetData();
+						TensorDataBlob.SetNumUninitialized(DataSize);
 					}
+
+					Graph->GetTensorData(TensorInit, TensorDataBlob.GetData(), DataSize, 0);
+					Data = TensorDataBlob.GetData();
 				}
 
 				auto Tensor =

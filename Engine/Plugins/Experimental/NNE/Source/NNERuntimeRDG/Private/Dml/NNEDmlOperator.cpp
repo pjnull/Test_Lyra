@@ -353,6 +353,11 @@ TConstArrayView<int32> FOperatorDml::GetConstantCPUInputs() const
 	return ConstantCPUInputs;
 }
 
+TConstArrayView<int32> FOperatorDml::GetRemappedInputs() const
+{
+	return RemappedInputs;
+}
+
 IDMLOperator* FOperatorDml::GetOperator()
 {
 	return DmlOp;
@@ -383,6 +388,16 @@ bool FOperatorDml::InitDmlTensorDesc(DmlUtil::FTensorDesc& DmlTensorDesc, const 
 	BuffDesc.Sizes = DmlTensorDesc.Sizes.GetData();
 	BuffDesc.Strides = nullptr;
 	BuffDesc.TotalTensorSizeInBytes = Tensor.GetDataSize(); // DmlUtil::CalculateBufferSize(DmlTensorDesc, Tensor);
+
+	static DmlUtil::FSmallUIntArray ScalarShape({ 1 });
+
+	//Handle scalar tensors
+	if (Tensor.GetShape().Rank() == 0)
+	{
+		BuffDesc.DimensionCount = ScalarShape.Num();
+		DmlTensorDesc.Sizes = ScalarShape;
+		BuffDesc.Sizes = ScalarShape.GetData();
+	}
 
 	DmlTensorDesc.Desc = DML_TENSOR_DESC{ DML_TENSOR_TYPE_BUFFER, &DmlTensorDesc.BuffDesc };
 

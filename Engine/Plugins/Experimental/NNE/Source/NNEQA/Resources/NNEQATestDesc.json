@@ -10,8 +10,8 @@
 					"absolute_tolerance": 5.0e-2
 				}
 			]
-				},
-				{
+		},
+		{
 			"category": "StyleTransfer.VariableInputSize",
 			"is_model_test": true,
 			"targets": [
@@ -59,6 +59,76 @@
 				{
 					"target": "VertexDeltaModel",
 					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m01",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m02",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m03",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m04",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m05",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m06",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m07",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m08",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m09",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
+				},
+				{
+					"target": "hs_m10",
+					"runtimes": [
+						{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Model not supported yet." }
+					],
+					"absolute_tolerance": 1e-4
 				}
 			]
 		},
@@ -67,17 +137,15 @@
 			"is_model_test": true,
 			"targets": [
 				{
-					"target": "OneLayerWithWeights",
-					"runtimes": [
-						{ "name": "NNERuntimeRDGDml",  "skip": true, "comment": "Model not supported yet." }
-					]
+					"target": "OneLayerWithWeights"
 				},
 				{
 					"target": "TwoLayersNoWeight",
-					"tags": [ "SmokeTest" ],
-					"runtimes": [
-						{ "name": "NNERuntimeRDGDml",  "skip": true, "comment": "Model not supported yet." }
-					]
+					"tags": [ "SmokeTest" ]
+				},
+				{
+					"target": "MultiInput",
+					"tags": [ "SmokeTest" ]
 				},
 				{
 					"target": "MultiOutput",
@@ -85,6 +153,10 @@
 					"runtimes": [
 						{ "name": "NNERuntimeRDGDml",  "skip": true, "comment": "Model not supported yet." }
 					]
+				},
+				{
+					"target": "ConstOutput",
+					"comment": "Model contain a 2nd output (Y1) constant from an initializer."
 				}
 			]
 		},
@@ -157,9 +229,7 @@
 				{	"target": "BitShift", "skip": true, "comment": "TODO need attributes" },
 				{	"target": "Cast",     "skip": true, "comment": "TODO need attributes" },
 				{	"target": "Ceil"},
-				{	"target": "Clip", "additional_datasets": [ "Elementwise.Clip.AttributeTest" ], "runtimes": [
-						{ "name": "NNERuntimeRDGDml", "skip": true, "comment": "RDG need scalar tensor support"}
-					]},
+				{	"target": "Clip", "additional_datasets": [ "Elementwise.Clip.AttributeTest" ] },
 				{	"target": "Cos" },
 				{	"target": "Cosh" },
 				{	"target": "Elu", "additional_datasets": [ "Elementwise.Elu.AttributeTest" ], "runtimes": [
@@ -205,6 +275,10 @@
 						{ "name": "NNERuntimeRDGHlsl",   "absolute_tolerance":  1e-4}
 					]},
 				{	"target": "Sinh" },
+				{	"target": "Softmax", 
+					"runtimes": [{ "name": "NNERuntimeRDGHlsl",   "skip": true }],
+					"additional_datasets": [ "Elementwise.Softmax.AttributeTest" ]
+				},
 				{	"target": "Softplus"},
 				{	"target": "Softsign"},
 				{	"target": "Sqrt"},
@@ -311,9 +385,6 @@
 		},
 		{
 			"category": "Identity",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "Identity" }
 			]
@@ -329,18 +400,12 @@
 		},
 		{
 			"category": "Flatten",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "Flatten" }
 			]
 		},
 		{
 			"category": "BatchNormalization",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "BatchNormalization", "relative_tolerance": 5e-1 }
 			]
@@ -414,6 +479,24 @@
 			]
 		},
 		{
+			"category": "Reduce",
+			"runtimes": [
+				{ "name": "NNERuntimeRDGHlsl", "skip": true }
+			],
+			"targets": [
+				{ "target": "ReduceL1" },
+				{ "target": "ReduceL2" },
+				{ "target": "ReduceLogSum" },
+				{ "target": "ReduceLogSumExp" },
+				{ "target": "ReduceMin" },
+				{ "target": "ReduceMax" },
+				{ "target": "ReduceMean" },
+				{ "target": "ReduceProd" },
+				{ "target": "ReduceSum" },
+				{ "target": "ReduceSumSquare" }
+			]
+		},
+		{
 			"category": "Reshape",
 			"targets": [
 				{ "target": "Reshape" }
@@ -421,20 +504,36 @@
 		},
 		{
 			"category": "SqueezeOp",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "Squeeze" }
 			]
 		},
 		{
 			"category": "Unsqueeze",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "Unsqueeze" }
+			]
+		},
+		{
+			"category": "PoolOp",
+			"targets": [
+				{ "target": "MaxPool" },
+				{ "target": "AveragePool", "absolute_tolerance": 1e-6 },
+				{ "target": "LpPool", "absolute_tolerance": 1e-6 }
+			],
+			"runtimes": [
+				{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Not supported" }
+			]
+		},
+		{
+			"category": "GlobalPool",
+			"targets": [
+				{ "target": "GlobalMaxPool" },
+				{ "target": "GlobalAveragePool", "absolute_tolerance": 1e-6 },
+				{ "target": "GlobalLpPool", "absolute_tolerance": 1e-6 }
+			],
+			"runtimes": [
+				{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Not supported" }
 			]
 		}
 	],
@@ -478,7 +577,8 @@
 			"datasets": [
 				{ "inputs": [ { "shape": [1], "comment": "input" }, { "shape": [1], "comment": "min" } ] },
 				{ "inputs": [ { "shape": [1], "comment": "input" }, { "shape": [1], "comment": "min" }, { "shape": [1], "comment": "max" } ] }
-			]
+			],
+			"runtimes": [{ "name": "NNERuntimeRDGDml", "skip": true, "comment": "RDG need scalar tensor support"}]
 		},
 		{
 			"name": "Elementwise.Slow.OneInput",
@@ -501,6 +601,14 @@
 			"datasets": [
 				{
 					"inputs": [ { "shape": [ 4 ] } ]
+				}
+			]
+		},
+		{
+			"name": "Elementwise.Softmax.AttributeTest",
+			"datasets": [
+				{
+					"inputs": [ { "shape": [ 4, 3, 5, 2 ] } ]
 				}
 			]
 		},
@@ -999,15 +1107,27 @@
 			]
 		},
 		{ 
-			"name": "Unsqueeze",
+			"name": "Unsqueeze.Unsqueeze1",
 			"datasets": [
 				{ "inputs": [ { "shape": [ 2, 3, 4 ] } ], "outputs": [ { "shape": [ 2, 1, 3, 4 ] } ] }
 			]
 		},
 		{ 
-			"name": "SqueezeOp",
+			"name": "Unsqueeze.Unsqueeze2",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 1, 131 ] } ], "outputs": [ { "shape": [ 1, 131, 1 ] } ] }
+			]
+		},
+		{ 
+			"name": "SqueezeOp.Axes",
 			"datasets": [
 				{ "inputs": [ { "shape": [ 2, 3, 1, 4 ] } ], "outputs": [ { "shape": [ 2, 3, 4 ] } ] }
+			]
+		},
+		{ 
+			"name": "SqueezeOp.MultiAxes",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 2, 1, 3, 1, 4 ] } ], "outputs": [ { "shape": [ 2, 3, 4 ] } ] }
 			]
 		},
 		{ 
@@ -1023,7 +1143,7 @@
 			]
 		},
 		{ 
-			"name": "Reshape.ReducedDims",
+			"name": "Reshape.RducedDims",
 			"datasets": [
 				{ "inputs": [ { "shape": [ 2, 3, 4 ] } ], "weights": [ { "shape": [ 2 ], "source": [ "2", "12" ], "type": "int64" } ], "outputs": [ { "shape": [ 2, 12 ] } ] }
 			]
@@ -1050,6 +1170,54 @@
 			"name": "Reshape.Zero",
 			"datasets": [
 				{ "inputs": [ { "shape": [ 2, 4, 3 ] } ], "weights": [ { "shape": [ 3 ], "source": [ "3", "0", "2" ], "type": "int64" } ], "outputs": [ { "shape": [ 3, 4, 2 ] } ] }
+			]
+		},
+		{
+			"name": "PoolOp.2D.Default",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 1, 3, 32, 32 ] } ], "outputs": [ { "shape": [ 1, 3, 31, 31 ] } ] }
+			]
+		},
+		{
+			"name": "PoolOp.2D.Strides2",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 1, 2, 256, 256 ] } ], "outputs": [ { "shape": [ 1, 2, 128, 128 ] } ] }
+			]
+		},
+		{
+			"name": "GlobalPool.2D",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 2, 2, 128, 256 ] } ], "outputs": [ { "shape": [ 2, 2, 1, 1 ] } ] }
+			]
+		},
+		{
+			"name": "GlobalPool.3D",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 2, 3, 128, 256, 64 ] } ], "outputs": [ { "shape": [ 2, 3, 1, 1, 1 ] } ] }
+			]
+		},
+		{ 
+			"name": "Reduce.Default",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 3, 2, 2 ] } ], "outputs": [ { "shape": [ 1, 1, 1 ] } ] }
+			]
+		},
+		{ 
+			"name": "Reduce.Axes.Keepdims",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 3, 2, 2 ] } ], "outputs": [ { "shape": [ 3, 1, 2 ] } ] }
+			]
+		},
+		{ 
+			"name": "Reduce.Axes.DontKeepdims",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 3, 2, 2 ] } ], "outputs": [ { "shape": [ 3, 2 ] } ] }
+			]
+		},
+		{ 
+			"name": "Reduce.NegativeAxes.Keepdims",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 3, 2, 2 ] } ], "outputs": [ { "shape": [ 3, 1, 2 ] } ] }
 			]
 		}
 	],
@@ -1089,6 +1257,12 @@
 				{ "attributes": [ { "name": "alpha", "value": 0.7 }, { "name": "gamma", "value": 0.1 } ] },
 				{ "attributes": [ { "name": "alpha", "value": 0.7 }, { "name": "gamma", "value": 0.5 } ] },
 				{ "attributes": [ ] }
+			]
+		},
+		{
+			"name": "Elementwise.Softmax.AttributeTest",
+			"attribute_maps": [
+				{ "attributes": [ { "name": "axis", "value": 2, "type": "Int32" } ] }
 			]
 		},
 		{
@@ -1482,7 +1656,7 @@
 			]
 		},
 		{
-			"name": "SqueezeOp",
+			"name": "SqueezeOp.Axes",
 			"attribute_maps": [
 				{ "attributes": [
 					{ "name": "axes", "value": [2], "type": "Int32Array" }
@@ -1490,10 +1664,26 @@
 			]
 		},
 		{
-			"name": "Unsqueeze",
+			"name": "SqueezeOp.MultiAxes",
+			"attribute_maps": [
+				{ "attributes": [
+					{ "name": "axes", "value": [1, 3], "type": "Int32Array" }
+				] }
+			]
+		},
+		{
+			"name": "Unsqueeze.Unsqueeze1",
 			"attribute_maps": [
 				{ "attributes": [
 					{ "name": "axes", "value": [1], "type": "Int32Array" }
+				] }
+			]
+		},
+		{
+			"name": "Unsqueeze.Unsqueeze2",
+			"attribute_maps": [
+				{ "attributes": [
+					{ "name": "axes", "value": [2], "type": "Int32Array" }
 				] }
 			]
 		},
@@ -1511,6 +1701,57 @@
 				{ "attributes": [
 					{ "name": "axis", "value": -3, "type": "Int32" }
 				] }
+			]
+		},
+		{
+			"name": "PoolOp.2D.Default",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "kernel_shape", "value": [2, 2], "type": "Int32Array" } 
+					]
+				}
+			]
+		},
+		{
+			"name": "PoolOp.2D.Strides2",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "kernel_shape", "value": [2, 2], "type": "Int32Array" },
+						{ "name": "pads", "value": [0, 0, 0, 0], "type": "Int32Array" },
+						{ "name": "strides", "value": [2, 2], "type": "Int32Array" } 
+					]
+				}
+			]
+		},
+		{
+			"name": "Reduce.Axes.Keepdims",
+			"attribute_maps": [
+				{
+					"attributes": [
+						{ "name": "axes", "value": [ 1 ], "type": "Int32Array" },
+						{ "name": "keepdims", "value": 1, "type": "Int32" }
+					]
+				}
+			]
+		},
+		{
+			"name": "Reduce.Axes.DontKeepdims",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "axes", "value": [1], "type": "Int32Array" },
+						{ "name": "keepdims", "value": 0, "type": "Int32" }
+					]
+				}
+			]
+		},
+		{
+			"name": "Reduce.NegativeAxes.Keepdims",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "axes", "value": [-2], "type": "Int32Array" },
+						{ "name": "keepdims", "value": 1, "type": "Int32" }
+					]
+				}
 			]
 		}
 	]

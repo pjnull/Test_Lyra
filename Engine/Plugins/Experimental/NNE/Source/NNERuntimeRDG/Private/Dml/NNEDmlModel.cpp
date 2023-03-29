@@ -280,7 +280,7 @@ private:
 		else
 		{
 			DML_BUFFER_BINDING& Bind = Bindings.Add_GetRef({});
-			Descs.Add({ DML_BINDING_TYPE_BUFFER, &Bind });
+			Descs.Add({ DML_BINDING_TYPE_NONE, nullptr });
 		}
 	}
 
@@ -493,7 +493,7 @@ public:
 			
 		DML_GRAPH_DESC	Graph = DML_GRAPH_DESC{};
 
-		Graph.InputCount = InputEdges.Num();
+		Graph.InputCount = NumInputs;
 		Graph.OutputCount = OutputEdges.Num();
 		Graph.NodeCount = Operators.Num();
 		Graph.Nodes = Nodes.GetData();
@@ -624,6 +624,11 @@ private:
 			{
 				AddInputEdge(TensorIdx);
 			}
+
+			if (InGraph.ConstantCPUIndices.Find(TensorIdx) == INDEX_NONE)
+			{
+				++NumInputs;
+			}
 		}
 
 		return true;
@@ -728,8 +733,6 @@ private:
 				.SetTensorIdx(TensorIdx)
 				.SetNodeSrcOutput(NumInputs)
 		);
-
-		++NumInputs;
 	}
 
 	void AddOutputEdge(int32 TensorIdx)
@@ -922,6 +925,14 @@ bool FModel::Init(TConstArrayView<uint8> ModelData, FDmlDeviceContext* InDevCtx)
 		{
 			UE_LOG(LogNNE, Warning, TEXT("Error:Failed to create operator:%s"), *TypeName);
 			return false;
+		}
+
+		// Remap inputs
+		TConstArrayView<int32> OpRemappedInputs = OpDesc.Op->GetRemappedInputs();
+
+		for (int32 InputIdx = 0; InputIdx < OpRemappedInputs.Num(); ++InputIdx)
+		{
+			OpInputIndices[OpDesc.InputStart + InputIdx] = OpRemappedInputs[InputIdx];
 		}
 
 		// Filter out the constant CPU inputs from the graph node inputs
@@ -1157,8 +1168,9 @@ bool FModel::InitCompiledOp(TConstArrayView<int32> OpInputIndices, uint64 Tensor
 	return true;
 }
 
-BEGIN_SHADER_PARAMETER_STRUCT(FTensorBufferParamsDml, )
-	RDG_BUFFER_ACCESS(Buffer, ERHIAccess::UAVCompute)
+BEGIN_SHADER_PARAMETER_STRUCT(FDmlModelDispatchPassParameters, )
+	RDG_BUFFER_ACCESS_ARRAY(InputBuffers)
+	RDG_BUFFER_ACCESS_ARRAY(OutputBuffers)
 END_SHADER_PARAMETER_STRUCT()
 
 //
@@ -1166,27 +1178,11 @@ END_SHADER_PARAMETER_STRUCT()
 //
 void FModel::AddDispatchOps_RenderThread(FRDGBuilder& GraphBuilder)
 {
-	const ERDGPassFlags TransitionBuffFlags = ERDGPassFlags::Compute | ERDGPassFlags::NeverCull;
-
-	InputBuffers.Reset();
-	OutputBuffers.Reset();
-	InputBuffers.Reserve(InputTensorIndices.Num() + WeightTensorIndices.Num());
-	OutputBuffers.Reserve(OutputTensorIndices.Num());
+	FDmlModelDispatchPassParameters* DispatchParams = GraphBuilder.AllocParameters<FDmlModelDispatchPassParameters>();
 
 	for (int32 Idx = 0; Idx < InputTensorIndices.Num(); ++Idx)
 	{
-		FTensorBufferParamsDml* Params = GraphBuilder.AllocParameters<FTensorBufferParamsDml>();
-		Params->Buffer = AllTensorRDGRefs[InputTensorIndices[Idx]]->GetBuffer();
-
-		GraphBuilder.AddPass(
-			RDG_EVENT_NAME("FModel_Dispatch_GetInputBuffer"),
-			Params,
-			TransitionBuffFlags,
-			[this, Params](FRHICommandListImmediate& RHICmdList)
-			{
-				InputBuffers.Emplace(Params->Buffer->GetRHI());
-			}
-		);
+		DispatchParams->InputBuffers.Emplace(AllTensorRDGRefs[InputTensorIndices[Idx]]->GetBuffer(), ERHIAccess::UAVCompute);
 	}
 
 	int32 NumWeightTensors = 0;
@@ -1201,35 +1197,40 @@ void FModel::AddDispatchOps_RenderThread(FRDGBuilder& GraphBuilder)
 
 	for (int32 Idx = 0; Idx < OutputTensorIndices.Num(); ++Idx)
 	{
-		FTensorBufferParamsDml* Params = GraphBuilder.AllocParameters<FTensorBufferParamsDml>();
-		Params->Buffer = AllTensorRDGRefs[OutputTensorIndices[Idx]]->GetBuffer();
-
-		GraphBuilder.AddPass(
-			RDG_EVENT_NAME("FModel_Dispatch_GetOutputBuffer"),
-			Params,
-			TransitionBuffFlags,
-			[this, Params](FRHICommandListImmediate& RHICmdList)
-			{
-				OutputBuffers.Emplace(Params->Buffer->GetRHI());
-			}
-		);
+		DispatchParams->OutputBuffers.Emplace(AllTensorRDGRefs[OutputTensorIndices[Idx]]->GetBuffer(), ERHIAccess::UAVCompute);
 	}
-	
+
 	GraphBuilder.AddPass(
-		RDG_EVENT_NAME("FModel_Dispatch"),
-		ERDGPassFlags::None | ERDGPassFlags::NeverCull,
-		[this, NumWeightTensors](FRHICommandListImmediate& RHICmdList)
+		RDG_EVENT_NAME("FDmlModelDispatch"),
+		DispatchParams,
+		ERDGPassFlags::Compute | ERDGPassFlags::NeverCull,
+		[this, DispatchParams, NumWeightTensors](FRHICommandListImmediate& RHICmdList)
 		{
+			FRHIBufferInputArray	RHIInputBuffers;
+			FRHIBufferOutputArray	RHIOutputBuffers;
+
+			for (FRDGBuffer* RDGBuffer : DispatchParams->InputBuffers)
+			{
+				RDGBuffer->MarkResourceAsUsed();
+				RHIInputBuffers.Add(RDGBuffer->GetRHI());
+			}
+
+			for (int32 Idx = 0; Idx < NumWeightTensors; ++Idx)
+			{
+				RHIInputBuffers.Add(nullptr);
+			}
+
+			for (FRDGBuffer* RDGBuffer : DispatchParams->OutputBuffers)
+			{
+				RDGBuffer->MarkResourceAsUsed();
+				RHIOutputBuffers.Add(RDGBuffer->GetRHI());
+			}
+
 			RHICmdList.EnqueueLambda(
-				[this, NumWeightTensors](FRHICommandListImmediate& RHICmdList)
+				[this, InputBuffers = MoveTemp(RHIInputBuffers), OutputBuffers = MoveTemp(RHIOutputBuffers)](FRHICommandListImmediate& RHICmdList)
 				{
 					TArray<CD3DX12_RESOURCE_BARRIER, TInlineAllocator<MaxNumInputs + MaxNumOutputs>>	PreBarriers;
 					TArray<CD3DX12_RESOURCE_BARRIER, TInlineAllocator<MaxNumOutputs * 2>>				PostBarriers;
-
-					for (int32 Idx = 0; Idx < NumWeightTensors; ++Idx)
-					{
-						InputBuffers.Emplace(nullptr);
-					}
 
 					for (FRHIBuffer* Buffer : InputBuffers)
 					{
