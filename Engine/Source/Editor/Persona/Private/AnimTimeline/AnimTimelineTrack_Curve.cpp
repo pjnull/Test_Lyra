@@ -203,7 +203,7 @@ TSharedRef<SWidget> FAnimTimelineTrack_Curve::GenerateContainerWidgetForTimeline
 		GetCurveEditInfo(CurveIndex, Name, Type, EditIndex);
 
 		TUniquePtr<FRichCurveEditorModelNamed> NewCurveModel = MakeUnique<FRichCurveEditorModelNamed>(Name, Type, EditIndex, GetModel()->GetAnimSequenceBase());
-		NewCurveModel->SetColor(GetCurveColor(CurveIndex));
+		NewCurveModel->SetColor(GetCurveColor(CurveIndex), false);
 		NewCurveModel->SetIsKeyDrawEnabled(MakeAttributeLambda([](){ return GetDefault<UPersonaOptions>()->bTimelineDisplayCurveKeys; }));
 		CurveEditor->AddCurve(MoveTemp(NewCurveModel));
 	}
