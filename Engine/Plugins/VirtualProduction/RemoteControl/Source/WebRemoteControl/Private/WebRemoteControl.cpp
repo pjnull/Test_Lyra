@@ -292,6 +292,7 @@ void FWebRemoteControlModule::StartupModule()
 
 	HttpServerPort = GetDefault<URemoteControlSettings>()->RemoteControlHttpServerPort;
 	WebSocketServerPort = GetDefault<URemoteControlSettings>()->RemoteControlWebSocketServerPort;
+	WebsocketServerBindAddress = GetDefault<URemoteControlSettings>()->RemoteControlWebsocketServerBindAddress;
 
 	WebSocketHandler = MakeUnique<FWebSocketMessageHandler>(&WebSocketServer, ActingClientId);
 
