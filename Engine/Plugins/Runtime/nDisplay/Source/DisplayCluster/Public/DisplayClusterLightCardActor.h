@@ -115,7 +115,10 @@ public:
 
 	/** If this light card is considered a flag */
 	bool IsLightCardFlag() const { return bIsLightCardFlag; }
-	
+
+	/** Configures this light card as a UV actor */
+	void SetIsUVActor(bool bNewUVValue);
+
 	/** Show or hide the light card label  */
 	void ShowLightCardLabel(bool bValue, float ScaleValue, ADisplayClusterRootActor* InRootActor);
 
@@ -270,7 +273,7 @@ public:
 	bool bLockToOwningRootActor = true;
 
 	/** Indicates if the light card exists in 3D space or in UV space */
-	UPROPERTY()
+	UPROPERTY(Getter = IsUVActor, Setter = SetIsUVActor)
 	bool bIsUVLightCard = false;
 
 	/** Polygon points when using this type of mask */
@@ -328,7 +331,7 @@ protected:
 #endif
 
 	/** Indicates this light card should be considered a flag */
-	UPROPERTY()
+	UPROPERTY(Getter = IsLightCardFlag, Setter = SetIsLightCardFlag, meta = (AllowPrivateAccess))
 	bool bIsLightCardFlag = false;
 
 private:
