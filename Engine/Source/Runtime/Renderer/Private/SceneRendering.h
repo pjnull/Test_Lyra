@@ -1200,9 +1200,14 @@ typedef TArray<FViewCommands, TInlineAllocator<4>> FViewVisibleCommandsPerView;
 
 #if RHI_RAYTRACING
 
+namespace RayTracing
+{
+	enum class ECullingMode : uint8;
+};
+
 struct FRayTracingCullingParameters
 {
-	int32 CullInRayTracing;
+	RayTracing::ECullingMode CullingMode;
 	float CullingRadius;
 	float FarFieldCullingRadius;
 	float CullAngleThreshold;

@@ -273,7 +273,7 @@ void FDeferredShadingSceneRenderer::PrepareLumenHardwareRayTracingRadianceCache(
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FEnableFarFieldTracing>(false);
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FIndirectDispatchDim>(IsHardwareRayTracingRadianceCacheIndirectDispatch());
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FSpecularOcclusionDim>(false);
-		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(GetRayTracingCulling() != 0);
+		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 		TShaderRef<FLumenRadianceCacheHardwareRayTracingRGS> RayGenerationShader = View.ShaderMap->GetShader<FLumenRadianceCacheHardwareRayTracingRGS>(PermutationVector);
 
 		OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
@@ -301,7 +301,7 @@ void FDeferredShadingSceneRenderer::PrepareLumenHardwareRayTracingRadianceCacheL
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FIndirectDispatchDim>(IsHardwareRayTracingRadianceCacheIndirectDispatch());
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FSpecularOcclusionDim>(false);
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FPackTraceDataDim>(false);
-			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(GetRayTracingCulling() != 0);
+			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 			TShaderRef<FLumenRadianceCacheHardwareRayTracingRGS> RayGenerationShader = View.ShaderMap->GetShader<FLumenRadianceCacheHardwareRayTracingRGS>(PermutationVector);
 
 			OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
@@ -318,7 +318,7 @@ void FDeferredShadingSceneRenderer::PrepareLumenHardwareRayTracingRadianceCacheL
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FIndirectDispatchDim>(IsHardwareRayTracingRadianceCacheIndirectDispatch());
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FSpecularOcclusionDim>(false);
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FPackTraceDataDim>(true);
-				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(GetRayTracingCulling() != 0);
+				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 				TShaderRef<FLumenRadianceCacheHardwareRayTracingRGS> RayGenerationShader = View.ShaderMap->GetShader<FLumenRadianceCacheHardwareRayTracingRGS>(PermutationVector);
 
 				OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
@@ -333,7 +333,7 @@ void FDeferredShadingSceneRenderer::PrepareLumenHardwareRayTracingRadianceCacheL
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FIndirectDispatchDim>(IsHardwareRayTracingRadianceCacheIndirectDispatch());
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FSpecularOcclusionDim>(false);
 				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FPackTraceDataDim>(false);
-				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(GetRayTracingCulling() != 0);
+				PermutationVector.Set<FLumenRadianceCacheHardwareRayTracingRGS::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 				TShaderRef<FLumenRadianceCacheHardwareRayTracingRGS> RayGenerationShader = View.ShaderMap->GetShader<FLumenRadianceCacheHardwareRayTracingRGS>(PermutationVector);
 			
 				OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
@@ -588,7 +588,7 @@ void RenderLumenHardwareRayTracingRadianceCacheTwoPass(
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FIndirectDispatchDim>(bIndirectDispatch);
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FSpecularOcclusionDim>(false);
 		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FPackTraceDataDim>(bUseFarField);
-		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FClipRayDim>(GetRayTracingCulling() != 0);
+		PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 
 		DispatchRayGenOrComputeShader(GraphBuilder, Scene, View, SceneTextures, TracingParameters, RadianceCacheParameters, PermutationVector,
 			DiffuseConeHalfAngle, MaxNumProbes, MaxProbeTraceTileResolution, bApplySkyLight, bInlineRayTracing,
@@ -617,7 +617,7 @@ void RenderLumenHardwareRayTracingRadianceCacheTwoPass(
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FIndirectDispatchDim>(bIndirectDispatch);
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FSpecularOcclusionDim>(false);
 			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FPackTraceDataDim>(false);
-			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FClipRayDim>(GetRayTracingCulling() != 0);
+			PermutationVector.Set<FLumenRadianceCacheHardwareRayTracing::FClipRayDim>(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 
 			DispatchRayGenOrComputeShader(GraphBuilder, Scene, View, SceneTextures, TracingParameters, RadianceCacheParameters, PermutationVector,
 				DiffuseConeHalfAngle, MaxNumProbes, MaxProbeTraceTileResolution, bApplySkyLight, bInlineRayTracing,

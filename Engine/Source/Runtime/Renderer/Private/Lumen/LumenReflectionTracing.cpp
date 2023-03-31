@@ -480,11 +480,11 @@ FCompactedReflectionTraceParameters CompactTraces(
 		PassParameters->DitheredStartDistanceFactor = LumenReflections::UseFarField(*View.Family) ? Lumen::GetFarFieldDitheredStartDistanceFactor() : 1.0f;
 		PassParameters->Strata = Strata::BindStrataGlobalUniformParameters(View);
 		PassParameters->IndirectArgs = ReflectionCompactionIndirectArgs;
-
+	
 		FReflectionCompactTracesCS::FPermutationDomain PermutationVector;
 		PermutationVector.Set< FReflectionCompactTracesCS::FWaveOps >(bWaveOps);
 		PermutationVector.Set< FReflectionCompactTracesCS::FThreadGroupSize >(CompactionThreadGroupSize);
-		PermutationVector.Set< FReflectionCompactTracesCS::FClipRayDim >(GetRayTracingCulling() != 0);
+		PermutationVector.Set< FReflectionCompactTracesCS::FClipRayDim >(RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled);
 		auto ComputeShader = View.ShaderMap->GetShader<FReflectionCompactTracesCS>(PermutationVector);
 
 		FComputeShaderUtils::AddPass(

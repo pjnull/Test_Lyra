@@ -544,7 +544,7 @@ void LumenVisualize::VisualizeHardwareRayTracing(
 
 	// Cache near-field and far-field trace distances
 	const float FarFieldMaxTraceDistance = Lumen::GetFarFieldMaxTraceDistance();
-	const float MaxTraceDistance = (GetRayTracingCulling() != 0) ? GetRayTracingCullingRadius() : IndirectTracingParameters.MaxTraceDistance;
+	const float MaxTraceDistance = (RayTracing::GetCullingMode(View.Family->EngineShowFlags) != RayTracing::ECullingMode::Disabled) ? GetRayTracingCullingRadius() : IndirectTracingParameters.MaxTraceDistance;
 
 	// Generate tiles
 	FRDGBufferRef TileAllocatorBuffer = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), 1), TEXT("Lumen.Visualize.TileAllocator"));
