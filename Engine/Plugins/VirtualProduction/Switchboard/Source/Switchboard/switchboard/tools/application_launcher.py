@@ -15,6 +15,7 @@ class ApplicationLauncher(object):
         self.lock = threading.Lock()
         self.process: Optional[subprocess.Popen] = None
         self.name = name
+        self.requires_elevation = False
 
     def exe_path(self):
         ''' Returns the expected executable path. Extension not included '''
@@ -41,7 +42,9 @@ class ApplicationLauncher(object):
 
             LOGGER.debug(f"Launching '{cmdline}' ...")
 
-            subprocess.Popen(cmdline)
+            shell = True if self.requires_elevation else False
+
+            subprocess.Popen(cmdline, shell=shell)
 
         return True
 
