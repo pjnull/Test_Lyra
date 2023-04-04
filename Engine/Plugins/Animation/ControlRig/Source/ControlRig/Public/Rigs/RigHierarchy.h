@@ -3606,6 +3606,7 @@ private:
 
 	// Storage for the elements
 	mutable TArray<FRigBaseElement*> Elements;
+	FCriticalSection ElementsLock;
 
 	// Storage for the elements
 	mutable TArray<TArray<FRigBaseElement*>> ElementsPerType;
