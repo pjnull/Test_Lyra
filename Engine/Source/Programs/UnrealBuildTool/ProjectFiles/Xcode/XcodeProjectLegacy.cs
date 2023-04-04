@@ -1824,7 +1824,10 @@ namespace UnrealBuildTool.XcodeProjectLegacy
 				return true;
 			}
 
-			FileReference? GameProjectPath = null;
+			// if a single project was specified then start with that, this will allow content-only projects to have
+			// their BundleID set in the stub xcode project when codesigning, which Xcode needs to have now)
+			// note that usually SingleGameProject is null
+			FileReference? GameProjectPath = XcodeProjectFileGenerator.SingleGameProject;
 			foreach (Project Target in ProjectTargets)
 			{
 				if (Target.UnrealProjectFilePath != null)
