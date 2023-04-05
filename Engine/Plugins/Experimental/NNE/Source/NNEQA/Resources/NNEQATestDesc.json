@@ -227,8 +227,7 @@
 					]},
 				{	"target": "Atanh" },
 				{	"target": "BitShift", "skip": true, "comment": "TODO need attributes" },
-				{	"target": "Cast",     "skip": true, "comment": "TODO need attributes" },
-				{	"target": "Ceil"},
+				{	"target": "Ceil" },
 				{	"target": "Clip", "additional_datasets": [ "Elementwise.Clip.AttributeTest" ] },
 				{	"target": "Cos" },
 				{	"target": "Cosh" },
@@ -254,6 +253,10 @@
 						{ "name": "NNERuntimeRDGDml"},
 						{ "name": "NNERuntimeRDGHlsl"}
 					], "absolute_tolerance": 1e-6 },
+				{	"target": "LogSoftmax", 
+					"runtimes": [{ "name": "NNERuntimeRDGHlsl",   "skip": true }],
+					"additional_datasets": [ "Elementwise.Softmax.AttributeTest" ]
+				},
 				{	"target": "Neg" },
 				{	"target": "Not", "input_type": "boolean", "output_type": "boolean", "runtimes": [
 						{ "name": "NNERuntimeRDGDml", "skip": true, "comment": "RDG need bool tensor support"},
@@ -359,6 +362,15 @@
 			]
 		},
 		{
+			"category": "CastOp",
+			"runtimes": [	
+				{ "name": "NNERuntimeRDGHlsl", "skip": true }
+			],
+			"targets": [
+				{ "target": "Cast", "tags": [ "SmokeTest" ] }
+			]
+		},
+		{
 			"category": "Convolution",
 			"targets": [
 				{ "target": "Conv", "absolute_tolerance": 1e-4, "relative_tolerance": 1e-4 }
@@ -391,9 +403,6 @@
 		},
 		{
 			"category": "Dropout",
-			"runtimes": [
-				{ "name": "NNERuntimeRDGDml", "skip": true },
-			],
 			"targets": [
 				{ "target": "Dropout" }
 			]
@@ -420,6 +429,16 @@
 			"category": "Upsample",
 			"targets": [
 				{ "target": "Upsample" }
+			]
+		},
+		{
+			"category": "Resize",
+			"runtimes": [	
+				{ "name": "NNERuntimeRDGHlsl", "skip": true },
+				{ "name": "NNERuntimeORTDml", "skip": true }
+			],
+			"targets": [
+				{ "target": "Resize", "absolute_tolerance": 1e-5 }
 			]
 		},
 		{
@@ -535,6 +554,15 @@
 			"runtimes": [
 				{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Not supported" }
 			]
+		},
+		{
+			"category": "Split",
+			"targets": [
+				{ "target": "Split" }
+			],
+			"runtimes": [
+				{ "name": "NNERuntimeRDGHlsl", "skip": true, "comment": "Not supported" }
+			]
 		}
 	],
 
@@ -552,6 +580,12 @@
 				{ "inputs": [ { "shape": [ 1,3,224,224 ] } ] },
 				{ "inputs": [ { "shape": [ 1,3,128,64 ] } ] },
 				{ "inputs": [ { "shape": [ 1,3,720,1280] } ] }
+			]
+		},
+		{
+			"name": "CastOp",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 32 ] } ] , "outputs": [ { "shape": [ 32 ], "type": "float" } ]}
 			]
 		},
 		{
@@ -925,6 +959,13 @@
 			]
 		},
 		{
+			"name": "Resize.Downsample.Linear",
+			"datasets": [
+				{ "inputs":  [ { "shape": [ 10, 10 ] } ],	"weights": [ { "shape": [ 4 ], "source": [ "2", "1", "8", "9" ], "type": "float" }, { "shape": [ 2 ], "source": [ "0.6", "0.8"  ], "type": "float" } ],	"outputs": [ { "shape": [ 6, 8 ]} ] },
+				{ "inputs":  [ { "shape": [ 20, 15 ] } ],	"weights": [ { "shape": [ 4 ], "source": [ "5", "3", "19", "14" ], "type": "float" }, { "shape": [ 2 ], "source": [ "0.5", "0.4"  ], "type": "float" } ],	"outputs": [ { "shape": [ 10, 6 ]} ] }
+			]
+		},
+		{
 			"name": "Identity",
 			"datasets": [
 				{ 
@@ -1196,6 +1237,18 @@
 				{ "inputs": [ { "shape": [ 2, 3, 128, 256, 64 ] } ], "outputs": [ { "shape": [ 2, 3, 1, 1, 1 ] } ] }
 			]
 		},
+		{
+			"name": "Split.Axis2",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 1, 1, 6, 2 ] } ], "outputs": [ { "shape": [ 1, 1, 2, 2 ] }, { "shape": [ 1, 1, 1, 2 ] }, { "shape": [ 1, 1, 3, 2 ] } ] }
+			]
+		},
+		{
+			"name": "Split.Axis3",
+			"datasets": [
+				{ "inputs": [ { "shape": [ 1, 1, 6, 2 ] } ], "outputs": [ { "shape": [ 1, 1, 6, 1 ] }, { "shape": [ 1, 1, 6, 1 ] } ] }
+			]
+		},
 		{ 
 			"name": "Reduce.Default",
 			"datasets": [
@@ -1358,6 +1411,12 @@
 			"name": "Gemm.ThreeInputs.AllTransposed",
 			"attribute_maps": [
 				{ "attributes": [ { "name": "transA", "value": 1, "type": "Int32" }, { "name": "transB", "value": 1, "type": "Int32" } ] }
+			]
+		},
+		{
+			"name": "CastOp",
+			"attribute_maps": [
+				{ "attributes": [ { "name": "to", "value": 1, "type": "Int32" } ] }
 			]
 		},
 		{
@@ -1600,6 +1659,25 @@
 			]
 		},
 		{
+			"name": "Resize.Downsample.Linear",
+			"attribute_maps": [
+				{
+					"attributes": [ 
+						{ "name": "mode", "value": "linear", "type": "String" }
+					]
+				}
+			]
+		},
+		{
+			"name": "Resize.Downsample.Linear.Transform",
+			"multiply_with_attribute_sets": [ "Resize.Downsample.Linear" ],
+			"attribute_maps": [
+				{ "attributes": [ { "name": "coordinate_transformation_mode", "value": "align_corners", "type": "String" } ] },
+				{ "attributes": [ { "name": "coordinate_transformation_mode", "value": "asymmetric", "type": "String" } ] },
+				{ "attributes": [ { "name": "coordinate_transformation_mode", "value": "tf_half_pixel_for_nn", "type": "String" } ] }
+			]
+		},
+		{
 			"name": "GRU.Defaults",
 			"attribute_maps": [
 				{ "attributes": [
@@ -1719,6 +1797,26 @@
 						{ "name": "kernel_shape", "value": [2, 2], "type": "Int32Array" },
 						{ "name": "pads", "value": [0, 0, 0, 0], "type": "Int32Array" },
 						{ "name": "strides", "value": [2, 2], "type": "Int32Array" } 
+					]
+				}
+			]
+		},
+		{
+			"name": "Split.Axis2",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "axis", "value": 2, "type": "Int32" },
+						{ "name": "split", "value": [2, 1, 3], "type": "Int32Array" }
+					]
+				}
+			]
+		},
+		{
+			"name": "Split.Axis3",
+			"attribute_maps": [
+				{ "attributes": [ 
+						{ "name": "axis", "value": 3, "type": "Int32" },
+						{ "name": "split", "value": [1, 1], "type": "Int32Array" }
 					]
 				}
 			]
