@@ -723,6 +723,8 @@ bool ADisplayClusterRootActor::BuildHierarchy()
 
 void ADisplayClusterRootActor::SetLightCardOwnership()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(DCRootActor_SetLightCardOwnership);
+
 	if (UDisplayClusterConfigurationData* CurrentData = GetConfigData())
 	{
 		FDisplayClusterConfigurationICVFX_VisibilityList& LightCardVisibilityList = CurrentData->StageSettings.Lightcard.ShowOnlyList;
@@ -854,6 +856,8 @@ bool ADisplayClusterRootActor::GetFlushPositionAndNormal(const FVector& WorldPos
 
 bool ADisplayClusterRootActor::MakeStageActorFlushToWall(const TScriptInterface<IDisplayClusterStageActor>& StageActor, double DesiredOffsetFromFlush)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(DCRootActor_MakeStageActorFlushToWall);
+
 	if (StageActor.GetObject() && !StageActor->IsUVActor())
 	{
 		FVector Position;
