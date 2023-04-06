@@ -2,17 +2,17 @@
 
 #include "Helpers/PCGActorHelpers.h"
 
-#include "Materials/MaterialInterface.h"
-#include "PCGHelpers.h"
-
 #include "PCGComponent.h"
 #include "PCGManagedResource.h"
+#include "PCGModule.h"
+#include "Helpers/PCGHelpers.h"
+
 #include "EngineUtils.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Engine/InheritableComponentHandler.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/StaticMesh.h"
-#include "PCGModule.h"
+#include "Materials/MaterialInterface.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(PCGActorHelpers)
 
