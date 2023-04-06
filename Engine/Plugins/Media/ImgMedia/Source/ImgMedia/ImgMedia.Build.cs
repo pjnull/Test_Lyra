@@ -27,6 +27,8 @@ namespace UnrealBuildTool.Rules
 					"RenderCore",
 					"Renderer",
 					"RHI",
+					"Slate",
+					"SlateCore",
 				});
 
 			PrivateIncludePathModuleNames.AddRange(
