@@ -588,7 +588,11 @@ TRefCountPtr<IPooledRenderTarget> FVirtualShadowMapArrayCacheManager::SetPhysica
 			PF_R32_UINT,
 			FClearValueBinding::None,
 			TexCreate_None,
+		#if PLATFORM_MAC_ENABLE_EXPERIMENTAL_NANITE_SUPPORT
+			TexCreate_ShaderResource | TexCreate_UAV | TexCreate_AtomicCompatible,
+		#else
 			TexCreate_ShaderResource | TexCreate_UAV,
+		#endif
 			false,
 			RequestedArraySize
 		);

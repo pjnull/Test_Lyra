@@ -883,6 +883,10 @@ void CompileShader_Metal(const FShaderCompilerInput& _Input,FShaderCompilerOutpu
 		}
 	}();
 
+	#if PLATFORM_MAC_ENABLE_EXPERIMENTAL_NANITE_SUPPORT
+		AdditionalDefines.SetDefine(TEXT("METAL_ENABLE_EXPERIMENTAL_NANITE_SUPPORT"), 1);
+	#endif 
+
 	// TODO read from toolchain
 	bool bAppleTV = (Input.ShaderFormat == NAME_SF_METAL_TVOS || Input.ShaderFormat == NAME_SF_METAL_MRT_TVOS);
 	if (Input.ShaderFormat == NAME_SF_METAL || Input.ShaderFormat == NAME_SF_METAL_TVOS)

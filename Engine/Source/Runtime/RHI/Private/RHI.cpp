@@ -1594,7 +1594,8 @@ bool RHIGetPreviewFeatureLevel(ERHIFeatureLevel::Type& PreviewFeatureLevelOUT)
 
 RHI_API int32 RHIGetPreferredClearUAVRectPSResourceType(const FStaticShaderPlatform Platform)
 {
-	if (IsMetalPlatform(Platform))
+	// We can't bind Nanite buffers as RWBuffer to perform a clear op.
+	if (IsMetalPlatform(Platform) && !FDataDrivenShaderPlatformInfo::GetSupportsNanite(Platform))
 	{
 		static constexpr uint32 METAL_TEXTUREBUFFER_SHADER_LANGUAGE_VERSION = 4;
 		if (METAL_TEXTUREBUFFER_SHADER_LANGUAGE_VERSION <= RHIGetMetalShaderLanguageVersion(Platform))
