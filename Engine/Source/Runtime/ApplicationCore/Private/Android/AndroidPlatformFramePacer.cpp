@@ -13,7 +13,7 @@
 
 TAutoConsoleVariable<int32> FAndroidPlatformRHIFramePacer::CVarUseSwappyForFramePacing(
 	TEXT("a.UseSwappyForFramePacing"),
-	0,
+	1,
 	TEXT("True to use Swappy for frame pacing."));
 
 TAutoConsoleVariable<int32> FAndroidPlatformRHIFramePacer::CVarSupportNonVSyncMultipleFrameRates(
