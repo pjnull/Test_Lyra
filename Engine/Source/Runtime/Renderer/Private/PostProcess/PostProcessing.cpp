@@ -259,6 +259,8 @@ void AddPostProcessingPasses(
 	FRDGTextureRef LocalExposureTexture = nullptr;
 	FRDGTextureRef LocalExposureBlurredLogLumTexture = BlackDummy.Texture;
 
+	FVisualizeTemporalUpscalerInputs VisualizeTemporalUpscalerInputs;
+
 	const FEngineShowFlags& EngineShowFlags = View.Family->EngineShowFlags;
 	const bool bVisualizeHDR = EngineShowFlags.VisualizeHDR;
 	const bool bViewFamilyOutputInHDR = View.Family->RenderTarget->GetSceneHDREnabled();
@@ -296,6 +298,7 @@ void AddPostProcessingPasses(
 		VisualizeHDR,
 		VisualizeLocalExposure,
 		VisualizeMotionVectors,
+		VisualizeTemporalUpscaler,
 		PixelInspector,
 		HMDDistortion,
 		HighResolutionScreenshotMask,
@@ -344,6 +347,7 @@ void AddPostProcessingPasses(
 		TEXT("VisualizeHDR"),
 		TEXT("VisualizeLocalExposure"),
 		TEXT("VisualizeMotionVectors"),
+		TEXT("VisualizeTemporalUpscaler"),
 		TEXT("PixelInspector"),
 		TEXT("HMDDistortion"),
 		TEXT("HighResolutionScreenshotMask"),
@@ -384,6 +388,7 @@ void AddPostProcessingPasses(
 	PassSequence.SetEnabled(EPass::VisualizeLumenSceneOverview, LumenVisualizeMode == VISUALIZE_MODE_OVERVIEW && bPostProcessingEnabled);
 	PassSequence.SetEnabled(EPass::VisualizeHDR, EngineShowFlags.VisualizeHDR);
 	PassSequence.SetEnabled(EPass::VisualizeMotionVectors, EngineShowFlags.VisualizeMotionVectors || EngineShowFlags.VisualizeReprojection);
+	PassSequence.SetEnabled(EPass::VisualizeTemporalUpscaler, EngineShowFlags.VisualizeTemporalUpscaler);
 #if WITH_EDITOR
 	PassSequence.SetEnabled(EPass::PixelInspector, View.bUsePixelInspector);
 #else
@@ -659,6 +664,14 @@ void AddPostProcessingPasses(
 			HalfResSceneColor = Outputs.HalfRes;
 			QuarterResSceneColor = Outputs.QuarterRes;
 			VelocityFlattenTextures = Outputs.VelocityFlattenTextures;
+
+			if (PassSequence.IsEnabled(EPass::VisualizeTemporalUpscaler))
+			{
+				VisualizeTemporalUpscalerInputs.TAAConfig = TAAConfig;
+				VisualizeTemporalUpscalerInputs.UpscalerUsed = UpscalerToUse;
+				VisualizeTemporalUpscalerInputs.Inputs = UpscalerPassInputs;
+				VisualizeTemporalUpscalerInputs.Outputs = Outputs;
+			}
 		}
 		else if (ReflectionsMethod == EReflectionsMethod::SSR)
 		{
@@ -1331,6 +1344,14 @@ void AddPostProcessingPasses(
 		PassInputs.SceneVelocity = Velocity;
 
 		SceneColor = AddVisualizeMotionVectorsPass(GraphBuilder, View, PassInputs);
+	}
+
+	if (PassSequence.IsEnabled(EPass::VisualizeTemporalUpscaler))
+	{
+		PassSequence.AcceptOverrideIfLastPass(EPass::VisualizeTemporalUpscaler, VisualizeTemporalUpscalerInputs.OverrideOutput);
+		VisualizeTemporalUpscalerInputs.SceneColor = SceneColor;
+
+		SceneColor = AddVisualizeTemporalUpscalerPass(GraphBuilder, View, VisualizeTemporalUpscalerInputs);
 	}
 
 #if WITH_EDITOR
