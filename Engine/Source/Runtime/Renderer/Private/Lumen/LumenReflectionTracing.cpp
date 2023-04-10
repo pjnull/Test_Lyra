@@ -441,7 +441,12 @@ FCompactedReflectionTraceParameters CompactTraces(
 	const int32 NumCompactedTraceTexelDataElements = ReflectionTracingParameters.ReflectionTracingBufferSize.X * ReflectionTracingParameters.ReflectionTracingBufferSize.Y;
 	FRDGBufferRef CompactedTraceTexelData = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateBufferDesc(sizeof(uint32) * 2, NumCompactedTraceTexelDataElements), TEXT("Lumen.Reflections.CompactedTraceTexelData"));
 
-	const bool bWaveOps = GLumenReflectionTraceCompactionWaveOps != 0 && GRHISupportsWaveOperations && GRHIMinimumWaveSize >= 32 && RHISupportsWaveOperations(View.GetShaderPlatform());
+	const bool bWaveOps = GLumenReflectionTraceCompactionWaveOps != 0 
+		&& GRHISupportsWaveOperations 
+		&& GRHIMinimumWaveSize <= 32 
+		&& GRHIMaximumWaveSize >= 32
+		&& RHISupportsWaveOperations(View.GetShaderPlatform());
+
 	// Only the wave ops path maintains trace order, switch to smaller groups without it to preserve coherency in the traces
 	const uint32 CompactionThreadGroupSize = FReflectionCompactTracesCS::GetThreadGroupSize(bWaveOps ? GLumenReflectionTraceCompactionGroupSizeInTiles : 1);
 	FRDGBufferRef ReflectionCompactionIndirectArgs = GraphBuilder.CreateBuffer(FRDGBufferDesc::CreateIndirectDesc<FRHIDispatchIndirectParameters>(1), TEXT("Lumen.Reflections.CompactionIndirectArgs"));
@@ -705,7 +710,8 @@ void TraceReflections(
 
 		const bool bTerminateOnLowOccupancy = GLumenReflectionScreenTracesMinimumOccupancy > 0
 			&& GRHISupportsWaveOperations 
-			&& GRHIMinimumWaveSize >= 32 
+			&& GRHIMinimumWaveSize <= 32 
+			&& GRHIMaximumWaveSize >= 32
 			&& RHISupportsWaveOperations(View.GetShaderPlatform());
 
 		FReflectionTraceScreenTexturesCS::FPermutationDomain PermutationVector;

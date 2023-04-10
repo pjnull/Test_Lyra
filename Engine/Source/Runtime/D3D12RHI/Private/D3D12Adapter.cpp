@@ -962,6 +962,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				GRHISupportsWaveOperations = Features.WaveOps;
 				GRHIMinimumWaveSize = Features.WaveLaneCountMin;
 				GRHIMaximumWaveSize = Features.WaveLaneCountMax;
+
+				if (GRHISupportsWaveOperations)
+				{
+					UE_LOG(LogD3D12RHI, Log, TEXT("Wave Operations are supported (wave size: min=%d max=%d)."), GRHIMinimumWaveSize, GRHIMaximumWaveSize);
+				}
 			}
 
 #if D3D12_RHI_RAYTRACING
