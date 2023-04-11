@@ -2385,7 +2385,8 @@ void UAnimSequencerController::PopulateWithExistingModel(TScriptInterface<IAnima
 
 		if (const UAnimSequence* AnimSequence = Model->GetAnimationSequence())
 		{
-			const USkeleton* Skeleton = AnimSequence->GetSkeleton();		
+			const USkeleton* Skeleton = AnimSequence->GetSkeleton();
+			if (Skeleton)
 			{
 				QUICK_SCOPE_CYCLE_COUNTER(STAT_PopulateBoneTrack);
 				for (const FBoneAnimationTrack& BoneTrack : BoneTracks)
