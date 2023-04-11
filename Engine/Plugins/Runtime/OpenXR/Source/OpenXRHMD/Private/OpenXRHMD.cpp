@@ -76,6 +76,12 @@ static TAutoConsoleVariable<bool> CVarOpenXRDoNotCopyEmulatedLayersToSpectatorSc
 	TEXT("If face locked stereo layers emulation is active, avoid copying the face locked stereo layers to the spectator screen.\n"),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarOpenXRAcquireMode(
+	TEXT("xr.OpenXRAcquireMode"),
+	0,
+	TEXT("Override the swapchain acquire mode. 1 = Acquire on any thread, 2 = Only acquire on RHI thread\n"),
+	ECVF_Default);
+
 namespace {
 	static TSet<XrViewConfigurationType> SupportedViewConfigurations{ XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO };
 
@@ -1231,6 +1237,20 @@ bool CheckPlatformDepthExtensionSupport(const XrInstanceProperties& InstanceProp
 	return true;
 }
 
+bool CheckPlatformAcquireOnAnyThreadSupport(const XrInstanceProperties& InstanceProps)
+{
+	int32 AcquireMode = CVarOpenXRAcquireMode.GetValueOnAnyThread();
+	if (AcquireMode > 0)
+	{
+		return AcquireMode == 1;
+	}
+	else if (RHIGetInterfaceType() != ERHIInterfaceType::Vulkan || FCStringAnsi::Strstr(InstanceProps.runtimeName, "Oculus"))
+	{
+		return true;
+	}
+	return false;
+}
+
 FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance, TRefCountPtr<FOpenXRRenderBridge>& InRenderBridge, TArray<const char*> InEnabledExtensions, TArray<IOpenXRExtensionPlugin*> InExtensionPlugins, IARSystemSupport* ARSystemSupport)
 	: FHeadMountedDisplayBase(ARSystemSupport)
 	, FHMDSceneViewExtension(AutoRegister)
@@ -1242,7 +1262,6 @@ FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance,
 	, bIsSynchronized(false)
 	, bShouldWait(true)
 	, bIsExitingSessionByxrRequestExitSession(false)
-	, bNeedReAllocatedDepth(false)
 	, bNeedReBuildOcclusionMesh(true)
 	, bIsMobileMultiViewEnabled(false)
 	, bSupportsHandTracking(false)
@@ -1281,7 +1300,7 @@ FOpenXRHMD::FOpenXRHMD(const FAutoRegister& AutoRegister, XrInstance InInstance,
 	bViewConfigurationFovSupported = IsExtensionEnabled(XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME);
 	bSupportsHandTracking = IsExtensionEnabled(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
 	bSpaceAccellerationSupported = IsExtensionEnabled(XR_EPIC_SPACE_ACCELERATION_NAME);
-
+	bIsAcquireOnAnyThreadSupported = CheckPlatformAcquireOnAnyThreadSupport(InstanceProperties);
 	ReconfigureForShaderPlatform(GMaxRHIShaderPlatform);
 
 #if PLATFORM_HOLOLENS || PLATFORM_ANDROID
@@ -2010,7 +2029,6 @@ void FOpenXRHMD::DestroySession()
 		bIsRunning = false;
 		bIsRendering = false;
 		bIsSynchronized = false;
-		bNeedReAllocatedDepth = true;
 		bNeedReBuildOcclusionMesh = true;
 	}
 }
@@ -2171,7 +2189,24 @@ IStereoRenderTargetManager* FOpenXRHMD::GetRenderTargetManager()
 	return this;
 }
 
-bool FOpenXRHMD::AllocateRenderTargetTexture(uint32 Index, uint32 SizeX, uint32 SizeY, uint8 Format, uint32 NumMips, ETextureCreateFlags Flags, ETextureCreateFlags TargetableTextureFlags, FTexture2DRHIRef& OutTargetableTexture, FTexture2DRHIRef& OutShaderResourceTexture, uint32 NumSamples)
+int32 FOpenXRHMD::AcquireColorTexture()
+{
+	if (Session)
+	{
+		const FXRSwapChainPtr& ColorSwapchain = PipelinedLayerStateRendering.ColorSwapchain;
+		if (ColorSwapchain)
+		{
+			if (bIsAcquireOnAnyThreadSupported)
+			{
+				ColorSwapchain->IncrementSwapChainIndex_RHIThread();
+			}
+			return ColorSwapchain->GetSwapChainIndex_RHIThread();
+		}
+	}
+	return 0;
+}
+
+bool FOpenXRHMD::AllocateRenderTargetTextures(uint32 SizeX, uint32 SizeY, uint8 Format, uint32 NumMips, ETextureCreateFlags Flags, ETextureCreateFlags TargetableTextureFlags, TArray<FTexture2DRHIRef>& OutTargetableTextures, TArray<FTexture2DRHIRef>& OutShaderResourceTextures, uint32 NumSamples)
 {
 	check(IsInRenderingThread());
 
@@ -2227,15 +2262,25 @@ bool FOpenXRHMD::AllocateRenderTargetTexture(uint32 Index, uint32 SizeX, uint32 
 		{
 			return false;
 		}
+
+		// Image will be acquired by the viewport if supported, if not we acquire it ahead of time here
+		if (!bIsAcquireOnAnyThreadSupported)
+		{
+			ExecuteOnRHIThread([Swapchain]() {
+				Swapchain->IncrementSwapChainIndex_RHIThread();
+			});
+		}
 	}
 
 	// Grab the presentation texture out of the swapchain.
-	OutTargetableTexture = OutShaderResourceTexture = (FTexture2DRHIRef&)Swapchain->GetTextureRef();
+	OutTargetableTextures = Swapchain->GetSwapChain();
+	OutShaderResourceTextures = OutTargetableTextures;
 	LastRequestedColorSwapchainFormat = Format;
 	LastActualColorSwapchainFormat = ActualFormat;
 
-	if(IsEmulatingStereoLayers())
+	if (IsEmulatingStereoLayers() && (SystemProperties.graphicsProperties.maxLayerCount > 1))
 	{
+		// If we have at least two native layers, use non-background layer to render the composited image of all the emulated face locked layers.
 		FXRSwapChainPtr& EmulationSwapchain = PipelinedLayerStateRendering.EmulatedLayerState.EmulationSwapchain;
 		const FRHITexture2D* const EmulationSwapchainTexture = EmulationSwapchain == nullptr ? nullptr : EmulationSwapchain->GetTexture2DArray() ? EmulationSwapchain->GetTexture2DArray() : EmulationSwapchain->GetTexture2D();
 		if (EmulationSwapchain == nullptr || EmulationSwapchainTexture == nullptr || EmulationSwapchainTexture->GetSizeX() != SizeX || EmulationSwapchainTexture->GetSizeY() != SizeY)
@@ -2244,19 +2289,25 @@ bool FOpenXRHMD::AllocateRenderTargetTexture(uint32 Index, uint32 SizeX, uint32 
 
 			uint8 UnusedActualFormat = 0;
 			EmulationSwapchain = RenderBridge->CreateSwapchain(Session, IStereoRenderTargetManager::GetStereoLayerPixelFormat(), UnusedActualFormat, SizeX, SizeY, bIsMobileMultiViewEnabled ? 2 : 1, NumMips, NumSamples, EmulationCreateFlags, FClearValueBinding::Transparent);
+
+			// Image will be acquired by SetupFrameLayers_RenderThread if supported, if not we acquire it ahead of time here
+			if (!bIsAcquireOnAnyThreadSupported)
+			{
+				ExecuteOnRHIThread([EmulationSwapchain]() {
+					EmulationSwapchain->IncrementSwapChainIndex_RHIThread();
+				});
+			}
 		}
 	}
 
 	// TODO: Pass in known depth parameters (format + flags)? Do we know that at viewport setup time?
-	AllocateDepthTextureInternal(Index, SizeX, SizeY, NumSamples, OutTargetableTexture->GetDesc().ArraySize);
+	AllocateDepthTextureInternal(SizeX, SizeY, NumSamples, bIsMobileMultiViewEnabled ? 2 : 1);
 
 	return true;
 }
 
-void FOpenXRHMD::AllocateDepthTextureInternal(uint32 Index, uint32 SizeX, uint32 SizeY, uint32 NumSamples, uint32 InArraySize)
+void FOpenXRHMD::AllocateDepthTextureInternal(uint32 SizeX, uint32 SizeY, uint32 NumSamples, uint32 InArraySize)
 {
-	// TODO: Allocate depth texture by checking bNeedReAllocatedDepth
-
 	check(IsInRenderingThread());
 
 	FReadScopeLock Lock(SessionHandleMutex);
@@ -2265,11 +2316,9 @@ void FOpenXRHMD::AllocateDepthTextureInternal(uint32 Index, uint32 SizeX, uint32
 		return;
 	}
 
-	check(LastRequestedDepthSwapchainFormat == PF_DepthStencil);
-
 	FXRSwapChainPtr& DepthSwapchain = PipelinedLayerStateRendering.DepthSwapchain;
 	const FRHITexture2D* const DepthSwapchainTexture = DepthSwapchain == nullptr ? nullptr : DepthSwapchain->GetTexture2DArray() ? DepthSwapchain->GetTexture2DArray() : DepthSwapchain->GetTexture2D();
-	if (DepthSwapchain == nullptr || DepthSwapchainTexture == nullptr || 
+	if (DepthSwapchain == nullptr || DepthSwapchainTexture == nullptr ||
 		DepthSwapchainTexture->GetSizeX() != SizeX || DepthSwapchainTexture->GetSizeY() != SizeY || DepthSwapchainTexture->GetDesc().ArraySize != InArraySize)
 	{
 		// We're only creating a 1x target here, but we don't know whether it'll be the targeted texture
@@ -2293,10 +2342,14 @@ void FOpenXRHMD::AllocateDepthTextureInternal(uint32 Index, uint32 SizeX, uint32
 			return;
 		}
 
-		// image will be acquired next time we begin the rendering
+		// Image will be acquired by the renderer if supported, if not we acquire it ahead of time here
+		if (!bIsAcquireOnAnyThreadSupported)
+		{
+			ExecuteOnRHIThread([DepthSwapchain]() {
+				DepthSwapchain->IncrementSwapChainIndex_RHIThread();
+			});
+		}
 	}
-
-	bNeedReAllocatedDepth = false;
 }
 
 // TODO: in the future, we can rename the interface to GetDepthTexture because allocate could happen in AllocateRenderTargetTexture
@@ -2319,6 +2372,10 @@ bool FOpenXRHMD::AllocateDepthTexture(uint32 Index, uint32 SizeX, uint32 SizeY, 
 
 	const ETextureCreateFlags UnifiedCreateFlags = Flags | TargetableTextureFlags;
 	ensure(EnumHasAllFlags(UnifiedCreateFlags, TexCreate_DepthStencilTargetable)); // We can't use the depth swapchain w/o this flag
+	if (bIsAcquireOnAnyThreadSupported)
+	{
+		DepthSwapchain->IncrementSwapChainIndex_RHIThread();
+	}
 
 	const FRHITexture2D* const DepthSwapchainTexture = DepthSwapchain->GetTexture2DArray() ? DepthSwapchain->GetTexture2DArray() : DepthSwapchain->GetTexture2D();
 	const FRHITextureDesc& DepthSwapchainDesc = DepthSwapchainTexture->GetDesc();
@@ -2479,6 +2536,11 @@ void FOpenXRHMD::SetupFrameQuadLayers_RenderThread(FRHICommandListImmediate& RHI
 		PipelinedLayerStateRendering.EmulatedLayerState.bIsFaceLockedLayerEmulationActive = !EmulatedFaceLockedLayers.IsEmpty();
 	}
 
+	if (bIsAcquireOnAnyThreadSupported && PipelinedLayerStateRendering.EmulatedLayerState.EmulationSwapchain)
+	{
+		PipelinedLayerStateRendering.EmulatedLayerState.EmulationSwapchain->IncrementSwapChainIndex_RHIThread();
+	}
+
 	const FTransform InvTrackingToWorld = GetTrackingToWorldTransform().Inverse();
 	const float WorldToMeters = GetWorldToMetersScale();
 
@@ -2567,7 +2629,8 @@ void FOpenXRHMD::DrawEmulatedFaceLockedLayers_RenderThread(FRDGBuilder& GraphBui
 
 	AddPass(GraphBuilder, RDG_EVENT_NAME("OpenXREmulatedFaceLockedLayerRender"), [this, &InView](FRHICommandListImmediate& RHICmdList)
 	{
-		FTexture2DRHIRef RenderTarget = PipelinedLayerStateRendering.EmulatedLayerState.EmulationSwapchain->GetTextureRef();
+		FXRSwapChainPtr EmulationSwapchain = PipelinedLayerStateRendering.EmulatedLayerState.EmulationSwapchain;
+		FTexture2DRHIRef RenderTarget = EmulationSwapchain->GetTextureRef();
 
 		FDefaultStereoLayers_LayerRenderParams RenderParams;
 		FRHIRenderPassInfo RPInfo = SetupEmulatedLayersRenderPass(RHICmdList, InView, EmulatedFaceLockedLayers, RenderTarget, RenderParams);
@@ -3147,17 +3210,27 @@ void FOpenXRHMD::OnBeginRendering_RHIThread(const FPipelinedFrameState& InFrameS
 		// We need a new swapchain image unless we've already acquired one for rendering
 		if (!bIsRendering && ColorSwapchain)
 		{
-			ColorSwapchain->IncrementSwapChainIndex_RHIThread();
+			TArray<XrSwapchain> Swapchains;
 			ColorSwapchain->WaitCurrentImage_RHIThread(OPENXR_SWAPCHAIN_WAIT_TIMEOUT);
-			if (bDepthExtensionSupported && DepthSwapchain)
+			if (!bIsAcquireOnAnyThreadSupported)
 			{
-				DepthSwapchain->IncrementSwapChainIndex_RHIThread();
-				DepthSwapchain->WaitCurrentImage_RHIThread(OPENXR_SWAPCHAIN_WAIT_TIMEOUT);
+				ColorSwapchain->IncrementSwapChainIndex_RHIThread();
 			}
-			if(PipelinedLayerStateRHI.EmulatedLayerState.bIsFaceLockedLayerEmulationActive && EmulationSwapchain)
+			if (DepthSwapchain)
 			{
-				EmulationSwapchain->IncrementSwapChainIndex_RHIThread();
+				DepthSwapchain->WaitCurrentImage_RHIThread(OPENXR_SWAPCHAIN_WAIT_TIMEOUT);
+				if (!bIsAcquireOnAnyThreadSupported)
+				{
+					DepthSwapchain->IncrementSwapChainIndex_RHIThread();
+				}
+			}
+			if (EmulationSwapchain)
+			{
 				EmulationSwapchain->WaitCurrentImage_RHIThread(OPENXR_SWAPCHAIN_WAIT_TIMEOUT);
+				if (!bIsAcquireOnAnyThreadSupported)
+				{
+					EmulationSwapchain->IncrementSwapChainIndex_RHIThread();
+				}
 			}
 		}
 
@@ -3196,7 +3269,7 @@ void FOpenXRHMD::OnFinishRendering_RHIThread()
 		{
 			PipelinedLayerStateRHI.DepthSwapchain->ReleaseCurrentImage_RHIThread();
 		}
-		if(PipelinedLayerStateRHI.EmulatedLayerState.bIsFaceLockedLayerEmulationActive && PipelinedLayerStateRHI.EmulatedLayerState.EmulationSwapchain)
+		if (PipelinedLayerStateRHI.EmulatedLayerState.EmulationSwapchain)
 		{
 			PipelinedLayerStateRHI.EmulatedLayerState.EmulationSwapchain->ReleaseCurrentImage_RHIThread();
 		}
