@@ -613,8 +613,8 @@ bool URemoteControlPreset::RemoveController(const FName& InPropertyName)
 
 		if (const URCVirtualPropertyBase* ControllerToDelete = ControllerContainer->GetVirtualProperty(InPropertyName))
 		{
-			ControllerContainer->RemoveProperty(ControllerToDelete->GetPropertyName());
 			OnControllerRemoved().Broadcast(this, ControllerToDelete->Id);
+			ControllerContainer->RemoveProperty(ControllerToDelete->GetPropertyName());
 			return true;
 		}
 	}
