@@ -21,6 +21,7 @@ BEGIN_SHADER_PARAMETER_STRUCT(FOpenColorIOPixelShaderParameters, )
 	SHADER_PARAMETER_RDG_TEXTURE(Texture2D, InputTexture)
 	SHADER_PARAMETER_SAMPLER(SamplerState, InputTextureSampler)
 	SHADER_PARAMETER(float, Gamma)
+	SHADER_PARAMETER(uint32, TransformAlpha)
 	
 	SHADER_PARAMETER_TEXTURE(Texture3D, Ocio_lut3d_0)
 	SHADER_PARAMETER_SAMPLER(SamplerState, Ocio_lut3d_0Sampler)
