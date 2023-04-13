@@ -2318,25 +2318,28 @@ void UAnimSequencerController::RemoveUnusedControlsAndCurves() const
 
 void UAnimSequencerController::UpdateWithSkeleton(USkeleton* TargetSkeleton, bool bShouldTransact)
 {
-	OpenBracket(LOCTEXT("SettingNewskeleton", "Updating Skeleton for Animation Data Model"));
+	if (ModelInterface->HasBeenPopulated())
 	{
-		// Update the curve names with the new skeleton
-		FindOrAddCurveNamesOnSkeleton(TargetSkeleton, ERawCurveTrackTypes::RCT_Float, bShouldTransact);	
-		FindOrAddCurveNamesOnSkeleton(TargetSkeleton, ERawCurveTrackTypes::RCT_Transform, bShouldTransact);
+		OpenBracket(LOCTEXT("SettingNewskeleton", "Updating Skeleton for Animation Data Model"));
+		{
+			// Update the curve names with the new skeleton
+			FindOrAddCurveNamesOnSkeleton(TargetSkeleton, ERawCurveTrackTypes::RCT_Float, bShouldTransact);	
+			FindOrAddCurveNamesOnSkeleton(TargetSkeleton, ERawCurveTrackTypes::RCT_Transform, bShouldTransact);
 
-		// (re-)generate the rig hierarchy
-		Model->InitializeFKControlRig(CastChecked<UFKControlRig>(Model->GetControlRig()), TargetSkeleton);
+			// (re-)generate the rig hierarchy
+			Model->InitializeFKControlRig(CastChecked<UFKControlRig>(Model->GetControlRig()), TargetSkeleton);
 
-		// Remove any bone tracks that do not exist in the new hierarchy
-		RemoveBoneTracksMissingFromSkeleton(TargetSkeleton, bShouldTransact);
+			// Remove any bone tracks that do not exist in the new hierarchy
+			RemoveBoneTracksMissingFromSkeleton(TargetSkeleton, bShouldTransact);
 
-		// Remove any control/curves which were created in InitializeFKControlRig which are no longer keyed
-		RemoveUnusedControlsAndCurves();		
+			// Remove any control/curves which were created in InitializeFKControlRig which are no longer keyed
+			RemoveUnusedControlsAndCurves();		
 
-		// Forcefully re-generate legacy data structures
-		Model->GenerateLegacyCurveData();
-	}
-	CloseBracket();
+			// Forcefully re-generate legacy data structures
+			Model->GenerateLegacyCurveData();
+		}
+		CloseBracket();
+	}	
 }
 
 void UAnimSequencerController::PopulateWithExistingModel(TScriptInterface<IAnimationDataModel> InModel)
