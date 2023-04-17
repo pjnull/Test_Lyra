@@ -1117,7 +1117,7 @@ private:
 	bool UpdateFilteredPermutations(URigVMTemplateNode* InNode, const TArray<int32>& InPermutations, bool bSetupUndoRedo);
 
 	// Changes Pin types if filtered types of a pin are unique
-	bool UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bool bSetupUndoRedo, bool bInitializeDefaultValue = true);
+	bool UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bool bSetupUndoRedo, bool bInitializeDefaultValue = true, TMap<URigVMPin*, TArray<TRigVMTypeIndex>> ProposedTypes = TMap<URigVMPin*, TArray<TRigVMTypeIndex>>());
 
 	// Reduces the filtered permutations of all templates in the graph to comply with the types filtered by InNode
 	// Returns false if a link had to be broken
@@ -1212,6 +1212,7 @@ protected:
 	FRigVMClientPatchResult PatchBranchNodesOnLoad();
 	FRigVMClientPatchResult PatchIfSelectNodesOnLoad();
 	FRigVMClientPatchResult PatchArrayNodesOnLoad();
+	FRigVMClientPatchResult PatchReduceArrayFloatDoubleConvertsionsOnLoad();
 
 	// work to do after a duplication of the host asset
 	void PostDuplicateHost(const FString& InOldPathName, const FString& InNewPathName);
