@@ -17137,6 +17137,7 @@ bool URigVMController::UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bo
 	FinalPinTypes.SetNumUninitialized(Pins.Num());
 	
 	// Reduce to preferred types (no casting)
+	FRigVMTemplateTypeMap AlreadyResolvedTypeMap;
 	if (ReducedTypes.Num() > 1)
 	{
 		for (FRigVMTemplatePreferredType& Preferred : PreferredPermutationPairs)
@@ -17152,6 +17153,7 @@ bool URigVMController::UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bo
 				int32 PinIndex = Pins.Find(ArgumentPin);
 				WasReduced[PinIndex] = true;
 				FinalPinTypes[PinIndex] = Preferred.TypeIndex;
+				AlreadyResolvedTypeMap.Add(ArgumentPin->GetFName(), FinalPinTypes[PinIndex]);
 
 				// If the argument is hidden, the available PinTypes will all be INDEX_NONE
 				if (ArgumentPin->Direction != ERigVMPinDirection::Hidden)
@@ -17165,13 +17167,54 @@ bool URigVMController::UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bo
 		}
 	}
 
+	// Reduce compatible types, try to find the permutation in the reduced types (from the proposed types)
+	for(int32 PinIndex=0; PinIndex < Pins.Num(); ++PinIndex)
+	{
+		if (WasReduced[PinIndex])
+		{
+			continue;
+		}
+		
+		URigVMPin* Pin = Pins[PinIndex];
+		if (Pin->GetDirection() == ERigVMPinDirection::Hidden)
+		{
+			continue;
+		}
+		
+		if (TArray<TRigVMTypeIndex>* Proposed = ProposedTypes.Find(Pin))
+		{
+			TArray<TRigVMTypeIndex> ReducedPinTypes;
+			ReducedPinTypes.Reserve(ReducedTypes.Num());
+			for (auto Pair : ReducedTypes)
+			{
+				ReducedPinTypes.Add(Pair.Value[PinIndex]);
+			}
+			// Intersect the types with the input proposed types
+			TArray<TRigVMTypeIndex> Intersection = ReducedPinTypes.FilterByPredicate([Proposed](const TRigVMTypeIndex& Type) { return Proposed->Contains(Type); });
+			if (Intersection.Num() == 1)
+			{
+				WasReduced[PinIndex] = true;
+				FinalPinTypes[PinIndex] = Intersection[0];
+				AlreadyResolvedTypeMap.Add(Pin->GetFName(), FinalPinTypes[PinIndex]);
+
+				// If the argument is hidden, the available PinTypes will all be INDEX_NONE
+				if (Pin->Direction != ERigVMPinDirection::Hidden)
+				{
+					ReducedTypes = ReducedTypes.FilterByPredicate([Intersection, PinIndex](const TPair<int32, TArray<TRigVMTypeIndex>>& Permutation)
+					{
+						return Permutation.Value[PinIndex] == Intersection[0];
+					});
+				}
+			}
+		}
+	}
+
 	if (PinTypes.Num() > ReducedTypes.Num())
 	{
 		ensureMsgf(!ReducedTypes.IsEmpty(), TEXT("Found incompatible preferred types"));
 	}
 	
 	// Reduce compatible types, try to find the permutation in the reduced types
-	FRigVMTemplateTypeMap AlreadyResolvedTypeMap;
 	for(int32 PinIndex=0; PinIndex < Pins.Num(); ++PinIndex)
 	{
 		if (WasReduced[PinIndex])
@@ -17198,17 +17241,6 @@ bool URigVMController::UpdateTemplateNodePinTypes(URigVMTemplateNode* InNode, bo
 				{
 					PreferredType = PinTypes.FindChecked(ResolvedPermutation)[PinIndex];
 				}				
-			}
-		}
-
-		if (TArray<TRigVMTypeIndex>* Proposed = ProposedTypes.Find(Pin))
-		{
-			// Intersect the types with the input proposed types
-			TArray<TRigVMTypeIndex> Intersection = Types.FilterByPredicate([Proposed](const TRigVMTypeIndex& Type) { return Proposed->Contains(Type); });
-			if (Intersection.Num() == 1)
-			{
-				PreferredType = Intersection[0];
-				TypesFoundInReduced = 1;
 			}
 		}
 
