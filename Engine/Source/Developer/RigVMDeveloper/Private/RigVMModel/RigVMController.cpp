@@ -17890,20 +17890,23 @@ bool URigVMController::UpdateLibraryTemplate(URigVMLibraryNode* LibraryNode, boo
 
 		AllPermutationTypes.Add(PermutationTypesStr);
 
-		// If this is a new permutation, add it to the template 
-		int32 NewArgumentIndex=0;
-		for (TPair<const FName, TRigVMTypeIndex> TypePair : TypesToAdd)
+		// If this is a new permutation, add it to the template
+		for (FRigVMTemplateArgument& NewArgument : NewTemplate.Arguments)
 		{
-			FRigVMTemplateArgument& NewArgument = NewTemplate.Arguments[NewArgumentIndex++];
-			const TRigVMTypeIndex& TypeIndex = TypePair.Value; 
-			NewArgument.TypeIndices.Add(TypeIndex);
-			if (TArray<int32>* Permutations = NewArgument.TypeToPermutations.Find(TypeIndex))
+			// multiple argument can have the same name in case of IO pins
+			TRigVMTypeIndex* TypeIndex= TypesToAdd.Find(NewArgument.Name);
+			
+			if (ensure(TypeIndex))
 			{
-				Permutations->Add(PermutationIndex);
-			}
-			else
-			{
-				NewArgument.TypeToPermutations.Add(TypeIndex, {PermutationIndex});
+				NewArgument.TypeIndices.Add(*TypeIndex);
+				if (TArray<int32>* Permutations = NewArgument.TypeToPermutations.Find(*TypeIndex))
+				{
+					Permutations->Add(PermutationIndex);
+				}
+				else
+				{
+					NewArgument.TypeToPermutations.Add(*TypeIndex, {PermutationIndex});
+				}		
 			}
 		}
 		NewTemplate.Permutations.Add(INDEX_NONE);
