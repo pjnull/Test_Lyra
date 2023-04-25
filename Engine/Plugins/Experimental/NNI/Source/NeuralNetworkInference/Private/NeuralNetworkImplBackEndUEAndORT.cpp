@@ -347,7 +347,7 @@ bool UNeuralNetwork::FImplBackEndUEAndORT::Load(TSharedPtr<FImplBackEndUEAndORT>
 		ENeuralDeviceType OutputDeviceType = InOutputDeviceType;
 		if (InDeviceType == ENeuralDeviceType::CPU && (InInputDeviceType == ENeuralDeviceType::GPU || InOutputDeviceType == ENeuralDeviceType::GPU))
 		{
-			UE_LOG(LogNeuralNetworkInference, Warning,
+			UE_LOG(LogNeuralNetworkInference, Display,
 				TEXT("FImplBackEndUEAndORT::Load(): DeviceType is CPU but Input and/or Output is set to GPU, setting all to CPU."));
 			InputDeviceType = ENeuralDeviceType::CPU;
 			OutputDeviceType = ENeuralDeviceType::CPU;
