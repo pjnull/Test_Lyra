@@ -310,14 +310,17 @@ static void RecordStrataAnalytics(EShaderPlatform InPlatform)
 	}
 }
 
-static EPixelFormat GetTopLayerTextureFormat()
+static EPixelFormat GetTopLayerTextureFormat(bool bUseDBufferPass)
 {
 	const bool bStrataHighQualityNormal = GetNormalQuality() > 0;
 
 	// High quality normal is not supported on platforms that do not support R32G32 UAV load.
 	// This is dues to the way Strata account for decals. See FStrataDBufferPassCS, updating TopLayerTexture this way.
 	// If you encounter this check, you must disable high quality normal for Strata (material shaders must be recompiled to account for that).
-	check(!bStrataHighQualityNormal || (bStrataHighQualityNormal && UE::PixelFormat::HasCapabilities(PF_R32G32_UINT, EPixelFormatCapabilities::TypedUAVLoad)));
+	if (bUseDBufferPass)
+	{
+		check(!bStrataHighQualityNormal || (bStrataHighQualityNormal && UE::PixelFormat::HasCapabilities(PF_R32G32_UINT, EPixelFormatCapabilities::TypedUAVLoad)));
+	}
 
 	return bStrataHighQualityNormal ? PF_R32G32_UINT : PF_R32_UINT;
 }
@@ -337,11 +340,13 @@ void InitialiseStrataFrameSceneData(FRDGBuilder& GraphBuilder, FSceneRenderer& S
 	bool bNeedBSDFOffsets = false;
 	bool bNeedUAV = false;
 	uint32 MaxBytePerPixel = 0;
+	bool bUseDBufferPass = false;
 	for (const FViewInfo& View : SceneRenderer.Views)
 	{
 		bNeedBSDFOffsets = bNeedBSDFOffsets || NeedBSDFOffsets(SceneRenderer.Scene, View);
 		bNeedUAV = bNeedUAV || IsDBufferPassEnabled(View.GetShaderPlatform());
 		MaxBytePerPixel = FMath::Max(MaxBytePerPixel, View.StrataViewData.MaxBytePerPixel);
+		bUseDBufferPass = bUseDBufferPass || IsDBufferPassEnabled(View.GetShaderPlatform());
 	}
 	MaxBytePerPixel = FMath::Clamp(MaxBytePerPixel, 4u * STRATA_BASE_PASS_MRT_OUTPUT_COUNT, GetBytePerPixel(SceneRenderer.ShaderPlatform));
 
@@ -367,7 +372,7 @@ void InitialiseStrataFrameSceneData(FRDGBuilder& GraphBuilder, FSceneRenderer& S
 
 		// Top layer texture
 		{
-			Out.TopLayerTexture = GraphBuilder.CreateTexture(FRDGTextureDesc::Create2D(SceneTextureExtent, GetTopLayerTextureFormat(), FClearValueBinding::Black, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_FastVRAM | (bNeedUAV ? TexCreate_UAV : TexCreate_None)), TEXT("Substrate.TopLayerTexture"));
+			Out.TopLayerTexture = GraphBuilder.CreateTexture(FRDGTextureDesc::Create2D(SceneTextureExtent, GetTopLayerTextureFormat(bUseDBufferPass), FClearValueBinding::Black, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_FastVRAM | (bNeedUAV ? TexCreate_UAV : TexCreate_None)), TEXT("Substrate.TopLayerTexture"));
 		}
 
 		// Separated subsurface and rough refraction textures
@@ -1168,7 +1173,7 @@ void SetBasePassRenderTargetOutputFormat(const EShaderPlatform Platform, const F
 		}
 
 		// Add another MRT for Strata top layer information
-		OutEnvironment.SetRenderTargetOutputFormat(BufferInfo.NumTargets + STRATA_BASE_PASS_MRT_OUTPUT_COUNT, GetTopLayerTextureFormat());
+		OutEnvironment.SetRenderTargetOutputFormat(BufferInfo.NumTargets + STRATA_BASE_PASS_MRT_OUTPUT_COUNT, GetTopLayerTextureFormat(IsDBufferPassEnabled(Platform)));
 	}
 }
 
