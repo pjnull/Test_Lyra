@@ -5202,7 +5202,10 @@ void UNetConnection::CleanupDormantReplicatorsForActor(AActor* Actor)
 
 			DormantReplicatorSet.ForEachDormantReplicatorOfActor(Actor, ExecuteFunction);
 
-			Driver->GetNetworkObjectList().RemoveMultipleSubObjectChannelReference(Actor, RemovedObjects, this);
+			if (RemovedObjects.Num() > 0)
+			{
+				Driver->GetNetworkObjectList().RemoveMultipleSubObjectChannelReference(Actor, RemovedObjects, this);
+			}
 		}
 #endif
 
