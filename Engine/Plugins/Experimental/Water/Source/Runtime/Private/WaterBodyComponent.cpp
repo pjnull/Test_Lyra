@@ -1448,14 +1448,17 @@ void UWaterBodyComponent::PostLoad()
 		SetupPrecachePSOParams(PrecachePSOParams);
 		if (WaterMaterial)
 		{
+			WaterMaterial->ConditionalPostLoad();
 			WaterMaterial->PrecachePSOs(&FLocalVertexFactory::StaticType, PrecachePSOParams);
 		}
 		if (UnderwaterPostProcessMaterial)
 		{
+			UnderwaterPostProcessMaterial->ConditionalPostLoad();
 			UnderwaterPostProcessMaterial->PrecachePSOs(&FLocalVertexFactory::StaticType, PrecachePSOParams);
 		}
 		if (WaterInfoMaterial)
 		{
+			WaterInfoMaterial->ConditionalPostLoad();
 			WaterInfoMaterial->PrecachePSOs(&FLocalVertexFactory::StaticType, PrecachePSOParams);
 		}
 	}
