@@ -4047,7 +4047,11 @@ protected:
 	bool bUpdatePreferedEulerAngleWhenSettingTransform;
 	
 private:
-	
+
+	// NOTE: it is not safe to read or write the execute context without locking it first as the
+	// FRigHierarchyExecuteContextBracket can change the context from the main thread (from sequencer for example)
+	// at the same time that a control rig is being evaluated on an animation thread.
+	mutable FCriticalSection ExecuteContextLock;
 	void EnsureCacheValidityImpl();
 
 	const FRigVMExtendedExecuteContext* ExecuteContext;
@@ -4141,6 +4145,7 @@ private:
 		: Hierarchy(InHierarchy)
 		, PreviousContext(InHierarchy->ExecuteContext)
 	{
+		Hierarchy->ExecuteContextLock.Lock();
 		Hierarchy->ExecuteContext = InContext;
 	}
 
@@ -4148,6 +4153,7 @@ private:
 	{
 		Hierarchy->ExecuteContext = PreviousContext;
 		Hierarchy->SendQueuedNotifications();
+		Hierarchy->ExecuteContextLock.Unlock();
 	}
 
 	URigHierarchy* Hierarchy;
