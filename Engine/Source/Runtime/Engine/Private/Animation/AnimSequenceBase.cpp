@@ -267,6 +267,10 @@ void UAnimSequenceBase::PostLoad()
 				Controller->CloseBracket(bDoNotTransactAction);
 			}
 		}
+#else
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		VerifyCurveNames<FFloatCurve>(*MySkeleton, USkeleton::AnimCurveMappingName, RawCurveData.FloatCurves);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #endif
 
 		// this should continue to add if skeleton hasn't been saved either 
