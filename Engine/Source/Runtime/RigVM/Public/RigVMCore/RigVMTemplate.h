@@ -75,6 +75,12 @@ struct RIGVM_API FRigVMTemplateArgumentType
 		checkf(!CPPType.IsNone(), TEXT("FRigVMTemplateArgumentType(): Input CPPType '%s' could not be resolved."), *InCPPTypeString);
 	}
 
+	FRigVMTemplateArgumentType(UClass* InClass)
+	: CPPType(*RigVMTypeUtils::CPPTypeFromObject(InClass))
+	, CPPTypeObject(InClass)
+	{
+	}
+
 	FRigVMTemplateArgumentType(UScriptStruct* InScriptStruct)
 	: CPPType(*RigVMTypeUtils::GetUniqueStructTypeName(InScriptStruct))
 	, CPPTypeObject(InScriptStruct)
@@ -107,7 +113,7 @@ struct RIGVM_API FRigVMTemplateArgumentType
 		return CPPType != InOther.CPPType;
 	}
 
-	friend uint32 GetTypeHash(const FRigVMTemplateArgumentType& InType)
+	RIGVM_API friend FORCEINLINE uint32 GetTypeHash(const FRigVMTemplateArgumentType& InType)
 	{
 		return GetTypeHash(InType.CPPType);
 	}
@@ -235,6 +241,8 @@ struct RIGVM_API FRigVMTemplateArgument
 	// returns true if the argument uses an array container
 	EArrayType GetArrayType() const;
 
+	RIGVM_API friend uint32 GetTypeHash(const FRigVMTemplateArgument& InArgument);
+
 protected:
 
 	int32 Index;
@@ -344,6 +352,10 @@ public:
 	// returns true if the template was able to resolve to at least one permutation
 	bool Resolve(FTypeMap& InOutTypes, TArray<int32> & OutPermutationIndices, bool bAllowFloatingPointCasts) const;
 
+	// Will return the hash of the input type map, if it is a valid type map. Otherwise, will return 0.
+	// It is only a valid type map if it includes all arguments, and non of the types is a wildcard.
+	uint32 GetTypesHashFromTypes(const FTypeMap& InTypes) const;
+
 	// returns true if the template was able to resolve to at least one permutation
 	bool ContainsPermutation(const FTypeMap& InTypes) const;
 
@@ -418,7 +430,13 @@ public:
 	{
 		return Delegates.RequestDispatchFunctionDelegate.IsBound() &&
 			Delegates.GetDispatchFactoryDelegate.IsBound();
-	}  
+	}
+
+	void RecomputeTypesHashToPermutations();
+
+	void UpdateTypesHashToPermutation(const int32& InPermutation);
+
+	RIGVM_API friend uint32 GetTypeHash(const FRigVMTemplate& InTemplate);
 
 private:
 
@@ -430,13 +448,18 @@ private:
 
 	static FLinearColor GetColorFromMetadata(FString InMetadata);
 
+	void InvalidateHash() { Hash = UINT32_MAX; }
 	const TArray<FRigVMExecuteArgument>& GetExecuteArguments(const FRigVMDispatchContext& InContext) const;
+
+	const FRigVMFunction* GetPermutation_NoLock(int32 InIndex) const;
 
 	int32 Index;
 	FName Notation;
 	TArray<FRigVMTemplateArgument> Arguments;
 	mutable TArray<FRigVMExecuteArgument> ExecuteArguments;
 	TArray<int32> Permutations;
+	TMap<uint32, int32> TypesHashToPermutation;
+	mutable uint32 Hash;
 
 	FRigVMTemplateDelegates Delegates;
 

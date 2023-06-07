@@ -13,6 +13,7 @@
 #include "RigVMCore/RigVMStructUpgradeInfo.h"
 #include "RigVMCore/RigVMTemplate.h"
 #include "RigVMCore/RigVMTypeIndex.h"
+#include "RigVMCore/RigVMExecuteContext.h"
 #include "UObject/Class.h"
 #include "UObject/NameTypes.h"
 #include "UObject/ObjectMacros.h"
@@ -147,10 +148,16 @@ public:
 	virtual FRigVMStructUpgradeInfo GetUpgradeInfo(const FRigVMTemplateTypeMap& InTypes, const FRigVMDispatchContext& InContext) const { return FRigVMStructUpgradeInfo(); }
 
 	// returns the dispatch function for a given type set
-	RIGVM_API FRigVMFunctionPtr GetDispatchFunction(const FRigVMTemplateTypeMap& InTypes) const;
+	RIGVM_API FRigVMFunctionPtr GetOrCreateDispatchFunction(const FRigVMTemplateTypeMap& InTypes) const;
+
+	// keep this one for backwards compat
+	RIGVM_API FRigVMFunctionPtr GetDispatchFunction(const FRigVMTemplateTypeMap& InTypes) const { return GetOrCreateDispatchFunction(InTypes); }
 
 	// builds and returns the template
 	RIGVM_API const FRigVMTemplate* GetTemplate() const;
+
+	// returns the name of the factory template
+	RIGVM_API FName GetTemplateNotation() const;
 
 	// returns the name of the permutation for a given set of types
 	RIGVM_API FString GetPermutationName(const FRigVMTemplateTypeMap& InTypes) const;
@@ -162,6 +169,9 @@ protected:
 
 	// returns the name of the permutation for a given set of types
 	RIGVM_API FString GetPermutationNameImpl(const FRigVMTemplateTypeMap& InTypes) const;
+
+	RIGVM_API FRigVMFunctionPtr CreateDispatchFunction(const FRigVMTemplateTypeMap& InTypes) const;
+	FRigVMFunctionPtr CreateDispatchFunction_NoLock(const FRigVMTemplateTypeMap& InTypes) const;
 
 	virtual FRigVMFunctionPtr GetDispatchFunctionImpl(const FRigVMTemplateTypeMap& InTypes) const { return nullptr; }
 
@@ -219,6 +229,7 @@ protected:
 
 	UScriptStruct* FactoryScriptStruct;
 	mutable const FRigVMTemplate* CachedTemplate;
+	static FCriticalSection GetTemplateMutex;
 	friend struct FRigVMTemplate;
 	friend struct FRigVMRegistry;
 };
