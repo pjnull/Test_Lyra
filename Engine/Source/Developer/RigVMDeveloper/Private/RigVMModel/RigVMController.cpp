@@ -13335,7 +13335,7 @@ URigVMNode* URigVMController::AddArrayNode(ERigVMOpCode InOpCode, const FString&
 				TypeMap.Add(ArgumentNameToResolve, TypeIndex);
 
 				TArray<int32> Permutations;
-				Template->Resolve(TypeMap, Permutations, true);
+				Template->Resolve(TypeMap, Permutations, false);
 				check(Permutations.Num() == 1);
 				Template->GetOrCreatePermutation(Permutations[0]);
 
