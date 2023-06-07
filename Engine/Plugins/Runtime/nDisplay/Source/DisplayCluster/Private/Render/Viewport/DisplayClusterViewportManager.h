@@ -82,7 +82,12 @@ public:
 
 	// Current world is a tools window (configurator, other tools)
 	bool IsEditorPreviewWorld() const;
+
+private:
+	/** Called before garbage collection is run */
+	void OnPreGarbageCollect();
 #endif
+public:
 
 	virtual IDisplayClusterViewport* FindViewport(const FString& InViewportId) const override
 	{
@@ -160,6 +165,12 @@ private:
 	void HandleViewportRTTChanges(const TArray<FDisplayClusterViewport_Context>& PrevContexts, const TArray<FDisplayClusterViewport_Context>& Contexts);
 	void ImplUpdateClusterNodeViewports(const EDisplayClusterRenderFrameMode InRenderMode, const FString& InClusterNodeId);
 
+	/** Register any callbacks */
+	void RegisterCallbacks();
+	
+	/** Unregister any callbacks used */
+	void UnregisterCallbacks();
+	
 protected:
 	friend FDisplayClusterViewportManagerProxy;
 	friend FDisplayClusterViewportConfiguration;
@@ -197,4 +208,9 @@ private:
 
 	// Handle special features
 	TSharedPtr<class FDisplayClusterViewportManagerViewExtension, ESPMode::ThreadSafe> ViewportManagerViewExtension;
+
+#if WITH_EDITOR
+	/** The handle for FCoreUObjectDelegates::GetPreGarbageCollectDelegate */
+	FDelegateHandle PreGarbageCollectHandle;
+#endif
 };

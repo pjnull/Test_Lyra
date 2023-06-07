@@ -115,6 +115,18 @@ void FDisplayClusterViewportManager::ImplUpdatePreviewRTTResources()
 	}
 }
 
+void FDisplayClusterViewportManager::OnPreGarbageCollect()
+{
+	// The view state can reference materials from the world being cleaned up. (Example post process materials)
+	for (FDisplayClusterViewport* const ViewportIt : Viewports)
+	{
+		if (ViewportIt)
+		{
+			ViewportIt->CleanupViewState();
+		}
+	}
+}
+
 bool FDisplayClusterViewportManager::RenderInEditor(class FDisplayClusterRenderFrame& InRenderFrame, FViewport* InViewport, const uint32 InFirstViewportNum, const int32 InViewportsAmount, int32& OutViewportsAmount, bool& bOutFrameRendered)
 {
 	bOutFrameRendered = false;

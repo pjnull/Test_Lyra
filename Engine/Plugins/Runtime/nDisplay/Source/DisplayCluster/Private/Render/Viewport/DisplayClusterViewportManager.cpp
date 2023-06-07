@@ -57,22 +57,26 @@ FDisplayClusterViewportManager::FDisplayClusterViewportManager()
 {
 	Configuration      = MakeUnique<FDisplayClusterViewportConfiguration>(*this);
 	RenderFrameManager = MakeUnique<FDisplayClusterRenderFrameManager>();
-
+ 
 	ViewportManagerProxy = MakeShared<FDisplayClusterViewportManagerProxy, ESPMode::ThreadSafe>();
-
+ 
 	RenderTargetManager = MakeShared<FDisplayClusterRenderTargetManager, ESPMode::ThreadSafe>(ViewportManagerProxy.Get());
 	PostProcessManager  = MakeShared<FDisplayClusterViewportPostProcessManager, ESPMode::ThreadSafe>(*this);
 	LightCardManager = MakeShared<FDisplayClusterViewportLightCardManager, ESPMode::ThreadSafe>(*this);
-
+ 
 	// initialize proxy
 	ViewportManagerProxy->Initialize(*this);
-
+ 
 	// Always reset RTT when root actor re-created
 	ResetSceneRenderTargetSize();
+
+	RegisterCallbacks();
 }
 
 FDisplayClusterViewportManager::~FDisplayClusterViewportManager()
 {
+	UnregisterCallbacks();
+	
 	// Remove viewports
 	for (FDisplayClusterViewport* ViewportIt : Viewports)
 	{
@@ -444,6 +448,20 @@ void FDisplayClusterViewportManager::ImplUpdateClusterNodeViewports(const EDispl
 		ClusterNodeViewports.Append(Viewports);
 		break;
 	}
+}
+
+void FDisplayClusterViewportManager::RegisterCallbacks()
+{
+#if WITH_EDITOR
+	PreGarbageCollectHandle = FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddRaw(this, &FDisplayClusterViewportManager::OnPreGarbageCollect);
+#endif
+}
+
+void FDisplayClusterViewportManager::UnregisterCallbacks()
+{
+#if WITH_EDITOR
+	FCoreUObjectDelegates::GetPreGarbageCollectDelegate().Remove(PreGarbageCollectHandle);
+#endif
 }
 
 int32 FDisplayClusterViewportManager::GetViewPerViewportAmount() const
