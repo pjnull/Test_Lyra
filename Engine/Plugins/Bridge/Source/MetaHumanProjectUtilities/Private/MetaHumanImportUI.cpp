@@ -4,7 +4,12 @@
 #include "MetaHumanTypes.h"
 #include "MetaHumanVersionService.h"
 #include "SPrimaryButton.h"
+#include "Misc\MessageDialog.h"
 #include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Views/SListView.h"
+#include "Widgets/Views/STableRow.h"
 
 #define LOCTEXT_NAMESPACE "MetaHumanImportUI"
 
