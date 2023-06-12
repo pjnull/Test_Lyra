@@ -1,12 +1,14 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MetaHumanImportUI.h"
 #include "MetaHumanTypes.h"
 #include "MetaHumanVersionService.h"
+#include "Editor.h"
 #include "SPrimaryButton.h"
 #include "Misc/MessageDialog.h"
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SListView.h"
 #include "Widgets/Views/STableRow.h"
