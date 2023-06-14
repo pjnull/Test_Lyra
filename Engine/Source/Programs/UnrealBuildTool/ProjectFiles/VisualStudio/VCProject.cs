@@ -624,6 +624,53 @@ namespace UnrealBuildTool
 			}
 		}
 
+		private string GetConformanceCompileArguments(TargetRules Target)
+		{
+			if (Target.Platform.IsInGroup(UnrealPlatformGroup.Microsoft) && Target.WindowsPlatform.Compiler.IsMSVC())
+			{
+				VersionNumber CompilerVersion = Target.WindowsPlatform.Environment?.CompilerVersion ?? new VersionNumber(0);
+				List<string> Arguments = new();
+				if (Target.WindowsPlatform.bStrictConformanceMode)
+				{
+					// This define is needed to ensure that MSVC static analysis mode doesn't declare attributes that are incompatible with strict conformance mode
+					Arguments.Add("/DSAL_NO_ATTRIBUTE_DECLARATIONS=1");
+
+					Arguments.Add("/permissive-");
+					Arguments.Add("/Zc:strictStrings-"); // Have to disable strict const char* semantics due to Windows headers not being compliant.
+					if (CompilerVersion >= new VersionNumber(14, 32) && CompilerVersion < new VersionNumber(14, 33, 31629))
+					{
+						Arguments.Add("/Zc:lambda-");
+					}
+				}
+				else
+				{
+					Arguments.Add("/Zc:hiddenFriend");
+				}
+
+				if (Target.WindowsPlatform.bUpdatedCPPMacro)
+				{
+					Arguments.Add("/Zc:__cplusplus");
+				}
+
+				if (Target.WindowsPlatform.bStrictInlineConformance)
+				{
+					Arguments.Add("/Zc:inline");
+				}
+
+				if (Target.WindowsPlatform.bStrictPreprocessorConformance)
+				{
+					Arguments.Add("/Zc:preprocessor");
+				}
+
+				if (Target.WindowsPlatform.bStrictEnumTypesConformance && CompilerVersion >= new VersionNumber(14, 34, 31931))
+				{
+					Arguments.Add("/Zc:enumTypes");
+				}
+				return string.Join(' ', Arguments);
+			}
+			return string.Empty;
+		}
+
 		/// <summary>
 		/// Gets compiler switch for specifying in AdditionalOptions in .vcxproj file for coroutines support
 		/// </summary>
@@ -1113,9 +1160,11 @@ namespace UnrealBuildTool
 			}
 
 			// Write each project configuration
+			TargetRules? DefaultRules = null;
 			foreach (ProjectConfigAndTargetCombination Combination in ProjectConfigAndTargetCombinations)
 			{
 				WriteConfiguration(ProjectName, Combination, VCProjectFileContent, PlatformProjectGenerators, bGenerateUserFileContent ? VCUserFileContent : null, Logger);
+				DefaultRules = DefaultRules ?? Combination.ProjectTarget?.TargetRules;
 			}
 
 			// Write IntelliSense info
@@ -1131,8 +1180,8 @@ namespace UnrealBuildTool
 				VCProjectFileContent.AppendLine("    <IncludePath>$(IncludePath){0}</IncludePath>", (SharedIncludeSearchPaths.Length > 0 ? (";" + SharedIncludeSearchPaths) : ""));
 				VCProjectFileContent.AppendLine("    <NMakeForcedIncludes>$(NMakeForcedIncludes)</NMakeForcedIncludes>");
 				VCProjectFileContent.AppendLine("    <NMakeAssemblySearchPath>$(NMakeAssemblySearchPath)</NMakeAssemblySearchPath>");
-				VCProjectFileContent.AppendLine("    <AdditionalOptions>{0} {1}</AdditionalOptions>",
-					GetCppStandardCompileArgument(GetIntelliSenseCppVersion()), GetEnableCoroutinesArgument());
+				VCProjectFileContent.AppendLine("    <AdditionalOptions>{0} {1} {2}</AdditionalOptions>",
+					GetCppStandardCompileArgument(GetIntelliSenseCppVersion()), GetEnableCoroutinesArgument(), DefaultRules != null ? GetConformanceCompileArguments(DefaultRules) : string.Empty);
 				VCProjectFileContent.AppendLine("  </PropertyGroup>");
 			}
 
@@ -1928,7 +1977,7 @@ namespace UnrealBuildTool
 					VCProjectFileContent.AppendLine("    <NMakeReBuildCommandLine>{0} {1}</NMakeReBuildCommandLine>", EscapePath(NormalizeProjectPath(Builder.RebuildScript)), BuildArguments);
 					VCProjectFileContent.AppendLine("    <NMakeCleanCommandLine>{0} {1}</NMakeCleanCommandLine>", EscapePath(NormalizeProjectPath(Builder.CleanScript)), BuildArguments);
 					VCProjectFileContent.AppendLine("    <NMakeOutput>{0}</NMakeOutput>", NormalizeProjectPath(NMakePath.FullName));
-					VCProjectFileContent.AppendLine("    <AdditionalOptions>{0}</AdditionalOptions>", GetCppStandardCompileArgument(TargetRulesObject.CppStandard));
+					VCProjectFileContent.AppendLine("    <AdditionalOptions>{0} {1} {2}</AdditionalOptions>", GetCppStandardCompileArgument(TargetRulesObject.CppStandard), GetEnableCoroutinesArgument(), GetConformanceCompileArguments(TargetRulesObject));
 
 					if (TargetRulesObject.Type == TargetType.Game || TargetRulesObject.Type == TargetType.Client || TargetRulesObject.Type == TargetType.Server)
 					{
