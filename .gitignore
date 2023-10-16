@@ -91,11 +91,8 @@
 !*.config
 !*.version
 !.git*
-!.dockerignore
 !.editorconfig
 !.plist
-!.yaml
-!.yml
 
 # Projects and makefiles
 !*.cmake
@@ -111,7 +108,6 @@
 !*.xcconfig
 !*.vsprops
 !*.snippet
-!Dockerfile
 !Makefile
 !Makefile.*
 !Settings.settings
@@ -205,7 +201,9 @@
 /Engine/Binaries/DotNET/UnrealBuildTool.xml
 /Engine/Binaries/DotNET/AutomationScripts/BuildGraph.Automation.xml
 /Engine/Binaries/DotNET/AutomationScripts/Newtonsoft.Json.xml
-/Engine/Platforms/Hololens/Binaries/DotNET/AutomationTool/AutomationScripts/Platforms/HoloLens/*.xml
+/Engine/Platforms/Hololens/Binaries/DotNET/AutomationTool/AutomationScripts/Platforms/HoloLens/EpicGames.UHT.xml
+/Engine/Platforms/Hololens/Binaries/DotNET/AutomationTool/AutomationScripts/Platforms/HoloLens/System.Runtime.WindowsRuntime.xml
+/Engine/Platforms/Hololens/Binaries/DotNET/AutomationTool/AutomationScripts/Platforms/HoloLens/WindowsDevicePortalWrapper.xml
 /Engine/Source/Programs/AutomationTool/BuildGraph/BuildGraph.Automation.xml
 
 # Ignore generated files from C# tools
@@ -278,4 +276,23 @@ Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/**
 
 # Ignore test json data files in NeuralNetworkInterface
 /Engine/Plugins/Experimental/NNI/Source/ThirdParty/Deps/json/**
-/Engine/Plugins/Experimental/NNE/Source/ThirdParty/Deps/json/**
+
+# Btt
+
+# ignore Hololens binaries
+/Engine/Platforms/Hololens/Binaries/**
+
+# ignore platforms folders
+/Games/BttDemo/Platforms/
+
+# include unreal file types
+!*.uasset
+!*.umap
+!*.udk
+!*.upk
+
+# include BttDemo content folder
+!/Games/BttDemo/Content/
+
+# include BttDemo's game feature content folders
+!/Games/BttDemo/Plugins/GameFeatures/**/Content/
