@@ -10,4 +10,7 @@ class ULyra_Clone_PawnData :public UPrimaryDataAsset
 public:
 	ULyra_Clone_PawnData(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="Clone|Pawn")
+	TSubclassOf<APawn>PawnClass;
 };

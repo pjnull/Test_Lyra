@@ -22,8 +22,10 @@ public:
 	virtual void InitGame(const FString& Mapname, const FString& option, FString& ErrorMessage)final;
 	virtual void InitGameState()final;
 
+	virtual APawn* SpawnDefaultPawnAtTransform_Implementation(AController* Newplayer,const FTransform& SpawnTransform)final;
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* Newplayer)final;
 
 	void HandleMatchAssignmentIfNotExpectingOne();
-
+	bool IsExperienceLoaded()const;
 	void OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience);
 };

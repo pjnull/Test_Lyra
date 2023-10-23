@@ -7,6 +7,7 @@
 #include "../Player/LyraClonePlayerState.h"
 #include "../Player/LyraClonePlayerController.h"
 #include "Lyra_Clone_ExperienceManagerComponent.h"
+#include "../LryaCloneLogChannel.h"
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Lyra_CloneGameMode)
 
 
@@ -38,10 +39,33 @@ void ALyra_CloneGameMode::InitGameState()
 	ExperienceManagerComponent->CallOrRegister_OnExperienceLoaded(FOnLyraClonExperienceLoaded::FDelegate::CreateUObject(this,&ThisClass::OnExperienceLoaded));
 }
 
-void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
+APawn* ALyra_CloneGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* Newplayer, const FTransform& SpawnTransform)
 {
+	UE_LOG(LogClone, Log, TEXT("spawnpawnImple called"));
+	return Super::SpawnDefaultPawnAtTransform_Implementation(Newplayer, SpawnTransform);
 }
 
+void ALyra_CloneGameMode::HandleStartingNewPlayer_Implementation(APlayerController* Newplayer)
+{
+	if (IsExperienceLoaded())
+	{
+		Super::HandleStartingNewPlayer_Implementation(Newplayer);
+	}
+}
+
+
+void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
+{
+
+}
+bool ALyra_CloneGameMode::IsExperienceLoaded() const
+{
+	check(GameState);
+	ULyra_Clone_ExperienceManagerComponent* ExperienceComponent = GameState->FindComponentByClass<ULyra_Clone_ExperienceManagerComponent>();
+	check(ExperienceComponent);
+
+	return ExperienceComponent->IsExperienceLoaded();
+}
 void ALyra_CloneGameMode::OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience)
 {
 }
