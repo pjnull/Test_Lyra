@@ -36,5 +36,10 @@ public:
 
 	bool IsExperienceLoaded() { return (LoadState == ELyraCloneExperienceLoadState::Loaded)&&(CurrentExperience!=nullptr); }
 	
+	void ServerSetCurrentExperience(FPrimaryAssetId ExperienceId);
+	void StartExperienceLoad();
+
+	void OnExperienceLoadComplete();
+	void OnExperienceFullLoadCompleted();
 
 };

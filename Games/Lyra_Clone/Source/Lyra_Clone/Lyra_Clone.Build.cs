@@ -16,6 +16,7 @@ public class Lyra_Clone : ModuleRules
 			"InputCore",
 			"GameplayTags",
 			"ModularGameplay",
+			"GameFeatures",
 			"EnhancedInput",
 		});
 

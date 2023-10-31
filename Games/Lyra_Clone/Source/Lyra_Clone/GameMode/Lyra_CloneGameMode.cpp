@@ -56,6 +56,17 @@ void ALyra_CloneGameMode::HandleStartingNewPlayer_Implementation(APlayerControll
 
 void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
 {
+	FPrimaryAssetId ExperienceId;
+
+	UWorld* World = GetWorld();
+
+	if (!ExperienceId.IsValid())
+	{
+		ExperienceId = FPrimaryAssetId(FPrimaryAssetType("Lyra_CloneExperienceDefinition"),FName("BP_DefaultExperienceDefinition"));
+	}
+
+	OnMatchAssignmentGiven(ExperienceId);
+
 
 }
 bool ALyra_CloneGameMode::IsExperienceLoaded() const
@@ -69,4 +80,13 @@ bool ALyra_CloneGameMode::IsExperienceLoaded() const
 void ALyra_CloneGameMode::OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience)
 {
 }
+
+void ALyra_CloneGameMode::OnMatchAssignmentGiven(FPrimaryAssetId ExperienceId)
+{
+	check(ExperienceId.IsValid());
+
+	ULyra_Clone_ExperienceManagerComponent* ExperienceComponent = GameState->FindComponentByClass<ULyra_Clone_ExperienceManagerComponent>();
+	check(ExperienceComponent);
+	ExperienceComponent->ServerSetCurrentExperience(ExperienceId);
+}						
 		

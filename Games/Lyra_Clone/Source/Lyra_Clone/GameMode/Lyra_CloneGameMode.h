@@ -28,4 +28,7 @@ public:
 	void HandleMatchAssignmentIfNotExpectingOne();
 	bool IsExperienceLoaded()const;
 	void OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience);
+	
+	void OnMatchAssignmentGiven(FPrimaryAssetId ExperienceId);
+
 };
