@@ -6,6 +6,8 @@
 
 class ULyra_Clone_PawnData;
 class ULyra_CloneExperienceDefinition;
+
+
 UCLASS()
 class ALyraClonePlayerState :public APlayerState
 {
@@ -18,9 +20,16 @@ public:
 
 	void OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience);
 
-	UPROPERTY()
-	TObjectPtr<const ULyra_Clone_PawnData>PawnData;
+	
+	void SetPawnData(const ULyra_Clone_PawnData* InPawnData);
+
+	template<class T>
+	const T* GetPawnData()const { return Cast<T>(PawnData); }
 
 	
+
+	
+	UPROPERTY()
+	TObjectPtr<const ULyra_Clone_PawnData>PawnData;
 
 };

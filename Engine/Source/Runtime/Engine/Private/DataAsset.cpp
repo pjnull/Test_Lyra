@@ -71,6 +71,8 @@ FPrimaryAssetId UPrimaryDataAsset::GetPrimaryAssetId() const
 			return FPrimaryAssetId();
 		}
 
+		//bool bHasIntrinsic = UObjectProperty::StaticClass()->HasAnyClassFlags(CLASS_Intrinsic);
+
 		// Starting with parent, look up the hierarchy for a class that is either native, or a blueprint class immediately below PrimaryDataAsset
 		while (SearchPrimaryAssetTypeClass)
 		{

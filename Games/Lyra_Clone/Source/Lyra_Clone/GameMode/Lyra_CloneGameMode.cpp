@@ -8,6 +8,8 @@
 #include "../Player/LyraClonePlayerController.h"
 #include "Lyra_Clone_ExperienceManagerComponent.h"
 #include "../LryaCloneLogChannel.h"
+#include "../Character/Lyra_Clone_PawnData.h"
+#include "Lyra_CloneExperienceDefinition.h"
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Lyra_CloneGameMode)
 
 
@@ -53,6 +55,18 @@ void ALyra_CloneGameMode::HandleStartingNewPlayer_Implementation(APlayerControll
 	}
 }
 
+UClass* ALyra_CloneGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+	if (const ULyra_Clone_PawnData* PawnData = GetPawnDataForController(InController))
+	{
+		if (PawnData->PawnClass)
+		{
+			return PawnData->PawnClass;
+		}
+	}
+	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
 
 void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
 {
@@ -79,6 +93,18 @@ bool ALyra_CloneGameMode::IsExperienceLoaded() const
 }
 void ALyra_CloneGameMode::OnExperienceLoaded(const ULyra_CloneExperienceDefinition* CurrentExperience)
 {
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		APlayerController* PC = Cast<APlayerController>(*Iterator);
+
+		if (PC && PC->GetPawn() == nullptr)
+		{
+			if (PlayerCanRestart(PC))
+			{
+				RestartPlayer(PC);
+			}
+		}
+	}
 }
 
 void ALyra_CloneGameMode::OnMatchAssignmentGiven(FPrimaryAssetId ExperienceId)
@@ -88,5 +114,32 @@ void ALyra_CloneGameMode::OnMatchAssignmentGiven(FPrimaryAssetId ExperienceId)
 	ULyra_Clone_ExperienceManagerComponent* ExperienceComponent = GameState->FindComponentByClass<ULyra_Clone_ExperienceManagerComponent>();
 	check(ExperienceComponent);
 	ExperienceComponent->ServerSetCurrentExperience(ExperienceId);
-}						
-		
+}
+
+const ULyra_Clone_PawnData* ALyra_CloneGameMode::GetPawnDataForController(const AController* InController) const
+{
+	if (InController)
+	{
+		if (const ALyraClonePlayerState* LyraPs = InController->GetPlayerState<ALyraClonePlayerState>())
+		{	
+			if (const ULyra_Clone_PawnData* PawnData = LyraPs->GetPawnData<ULyra_Clone_PawnData>())
+				return PawnData;
+		}
+	}
+
+	check(GameState);
+	ULyra_Clone_ExperienceManagerComponent* ExperienceComponent = GameState->FindComponentByClass<ULyra_Clone_ExperienceManagerComponent>();
+	check(ExperienceComponent);
+
+	if (ExperienceComponent->IsExperienceLoaded())
+	{
+		const ULyra_CloneExperienceDefinition* Experience = ExperienceComponent->GetCurrentExperienceChecked();
+
+		if (Experience->DefaultPawnData != nullptr)
+		{
+			return Experience->DefaultPawnData;
+		}
+	}
+	return nullptr;
+}
+

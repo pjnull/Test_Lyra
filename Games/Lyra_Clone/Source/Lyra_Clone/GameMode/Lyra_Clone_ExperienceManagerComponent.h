@@ -42,4 +42,7 @@ public:
 	void OnExperienceLoadComplete();
 	void OnExperienceFullLoadCompleted();
 
+
+	const ULyra_CloneExperienceDefinition* GetCurrentExperienceChecked()const;
+
 };
