@@ -35,6 +35,8 @@ void ALyraClonePlayerState::SetPawnData(const ULyra_Clone_PawnData* InPawnData)
 
 }
 
+PRAGMA_DISABLE_OPTIMIZATION
+
 void ALyraClonePlayerState::PostInitializerComponent()
 {
 	Super::PostInitializeComponents();
@@ -48,4 +50,6 @@ void ALyraClonePlayerState::PostInitializerComponent()
 	ExperienceComponent->CallOrRegister_OnExperienceLoaded(FOnLyraClonExperienceLoaded::FDelegate::CreateUObject(this,&ThisClass::OnExperienceLoaded));
 	
 }
+
+PRAGMA_ENABLE_OPTIMIZATION
 

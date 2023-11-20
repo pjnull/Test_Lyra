@@ -10,10 +10,12 @@
 #include "../LryaCloneLogChannel.h"
 #include "../Character/Lyra_Clone_PawnData.h"
 #include "Lyra_CloneExperienceDefinition.h"
+#include "../Character/Lyra_Clone_PawnExtensionComponent.h"
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Lyra_CloneGameMode)
 
 
-
+PRAGMA_DISABLE_OPTIMIZATION
 ALyra_CloneGameMode::ALyra_CloneGameMode(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
 {
@@ -23,6 +25,9 @@ ALyra_CloneGameMode::ALyra_CloneGameMode(const FObjectInitializer& ObjectInitial
 	DefaultPawnClass = ALyra_Clone_Character::StaticClass();
 
 }
+PRAGMA_ENABLE_OPTIMIZATION
+
+
 
 void ALyra_CloneGameMode::InitGame(const FString& Mapname, const FString& option, FString& ErrorMessage)
 {
@@ -43,8 +48,27 @@ void ALyra_CloneGameMode::InitGameState()
 
 APawn* ALyra_CloneGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* Newplayer, const FTransform& SpawnTransform)
 {
-	UE_LOG(LogClone, Log, TEXT("spawnpawnImple called"));
-	return Super::SpawnDefaultPawnAtTransform_Implementation(Newplayer, SpawnTransform);
+	FActorSpawnParameters SpawnInfo;
+	SpawnInfo.Instigator = GetInstigator();
+	SpawnInfo.ObjectFlags |= RF_Transient;	// We never want to save default player pawns into a map
+	SpawnInfo.bDeferConstruction = true;
+	if (UClass* PawnClass = GetDefaultPawnClassForController(Newplayer))
+	{
+		if (APawn* SpawnedPawn = GetWorld()->SpawnActor<APawn>(PawnClass, SpawnTransform, SpawnInfo))
+		{
+			if (ULyra_Clone_PawnExtensionComponent* PawnExtcomp = ULyra_Clone_PawnExtensionComponent::FindPawnExtensionComponent(SpawnedPawn))
+			{
+				if (const ULyra_Clone_PawnData* PawnData = GetPawnDataForController(Newplayer))
+				{
+					PawnExtcomp->SetPawnData(PawnData);
+				}
+			}
+			SpawnedPawn->FinishSpawning(SpawnTransform);
+			return SpawnedPawn;
+		}
+	}
+	
+	return nullptr;
 }
 
 void ALyra_CloneGameMode::HandleStartingNewPlayer_Implementation(APlayerController* Newplayer)
