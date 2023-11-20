@@ -20,6 +20,8 @@ public:
 	virtual void GetCameraView(float DeltaTime, OUT FMinimalViewInfo& DesiredView)final;
 
 	void UpdateCameraModes();
+	AActor* GetTargetActor()const { return GetOwner(); }
+
 
 	UPROPERTY()
 	TObjectPtr<ULyraClone_CameraModeStack>CameraModeStack;

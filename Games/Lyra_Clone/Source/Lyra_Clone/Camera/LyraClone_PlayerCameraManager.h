@@ -4,7 +4,7 @@
 
 #define CLONE_CAMERA_DEFAULT_FOV (80.f)
 #define CLONE_CAMERA_DEFAULT_PITCH_MIN (-89.f)
-#define CLONE_CAMERA_DEFAULT_MAX (89.f)
+#define CLONE_CAMERA_DEFAULT_PITCH_MAX (89.f)
 
 UCLASS()
 class ALyraClone_PlayerCameraManager :public APlayerCameraManager

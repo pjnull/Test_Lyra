@@ -23,6 +23,8 @@ void ULyraClone_CameraComponent::GetCameraView(float DeltaTime,OUT FMinimalViewI
 
 	UpdateCameraModes();
 
+	FLyraClone_CameraModeView CameraModeView;
+	CameraModeStack->EvaluateStack(DeltaTime,CameraModeView);
 
 }
 
@@ -34,7 +36,7 @@ void ULyraClone_CameraComponent::UpdateCameraModes()
 	{
 		if (const TSubclassOf<ULyraClone_CameraMode>CameraMode = DetermineCameraModeDelegate.Execute())
 		{
-
+			CameraModeStack->PushCameraMode(CameraMode);
 		}
 	}
 }
