@@ -6,6 +6,14 @@
 #include "Lyra_Clone_PawnExtensionComponent.h"
 #include "../Camera/LyraClone_CameraComponent.h"
 #include "Lyra_Clone_PawnData.h"
+#include "../Input/LyraClone_MappableConfigPair.h"
+#include "../Player/LyraClonePlayerController.h"
+#include "../Input/LyraClone_InputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "PlayerMappableInputConfig.h"
+#include "InputActionValue.h"
+
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Lyra_Clone_HeroComponent)
 
 
@@ -118,7 +126,9 @@ bool ULyra_Clone_HeroComponent::CanChangeInitState(UGameFrameworkComponentManage
 	
 }
 
-void ULyra_Clone_HeroComponent::HandleChageInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState)
+
+
+void ULyra_Clone_HeroComponent::HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState)
 {
 	const FLyraClone_GameplayTag& InitTags = FLyraClone_GameplayTag::Get();
 
@@ -146,6 +156,13 @@ void ULyra_Clone_HeroComponent::HandleChageInitState(UGameFrameworkComponentMana
 			}
 		}
 
+		if (ALyraClonePlayerController* ClonePC = GetController<ALyraClonePlayerController>())
+		{
+			if (Pawn->InputComponent != nullptr)
+			{
+				InitializePlayerInput(Pawn->InputComponent);
+			}
+		}
 
 	}
 
@@ -168,5 +185,96 @@ TSubclassOf<ULyraClone_CameraMode> ULyra_Clone_HeroComponent::DetermineCameraMod
 		}
 	}
 	return nullptr;
+}
+
+void ULyra_Clone_HeroComponent::InitializePlayerInput(UInputComponent* PlayerInputComponent)
+{
+	check(PlayerInputComponent);
+
+	const APawn* pawn = GetPawn<APawn>();
+	if (!pawn)
+	{
+		return;
+	}
+
+	const APlayerController* PC = GetController<APlayerController>();
+	check(PC);
+
+	const ULocalPlayer* player = PC->GetLocalPlayer();
+	check(player);
+
+	UEnhancedInputLocalPlayerSubsystem* subsystem = player->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	check(subsystem);
+
+	subsystem->ClearAllMappings();
+
+	if (const ULyra_Clone_PawnExtensionComponent* PawnExtensioncomp = ULyra_Clone_PawnExtensionComponent::FindPawnExtensionComponent(pawn))
+	{
+		if (const ULyra_Clone_PawnData* PawnData = PawnExtensioncomp->GetPawnData<ULyra_Clone_PawnData>())
+		{
+			if (const ULyraClone_InputConfig* InputConfig = PawnData->InputConfig)
+			{
+				const FLyraClone_GameplayTag& GameplayTags = FLyraClone_GameplayTag::Get();
+				
+				for (const FLyraClone_MappableConfigPair& Pair : DefaultInputConfigs)
+				{
+					if (Pair.bShouldActivateAutomatically)
+					{
+						FModifyContextOptions options = {};
+						options.bIgnoreAllPressedKeysUntilRelease = false;
+						subsystem->AddPlayerMappableConfig(Pair.Config.LoadSynchronous(),options);
+					}
+				}
+
+				ULyraClone_InputComponent* CloneInputComp = CastChecked<ULyraClone_InputComponent>(PlayerInputComponent);
+				{
+					CloneInputComp->BindNativeAction(InputConfig,GameplayTags.InputTag_Move,ETriggerEvent::Triggered,this,&ThisClass::Input_Move,false);
+					CloneInputComp->BindNativeAction(InputConfig,GameplayTags.InputTag_Look_Mouse,ETriggerEvent::Triggered,this,&ThisClass::Input_Mouse,false);
+				}
+			}
+		}
+	}
+}
+
+void ULyra_Clone_HeroComponent::Input_Move(const FInputActionValue& InputActionValue)
+{
+	APawn* pawn = GetPawn<APawn>();
+	AController* Controller = pawn ? pawn->GetController() : nullptr;
+
+	if (Controller)
+	{
+		const FVector2D Value = InputActionValue.Get<FVector2D>();
+		const FRotator MovementRotation(0.f,Controller->GetControlRotation().Yaw,0.f);
+		
+		if (Value.X != 0.f)
+		{
+			const FVector MovementDir = MovementRotation.RotateVector(FVector::RightVector);
+			pawn->AddMovementInput(MovementDir, Value.X);
+
+		}
+		if (Value.Y != 0.f)
+		{
+			const FVector MovementDir = MovementRotation.RotateVector(FVector::ForwardVector);
+			pawn->AddMovementInput(MovementDir, Value.Y);
+		}
+	}
+}
+
+void ULyra_Clone_HeroComponent::Input_Mouse(const FInputActionValue& InputActionValue)
+{
+	APawn* pawn = GetPawn<APawn>();
+	if (!pawn)return;
+	
+	const FVector2D Value = InputActionValue.Get<FVector2D>();
+	if (Value.X != 0.f)
+	{
+		pawn->AddControllerYawInput(Value.X);
+	}
+
+	if (Value.Y != 0.f)
+	{
+		double AimInversionValue = -Value.Y;
+		pawn->AddControllerPitchInput(AimInversionValue);
+	}
 }
 

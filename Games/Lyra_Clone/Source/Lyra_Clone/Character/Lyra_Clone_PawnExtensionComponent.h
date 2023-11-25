@@ -29,7 +29,7 @@ public:
 	//PawnCOmponent를 상속받은 Component가 바인딩을 하기 위해서는 GameFeature의 이름이 있어야한다. 
 	virtual void OnRegister()final;
 	virtual void BeginPlay()override;
-	virtual void EndGame(const EEndPlayReason::Type EndPlayReason)final;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason)final;
 
 
 

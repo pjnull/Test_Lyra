@@ -51,6 +51,8 @@ void ULyra_Clone_PawnExtensionComponent::OnRegister()
 	RegisterInitStateFeature();
 	//UGameFrameworkComponentManager* Manager = UGameFrameworkComponentManager::GetForActor(GetOwningActor());
 }
+
+
 PRAGMA_ENABLE_OPTIMIZATION
 
 
@@ -68,7 +70,7 @@ void ULyra_Clone_PawnExtensionComponent::BeginPlay()
 	CheckDefaultInitialization();//강제 업데이트 진행
 }
 
-void ULyra_Clone_PawnExtensionComponent::EndGame(const EEndPlayReason::Type EndPlayReason)
+void ULyra_Clone_PawnExtensionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnregisterInitStateFeature();
 	Super::EndPlay(EndPlayReason);

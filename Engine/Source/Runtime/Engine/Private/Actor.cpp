@@ -4092,7 +4092,7 @@ EActorUpdateOverlapsMethod AActor::GetUpdateOverlapsMethodDuringLevelStreaming()
 	return UpdateOverlapsMethodDuringLevelStreaming;
 }
 
-void AActor::DispatchBeginPlay(bool bFromLevelStreaming)
+	void AActor::DispatchBeginPlay(bool bFromLevelStreaming)
 {
 	UWorld* World = (!HasActorBegunPlay() && IsValidChecked(this) ? GetWorld() : nullptr);
 

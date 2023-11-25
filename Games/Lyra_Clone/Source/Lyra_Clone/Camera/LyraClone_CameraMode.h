@@ -10,6 +10,7 @@ enum class ECloneCameraModeBlendFunction :uint8
 	Linear,
 	EaseIn,
 	EaseOut,
+	EaseInOut,
 	COUNT,
 };
 struct FLyraClone_CameraModeView
@@ -33,12 +34,13 @@ public:
 
 	
 	void UpdateCameraMode(float DeltaTime);
-	void UpdateView(float DeltaTime);
 	void UpdateBlend(float DeltaTime);
 	FVector GetPivotLocation()const;
 	FRotator GetPivotRotation()const;
 	AActor* GetTargetActor()const;
 	ULyraClone_CameraComponent* GetCloneCameraComponent()const;
+	
+	virtual void UpdateView(float DeltaTime);
 
 
 
@@ -79,7 +81,7 @@ public:
 	ULyraClone_CameraModeStack(const FObjectInitializer& ObejctInitializer = FObjectInitializer::Get());
 	
 	ULyraClone_CameraMode* GetCameraModeInstance(TSubclassOf<ULyraClone_CameraMode>& CameraModeClass);
-	void PushCameraMode(TSubclassOf<ULyraClone_CameraMode> CameraModeClass);
+	void PushCameraMode(TSubclassOf<ULyraClone_CameraMode>& CameraModeClass);
 	void UpdateStack(float DeltaTime);
 	void BlendStack(FLyraClone_CameraModeView& OutCameraModeView)const ;
 	void EvaluateStack(float DeltaTime, FLyraClone_CameraModeView& OutCameraModeView);

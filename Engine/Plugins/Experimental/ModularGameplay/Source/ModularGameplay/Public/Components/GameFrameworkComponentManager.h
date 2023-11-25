@@ -375,11 +375,17 @@ private:
 		FActorFeatureState(FName InFeatureName) : FeatureName(InFeatureName) {}
 
 		/** The feature this is tracking */
+		//해당 FeatureName은 앞서 우리가 보았던 PawnExtensionComponent나 HeroComponen와 같이
+		//FeatureName을 정의하여 할당하는 이름이다.
 		FName FeatureName;
 
+
+		//해당 Feature는 앞서 GameFrameworkComponentManager에 할당된 InitState중,
+		//현재 진행된 InitState상태를 캐싱
 		/** The state when it was last registered */
 		FGameplayTag CurrentState;
 
+		//여기에 Actor에 할당된 Feature 단위 Component가 할당된다. 
 		/** The object implementing this feature, this can be null */
 		TWeakObjectPtr<UObject> Implementer;
 	};
@@ -405,7 +411,7 @@ private:
 
 		/** If this is not null, will only activate for specific feature names */
 		FName RequiredFeatureName;
-
+		
 		/** If this is not null, will only activate for states >= to this */
 		FGameplayTag RequiredInitState;
 	};

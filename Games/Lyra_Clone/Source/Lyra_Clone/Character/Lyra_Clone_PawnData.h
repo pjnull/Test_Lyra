@@ -5,6 +5,7 @@
 
 
 class ULyraClone_CameraMode;
+class ULyraClone_InputConfig;
 
 
 UCLASS()
@@ -21,4 +22,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Clone|Camera")
 	TSubclassOf<ULyraClone_CameraMode>DefaultCameraMode;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Clone|Camera")
+	TObjectPtr<ULyraClone_InputConfig>InputConfig;
 };

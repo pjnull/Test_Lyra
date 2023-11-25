@@ -7,7 +7,7 @@
 #include "GameFrameworkInitStateInterface.generated.h"
 
 class FActorInitStateChangedBPDelegate;
-struct FActorInitStateChangedParams;
+struct FActorInitStateChangedParams;	
 
 class UGameFrameworkComponentManager;
 

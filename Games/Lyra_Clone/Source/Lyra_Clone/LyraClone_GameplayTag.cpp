@@ -25,4 +25,14 @@ void FLyraClone_GameplayTag::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(InitState_DataAvailable,"InitState.DataAvailable","2:all required");
 	AddTag(InitState_DataInitialized,"InitState.DataInitialized","3:The available data");
 	AddTag(InitState_GameplayReady,"InitState.GameplayReady","4:The actor/component");
+	///InitState
+
+	AddTag(InputTag_Move,"InputTag.Move","");
+	AddTag(InputTag_Look_Mouse,"InputTag.Look.Mouse","");
+
+
+
+	//INPUT
+
+
 }
