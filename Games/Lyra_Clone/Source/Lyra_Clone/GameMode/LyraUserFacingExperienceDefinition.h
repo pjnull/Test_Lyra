@@ -6,15 +6,21 @@
 #include "Engine/DataAsset.h"
 #include "LyraUserFacingExperienceDefinition.generated.h"
 
+class UCommonSession_HostSessionRequest;
+
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class LYRA_CLONE_API ULyraUserFacingExperienceDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 
 public:
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure = false)
+	UCommonSession_HostSessionRequest* CreateHostingRequest()const;
+	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Experience, meta = (AllowTypes = "Map"))
 	FPrimaryAssetId MapID;
 
