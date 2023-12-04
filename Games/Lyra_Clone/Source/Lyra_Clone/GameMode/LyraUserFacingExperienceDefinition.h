@@ -27,6 +27,4 @@ public:
 	UPROPERTY(BlueprintReadWrite,EditAnywhere,Category=Experience,meta=(AllowTypes="Lyra_CloneExperienceDefinition"))
 	FPrimaryAssetId ExperienceID;
 
-
-	
 };

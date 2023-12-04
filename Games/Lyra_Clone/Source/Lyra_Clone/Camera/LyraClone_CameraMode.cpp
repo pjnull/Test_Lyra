@@ -52,6 +52,36 @@ ULyraClone_CameraMode::ULyraClone_CameraMode(const FObjectInitializer& ObejctIni
 
 }
 
+void ULyraClone_CameraMode::SetBlendWeight(float Weight)
+{
+	BlendWeight = FMath::Clamp(Weight, 0.0f, 1.0f);
+
+	// Since we're setting the	 weight directly, we need to calculate the blend alpha to account for the blend function.
+	const float InvExponent = (BlendExponent > 0.0f) ? (1.0f / BlendExponent) : 1.0f;
+
+	switch (BlendFunction)
+	{
+	case ECloneCameraModeBlendFunction::Linear:
+		BlendAlpha = BlendWeight;
+		break;
+
+	case ECloneCameraModeBlendFunction::EaseIn:
+		BlendAlpha = FMath::InterpEaseIn(0.0f, 1.0f, BlendWeight, InvExponent);
+		break;
+
+	case ECloneCameraModeBlendFunction::EaseOut:
+		BlendAlpha = FMath::InterpEaseOut(0.0f, 1.0f, BlendWeight, InvExponent);
+		break;
+
+	case ECloneCameraModeBlendFunction::EaseInOut:
+		BlendAlpha = FMath::InterpEaseInOut(0.0f, 1.0f, BlendWeight, InvExponent);
+		break;
+
+	default:
+		checkf(false, TEXT("SetBlendWeight: Invalid BlendFunction [%d]\n"), (uint8)BlendFunction);
+		break;
+	}
+}
 void ULyraClone_CameraMode::UpdateCameraMode(float DeltaTime)
 {
 	UpdateView(DeltaTime);//Actor를 활용하여 Pivot을 계산하여 View를 업데이트
@@ -227,10 +257,17 @@ void ULyraClone_CameraModeStack::PushCameraMode(TSubclassOf<ULyraClone_CameraMod
 
 	const bool bShouldBlend = ((CameraMode->BlendTime>0.0f)&&(StackSize>0));
 	const float BlendWeight = ((bShouldBlend?ExistingStackContribution:1.0f));
-	CameraMode->BlendWeight = BlendWeight;
+	
+	CameraMode->SetBlendWeight(BlendWeight);
 
-	CameraModeStack.Insert(CameraMode,0);
-	CameraModeStack.Last()->BlendWeight = 1.0f;
+	CameraModeStack.Insert(CameraMode, 0);
+
+	CameraModeStack.Last()->SetBlendWeight(1.0f);
+
+	if (ExistingStackIndex == INDEX_NONE)
+	{
+		//CameraMode->OnActivation();
+	}
 }
 
 void ULyraClone_CameraModeStack::UpdateStack(float DeltaTime)

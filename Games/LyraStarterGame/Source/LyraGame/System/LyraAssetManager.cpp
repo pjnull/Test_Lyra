@@ -22,9 +22,7 @@ const FName FLyraBundles::Equipped("Equipped");
 static FAutoConsoleCommand CVarDumpLoadedAssets(
 	TEXT("Lyra.DumpLoadedAssets"),
 	TEXT("Shows all assets that were loaded via the asset manager and are currently in memory."),
-	FConsoleCommandDelegate::
-	
-	Static(ULyraAssetManager::DumpLoadedAssets)
+	FConsoleCommandDelegate::CreateStatic(ULyraAssetManager::DumpLoadedAssets)
 );
 
 //////////////////////////////////////////////////////////////////////

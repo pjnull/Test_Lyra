@@ -32,7 +32,7 @@ class ULyraClone_CameraMode :public UObject
 public:
 	ULyraClone_CameraMode(const FObjectInitializer& ObejctInitializer = FObjectInitializer::Get());
 
-	
+	void SetBlendWeight(float Weight);
 	void UpdateCameraMode(float DeltaTime);
 	void UpdateBlend(float DeltaTime);
 	FVector GetPivotLocation()const;

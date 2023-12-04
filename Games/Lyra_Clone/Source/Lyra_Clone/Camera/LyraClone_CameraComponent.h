@@ -22,7 +22,6 @@ public:
 	void UpdateCameraModes();
 	AActor* GetTargetActor()const { return GetOwner(); }
 
-
 	UPROPERTY()
 	TObjectPtr<ULyraClone_CameraModeStack>CameraModeStack;
 

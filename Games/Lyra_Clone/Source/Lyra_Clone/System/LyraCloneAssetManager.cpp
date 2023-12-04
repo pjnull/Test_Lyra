@@ -12,13 +12,13 @@ ULyraCloneAssetManager& ULyraCloneAssetManager::Get()
 {
 	check(GEngine)
 	
-	if(ULyraCloneAssetManager* singleton=Cast< ULyraCloneAssetManager>(GEngine->AssetManager))
+	if(ULyraCloneAssetManager* singleton=Cast<ULyraCloneAssetManager>(GEngine->AssetManager))
 	{
 		return *singleton;
 	}
 	UE_LOG(LogClone, Fatal, TEXT("singleton Faild"));
 
-	return *NewObject< ULyraCloneAssetManager>();
+	return *NewObject<ULyraCloneAssetManager>();
 }
 
 

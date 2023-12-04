@@ -3,6 +3,7 @@
 
 #include "LyraUserFacingExperienceDefinition.h"
 #include "CommonSessionSubSystem.h"
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraUserFacingExperienceDefinition)
 
 UCommonSession_HostSessionRequest* ULyraUserFacingExperienceDefinition::CreateHostingRequest()const

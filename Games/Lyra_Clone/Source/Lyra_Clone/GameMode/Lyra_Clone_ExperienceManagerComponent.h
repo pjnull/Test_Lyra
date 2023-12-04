@@ -4,10 +4,14 @@
 #include "Lyra_Clone_ExperienceManagerComponent.generated.h"
 
 
+namespace UE::GameFeatures { struct FResult; }
+
 enum class ELyraCloneExperienceLoadState
 {
 	Unloaded,
 	Loading,
+	LoadingGameFeature,
+	ExecutingActions,
 	Loaded,
 	Deactivating,
 
@@ -41,8 +45,12 @@ public:
 
 	void OnExperienceLoadComplete();
 	void OnExperienceFullLoadCompleted();
+	void OnGameFeaturePluginLoadComplete(const UE::GameFeatures::FResult& result);
 
 
 	const ULyra_CloneExperienceDefinition* GetCurrentExperienceChecked()const;
 
+
+	int32 NumGameFeaturePluginsLoading = 0;
+	TArray<FString>GameFeaturePluginURLs;
 };

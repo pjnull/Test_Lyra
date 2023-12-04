@@ -18,6 +18,8 @@
 
 
 const FName ULyra_Clone_HeroComponent::NAME_ActorFeatureName("Hero");
+const FName ULyra_Clone_HeroComponent::NAME_BindInputNow("BindInputNow");
+
 
 ULyra_Clone_HeroComponent::ULyra_Clone_HeroComponent(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
@@ -165,7 +167,7 @@ void ULyra_Clone_HeroComponent::HandleChangeInitState(UGameFrameworkComponentMan
 		}
 
 	}
-
+	
 }
 
 TSubclassOf<ULyraClone_CameraMode> ULyra_Clone_HeroComponent::DetermineCameraMode() const
@@ -230,10 +232,12 @@ void ULyra_Clone_HeroComponent::InitializePlayerInput(UInputComponent* PlayerInp
 				{
 					CloneInputComp->BindNativeAction(InputConfig,GameplayTags.InputTag_Move,ETriggerEvent::Triggered,this,&ThisClass::Input_Move,false);
 					CloneInputComp->BindNativeAction(InputConfig,GameplayTags.InputTag_Look_Mouse,ETriggerEvent::Triggered,this,&ThisClass::Input_Mouse,false);
+					
 				}
 			}
 		}
 	}
+	UGameFrameworkComponentManager::SendGameFrameworkComponentExtensionEvent(const_cast<APawn*>(pawn), NAME_BindInputNow);
 }
 
 void ULyra_Clone_HeroComponent::Input_Move(const FInputActionValue& InputActionValue)

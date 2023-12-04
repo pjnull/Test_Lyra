@@ -11,6 +11,8 @@
 #include "../Character/Lyra_Clone_PawnData.h"
 #include "Lyra_CloneExperienceDefinition.h"
 #include "../Character/Lyra_Clone_PawnExtensionComponent.h"
+#include <Kismet/GameplayStatics.h>
+#include "Engine/DataAsset.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(Lyra_CloneGameMode)
 
@@ -95,9 +97,18 @@ UClass* ALyra_CloneGameMode::GetDefaultPawnClassForController_Implementation(ACo
 void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
 {
 	FPrimaryAssetId ExperienceId;
+	FString ExperienceIdSource;
 
 	UWorld* World = GetWorld();
 
+
+		if (!ExperienceId.IsValid() && UGameplayStatics::HasOption(OptionsString, TEXT("Experience")))
+		{
+			const FString ExperienceFromOptions = UGameplayStatics::ParseOption(OptionsString,TEXT("Experience"));
+			ExperienceId = FPrimaryAssetId(FPrimaryAssetType(ULyra_CloneExperienceDefinition::StaticClass()->GetFName()), FName(*ExperienceFromOptions));
+			ExperienceIdSource = TEXT("OptionsString");
+		}
+	
 	if (!ExperienceId.IsValid())
 	{
 		ExperienceId = FPrimaryAssetId(FPrimaryAssetType("Lyra_CloneExperienceDefinition"),FName("BP_DefaultExperienceDefinition"));

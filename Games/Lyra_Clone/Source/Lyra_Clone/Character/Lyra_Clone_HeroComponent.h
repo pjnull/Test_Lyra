@@ -30,7 +30,7 @@ public:
 
 
 	virtual FName GetFeatureName()const final { return NAME_ActorFeatureName; }
-	static const FName NAME_ActorFeatureName;
+	
 
 	TSubclassOf<ULyraClone_CameraMode>DetermineCameraMode()const;
 	void InitializePlayerInput(UInputComponent* PlayerInputComponent);
@@ -40,4 +40,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TArray<FLyraClone_MappableConfigPair>DefaultInputConfigs;
+	
+	static const FName NAME_ActorFeatureName;
+	static const FName NAME_BindInputNow;
+
+
 };
