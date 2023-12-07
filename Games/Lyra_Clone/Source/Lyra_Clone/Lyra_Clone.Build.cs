@@ -18,7 +18,8 @@ public class Lyra_Clone : ModuleRules
 			"ModularGameplay",
 			"GameFeatures",
 			"EnhancedInput",
-			"CommonUser"
+			"CommonUser",
+			"ModularGameplayActors",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });

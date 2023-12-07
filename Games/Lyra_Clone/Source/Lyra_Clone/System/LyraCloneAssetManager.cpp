@@ -16,7 +16,7 @@ ULyraCloneAssetManager& ULyraCloneAssetManager::Get()
 	{
 		return *singleton;
 	}
-	UE_LOG(LogClone, Fatal, TEXT("singleton Faild"));
+	//UE_LOG(CloneLog, Fatal, TEXT("singleton Faild"));
 
 	return *NewObject<ULyraCloneAssetManager>();
 }
@@ -72,7 +72,7 @@ void ULyraCloneAssetManager::StartInitialLoading()
 {
 	Super::StartInitialLoading();
 
-	UE_LOG(LogClone,Display,TEXT("StartInitialLoading"));
+	//UE_LOG(CloneLog,Display,TEXT("StartInitialLoading"));
 
 	FLyraClone_GameplayTag::InitializeNativeTags();
 }
