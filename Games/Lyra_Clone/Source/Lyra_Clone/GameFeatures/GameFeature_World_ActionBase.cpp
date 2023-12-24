@@ -2,6 +2,7 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameFeature_World_ActionBase)
 
 
+PRAGMA_DISABLE_OPTIMIZATION
 void UGameFeature_World_ActionBase::OnGameFeatureActivating(FGameFeatureActivatingContext& Context)
 {
 	for (const FWorldContext& WorldContext : GEngine->GetWorldContexts())
@@ -15,3 +16,4 @@ void UGameFeature_World_ActionBase::OnGameFeatureActivating(FGameFeatureActivati
 		}
 	}
 }
+PRAGMA_ENABLE_OPTIMIZATION

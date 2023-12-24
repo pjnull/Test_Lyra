@@ -147,12 +147,14 @@ void ULyra_Clone_ExperienceManagerComponent::OnExperienceFullLoadCompleted()
 {
 	check(LoadState!=ELyraCloneExperienceLoadState::Loaded);
 	
-	{
+	{//GameFeature Plugin의 로딩과 활성화 이후, GameFeature Action들을 활성화시켜야함.
 		LoadState = ELyraCloneExperienceLoadState::ExecutingActions;
 
 		FGameFeatureActivatingContext Context;
+		//GameFeatureAction 활성화를 위한 Context 준비
 		{
 			const FWorldContext* ExistWorldContext = GEngine->GetWorldContextFromWorld(GetWorld());
+			//월드의 핸들을 세팅한다.
 			if (ExistWorldContext)
 			{
 				Context.SetRequiredWorldContextHandle(ExistWorldContext->ContextHandle);
@@ -163,6 +165,7 @@ void ULyra_Clone_ExperienceManagerComponent::OnExperienceFullLoadCompleted()
 				for (UGameFeatureAction* Action : ActionList)
 				{
 					if (Action)
+					//명시적으로 GameFeatureAction에 대해 Registering->Loading->Activating순으로 호출
 					{
 						Action->OnGameFeatureRegistering();
 						Action->OnGameFeatureLoading();
@@ -171,8 +174,10 @@ void ULyra_Clone_ExperienceManagerComponent::OnExperienceFullLoadCompleted()
 				}
 			};
 		ActivateListOfActions(CurrentExperience->Actions);
+		//Experience의 Action
 		
 		for (const TObjectPtr< ULyraClone_ExperienceActionSet>& ActionSet : CurrentExperience->ActionsSets)
+		//Experience의 ActionSet
 		{
 			ActivateListOfActions(ActionSet->Actions);
 		}

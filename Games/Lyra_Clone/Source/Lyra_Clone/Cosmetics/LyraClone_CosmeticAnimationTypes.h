@@ -26,6 +26,9 @@ struct FLyraClone_AnimLayerSelectionSet
 {
 	GENERATED_BODY()
 
+	TSubclassOf<UAnimInstance>SelectBestLayer(const FGameplayTagContainer& Cosmetics)const;
+
+
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	TArray<FLyraClone_AnimLayerSelectionEntry>LayerRules;
 

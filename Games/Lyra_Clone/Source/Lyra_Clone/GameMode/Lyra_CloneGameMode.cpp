@@ -102,12 +102,12 @@ void ALyra_CloneGameMode::HandleMatchAssignmentIfNotExpectingOne()
 	UWorld* World = GetWorld();
 
 
-		if (!ExperienceId.IsValid() && UGameplayStatics::HasOption(OptionsString, TEXT("Experience")))
-		{
-			const FString ExperienceFromOptions = UGameplayStatics::ParseOption(OptionsString,TEXT("Experience"));
-			ExperienceId = FPrimaryAssetId(FPrimaryAssetType(ULyra_CloneExperienceDefinition::StaticClass()->GetFName()), FName(*ExperienceFromOptions));
-			ExperienceIdSource = TEXT("OptionsString");
-		}
+	if (!ExperienceId.IsValid() && UGameplayStatics::HasOption(OptionsString, TEXT("Experience")))
+	{
+		const FString ExperienceFromOptions = UGameplayStatics::ParseOption(OptionsString,TEXT("Experience"));
+		ExperienceId = FPrimaryAssetId(FPrimaryAssetType(ULyra_CloneExperienceDefinition::StaticClass()->GetFName()), FName(*ExperienceFromOptions));
+		ExperienceIdSource = TEXT("OptionsString");
+	}
 	
 	if (!ExperienceId.IsValid())
 	{

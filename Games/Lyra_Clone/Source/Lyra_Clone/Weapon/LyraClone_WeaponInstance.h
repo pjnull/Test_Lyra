@@ -10,6 +10,11 @@ class ULyraClone_WeaponInstance:public ULyraClone_EquipmentInstance
 public:
    ULyraClone_WeaponInstance(const FObjectInitializer&ObejctInitializer=FObjectInitializer::Get());
 	
+
+   UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = Animation)
+   TSubclassOf<UAnimInstance>PickBestAnimLayer(bool bEquipped,const FGameplayTagContainer& CosmeticsTags)const;
+
+
    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category=Animation)
    FLyraClone_AnimLayerSelectionSet EquippedAnimSet;
 

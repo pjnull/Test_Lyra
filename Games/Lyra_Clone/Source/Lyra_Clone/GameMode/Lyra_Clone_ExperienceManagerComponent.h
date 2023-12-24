@@ -19,17 +19,17 @@ enum class ELyraCloneExperienceLoadState
 
 class ULyra_CloneExperienceDefinition;
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnLyraClonExperienceLoaded,const class ULyra_CloneExperienceDefinition*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnLyraClonExperienceLoaded,const ULyra_CloneExperienceDefinition*);
 
 //
 UCLASS()
-class ULyra_Clone_ExperienceManagerComponent :public UGameStateComponent
+class ULyra_Clone_ExperienceManagerComponent final :public UGameStateComponent
 {
 	GENERATED_BODY()
 public:
 	ULyra_Clone_ExperienceManagerComponent(const FObjectInitializer& ObjectInitializer=FObjectInitializer::Get());
 	
-	void CallOrRegister_OnExperienceLoaded(FOnLyraClonExperienceLoaded::FDelegate&& Delegate);
+	void CallOrRegister_OnExperienceLoaded(FOnLyraClonExperienceLoaded::FDelegate&&Delegate);
 
 	UPROPERTY()
 	TObjectPtr<const ULyra_CloneExperienceDefinition> CurrentExperience;

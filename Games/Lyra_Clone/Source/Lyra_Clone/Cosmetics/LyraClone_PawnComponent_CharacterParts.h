@@ -5,7 +5,6 @@
 #include "Components/PawnComponent.h"
 #include "LyraClone_PawnComponent_CharacterParts.generated.h"
 
-
 USTRUCT()
 struct FLyraClone_AppliedCharacterPartEntry
 {
@@ -41,9 +40,12 @@ struct FLyraClone_CharacterPartList
    void DestroyActorForEntry(FLyraClone_AppliedCharacterPartEntry& Entry);
 
 
+   FGameplayTagContainer CollectCombinedTags()const;
    FLyraClone_CharacterPartHandle AddEntry(FLyraClone_CharacterPart NewPart);
    void RemoveEntry(FLyraClone_CharacterPartHandle Handle);
-   FGameplayTagContainer CollectCombinedTags()const;
+  
+   
+   
 
    UPROPERTY()
    TArray<FLyraClone_AppliedCharacterPartEntry>Entries;
@@ -73,8 +75,11 @@ public:
    
    FLyraClone_CharacterPartHandle AddCharacterPart(const FLyraClone_CharacterPart& NewPart);
    void RemoveCharacterParts(FLyraClone_CharacterPartHandle Handle);
-   FGameplayTagContainer GetCombinedTags(FGameplayTag RequiredPrefix)const;
 
+  
+   
+   UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = Cosmetics)
+   FGameplayTagContainer GetCombinedTags(FGameplayTag RequiredPrefix)const;
 
    UPROPERTY()
 	FLyraClone_CharacterPartList CharacterPartList;

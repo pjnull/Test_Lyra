@@ -2,7 +2,7 @@
 #include "LyraClone_PawnComponent_CharacterParts.h"
 #include "GameFramework/Character.h"
 #include "GameplayTagAssetInterface.h"
-#include "Components/SceneComponent.h"
+#include "Components/SceneComponent.h" 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraClone_PawnComponent_CharacterParts)
 
 ULyraClone_PawnComponent_CharacterParts::ULyraClone_PawnComponent_CharacterParts(const FObjectInitializer& ObejctInitializer)

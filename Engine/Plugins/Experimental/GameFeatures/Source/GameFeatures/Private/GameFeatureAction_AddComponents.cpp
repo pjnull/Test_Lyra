@@ -14,7 +14,7 @@
 #define LOCTEXT_NAMESPACE "GameFeatures"
 
 //////////////////////////////////////////////////////////////////////
-// UGameFeatureAction_AddComponents
+// UGameFeatureAction_AddCponents
 
 void UGameFeatureAction_AddComponents::OnGameFeatureActivating(FGameFeatureActivatingContext& Context)
 {
