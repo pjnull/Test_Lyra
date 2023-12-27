@@ -54,7 +54,7 @@ struct FLyraClone_AnimBodyStyleSelectionEntry
 
 USTRUCT(BlueprintType)
 struct FLyraClone_AnimBodyStyleSelectionSet
-{
+{//AnimLayer와 Mesh를 연결하는 다리 역할을 하게된다. 이를 위해 SkeletalMesh의 정보를 들고 있다.
 	GENERATED_BODY()
 
 	USkeletalMesh* SelectBestBodyStyle(const FGameplayTagContainer& CosmeticTags)const;

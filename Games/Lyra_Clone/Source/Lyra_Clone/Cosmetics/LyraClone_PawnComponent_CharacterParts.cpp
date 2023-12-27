@@ -39,10 +39,10 @@ USceneComponent* ULyraClone_PawnComponent_CharacterParts::GetSceneComponentToAtt
 	return nullptr;
 }
 
+
 void ULyraClone_PawnComponent_CharacterParts::BroadcastChanged()
 {
 	const bool bReinitPose = true;
-
 	if (USkeletalMeshComponent* MeshComponent = GetParentMeshComponent())
 	{//현재 Owner의 SkeletalmeshComponent가 존재하는가?
 		const FGameplayTagContainer MergedTags = GetCombinedTags(FGameplayTag());
@@ -60,10 +60,14 @@ void ULyraClone_PawnComponent_CharacterParts::BroadcastChanged()
 	}
 }
 
+
 FLyraClone_CharacterPartHandle ULyraClone_PawnComponent_CharacterParts::AddCharacterPart(const FLyraClone_CharacterPart& NewPart)
 {
+
+	
 	return CharacterPartList.AddEntry(NewPart);
 }
+
 
 void ULyraClone_PawnComponent_CharacterParts::RemoveCharacterParts(FLyraClone_CharacterPartHandle Handle)
 {
